@@ -24,10 +24,10 @@ void DeviceManager::initDeviceManager(const CreateCallback &createCallback, cons
 
 void DeviceManager::cleanUpDeviceManager()
 {
-    if (logicalDevice != VK_NULL_HANDLE)
+    /*if (logicalDevice != VK_NULL_HANDLE)
     {
         vkDeviceWaitIdle(logicalDevice);
-    }
+    }*/
 
     cleanUpQueueUtils(graphicsQueues);
     cleanUpQueueUtils(computeQueues);
@@ -39,7 +39,7 @@ void DeviceManager::cleanUpDeviceManager()
         logicalDevice = VK_NULL_HANDLE;
     }
 
-    physicalDevice = VK_NULL_HANDLE;
+    //physicalDevice = VK_NULL_HANDLE;
 }
 
 void DeviceManager::cleanUpQueueUtils(std::vector<QueueUtils> &queues)

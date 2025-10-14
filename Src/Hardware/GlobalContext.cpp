@@ -73,7 +73,7 @@ HardwareContext::~HardwareContext()
          };
      }
     
-    vkDestroyInstance(vkInstance, nullptr);
+    //vkDestroyInstance(vkInstance, nullptr);
 }
 
 
