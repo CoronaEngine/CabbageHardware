@@ -290,7 +290,9 @@ void DisplayManager::createSwapChain()
 	}
 }
 
-
+void DisplayManager::recreateSwapChain()
+{
+}
 
 bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayImage)
 {
@@ -514,7 +516,11 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
              queue->queueMutex->unlock();
 
-             if (result != VK_SUCCESS)
+             if (result == VK_ERROR_OUT_OF_DATE_KHR)
+             {
+                 recreateSwapChain();
+             }
+             else if (result != VK_SUCCESS)
              {
                  throw std::runtime_error("failed to vkQueuePresentKHR for a frame!");
              }

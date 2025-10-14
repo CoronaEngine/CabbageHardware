@@ -2,7 +2,6 @@
 #include <fstream>
 #include <regex>
 #include <sstream>
-
 #include <ktm/ktm.h>
 
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -11,7 +10,6 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
-
 
 #include "CabbageDisplayer.h"
 #include "Pipeline/ComputePipeline.h"
@@ -509,6 +507,8 @@ int main()
                     frameCount = 0;
                 }
             }
+
+            vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
         };
 
         for (size_t i = 0; i < windows.size(); i++)

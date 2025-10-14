@@ -27,6 +27,29 @@ void ResourceManager::initResourceManager(DeviceManager &device)
 
 void ResourceManager::cleanUpResourceManager()
 {
+    for (int i = 0; i < 4; i++)
+    {
+        if (bindlessDescriptors[i].descriptorPool != VK_NULL_HANDLE)
+        {
+            vkDestroyDescriptorPool(device->logicalDevice, bindlessDescriptors[i].descriptorPool, nullptr);
+            bindlessDescriptors[i].descriptorPool = VK_NULL_HANDLE;
+        }
+        if (bindlessDescriptors[i].descriptorSetLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyDescriptorSetLayout(device->logicalDevice, bindlessDescriptors[i].descriptorSetLayout, nullptr);
+            bindlessDescriptors[i].descriptorSetLayout = VK_NULL_HANDLE;
+        }
+        bindlessDescriptors[i].descriptorSet = VK_NULL_HANDLE;
+    }
+
+    vkDestroySampler(device->logicalDevice, textureSampler, nullptr);
+    textureSampler = VK_NULL_HANDLE;
+
+    if (g_hAllocator != VK_NULL_HANDLE)
+    {
+        vmaDestroyAllocator(g_hAllocator);
+        g_hAllocator = VK_NULL_HANDLE;
+    }
 }
 
 void ResourceManager::CreateVmaAllocator()
@@ -176,6 +199,7 @@ void ResourceManager::destroyBuffer(BufferHardwareWrap &buffer)
         vmaDestroyBuffer(g_hAllocator, buffer.bufferHandle, buffer.bufferAlloc);
     }
 }
+
 ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage)
 {
     BufferHardwareWrap resultBuffer;

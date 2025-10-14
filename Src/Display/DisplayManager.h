@@ -59,6 +59,7 @@ private:
 
 	void createSwapChain();
 
+    void recreateSwapChain();
 
 	uint32_t currentFrame = 0;
 
