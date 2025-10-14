@@ -507,8 +507,6 @@ int main()
                     frameCount = 0;
                 }
             }
-
-            vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
         };
 
         for (size_t i = 0; i < windows.size(); i++)
