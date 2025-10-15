@@ -959,7 +959,6 @@ ResourceManager::ExternalMemoryHandle ResourceManager::exportBufferMemory(Buffer
 {
     ExternalMemoryHandle memHandle{};
     
-    // 验证源图像的有效性
     if (sourceBuffer.bufferHandle == VK_NULL_HANDLE || sourceBuffer.bufferAlloc == VK_NULL_HANDLE)
     {
         throw std::runtime_error("Cannot export memory from invalid buffer!");
