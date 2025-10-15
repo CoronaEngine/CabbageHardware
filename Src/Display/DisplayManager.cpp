@@ -357,20 +357,19 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
 		if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
         {
-                // 在主设备上：源图像 -> srcStaging
-                globalHardwareContext.mainDevice->resourceManager.copyImageToBuffer(
-                    sourceImage.imageHandle,
-                    srcStaging.bufferHandle,
-                    sourceImage.imageSize.x,
-                    sourceImage.imageSize.y);
+            // 在主设备上：源图像 -> srcStaging
+            globalHardwareContext.mainDevice->resourceManager.copyImageToBuffer(
+                sourceImage.imageHandle,
+                srcStaging.bufferHandle,
+                sourceImage.imageSize.x,
+                sourceImage.imageSize.y);
 
-                // 在显示设备上：dstStaging -> 目标图像
-                displayDevice->resourceManager.copyBufferToImage(
-                    dstStaging.bufferHandle,
-                    this->displayImage.imageHandle,
-                    this->displayImage.imageSize.x,
-                    this->displayImage.imageSize.y);
-            }
+            // 在显示设备上：dstStaging -> 目标图像
+            displayDevice->resourceManager.copyBufferToImage(
+                dstStaging.bufferHandle,
+                this->displayImage.imageHandle,
+                this->displayImage.imageSize.x,
+                this->displayImage.imageSize.y);
 
             auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
 
