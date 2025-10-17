@@ -257,7 +257,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
         VmaAllocationCreateInfo vbAllocCreateInfo = {};
         vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
         vbAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-        vbAllocCreateInfo.pool = pools.front(); // It is enough to set this one member.
+        vbAllocCreateInfo.pool = g_hPool; // It is enough to set this one member.
 #else
         VmaAllocationCreateInfo vbAllocCreateInfo = {};
         vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
@@ -343,14 +343,12 @@ void ResourceManager::createExternalMemoryPool()
     poolInfo.maxBlockCount = 0; // 无限制
 
     // 创建内存池
-    VmaPool pool;
-    res = vmaCreatePool(g_hAllocator, &poolInfo, &pool);
+    res = vmaCreatePool(g_hAllocator, &poolInfo, &g_hPool);
     if (res != VK_SUCCESS)
     {
         throw std::runtime_error("vmaCreatePool failed!");
     }
 
-    pools.push_back(pool);
 }
 
 void ResourceManager::destroyImage(ImageHardwareWrap &image)
