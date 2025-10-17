@@ -66,11 +66,11 @@ void ResourceManager::CreateVmaAllocator()
     //     externalMemoryHandleTypes.push_back(VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT);
     // #endif
     // allocatorInfo.pTypeExternalMemoryHandleTypes = externalMemoryHandleTypes.data();
-#if _WIN32 || _WIN64
-    const VkExternalMemoryHandleTypeFlags externalMemoryHandleTypes[] = {
-        VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT};
-    allocatorInfo.pTypeExternalMemoryHandleTypes = externalMemoryHandleTypes;
-#endif
+//#if _WIN32 || _WIN64
+//    const VkExternalMemoryHandleTypeFlags externalMemoryHandleTypes[] = {
+//        VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT};
+//    allocatorInfo.pTypeExternalMemoryHandleTypes = externalMemoryHandleTypes;
+//#endif
     //bool g_EnableValidationLayer = true;
     //bool VK_KHR_get_memory_requirements2_enabled = false;
     //bool VK_KHR_get_physical_device_properties2_enabled = false;
