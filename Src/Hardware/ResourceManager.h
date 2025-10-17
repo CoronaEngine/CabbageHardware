@@ -126,12 +126,13 @@ private:
 	void createTextureSampler();
 	void CreateVmaAllocator();
 	void createBindlessDescriptorSet();
+    void createExternalMemoryPool();
 
 	VmaAllocator g_hAllocator;
 
+	VmaPool g_hPool;
 
 	VkSampler textureSampler;
-
 
 	const uint32_t UniformBinding = 0;
 	const uint32_t TextureBinding = 1;
