@@ -171,7 +171,7 @@ struct HardwareExecutor
         return *this;
     }
 
-    HardwareExecutor &operator()(ExecutorType type);
+    HardwareExecutor &operator()(ExecutorType type, HardwareExecutor *waitExecutor = nullptr);
 
     HardwareExecutor &commit();
 

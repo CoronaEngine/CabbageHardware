@@ -4,7 +4,7 @@
 
 
 
-HardwareExecutor& HardwareExecutor::operator()(ExecutorType type)
+HardwareExecutor &HardwareExecutor::operator()(ExecutorType type, HardwareExecutor *waitExecutor)
 {
     switch (type)
     {
