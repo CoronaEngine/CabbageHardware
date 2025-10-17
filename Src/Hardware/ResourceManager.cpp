@@ -7,6 +7,8 @@
 
 #include <Hardware/GlobalContext.h>
 
+#define USE_VMA_POOL
+
 ResourceManager::ResourceManager()
 {
 }
@@ -23,11 +25,14 @@ void ResourceManager::initResourceManager(DeviceManager &device)
     CreateVmaAllocator();
     createTextureSampler();
     createBindlessDescriptorSet();
+#ifdef USE_VMA_POOL
+    createExternalMemoryPool();
+#endif
 }
 
 void ResourceManager::cleanUpResourceManager()
 {
-    for (int i = 0; i < 4; i++)
+    /*for (int i = 0; i < 4; i++)
     {
         if (bindlessDescriptors[i].descriptorPool != VK_NULL_HANDLE)
         {
@@ -49,7 +54,7 @@ void ResourceManager::cleanUpResourceManager()
     {
         vmaDestroyAllocator(g_hAllocator);
         g_hAllocator = VK_NULL_HANDLE;
-    }
+    }*/
 }
 
 void ResourceManager::CreateVmaAllocator()
@@ -144,6 +149,7 @@ void ResourceManager::CreateVmaAllocator()
     heapSizeLimit[0] = 512ull * 1024 * 1024;
     outInfo.pHeapSizeLimit = heapSizeLimit.data();
     */
+
     vmaCreateAllocator(&allocatorInfo, &g_hAllocator);
 
     const VkPhysicalDeviceMemoryProperties *memProps = nullptr;
@@ -163,6 +169,21 @@ void ResourceManager::CreateVmaAllocator()
         {
             hostSharedMemorySize += heap.size;
         }
+
+#ifdef CABBAGE_ENGINE_DEBUG
+        if (heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+        {
+            std::cout << "Device Memory Size: " << (deviceMemorySize / 1048576.0f) << " MB " << std::endl;
+        }
+        if (heap.flags & VK_MEMORY_HEAP_MULTI_INSTANCE_BIT)
+        {
+            std::cout << "Multi Instance Memory Size: " << (mutiInstanceMemorySize / 1048576.0f) << " MB " << std::endl;
+        }
+        else
+        {
+            std::cout << "Host Shared Memory Size: " << (hostSharedMemorySize / 1048576.0f) << " MB " << std::endl;
+        }
+#endif
     }
 }
 
@@ -232,14 +253,104 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
 #endif
         vbInfo.pNext = &externalMemoryBufferInfo;
 
+#ifdef USE_VMA_POOL
         VmaAllocationCreateInfo vbAllocCreateInfo = {};
         vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
         vbAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        vbAllocCreateInfo.pool = pools.front(); // It is enough to set this one member.
+#else
+        VmaAllocationCreateInfo vbAllocCreateInfo = {};
+        vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        vbAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+#endif 
 
-        vmaCreateBuffer(g_hAllocator, &vbInfo, &vbAllocCreateInfo, &resultBuffer.bufferHandle, &resultBuffer.bufferAlloc, &resultBuffer.bufferAllocInfo);
+        VkResult res = vmaCreateBuffer(g_hAllocator, &vbInfo, &vbAllocCreateInfo, &resultBuffer.bufferHandle, &resultBuffer.bufferAlloc, &resultBuffer.bufferAllocInfo);
+        if (res != VK_SUCCESS)
+        {
+            switch (res)
+            {
+            case VK_ERROR_OUT_OF_HOST_MEMORY:
+                std::cerr << "Host memory allocation failed!" << std::endl;
+                break;
+            case VK_ERROR_OUT_OF_DEVICE_MEMORY:
+                std::cerr << "Device memory allocation failed!" << std::endl;
+                break;
+            default:
+                std::cerr << "VMA buffer creation failed with error code: " << res << std::endl;
+                break;
+            }
+        }
     }
 
     return resultBuffer;
+}
+
+void ResourceManager::createExternalMemoryPool()
+{
+    const VkExternalMemoryHandleTypeFlagsKHR handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR;
+
+    // 定义内存分配参数
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = 0x10000; // 示例大小
+    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+    std::vector<uint32_t> queueFamilys(device->getQueueFamilyNumber());
+    for (size_t i = 0; i < queueFamilys.size(); i++)
+    {
+        queueFamilys[i] = i;
+    }
+
+    bufferInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+    bufferInfo.queueFamilyIndexCount = queueFamilys.size();
+    bufferInfo.pQueueFamilyIndices = queueFamilys.data();
+
+    VkExternalMemoryBufferCreateInfoKHR externalBufInfo{};
+    externalBufInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO_KHR;
+    externalBufInfo.pNext = nullptr;
+    externalBufInfo.handleTypes = handleType;
+
+    bufferInfo.pNext = &externalBufInfo;
+
+    // 内存分配配置
+    VmaAllocationCreateInfo allocInfo{};
+    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+    // 查找合适的内存类型
+    uint32_t memTypeIndex = VK_MAX_MEMORY_TYPES;
+    VkResult res = vmaFindMemoryTypeIndexForBufferInfo(g_hAllocator, &bufferInfo, &allocInfo, &memTypeIndex);
+    if (res != VK_SUCCESS)
+    {
+        throw std::runtime_error("vmaFindMemoryTypeIndexForBufferInfo failed!");
+    }
+    if (memTypeIndex == VK_MAX_MEMORY_TYPES)
+    {
+        throw std::runtime_error("No suitable memory type found for external memory pool");
+    }
+
+    // 配置内存池
+    VkExportMemoryAllocateInfoKHR exportInfo{};
+    exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR;
+    exportInfo.pNext = nullptr;
+    exportInfo.handleTypes = handleType;
+
+    VmaPoolCreateInfo poolInfo{};
+    poolInfo.memoryTypeIndex = memTypeIndex;
+    poolInfo.pMemoryAllocateNext = &exportInfo;
+    poolInfo.blockSize = 0; // 使用自动块大小
+    poolInfo.minBlockCount = 1;
+    poolInfo.maxBlockCount = 0; // 无限制
+
+    // 创建内存池
+    VmaPool pool;
+    res = vmaCreatePool(g_hAllocator, &poolInfo, &pool);
+    if (res != VK_SUCCESS)
+    {
+        throw std::runtime_error("vmaCreatePool failed!");
+    }
+
+    pools.push_back(pool);
 }
 
 void ResourceManager::destroyImage(ImageHardwareWrap &image)

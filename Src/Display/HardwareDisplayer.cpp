@@ -25,7 +25,7 @@ HardwareDisplayer &HardwareDisplayer::operator=(const HardwareDisplayer &other)
     return *this;
 }
 
-HardwareDisplayer& HardwareDisplayer::operator = (const HardwareImage& image)
+HardwareDisplayer &HardwareDisplayer::operator=(const HardwareImage &image)
 {
     std::unique_lock<std::mutex> lock(displayerMutex);
     if (displayerGlobalPool.count(displaySurface))

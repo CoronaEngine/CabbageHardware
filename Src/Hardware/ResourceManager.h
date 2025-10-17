@@ -126,12 +126,20 @@ private:
 	void createTextureSampler();
 	void CreateVmaAllocator();
 	void createBindlessDescriptorSet();
+    void createExternalMemoryPool();
 
 	VmaAllocator g_hAllocator;
 
+	// 使用 vector 是为了后面多线程处理
+    // Example: 
+    //static VmaPool &getDefaultPool()
+    //{
+    //    std::lock_guard<std::mutex> lock(m_poolMutex);
+    //    return m_pools.front(); // 假设第一个池为默认池
+    //}
+	std::vector<VmaPool> pools;
 
 	VkSampler textureSampler;
-
 
 	const uint32_t UniformBinding = 0;
 	const uint32_t TextureBinding = 1;
