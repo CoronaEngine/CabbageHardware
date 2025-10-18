@@ -46,7 +46,7 @@ struct HardwareExecutor
     bool computePipelineBegin = false;
     bool rasterizerPipelineBegin = false;
 
-    ExecutorType type = ExecutorType::Graphics;
+    ExecutorType queueType = ExecutorType::Graphics;
 
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
 

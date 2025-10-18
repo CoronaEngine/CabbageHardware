@@ -123,6 +123,8 @@ class DeviceManager
     }
 
   private:
+    friend class HardwareExecutor;
+
     void createDevices(const CreateCallback &createInfo, const VkInstance &vkInstance);
 
     void chooseMainDevice();
