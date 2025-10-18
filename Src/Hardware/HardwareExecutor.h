@@ -16,6 +16,7 @@ struct HardwareExecutor
     };
 
     HardwareExecutor(std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext = globalHardwareContext.mainDevice)
+        : hardwareContext(hardwareContext)
     {
     }
 
@@ -37,5 +38,7 @@ struct HardwareExecutor
     bool computePipelineBegin = false;
     bool rasterizerPipelineBegin = false;
 
-    ExecutorType type;
+    ExecutorType type = ExecutorType::Graphics;
+
+    std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
 };
