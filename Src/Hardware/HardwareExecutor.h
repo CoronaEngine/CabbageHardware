@@ -1,5 +1,8 @@
 #pragma once
 
+#include<Hardware/DeviceManager.h>
+#include<Hardware/GlobalContext.h>
+
 class RasterizerPipeline;
 class ComputePipeline;
 
@@ -12,7 +15,10 @@ struct HardwareExecutor
         Transfer
     };
 
-    HardwareExecutor() = default;
+    HardwareExecutor(std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext = globalHardwareContext.mainDevice)
+    {
+    }
+
     ~HardwareExecutor() = default;
 
     HardwareExecutor &operator<<(const HardwareExecutor &other)
