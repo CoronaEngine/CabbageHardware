@@ -169,6 +169,8 @@ void DisplayManager::choosePresentDevice()
 		}
 	}
 #endif
+
+    hardwareExecutor = HardwareExecutor(displayDevice);
 }
 
 
@@ -432,8 +434,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 signalSemaphoreInfos.push_back(signalInfo);
             }
 
-             displayDevice->deviceManager.startCommands() << runCommand 
-                 << displayDevice->deviceManager.endCommands(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame]);
+             hardwareExecutor() << runCommand  << hardwareExecutor.commit(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame]);
 
              // 准备呈现信息，等待 timeline semaphore
              VkPresentInfoKHR presentInfo{};

@@ -95,7 +95,7 @@ ComputePipeline &ComputePipeline::operator()(uint16_t groupCountX, uint16_t grou
 				vkCmdDispatch(commandBuffer, groupCountX, groupCountY, groupCountZ);
 			};
 
-        globalHardwareContext.mainDevice->deviceManager << runCommand;
+        *executor << runCommand;
 	}
 
 	return *this;

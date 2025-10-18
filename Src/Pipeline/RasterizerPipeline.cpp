@@ -435,7 +435,7 @@ RasterizerPipeline &RasterizerPipeline::operator()(uint16_t imageSizeX, uint16_t
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
     };
 
-    globalHardwareContext.mainDevice->deviceManager << runCommand;
+    *executor << runCommand;
 
     return *this;
 }
@@ -471,7 +471,7 @@ HardwareExecutor &RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
         vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
     };
 
-    globalHardwareContext.mainDevice->deviceManager << runCommand;
+    *executor << runCommand;
 
     return *executor;
 }

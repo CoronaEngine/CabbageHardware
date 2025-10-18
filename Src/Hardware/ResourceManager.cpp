@@ -491,12 +491,12 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     return resultImage;
 }
 
-bool ResourceManager::copyImageMemory(ImageHardwareWrap &source, ImageHardwareWrap &destination, BufferHardwareWrap *srcStaging, BufferHardwareWrap *dstStaging)
+bool ResourceManager::copyImageMemory(ImageHardwareWrap &source, ImageHardwareWrap &destination)
 {
     //if (source.pixelSize == destination.pixelSize)
     //{
         if (source.imageSize == destination.imageSize && source.imageFormat == destination.imageFormat)
-        {
+        {/*
 
             if (source.device != destination.device)
             {
@@ -561,7 +561,7 @@ bool ResourceManager::copyImageMemory(ImageHardwareWrap &source, ImageHardwareWr
 
                 return true;
             }
-            else
+            else*/
             {
                 auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
                     VkImageCopy imageCopyRegion{};

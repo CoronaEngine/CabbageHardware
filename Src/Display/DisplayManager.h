@@ -3,6 +3,7 @@
 #include <chrono>  
 
 #include<Hardware/GlobalContext.h>
+#include<Hardware/HardwareExecutor.h>
 
 #include<CabbageHardware.h>
 
@@ -68,4 +69,6 @@ private:
     std::vector<char> srcCpuData;
     ResourceManager::BufferHardwareWrap dstStaging;
     std::vector<char> dstCpuData;
+
+    HardwareExecutor hardwareExecutor;
 };
