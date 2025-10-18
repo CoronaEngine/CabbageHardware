@@ -9,6 +9,7 @@
 
 #define USE_SAME_DEVICE
 
+#define TEST_CPU_DATA
 
 //#if _WIN32 || _WIN64
 //#include<vulkan/vulkan_win32.h>
@@ -364,11 +365,13 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 sourceImage.imageSize.x,
                 sourceImage.imageSize.y);
 
+#ifdef USE_SAME_DEVICE
             vkDeviceWaitIdle(displayDevice->deviceManager.logicalDevice);
             vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
 
             srcCpuData.resize(srcStaging.bufferAllocInfo.size);
             globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(srcStaging, srcCpuData.data());
+#endif
 
             // 在显示设备上：dstStaging -> 目标图像
             displayDevice->resourceManager.copyBufferToImage(
@@ -377,8 +380,10 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 this->displayImage.imageSize.x,
                 this->displayImage.imageSize.y);
 
+#ifdef USE_SAME_DEVICE
             dstCpuData.resize(dstStaging.bufferAllocInfo.size);
             displayDevice->resourceManager.copyBufferToCpu(dstStaging.device->logicalDevice, dstStaging.bufferAllocInfo.deviceMemory, dstStaging.bufferAllocInfo.size, dstCpuData.data());
+#endif
 
             auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
 
