@@ -6,6 +6,7 @@
 #include <vk_mem_alloc.h>
 
 #include <Hardware/GlobalContext.h>
+#include"HardwareExecutor.h"
 
 #define USE_VMA_POOL
 
@@ -576,7 +577,7 @@ bool ResourceManager::copyImageMemory(ImageHardwareWrap &source, ImageHardwareWr
                     vkCmdCopyImage(commandBuffer, source.imageHandle, VK_IMAGE_LAYOUT_GENERAL, destination.imageHandle, VK_IMAGE_LAYOUT_GENERAL, 1, &imageCopyRegion);
                 };
 
-                globalHardwareContext.mainDevice->deviceManager.startCommands(DeviceManager::TransferQueue) << runCommand << globalHardwareContext.mainDevice->deviceManager.endCommands();
+                 (*executor)(HardwareExecutor::ExecutorType::Transfer) << runCommand << executor->commit();
 
                 return true;
             }
@@ -860,7 +861,7 @@ void ResourceManager::transitionImageLayout(ImageHardwareWrap &image, VkImageLay
             transitionImageLayoutUnblocked(commandBuffer, image, newLayout, sourceStage, destinationStage);
         };
 
-        this->device->startCommands() << runCommand << this->device->endCommands();
+        (*executor)(HardwareExecutor::ExecutorType::Transfer) << runCommand << executor->commit();
 
     }
 }
@@ -885,7 +886,7 @@ void ResourceManager::copyImageToBuffer(VkImage image, VkBuffer buffer, uint32_t
         vkCmdCopyImageToBuffer(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer, 1, &region);
     };
 
-    this->device->startCommands(DeviceManager::TransferQueue) << runCommand << this->device->endCommands();
+    (*executor)(HardwareExecutor::ExecutorType::Transfer) << runCommand << executor->commit();
 }
 
 void ResourceManager::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
@@ -908,7 +909,7 @@ void ResourceManager::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t
         vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
     };
 
-    this->device->startCommands(DeviceManager::TransferQueue) << runCommand << this->device->endCommands();
+     (*executor)(HardwareExecutor::ExecutorType::Transfer) << runCommand << executor->commit();
 }
 
 void ResourceManager::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
@@ -919,7 +920,7 @@ void ResourceManager::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDevic
         vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
     };
 
-    this->device->startCommands(DeviceManager::TransferQueue) << runCommand << this->device->endCommands();
+     (*executor)(HardwareExecutor::ExecutorType::Transfer) << runCommand << executor->commit();
 }
 
 uint32_t ResourceManager::findExternalMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)

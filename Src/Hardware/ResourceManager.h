@@ -5,6 +5,9 @@
 #include<vk_mem_alloc.h>
 #include <ktm/ktm.h>
 
+//#include"HardwareExecutor.h"
+
+class HardwareExecutor;
 
 struct ResourceManager
 {
@@ -149,4 +152,14 @@ private:
 	uint64_t mutiInstanceMemorySize = 0;
 
 	DeviceManager *device;
+
+
+    friend HardwareExecutor &operator<<(HardwareExecutor &executor, ResourceManager &other);
+    HardwareExecutor *executor;
 };
+
+inline HardwareExecutor &operator<<(HardwareExecutor &executor, ResourceManager &other)
+{
+    other.executor = &executor;
+    return executor;
+}

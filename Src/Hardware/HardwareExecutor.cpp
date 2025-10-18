@@ -65,7 +65,7 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
             vkCmdEndRenderPass(commandBuffer);
         };
 
-        globalHardwareContext.mainDevice->deviceManager << runCommand;
+        *this << runCommand;
     }
 
     if (computePipelineBegin)
