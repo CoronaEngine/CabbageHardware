@@ -27,7 +27,7 @@ HardwareExecutor &HardwareExecutor::operator()(ExecutorType type, HardwareExecut
 }
 
 
-HardwareExecutor& HardwareExecutor::commit()
+HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos, std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos, VkFence fence)
 {
     if (rasterizerPipelineBegin)
     {
