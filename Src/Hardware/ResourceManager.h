@@ -1,11 +1,8 @@
 ﻿#pragma once
 
 #include <unordered_map>
-
 #include"DeviceManager.h"
-
 #include<vk_mem_alloc.h>
-
 #include <ktm/ktm.h>
 
 
@@ -61,7 +58,6 @@ struct ResourceManager
         ResourceManager *resourceManager;
 	};
 
-
 	struct
     {
         VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
@@ -69,21 +65,20 @@ struct ResourceManager
         VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
     } bindlessDescriptors[4];
     
-
 	ResourceManager();
     ~ResourceManager();
 
     void initResourceManager(DeviceManager &device);
     void cleanUpResourceManager();
 
-	void destroyImage(ImageHardwareWrap& image);
-	VkImageView createImageView(ImageHardwareWrap& image);
+	void destroyImage(ImageHardwareWrap &image);
+    VkImageView createImageView(ImageHardwareWrap &image);
     ImageHardwareWrap createImage(ktm::uvec2 imageSize, VkFormat imageFormat, uint32_t pixelSize,
 		VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		int arrayLayers = 1, int mipLevels = 1);
 
 
-	void destroyBuffer(BufferHardwareWrap& buffer);
+	void destroyBuffer(BufferHardwareWrap &buffer);
 	BufferHardwareWrap createBuffer(VkDeviceSize size, VkBufferUsageFlags usage);
 
 
@@ -91,25 +86,23 @@ struct ResourceManager
 	uint32_t storeDescriptor(BufferHardwareWrap buffer);
 	//uint32_t storeDescriptor(VkAccelerationStructureKHR m_tlas);
 
-
 	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	bool copyImageMemory(ImageHardwareWrap &source, ImageHardwareWrap &destination, BufferHardwareWrap *srcStaging = nullptr, BufferHardwareWrap *dstStaging = nullptr);
 
 	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
     void copyImageToBuffer(VkImage image, VkBuffer buffer, uint32_t width, uint32_t height);
-
+    void copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData);
+    void copyBufferToCpu(VkDevice &device, VkDeviceMemory &memory, VkDeviceSize size, void *cpuData);
 
     ExternalMemoryHandle exportBufferMemory(BufferHardwareWrap &sourceBuffer);
     BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle &memHandle, const BufferHardwareWrap &sourceBuffer);
 
-	
 	uint32_t findExternalMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-	void transitionImageLayoutUnblocked(const VkCommandBuffer& commandBuffer,ImageHardwareWrap& image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
+    void transitionImageLayoutUnblocked(const VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
 
-	void transitionImageLayout(ImageHardwareWrap& image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
+	void transitionImageLayout(ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
 
-
-	VkShaderModule createShaderModule(const std::vector<unsigned int>& code);
+	VkShaderModule createShaderModule(const std::vector<unsigned int> &code);
 
 	uint64_t getHostSharedMemorySize()
 	{
@@ -122,7 +115,6 @@ struct ResourceManager
 	}
 
 private:
-
 	void createTextureSampler();
 	void CreateVmaAllocator();
 	void createBindlessDescriptorSet();

@@ -364,12 +364,21 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 sourceImage.imageSize.x,
                 sourceImage.imageSize.y);
 
+            vkDeviceWaitIdle(displayDevice->deviceManager.logicalDevice);
+            vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
+
+            srcCpuData.resize(srcStaging.bufferAllocInfo.size);
+            globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(srcStaging, srcCpuData.data());
+
             // 在显示设备上：dstStaging -> 目标图像
             displayDevice->resourceManager.copyBufferToImage(
                 dstStaging.bufferHandle,
                 this->displayImage.imageHandle,
                 this->displayImage.imageSize.x,
                 this->displayImage.imageSize.y);
+
+            dstCpuData.resize(dstStaging.bufferAllocInfo.size);
+            displayDevice->resourceManager.copyBufferToCpu(dstStaging.device->logicalDevice, dstStaging.bufferAllocInfo.deviceMemory, dstStaging.bufferAllocInfo.size, dstCpuData.data());
 
             auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
 

@@ -257,7 +257,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
         VmaAllocationCreateInfo vbAllocCreateInfo = {};
         vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
         vbAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-        vbAllocCreateInfo.pool = g_hPool; // It is enough to set this one member.
+        vbAllocCreateInfo.pool = g_hPool;
 #else
         VmaAllocationCreateInfo vbAllocCreateInfo = {};
         vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
@@ -1056,12 +1056,43 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
             throw std::runtime_error("failed to bind imported memory to buffer!");
         }
 
+        // 保存分配信息
+        importedBuffer.bufferAllocInfo.deviceMemory = importedMemory;
+        importedBuffer.bufferAllocInfo.size = sourceBuffer.bufferAllocInfo.size;
+
         return importedBuffer;
     }
     else
     {
         throw std::runtime_error("failed to bind imported memory to buffer!");
     }
+}
+
+void ResourceManager::copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData)
+{
+    void *mappedData = nullptr;
+    VkResult result = vmaMapMemory(g_hAllocator, buffer.bufferAlloc, &mappedData);
+    if (result != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to map memory");
+    }
+
+    vmaInvalidateAllocation(g_hAllocator, buffer.bufferAlloc, 0, VK_WHOLE_SIZE);
+    memcpy(cpuData, mappedData, buffer.bufferAllocInfo.size);
+    vmaUnmapMemory(g_hAllocator, buffer.bufferAlloc);
+}
+
+void ResourceManager::copyBufferToCpu(VkDevice &device, VkDeviceMemory &memory, VkDeviceSize size, void *cpuData)
+{
+    void *mappedData = nullptr;
+    VkResult result = vkMapMemory(device, memory, 0, size, 0, &mappedData);
+    if (result != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to map memory");
+    }
+
+    memcpy(cpuData, mappedData, size);
+    vkUnmapMemory(device, memory);
 }
 
 ResourceManager::ExternalMemoryHandle ResourceManager::exportBufferMemory(BufferHardwareWrap &sourceBuffer)
