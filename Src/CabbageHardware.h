@@ -7,7 +7,6 @@
 
 #include <ktm/ktm.h>
 
-#include "Compiler/ShaderCodeCompiler.h"
 #include "Hardware/HardwareExecutor.h"
 
 enum class ImageFormat : uint32_t
