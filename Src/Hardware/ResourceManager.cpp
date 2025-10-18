@@ -257,7 +257,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
         VmaAllocationCreateInfo vbAllocCreateInfo = {};
         vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
         vbAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-        vbAllocCreateInfo.pool = g_hPool; // It is enough to set this one member.
+        vbAllocCreateInfo.pool = g_hPool;
 #else
         VmaAllocationCreateInfo vbAllocCreateInfo = {};
         vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
@@ -1063,6 +1063,24 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
         throw std::runtime_error("failed to bind imported memory to buffer!");
     }
 }
+
+void ResourceManager::vmaReadHostVisibleBufferFromGpu(BufferHardwareWrap &buffer, void *cpuData)
+{
+    auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
+        vmaMapMemory(g_hAllocator, buffer.bufferAlloc, &cpuData);
+        memcpy(cpuData, buffer.bufferAllocInfo.pMappedData, buffer.bufferAllocInfo.size);
+        vmaUnmapMemory(g_hAllocator, buffer.bufferAlloc);
+    };
+
+    this->device->startCommands(DeviceManager::TransferQueue) << runCommand << this->device->endCommands();
+}
+
+//void ResourceManager::readHostVisibleBufferFromGpu(VkDevice &device, VkBuffer &buffer, void *cpuData, VkDeviceSize size, VkDeviceSize offset = 0)
+//{
+//    vkMapMemory(device, buffer, 0, dataSize, 0, &mappedData);
+//    memcpy(dstData, mappedData, dataSize);
+//    vkUnmapMemory(device, stagingBufferMemory);
+//}
 
 ResourceManager::ExternalMemoryHandle ResourceManager::exportBufferMemory(BufferHardwareWrap &sourceBuffer)
 {

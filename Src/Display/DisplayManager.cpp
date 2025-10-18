@@ -364,12 +364,18 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 sourceImage.imageSize.x,
                 sourceImage.imageSize.y);
 
+            srcCpuData.resize(srcStaging.bufferAllocInfo.size);
+            globalHardwareContext.mainDevice->resourceManager.vmaReadHostVisibleBufferFromGpu(srcStaging, srcCpuData.data());
+
             // 在显示设备上：dstStaging -> 目标图像
             displayDevice->resourceManager.copyBufferToImage(
                 dstStaging.bufferHandle,
                 this->displayImage.imageHandle,
                 this->displayImage.imageSize.x,
                 this->displayImage.imageSize.y);
+
+            //dstCpuData.resize(dstStaging.bufferAllocInfo.size);
+            //globalHardwareContext.mainDevice->resourceManager.readHostVisibleBufferFromGpu(dstStaging, dstCpuData.data());
 
             auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
 
