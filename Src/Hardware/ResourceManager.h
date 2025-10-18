@@ -1,11 +1,8 @@
 ﻿#pragma once
 
 #include <unordered_map>
-
 #include"DeviceManager.h"
-
 #include<vk_mem_alloc.h>
-
 #include <ktm/ktm.h>
 
 
@@ -61,7 +58,6 @@ struct ResourceManager
         ResourceManager *resourceManager;
 	};
 
-
 	struct
     {
         VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
@@ -69,7 +65,6 @@ struct ResourceManager
         VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
     } bindlessDescriptors[4];
     
-
 	ResourceManager();
     ~ResourceManager();
 
@@ -91,27 +86,21 @@ struct ResourceManager
 	uint32_t storeDescriptor(BufferHardwareWrap buffer);
 	//uint32_t storeDescriptor(VkAccelerationStructureKHR m_tlas);
 
-
 	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	bool copyImageMemory(ImageHardwareWrap &source, ImageHardwareWrap &destination, BufferHardwareWrap *srcStaging = nullptr, BufferHardwareWrap *dstStaging = nullptr);
 
 	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
     void copyImageToBuffer(VkImage image, VkBuffer buffer, uint32_t width, uint32_t height);
-
+    void copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData);
+    void copyBufferToCpu(VkDevice &device, VkDeviceMemory &memory, VkDeviceSize size, void *cpuData);
 
     ExternalMemoryHandle exportBufferMemory(BufferHardwareWrap &sourceBuffer);
     BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle &memHandle, const BufferHardwareWrap &sourceBuffer);
 
-    void vmaReadHostVisibleBufferFromGpu(BufferHardwareWrap &buffer, void *cpuData);
-    //void readHostVisibleBufferFromGpu(VkBuffer &buffer, void *cpuData, VkDeviceSize size, VkDeviceSize offset = 0);
-    //void readDeviceLocalBufferFromGpu(BufferHardwareWrap &buffer, void *dstData, VkDeviceSize size, VkDeviceSize offset = 0);
-
-	
 	uint32_t findExternalMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     void transitionImageLayoutUnblocked(const VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
 
 	void transitionImageLayout(ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
-
 
 	VkShaderModule createShaderModule(const std::vector<unsigned int> &code);
 
@@ -125,13 +114,7 @@ struct ResourceManager
 		return deviceMemorySize;
 	}
 
-	VmaAllocator getVmaAllocator()
-	{
-		return g_hAllocator;
-    }
-
 private:
-
 	void createTextureSampler();
 	void CreateVmaAllocator();
 	void createBindlessDescriptorSet();

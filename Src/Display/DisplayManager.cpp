@@ -368,10 +368,8 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
             vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
 
             srcCpuData.resize(srcStaging.bufferAllocInfo.size);
-            globalHardwareContext.mainDevice->resourceManager.vmaReadHostVisibleBufferFromGpu(srcStaging, srcCpuData.data());
+            globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(srcStaging, srcCpuData.data());
 
-            vkDeviceWaitIdle(displayDevice->deviceManager.logicalDevice);
-            vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
             // 在显示设备上：dstStaging -> 目标图像
             displayDevice->resourceManager.copyBufferToImage(
                 dstStaging.bufferHandle,
@@ -379,8 +377,8 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 this->displayImage.imageSize.x,
                 this->displayImage.imageSize.y);
 
-            //dstCpuData.resize(dstStaging.bufferAllocInfo.size);
-            //globalHardwareContext.mainDevice->resourceManager.readHostVisibleBufferFromGpu(dstStaging, dstCpuData.data());
+            dstCpuData.resize(dstStaging.bufferAllocInfo.size);
+            displayDevice->resourceManager.copyBufferToCpu(dstStaging.device->logicalDevice, dstStaging.bufferAllocInfo.deviceMemory, dstStaging.bufferAllocInfo.size, dstCpuData.data());
 
             auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
 

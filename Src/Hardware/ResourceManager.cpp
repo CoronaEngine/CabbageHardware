@@ -1056,6 +1056,10 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
             throw std::runtime_error("failed to bind imported memory to buffer!");
         }
 
+        // 保存分配信息
+        importedBuffer.bufferAllocInfo.deviceMemory = importedMemory;
+        importedBuffer.bufferAllocInfo.size = sourceBuffer.bufferAllocInfo.size;
+
         return importedBuffer;
     }
     else
@@ -1064,7 +1068,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     }
 }
 
-void ResourceManager::vmaReadHostVisibleBufferFromGpu(BufferHardwareWrap &buffer, void *cpuData)
+void ResourceManager::copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData)
 {
     void *mappedData = nullptr;
     VkResult result = vmaMapMemory(g_hAllocator, buffer.bufferAlloc, &mappedData);
@@ -1073,23 +1077,23 @@ void ResourceManager::vmaReadHostVisibleBufferFromGpu(BufferHardwareWrap &buffer
         throw std::runtime_error("Failed to map memory");
     }
 
-    vmaInvalidateAllocation(
-        g_hAllocator,
-        buffer.bufferAlloc,
-        0,
-        VK_WHOLE_SIZE);
-
+    vmaInvalidateAllocation(g_hAllocator, buffer.bufferAlloc, 0, VK_WHOLE_SIZE);
     memcpy(cpuData, mappedData, buffer.bufferAllocInfo.size);
-
     vmaUnmapMemory(g_hAllocator, buffer.bufferAlloc);
 }
 
-//void ResourceManager::readHostVisibleBufferFromGpu(VkDevice &device, VkBuffer &buffer, void *cpuData, VkDeviceSize size, VkDeviceSize offset = 0)
-//{
-//    vkMapMemory(device, buffer, 0, dataSize, 0, &mappedData);
-//    memcpy(dstData, mappedData, dataSize);
-//    vkUnmapMemory(device, stagingBufferMemory);
-//}
+void ResourceManager::copyBufferToCpu(VkDevice &device, VkDeviceMemory &memory, VkDeviceSize size, void *cpuData)
+{
+    void *mappedData = nullptr;
+    VkResult result = vkMapMemory(device, memory, 0, size, 0, &mappedData);
+    if (result != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to map memory");
+    }
+
+    memcpy(cpuData, mappedData, size);
+    vkUnmapMemory(device, memory);
+}
 
 ResourceManager::ExternalMemoryHandle ResourceManager::exportBufferMemory(BufferHardwareWrap &sourceBuffer)
 {
