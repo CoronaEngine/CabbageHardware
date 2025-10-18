@@ -94,7 +94,7 @@ bool HardwareImage::copyFromData(const void* inputData)
 }
 
 
-HardwareImage::HardwareImage(ktm::uvec2 imageSize, ImageFormat imageFormat, ImageUsage imageUsage, int arrayLayers, void* imageData)
+HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage, int arrayLayers, void *imageData)
 {
     std::unique_lock<std::mutex> lock(imageMutex);
 
@@ -175,7 +175,7 @@ HardwareImage::HardwareImage(ktm::uvec2 imageSize, ImageFormat imageFormat, Imag
 		break;
 	}
 
-	imageGlobalPool[*imageID] = globalHardwareContext.mainDevice->resourceManager.createImage(imageSize, vkImageFormat, pixelSize, vkImageUsageFlags, arrayLayers);
+	imageGlobalPool[*imageID] = globalHardwareContext.mainDevice->resourceManager.createImage(ktm::uvec2(width,height), vkImageFormat, pixelSize, vkImageUsageFlags, arrayLayers);
 
 	if (imageData != nullptr)
 	{

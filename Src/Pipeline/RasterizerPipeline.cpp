@@ -388,7 +388,7 @@ RasterizerPipeline &RasterizerPipeline::operator()(uint16_t imageSizeX, uint16_t
 {
     if (!depthImage)
     {
-        depthImage = HardwareImage(ktm::uvec2(imageSizeX, imageSizeY), ImageFormat::D32_FLOAT, ImageUsage::DepthImage);
+        depthImage = HardwareImage(imageSizeX, imageSizeY, ImageFormat::D32_FLOAT, ImageUsage::DepthImage);
 
         createRenderPass(multiviewCount);
 

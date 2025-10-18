@@ -5,7 +5,7 @@
 #include <mutex>
 #include <type_traits>
 
-#include <ktm/ktm.h>
+//#include <ktm/ktm.h>
 
 #include "Hardware/HardwareExecutor.h"
 
@@ -93,7 +93,7 @@ struct HardwareImage
 {
     HardwareImage();
     HardwareImage(const HardwareImage &other);
-    HardwareImage(ktm::uvec2 imageSize, ImageFormat imageFormat, ImageUsage imageUsage = ImageUsage::SampledImage, int arrayLayers = 1, void *imageData = nullptr);
+    HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage = ImageUsage::SampledImage, int arrayLayers = 1, void *imageData = nullptr);
 
     ~HardwareImage();
 
