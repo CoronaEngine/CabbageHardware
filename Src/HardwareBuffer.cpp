@@ -1,4 +1,4 @@
-﻿#include"CabbageDisplayer.h"
+﻿#include"CabbageHardware.h"
 #include<Hardware/GlobalContext.h>
 
 std::unordered_map<uint64_t, ResourceManager::BufferHardwareWrap> bufferGlobalPool;

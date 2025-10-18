@@ -11,7 +11,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#include "CabbageDisplayer.h"
+#include "CabbageHardware.h"
 #include "Pipeline/ComputePipeline.h"
 #include "Pipeline/RasterizerPipeline.h"
 #include <Hardware/GlobalContext.h>

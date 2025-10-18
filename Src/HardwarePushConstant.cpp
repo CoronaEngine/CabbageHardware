@@ -1,4 +1,4 @@
-﻿#include"CabbageDisplayer.h"
+﻿#include"CabbageHardware.h"
 #include<Hardware/GlobalContext.h>
 
 struct PushConstant

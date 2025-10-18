@@ -1,5 +1,5 @@
-#include"CabbageDisplayer.h"
-#include"DisplayManager.h"
+#include"CabbageHardware.h"
+#include<Display/DisplayManager.h>
 
 std::unordered_map < void *, std::shared_ptr<DisplayManager>> displayerGlobalPool;
 

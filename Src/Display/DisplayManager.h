@@ -4,7 +4,7 @@
 
 #include<Hardware/GlobalContext.h>
 
-#include<CabbageDisplayer.h>
+#include<CabbageHardware.h>
 
 
 class DisplayManager

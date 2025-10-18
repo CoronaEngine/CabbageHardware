@@ -7,7 +7,7 @@
 
 #include"Compiler/ShaderCodeCompiler.h"
 
-#include"../CabbageDisplayer.h"
+#include"../CabbageHardware.h"
 
 
 struct ComputePipeline
