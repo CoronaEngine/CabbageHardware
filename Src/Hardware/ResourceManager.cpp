@@ -1066,21 +1066,22 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
 
 void ResourceManager::vmaReadHostVisibleBufferFromGpu(BufferHardwareWrap &buffer, void *cpuData)
 {
-    auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
-        vmaMapMemory(g_hAllocator, buffer.bufferAlloc, &cpuData);
+    void *mappedData = nullptr;
+    VkResult result = vmaMapMemory(g_hAllocator, buffer.bufferAlloc, &mappedData);
+    if (result != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to map memory");
+    }
 
-        vmaInvalidateAllocation(
-            g_hAllocator,
-            buffer.bufferAlloc,
-            0,
-            VK_WHOLE_SIZE);
+    vmaInvalidateAllocation(
+        g_hAllocator,
+        buffer.bufferAlloc,
+        0,
+        VK_WHOLE_SIZE);
 
+    memcpy(cpuData, mappedData, buffer.bufferAllocInfo.size);
 
-        memcpy(cpuData, buffer.bufferAllocInfo.pMappedData, buffer.bufferAllocInfo.size);
-        vmaUnmapMemory(g_hAllocator, buffer.bufferAlloc);
-    };
-
-    this->device->startCommands(DeviceManager::TransferQueue) << runCommand << this->device->endCommands();
+    vmaUnmapMemory(g_hAllocator, buffer.bufferAlloc);
 }
 
 //void ResourceManager::readHostVisibleBufferFromGpu(VkDevice &device, VkBuffer &buffer, void *cpuData, VkDeviceSize size, VkDeviceSize offset = 0)
