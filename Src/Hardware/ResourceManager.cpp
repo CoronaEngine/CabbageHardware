@@ -1068,6 +1068,14 @@ void ResourceManager::vmaReadHostVisibleBufferFromGpu(BufferHardwareWrap &buffer
 {
     auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
         vmaMapMemory(g_hAllocator, buffer.bufferAlloc, &cpuData);
+
+        vmaInvalidateAllocation(
+            g_hAllocator,
+            buffer.bufferAlloc,
+            0,
+            VK_WHOLE_SIZE);
+
+
         memcpy(cpuData, buffer.bufferAllocInfo.pMappedData, buffer.bufferAllocInfo.size);
         vmaUnmapMemory(g_hAllocator, buffer.bufferAlloc);
     };

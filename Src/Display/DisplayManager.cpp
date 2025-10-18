@@ -364,9 +364,14 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 sourceImage.imageSize.x,
                 sourceImage.imageSize.y);
 
+            vkDeviceWaitIdle(displayDevice->deviceManager.logicalDevice);
+            vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
+
             srcCpuData.resize(srcStaging.bufferAllocInfo.size);
             globalHardwareContext.mainDevice->resourceManager.vmaReadHostVisibleBufferFromGpu(srcStaging, srcCpuData.data());
 
+            vkDeviceWaitIdle(displayDevice->deviceManager.logicalDevice);
+            vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
             // 在显示设备上：dstStaging -> 目标图像
             displayDevice->resourceManager.copyBufferToImage(
                 dstStaging.bufferHandle,
