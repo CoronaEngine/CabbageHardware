@@ -89,11 +89,12 @@ struct ResourceManager
 	uint32_t storeDescriptor(BufferHardwareWrap buffer);
 	//uint32_t storeDescriptor(VkAccelerationStructureKHR m_tlas);
 
-	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-	bool copyImageMemory(ImageHardwareWrap &source, ImageHardwareWrap &destination);
+	ResourceManager& copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+    ResourceManager &copyImageMemory(ImageHardwareWrap &source, ImageHardwareWrap &destination);
 
-	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
-    void copyImageToBuffer(VkImage image, VkBuffer buffer, uint32_t width, uint32_t height);
+	ResourceManager &copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+    ResourceManager &copyImageToBuffer(VkImage image, VkBuffer buffer, uint32_t width, uint32_t height);
+
     void copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData);
     //void copyBufferToCpu(VkDevice &device, VkDeviceMemory &memory, VkDeviceSize size, void *cpuData);
 
@@ -103,7 +104,7 @@ struct ResourceManager
 	uint32_t findExternalMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     //void transitionImageLayoutUnblocked(const VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
 
-	void transitionImageLayout(ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
+	ResourceManager &transitionImageLayout(ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
 
 	VkShaderModule createShaderModule(const std::vector<unsigned int> &code);
 

@@ -492,7 +492,7 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     return resultImage;
 }
 
-bool ResourceManager::copyImageMemory(ImageHardwareWrap &source, ImageHardwareWrap &destination)
+ResourceManager &ResourceManager::copyImageMemory(ImageHardwareWrap &source, ImageHardwareWrap &destination)
 {
     //if (source.pixelSize == destination.pixelSize)
     //{
@@ -579,11 +579,12 @@ bool ResourceManager::copyImageMemory(ImageHardwareWrap &source, ImageHardwareWr
 
                  *executor << runCommand;
 
-                return true;
+                 return *this;
+                //return true;
             }
         }
 
-        return false;
+        //return false;
 
         //else
         //{
@@ -736,7 +737,7 @@ bool ResourceManager::copyImageMemory(ImageHardwareWrap &source, ImageHardwareWr
 //
 //}
 
-void ResourceManager::transitionImageLayout(ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage, VkPipelineStageFlags destinationStage)
+ResourceManager &ResourceManager::transitionImageLayout(ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage, VkPipelineStageFlags destinationStage)
 {
     if (image.imageLayout != newLayout)
     {
@@ -863,10 +864,11 @@ void ResourceManager::transitionImageLayout(ImageHardwareWrap &image, VkImageLay
 
         *executor << runCommand;
 
+        return *this;
     }
 }
 
-void ResourceManager::copyImageToBuffer(VkImage image, VkBuffer buffer, uint32_t width, uint32_t height)
+ResourceManager &ResourceManager::copyImageToBuffer(VkImage image, VkBuffer buffer, uint32_t width, uint32_t height)
 {
     auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
         VkBufferImageCopy region{};
@@ -887,9 +889,11 @@ void ResourceManager::copyImageToBuffer(VkImage image, VkBuffer buffer, uint32_t
     };
 
     *executor << runCommand;
+
+    return *this;
 }
 
-void ResourceManager::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
+ResourceManager &ResourceManager::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
 {
     auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
         VkBufferImageCopy region{};
@@ -910,9 +914,11 @@ void ResourceManager::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t
     };
 
      *executor << runCommand;
+
+    return *this;
 }
 
-void ResourceManager::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+ResourceManager &ResourceManager::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
 {
     auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
         VkBufferCopy copyRegion{};
@@ -921,6 +927,8 @@ void ResourceManager::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDevic
     };
 
      *executor << runCommand;
+
+     return *this;
 }
 
 uint32_t ResourceManager::findExternalMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
