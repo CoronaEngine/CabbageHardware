@@ -361,7 +361,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 		if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
         {
             // 在主设备上：源图像 -> srcStaging
-            globalHardwareContext.mainDevice->resourceManager.copyImageToBuffer(
+            hardwareExecutor(HardwareExecutor::ExecutorType::Graphics) << globalHardwareContext.mainDevice->resourceManager.copyImageToBuffer(
                 sourceImage.imageHandle,
                 srcStaging.bufferHandle,
                 sourceImage.imageSize.x,
@@ -376,7 +376,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 #endif
 
             // 在显示设备上：dstStaging -> 目标图像
-            displayDevice->resourceManager.copyBufferToImage(
+            hardwareExecutor << displayDevice->resourceManager.copyBufferToImage(
                 dstStaging.bufferHandle,
                 this->displayImage.imageHandle,
                 this->displayImage.imageSize.x,
@@ -434,7 +434,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 signalSemaphoreInfos.push_back(signalInfo);
             }
 
-             hardwareExecutor() << runCommand  << hardwareExecutor.commit(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame]);
+             hardwareExecutor << runCommand  << hardwareExecutor.commit(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame]);
 
              // 准备呈现信息，等待 timeline semaphore
              VkPresentInfoKHR presentInfo{};
