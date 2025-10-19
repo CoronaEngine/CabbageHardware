@@ -577,7 +577,7 @@ bool ResourceManager::copyImageMemory(ImageHardwareWrap &source, ImageHardwareWr
                     vkCmdCopyImage(commandBuffer, source.imageHandle, VK_IMAGE_LAYOUT_GENERAL, destination.imageHandle, VK_IMAGE_LAYOUT_GENERAL, 1, &imageCopyRegion);
                 };
 
-                 (*executor)(HardwareExecutor::ExecutorType::Transfer) << runCommand << executor->commit();
+                 *executor << runCommand;
 
                 return true;
             }
@@ -861,7 +861,7 @@ void ResourceManager::transitionImageLayout(ImageHardwareWrap &image, VkImageLay
             transitionImageLayoutUnblocked(commandBuffer, image, newLayout, sourceStage, destinationStage);
         };
 
-        (*executor)(HardwareExecutor::ExecutorType::Transfer) << runCommand << executor->commit();
+        *executor << runCommand;
 
     }
 }
@@ -886,7 +886,7 @@ void ResourceManager::copyImageToBuffer(VkImage image, VkBuffer buffer, uint32_t
         vkCmdCopyImageToBuffer(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer, 1, &region);
     };
 
-    (*executor)(HardwareExecutor::ExecutorType::Transfer) << runCommand << executor->commit();
+    *executor << runCommand;
 }
 
 void ResourceManager::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
@@ -909,7 +909,7 @@ void ResourceManager::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t
         vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
     };
 
-     (*executor)(HardwareExecutor::ExecutorType::Transfer) << runCommand << executor->commit();
+     *executor << runCommand;
 }
 
 void ResourceManager::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
@@ -920,7 +920,7 @@ void ResourceManager::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDevic
         vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
     };
 
-     (*executor)(HardwareExecutor::ExecutorType::Transfer) << runCommand << executor->commit();
+     *executor << runCommand;
 }
 
 uint32_t ResourceManager::findExternalMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
