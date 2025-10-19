@@ -101,17 +101,26 @@ struct HardwareImage
 
     uint32_t storeDescriptor();
 
-    bool blitFromImage(const HardwareImage &buffer);
-    bool copyFromImage(const HardwareImage &buffer);
+    //bool blitFromImage(const HardwareImage &buffer);
+    //bool copyFromImage(const HardwareImage &buffer);
 
     HardwareImage &operator=(const HardwareImage &other);
 
     std::shared_ptr<uint64_t> imageID;
 
   private:
-    bool copyFromBuffer(const HardwareBuffer &buffer);
-    bool copyFromData(const void *inputData);
+    friend HardwareExecutor &operator<<(HardwareExecutor &executor, HardwareImage &other);
+    HardwareExecutor *executor;
+
+    HardwareImage& copyFromBuffer(const HardwareBuffer &buffer);
+    HardwareImage& copyFromData(const void *inputData);
 };
+
+inline HardwareExecutor &operator<<(HardwareExecutor &executor, HardwareImage &other)
+{
+    other.executor = &executor;
+    return executor;
+}
 
 struct HardwarePushConstant
 {

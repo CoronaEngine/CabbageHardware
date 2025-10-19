@@ -80,17 +80,17 @@ uint32_t HardwareImage::storeDescriptor()
 }
 
 
-bool HardwareImage::copyFromBuffer(const HardwareBuffer& buffer)
+HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
 {
-    globalHardwareContext.mainDevice->resourceManager.copyBufferToImage(bufferGlobalPool[*buffer.bufferID].bufferHandle, imageGlobalPool[*imageID].imageHandle, imageGlobalPool[*imageID].imageSize.x, imageGlobalPool[*imageID].imageSize.y);
-	return true;
+    *executor << globalHardwareContext.mainDevice->resourceManager.copyBufferToImage(bufferGlobalPool[*buffer.bufferID].bufferHandle, imageGlobalPool[*imageID].imageHandle, imageGlobalPool[*imageID].imageSize.x, imageGlobalPool[*imageID].imageSize.y);
+	return *this;
 }
 
-bool HardwareImage::copyFromData(const void* inputData)
+HardwareImage &HardwareImage::copyFromData(const void *inputData)
 {
 	HardwareBuffer stagingBuffer = HardwareBuffer(imageGlobalPool[*imageID].imageSize.x * imageGlobalPool[*imageID].imageSize.y * imageGlobalPool[*imageID].pixelSize, BufferUsage::StorageBuffer, inputData);
 	copyFromBuffer(stagingBuffer);
-	return true;
+	return *this;
 }
 
 
@@ -179,6 +179,7 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
 
 	if (imageData != nullptr)
 	{
-		copyFromData(imageData);
+        HardwareExecutor tempExecutor;
+        tempExecutor() << copyFromData(imageData) << tempExecutor.commit();
 	}
 }
