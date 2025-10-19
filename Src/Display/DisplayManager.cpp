@@ -9,7 +9,7 @@
 
 #define USE_SAME_DEVICE
 
-#define TEST_CPU_DATA
+//#define TEST_CPU_DATA
 
 //#if _WIN32 || _WIN64
 //#include<vulkan/vulkan_win32.h>
@@ -367,7 +367,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 sourceImage.imageSize.x,
                 sourceImage.imageSize.y);
 
-#ifdef USE_SAME_DEVICE
+#ifdef TEST_CPU_DATA
             vkDeviceWaitIdle(displayDevice->deviceManager.logicalDevice);
             vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
 
@@ -382,7 +382,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 this->displayImage.imageSize.x,
                 this->displayImage.imageSize.y);
 
-#ifdef USE_SAME_DEVICE
+#ifdef TEST_CPU_DATA
             dstCpuData.resize(dstStaging.bufferAllocInfo.size);
             displayDevice->resourceManager.copyBufferToCpu(dstStaging.device->logicalDevice, dstStaging.bufferAllocInfo.deviceMemory, dstStaging.bufferAllocInfo.size, dstCpuData.data());
 #endif
