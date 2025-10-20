@@ -1211,6 +1211,10 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
 
     vmaCreateDedicatedBuffer(g_hAllocator, &bufferInfo, &importAllocCreateInfo, &importMemHandleInfo, &importedBuffer.bufferHandle, &importedBuffer.bufferAlloc, &importedBuffer.bufferAllocInfo);
 
+     VmaAllocationInfo2 allocInfo2 = {};
+    vmaGetAllocationInfo2(g_hAllocator, importedBuffer.bufferAlloc, &allocInfo2);
+    
+
     return importedBuffer;
 
 } 
