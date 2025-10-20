@@ -6,7 +6,7 @@
 class RasterizerPipeline;
 class ComputePipeline;
 
-struct HardwareExecutor
+struct AbstractCommand
 {
     enum class ExecutorType
     {
@@ -15,6 +15,16 @@ struct HardwareExecutor
         Transfer
     };
 
+    virtual ~AbstractCommand() = default;
+
+    virtual void Replay(const VkCommandBuffer &commandBuffer) const = 0;
+
+    ExecutorType executorType;
+};
+
+
+struct HardwareExecutor
+{
     HardwareExecutor(std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext = globalHardwareContext.mainDevice)
         : hardwareContext(hardwareContext)
     {
@@ -27,7 +37,7 @@ struct HardwareExecutor
         return *this;
     }
 
-    HardwareExecutor &operator()(ExecutorType type = ExecutorType::Graphics, HardwareExecutor *waitExecutor = nullptr);
+    HardwareExecutor &operator()(AbstractCommand::ExecutorType type = AbstractCommand::ExecutorType::Graphics, HardwareExecutor *waitExecutor = nullptr);
 
     HardwareExecutor &operator<<(std::function<void(const VkCommandBuffer &commandBuffer)> commandsFunction)
     {
@@ -48,7 +58,7 @@ struct HardwareExecutor
     bool computePipelineBegin = false;
     bool rasterizerPipelineBegin = false;
 
-    ExecutorType queueType = ExecutorType::Graphics;
+    AbstractCommand::ExecutorType queueType = AbstractCommand::ExecutorType::Graphics;
     DeviceManager::QueueUtils *currentRecordQueue = nullptr;
 
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
