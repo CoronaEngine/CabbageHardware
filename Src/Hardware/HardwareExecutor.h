@@ -15,7 +15,9 @@ struct CommandRecord
         Transfer
     };
 
-    virtual void commitCommand(const VkCommandBuffer &commandBuffer) const = 0;
+    virtual void commitCommand(const VkCommandBuffer& commandBuffer)
+    {
+    }
 
     ExecutorType executorType;
 };
@@ -32,7 +34,7 @@ struct CopyBufferCommand : public CommandRecord
         executorType = ExecutorType::Transfer;
     }
 
-    void commitCommand(const VkCommandBuffer &commandBuffer) const override
+    void commitCommand(const VkCommandBuffer &commandBuffer) override
     {
         vkCmdCopyBuffer(
             commandBuffer,
@@ -62,7 +64,7 @@ struct CopyImageCommand : public CommandRecord
         executorType = ExecutorType::Transfer;
     }
 
-    void commitCommand(const VkCommandBuffer &commandBuffer) const override
+    void commitCommand(const VkCommandBuffer &commandBuffer) override
     {
         vkCmdCopyImage(
             commandBuffer,
@@ -115,5 +117,5 @@ struct HardwareExecutor
 
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
 
-    //std::vector<std::unique_ptr<CommandRecord>> commandList;
+    std::vector<CommandRecord> commandList;
 };
