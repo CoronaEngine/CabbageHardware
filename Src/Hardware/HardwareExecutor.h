@@ -15,6 +15,8 @@ struct CommandRecord
         Transfer
     };
 
+    virtual ~CommandRecord() = default;
+
     virtual void commitCommand(const VkCommandBuffer& commandBuffer)
     {
     }
@@ -77,6 +79,72 @@ struct CopyImageCommand : public CommandRecord
     }
 };
 
+struct CopyBufferToImageCommand : public CommandRecord
+{
+    VkBuffer srcBuffer;
+    VkImage dstImage;
+    VkImageLayout dstImageLayout;
+    std::vector<VkBufferImageCopy> regions; // 使用 VkBufferImageCopy
+
+    CopyBufferToImageCommand(
+        VkBuffer srcBuf,
+        VkImage dstImg,
+        VkImageLayout dstLayout,
+        const std::vector<VkBufferImageCopy> &copyRegions)
+        : srcBuffer(srcBuf),
+          dstImage(dstImg),
+          dstImageLayout(dstLayout),
+          regions(copyRegions)
+    {
+        // 拷贝操作通常在 Transfer 队列中执行
+        executorType = ExecutorType::Transfer;
+    }
+
+    void commitCommand(const VkCommandBuffer &commandBuffer) override
+    {
+        vkCmdCopyBufferToImage(
+            commandBuffer,
+            srcBuffer,
+            dstImage,
+            dstImageLayout,
+            static_cast<uint32_t>(regions.size()),
+            regions.data());
+    }
+};
+
+struct CopyImageToBufferCommand : public CommandRecord
+{
+    VkImage srcImage;
+    VkImageLayout srcImageLayout;
+    VkBuffer dstBuffer;
+    std::vector<VkBufferImageCopy> regions; // 同样使用 VkBufferImageCopy
+
+    CopyImageToBufferCommand(
+        VkImage srcImg,
+        VkImageLayout srcLayout,
+        VkBuffer dstBuf,
+        const std::vector<VkBufferImageCopy> &copyRegions)
+        : srcImage(srcImg),
+          srcImageLayout(srcLayout),
+          dstBuffer(dstBuf),
+          regions(copyRegions)
+    {
+        // 拷贝操作通常在 Transfer 队列中执行
+        executorType = ExecutorType::Transfer;
+    }
+
+    void commitCommand(const VkCommandBuffer &commandBuffer) override
+    {
+        vkCmdCopyImageToBuffer(
+            commandBuffer,
+            srcImage,
+            srcImageLayout,
+            dstBuffer,
+            static_cast<uint32_t>(regions.size()),
+            regions.data());
+    }
+};
+
 struct HardwareExecutor
 {
     HardwareExecutor(std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext = globalHardwareContext.mainDevice)
@@ -117,5 +185,5 @@ struct HardwareExecutor
 
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
 
-    std::vector<CommandRecord> commandList;
+    //std::vector<std::unique_ptr<CommandRecord>> commandList;
 };
