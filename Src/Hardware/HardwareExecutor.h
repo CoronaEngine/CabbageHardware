@@ -22,6 +22,60 @@ struct CommandRecord
     ExecutorType executorType;
 };
 
+struct CopyBufferCommand : public CommandRecord
+{
+    VkBuffer srcBuffer;
+    VkBuffer dstBuffer;
+    std::vector<VkBufferCopy> regions;
+
+    CopyBufferCommand(VkBuffer src, VkBuffer dst, const std::vector<VkBufferCopy> &copyRegions)
+        : srcBuffer(src), dstBuffer(dst), regions(copyRegions)
+    {
+        executorType = ExecutorType::Transfer;
+    }
+
+    void commitCommand(const VkCommandBuffer &commandBuffer) const override
+    {
+        vkCmdCopyBuffer(
+            commandBuffer,
+            srcBuffer,
+            dstBuffer,
+            static_cast<uint32_t>(regions.size()),
+            regions.data());
+    }
+};
+
+struct CopyImageCommand : public CommandRecord
+{
+    VkImage srcImage;
+    VkImageLayout srcImageLayout;
+    VkImage dstImage;
+    VkImageLayout dstImageLayout;
+    std::vector<VkImageCopy> regions;
+
+    CopyImageCommand(
+        VkImage srcImg, VkImageLayout srcLayout,
+        VkImage dstImg, VkImageLayout dstLayout,
+        const std::vector<VkImageCopy> &copyRegions)
+        : srcImage(srcImg), srcImageLayout(srcLayout),
+          dstImage(dstImg), dstImageLayout(dstLayout),
+          regions(copyRegions)
+    {
+        executorType = ExecutorType::Transfer;
+    }
+
+    void commitCommand(const VkCommandBuffer &commandBuffer) const override
+    {
+        vkCmdCopyImage(
+            commandBuffer,
+            srcImage,
+            srcImageLayout,
+            dstImage,
+            dstImageLayout,
+            static_cast<uint32_t>(regions.size()),
+            regions.data());
+    }
+};
 
 struct HardwareExecutor
 {
