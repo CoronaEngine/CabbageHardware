@@ -62,4 +62,6 @@ struct HardwareExecutor
     DeviceManager::QueueUtils *currentRecordQueue = nullptr;
 
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
+
+    std::vector<std::unique_ptr<CommandRecord>> commandList;
 };
