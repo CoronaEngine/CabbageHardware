@@ -3,6 +3,18 @@
 #include <Hardware/GlobalContext.h>
 
 
+bool HardwareExecutor::beginRecording()
+{
+    vkResetCommandBuffer(currentRecordQueue->commandBuffer, 0);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(currentRecordQueue->commandBuffer, &beginInfo);
+
+    return true;
+}
 
 HardwareExecutor &HardwareExecutor::operator()(ExecutorType queueType, HardwareExecutor *waitExecutor)
 {
@@ -44,14 +56,6 @@ HardwareExecutor &HardwareExecutor::operator()(ExecutorType queueType, HardwareE
 
         std::this_thread::yield();
     }
-
-    vkResetCommandBuffer(currentRecordQueue->commandBuffer, 0);
-
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    vkBeginCommandBuffer(currentRecordQueue->commandBuffer, &beginInfo);
 
     return *this;
 }

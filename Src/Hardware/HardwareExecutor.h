@@ -39,16 +39,19 @@ struct HardwareExecutor
                              std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
                              VkFence fence = VK_NULL_HANDLE);
 
+    
+    bool beginRecording();
+
   private:
     friend HardwareExecutor &operator<<(HardwareExecutor &executor, RasterizerPipeline &other);
     friend HardwareExecutor &operator<<(HardwareExecutor &executor, ComputePipeline &other);
 
+    bool recordingBegan = false;
     bool computePipelineBegin = false;
     bool rasterizerPipelineBegin = false;
 
     ExecutorType queueType = ExecutorType::Graphics;
+    DeviceManager::QueueUtils *currentRecordQueue = nullptr;
 
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
-
-    DeviceManager::QueueUtils *currentRecordQueue = nullptr;
 };
