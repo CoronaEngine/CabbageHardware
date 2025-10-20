@@ -15,8 +15,6 @@ struct CommandRecord
         Transfer
     };
 
-    virtual ~CommandRecord() = default;
-
     virtual void commitCommand(const VkCommandBuffer &commandBuffer) const = 0;
 
     ExecutorType executorType;
@@ -117,5 +115,5 @@ struct HardwareExecutor
 
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
 
-    std::vector<std::unique_ptr<CommandRecord>> commandList;
+    //std::vector<std::unique_ptr<CommandRecord>> commandList;
 };
