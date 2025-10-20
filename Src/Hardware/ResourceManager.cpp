@@ -1100,7 +1100,16 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = sourceBuffer.bufferAllocInfo.size;
     bufferInfo.usage = importedBuffer.bufferUsage;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    std::vector<uint32_t> queueFamilys(device->getQueueFamilyNumber());
+    for (size_t i = 0; i < queueFamilys.size(); i++)
+    {
+        queueFamilys[i] = i;
+    }
+    bufferInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+    bufferInfo.queueFamilyIndexCount = queueFamilys.size();
+    bufferInfo.pQueueFamilyIndices = queueFamilys.data();
+
     bufferInfo.pNext = &externalMemBufCreateInfo;
 
     bool requiresDedicated = true;
