@@ -180,6 +180,6 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
 	if (imageData != nullptr)
 	{
         HardwareExecutor tempExecutor;
-        tempExecutor() << copyFromData(imageData) << tempExecutor.commit();
+        tempExecutor(HardwareExecutor::ExecutorType::Transfer) << copyFromData(imageData) << tempExecutor.commit();
 	}
 }
