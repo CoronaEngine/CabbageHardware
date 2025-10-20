@@ -7,7 +7,7 @@
 
 #include<Hardware/GlobalContext.h>
 
-#define USE_SAME_DEVICE
+//#define USE_SAME_DEVICE
 
 //#if _WIN32 || _WIN64
 //#include<vulkan/vulkan_win32.h>
@@ -419,7 +419,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
             std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos;
             {
-                VkSemaphoreSubmitInfo waitInfo{};
+                 VkSemaphoreSubmitInfo waitInfo{};
                 waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
                 waitInfo.semaphore = imageAvailableSemaphores[currentFrame];
                 waitInfo.value = 0; // For binary semaphores, this must be 0

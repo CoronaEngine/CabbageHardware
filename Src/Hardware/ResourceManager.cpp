@@ -287,7 +287,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
 
 void ResourceManager::createExternalMemoryPool()
 {
-    const VkExternalMemoryHandleTypeFlagsKHR handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR;
+    const VkExternalMemoryHandleTypeFlagsKHR handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 
     // 定义内存分配参数
     VkBufferCreateInfo bufferInfo{};
@@ -968,6 +968,106 @@ uint32_t ResourceManager::findExternalMemoryType(uint32_t typeFilter, VkMemoryPr
     throw std::runtime_error("failed to find suitable external memory type!");
 }
 
+//ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const ExternalMemoryHandle &memHandle, const BufferHardwareWrap &sourceBuffer)
+//{
+//    // 验证外部内存句柄的有效性
+//#if _WIN32 || _WIN64
+//    if (memHandle.handle == nullptr || memHandle.handle == INVALID_HANDLE_VALUE)
+//    {
+//        throw std::runtime_error("Cannot import buffer with invalid memory handle!");
+//    }
+//
+//    VkPhysicalDeviceExternalBufferInfo externalBufferInfo{};
+//    externalBufferInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO;
+//    externalBufferInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+//    externalBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+//
+//    VkExternalBufferProperties externalBufferProperties{};
+//    externalBufferProperties.sType = VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES;
+//
+//    vkGetPhysicalDeviceExternalBufferProperties(this->device->physicalDevice, &externalBufferInfo, &externalBufferProperties);
+//#endif
+//
+//    BufferHardwareWrap importedBuffer = {};
+//    importedBuffer.device = this->device;
+//    importedBuffer.resourceManager = this;
+//    importedBuffer.bufferUsage = sourceBuffer.bufferUsage;
+//
+//    // 创建新的缓冲区
+//    VkBufferCreateInfo bufferInfo = {};
+//    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+//    bufferInfo.size = sourceBuffer.bufferAllocInfo.size;
+//    bufferInfo.usage = importedBuffer.bufferUsage;
+//    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+//
+//    VkExternalMemoryBufferCreateInfo externalInfo = {};
+//    externalInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO;
+//#if _WIN32 || _WIN64
+//    externalInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+//#endif
+//    bufferInfo.pNext = &externalInfo;
+//
+//    if (vkCreateBuffer(this->device->logicalDevice, &bufferInfo, nullptr, &importedBuffer.bufferHandle) != VK_SUCCESS)
+//    {
+//        throw std::runtime_error("failed to create buffer for import!");
+//    }
+//
+//    // 获取内存需求
+//    VkMemoryRequirements memRequirements;
+//    vkGetBufferMemoryRequirements(this->device->logicalDevice, importedBuffer.bufferHandle, &memRequirements);
+//
+//    VkMemoryAllocateInfo allocInfo = {};
+//    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+//    allocInfo.allocationSize = memRequirements.size;
+//    allocInfo.memoryTypeIndex = findExternalMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+//
+//#if _WIN32 || _WIN64
+//    VkImportMemoryWin32HandleInfoKHR importInfo = {};
+//    importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR;
+//    importInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+//    importInfo.handle = memHandle.handle;
+//    allocInfo.pNext = &importInfo;
+//#endif
+//
+//    VkDeviceMemory importedMemory = VK_NULL_HANDLE;
+//    VkResult result = vkAllocateMemory(this->device->logicalDevice, &allocInfo, nullptr, &importedMemory);
+//    if (result != VK_SUCCESS)
+//    {
+//        std::string errorMsg = "Failed to allocate imported memory. Error code: " + std::to_string(result);
+//        switch (result)
+//        {
+//        case VK_ERROR_OUT_OF_HOST_MEMORY:
+//            errorMsg += " (VK_ERROR_OUT_OF_HOST_MEMORY)";
+//            break;
+//        case VK_ERROR_OUT_OF_DEVICE_MEMORY:
+//            errorMsg += " (VK_ERROR_OUT_OF_DEVICE_MEMORY)";
+//            break;
+//        case VK_ERROR_INVALID_EXTERNAL_HANDLE:
+//            errorMsg += " (VK_ERROR_INVALID_EXTERNAL_HANDLE)";
+//            break;
+//        }
+//        throw std::runtime_error(errorMsg);
+//    }
+//
+//    if (importedMemory != nullptr)
+//    {
+//        if (vkBindBufferMemory(this->device->logicalDevice, importedBuffer.bufferHandle, importedMemory, 0) != VK_SUCCESS)
+//        {
+//            throw std::runtime_error("failed to bind imported memory to buffer!");
+//        }
+//
+//        // 保存分配信息
+//        importedBuffer.bufferAllocInfo.deviceMemory = importedMemory;
+//        importedBuffer.bufferAllocInfo.size = sourceBuffer.bufferAllocInfo.size;
+//
+//        return importedBuffer;
+//    }
+//    else
+//    {
+//        throw std::runtime_error("failed to bind imported memory to buffer!");
+//    }
+//}
+
 ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const ExternalMemoryHandle &memHandle, const BufferHardwareWrap &sourceBuffer)
 {
     // 验证外部内存句柄的有效性
@@ -977,15 +1077,17 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
         throw std::runtime_error("Cannot import buffer with invalid memory handle!");
     }
 
-    VkPhysicalDeviceExternalBufferInfo externalBufferInfo{};
-    externalBufferInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO;
-    externalBufferInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-    externalBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    constexpr VkExternalMemoryHandleTypeFlagBits handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 
-    VkExternalBufferProperties externalBufferProperties{};
-    externalBufferProperties.sType = VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES;
+    constexpr static VkExportMemoryAllocateInfoKHR exportMemAllocInfo{
+        VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR,
+        nullptr,
+        handleType};
 
-    vkGetPhysicalDeviceExternalBufferProperties(this->device->physicalDevice, &externalBufferInfo, &externalBufferProperties);
+    constexpr static VkExternalMemoryBufferCreateInfoKHR externalMemBufCreateInfo{
+        VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO_KHR,
+        nullptr,
+        handleType};
 #endif
 
     BufferHardwareWrap importedBuffer = {};
@@ -999,74 +1101,71 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     bufferInfo.size = sourceBuffer.bufferAllocInfo.size;
     bufferInfo.usage = importedBuffer.bufferUsage;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    bufferInfo.pNext = &externalMemBufCreateInfo;
 
-    VkExternalMemoryBufferCreateInfo externalInfo = {};
-    externalInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO;
-#if _WIN32 || _WIN64
-    externalInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-#endif
-    bufferInfo.pNext = &externalInfo;
+    bool requiresDedicated = true;
+    {
+        VkPhysicalDeviceExternalBufferInfo externalBufferInfo = {
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO};
+        externalBufferInfo.flags = bufferInfo.flags;
+        externalBufferInfo.usage = bufferInfo.usage;
+        externalBufferInfo.handleType = handleType;
 
-    if (vkCreateBuffer(this->device->logicalDevice, &bufferInfo, nullptr, &importedBuffer.bufferHandle) != VK_SUCCESS)
+        VkExternalBufferProperties externalBufferProperties = {
+            VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES};
+
+        vkGetPhysicalDeviceExternalBufferProperties(this->device->physicalDevice, &externalBufferInfo, &externalBufferProperties);
+        constexpr VkExternalMemoryFeatureFlags expectedFlags =
+            VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT | VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT;
+        if ((externalBufferProperties.externalMemoryProperties.externalMemoryFeatures & expectedFlags) != expectedFlags)
+        {
+            throw std::runtime_error("The external memory handle type does not support both import and export.");
+        }
+        requiresDedicated = (externalBufferProperties.externalMemoryProperties.externalMemoryFeatures &
+                             VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) != 0;
+    }
+
+
+    VmaAllocationCreateInfo allocCreateInfo = {};
+    allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+
+    uint32_t memTypeIndex = UINT32_MAX;
+    vmaFindMemoryTypeIndexForBufferInfo(g_hAllocator, &bufferInfo, &allocCreateInfo, &memTypeIndex);
+
+    VmaPoolCreateInfo poolCreateInfo = {};
+    poolCreateInfo.memoryTypeIndex = memTypeIndex;
+    poolCreateInfo.pMemoryAllocateNext = (void *)&exportMemAllocInfo;
+
+    VmaPool pool = VK_NULL_HANDLE;
+    vmaCreatePool(g_hAllocator, &poolCreateInfo, &pool);
+
+    allocCreateInfo.pool = pool;
+
+    VkBuffer buf = VK_NULL_HANDLE;
+    VmaAllocation alloc = VK_NULL_HANDLE;
+    vmaCreateBuffer(g_hAllocator, &bufferInfo, &allocCreateInfo, &buf, &alloc, nullptr);
+
+    /*if (vkCreateBuffer(this->device->logicalDevice, &bufferInfo, nullptr, &importedBuffer.bufferHandle) != VK_SUCCESS)
     {
         throw std::runtime_error("failed to create buffer for import!");
-    }
+    }*/
 
-    // 获取内存需求
-    VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(this->device->logicalDevice, importedBuffer.bufferHandle, &memRequirements);
+     VkImportMemoryWin32HandleInfoKHR importMemHandleInfo = {
+        VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR};
+    importMemHandleInfo.handleType = handleType;
+     importMemHandleInfo.handle = memHandle.handle;
+    importMemHandleInfo.name = nullptr;
+    VmaAllocationCreateInfo importAllocCreateInfo = {};
+    importAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
 
-    VkMemoryAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findExternalMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    importedBuffer.bufferHandle = VK_NULL_HANDLE;
+    importedBuffer.bufferAlloc = VK_NULL_HANDLE;
 
-#if _WIN32 || _WIN64
-    VkImportMemoryWin32HandleInfoKHR importInfo = {};
-    importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR;
-    importInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-    importInfo.handle = memHandle.handle;
-    allocInfo.pNext = &importInfo;
-#endif
+    vmaCreateDedicatedBuffer(g_hAllocator, &bufferInfo, &importAllocCreateInfo, &importMemHandleInfo, &importedBuffer.bufferHandle, &importedBuffer.bufferAlloc, &importedBuffer.bufferAllocInfo);
 
-    VkDeviceMemory importedMemory = VK_NULL_HANDLE;
-    VkResult result = vkAllocateMemory(this->device->logicalDevice, &allocInfo, nullptr, &importedMemory);
-    if (result != VK_SUCCESS)
-    {
-        std::string errorMsg = "Failed to allocate imported memory. Error code: " + std::to_string(result);
-        switch (result)
-        {
-        case VK_ERROR_OUT_OF_HOST_MEMORY:
-            errorMsg += " (VK_ERROR_OUT_OF_HOST_MEMORY)";
-            break;
-        case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-            errorMsg += " (VK_ERROR_OUT_OF_DEVICE_MEMORY)";
-            break;
-        case VK_ERROR_INVALID_EXTERNAL_HANDLE:
-            errorMsg += " (VK_ERROR_INVALID_EXTERNAL_HANDLE)";
-            break;
-        }
-        throw std::runtime_error(errorMsg);
-    }
+    return importedBuffer;
 
-    if (importedMemory != nullptr)
-    {
-        if (vkBindBufferMemory(this->device->logicalDevice, importedBuffer.bufferHandle, importedMemory, 0) != VK_SUCCESS)
-        {
-            throw std::runtime_error("failed to bind imported memory to buffer!");
-        }
-
-        // 保存分配信息
-        importedBuffer.bufferAllocInfo.deviceMemory = importedMemory;
-        importedBuffer.bufferAllocInfo.size = sourceBuffer.bufferAllocInfo.size;
-
-        return importedBuffer;
-    }
-    else
-    {
-        throw std::runtime_error("failed to bind imported memory to buffer!");
-    }
-}
+} 
 
 void ResourceManager::copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData)
 {
