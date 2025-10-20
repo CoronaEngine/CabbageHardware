@@ -107,11 +107,11 @@ HardwareBuffer::HardwareBuffer(uint64_t bufferSize, BufferUsage usage, const voi
 	}
 }
 
-bool HardwareBuffer::copyFromBuffer(const HardwareBuffer& inputBuffer, uint64_t size)
+bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, uint64_t size, HardwareExecutor *executor)
 {
     std::unique_lock<std::mutex> lock(bufferMutex);
 
-    globalHardwareContext.mainDevice->resourceManager.copyBuffer(bufferGlobalPool[*inputBuffer.bufferID].bufferHandle, bufferGlobalPool[*bufferID].bufferHandle, size);
+    globalHardwareContext.mainDevice->resourceManager.copyBuffer(executor,bufferGlobalPool[*inputBuffer.bufferID].bufferHandle, bufferGlobalPool[*bufferID].bufferHandle, size);
 	return true;
 }
 

@@ -362,6 +362,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
         {
             // 在主设备上：源图像 -> srcStaging
             hardwareExecutor(HardwareExecutor::ExecutorType::Graphics) << globalHardwareContext.mainDevice->resourceManager.copyImageToBuffer(
+                &hardwareExecutor,
                 sourceImage.imageHandle,
                 srcStaging.bufferHandle,
                 sourceImage.imageSize.x,
@@ -377,6 +378,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
             // 在显示设备上：dstStaging -> 目标图像
             hardwareExecutor << displayDevice->resourceManager.copyBufferToImage(
+                &hardwareExecutor,
                 dstStaging.bufferHandle,
                 this->displayImage.imageHandle,
                 this->displayImage.imageSize.x,

@@ -68,7 +68,7 @@ struct HardwareBuffer
 
     uint32_t storeDescriptor();
 
-    bool copyFromBuffer(const HardwareBuffer &inputBuffer, uint64_t size);
+    bool copyFromBuffer(const HardwareBuffer &inputBuffer, uint64_t size, HardwareExecutor *executor);
     bool copyFromData(const void *inputData, uint64_t size);
 
     template <typename Type>
@@ -112,8 +112,8 @@ struct HardwareImage
     friend HardwareExecutor &operator<<(HardwareExecutor &executor, HardwareImage &other);
     HardwareExecutor *executor;
 
-    HardwareImage& copyFromBuffer(const HardwareBuffer &buffer);
-    HardwareImage& copyFromData(const void *inputData);
+    HardwareImage &copyFromBuffer(const HardwareBuffer &buffer, HardwareExecutor *executor);
+    HardwareImage &copyFromData(const void *inputData, HardwareExecutor *executor);
 };
 
 inline HardwareExecutor &operator<<(HardwareExecutor &executor, HardwareImage &other)

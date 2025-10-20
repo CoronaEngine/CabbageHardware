@@ -492,7 +492,7 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     return resultImage;
 }
 
-ResourceManager &ResourceManager::copyImageMemory(ImageHardwareWrap &source, ImageHardwareWrap &destination)
+ResourceManager &ResourceManager::copyImageMemory(HardwareExecutor *executor, ImageHardwareWrap &source, ImageHardwareWrap &destination)
 {
     //if (source.pixelSize == destination.pixelSize)
     //{
@@ -737,7 +737,7 @@ ResourceManager &ResourceManager::copyImageMemory(ImageHardwareWrap &source, Ima
 //
 //}
 
-ResourceManager &ResourceManager::transitionImageLayout(ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage, VkPipelineStageFlags destinationStage)
+ResourceManager &ResourceManager::transitionImageLayout(HardwareExecutor *executor, ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage, VkPipelineStageFlags destinationStage)
 {
     if (image.imageLayout != newLayout)
     {
@@ -868,7 +868,7 @@ ResourceManager &ResourceManager::transitionImageLayout(ImageHardwareWrap &image
     }
 }
 
-ResourceManager &ResourceManager::copyImageToBuffer(VkImage image, VkBuffer buffer, uint32_t width, uint32_t height)
+ResourceManager &ResourceManager::copyImageToBuffer(HardwareExecutor *executor, VkImage image, VkBuffer buffer, uint32_t width, uint32_t height)
 {
     auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
         VkBufferImageCopy region{};
@@ -893,7 +893,7 @@ ResourceManager &ResourceManager::copyImageToBuffer(VkImage image, VkBuffer buff
     return *this;
 }
 
-ResourceManager &ResourceManager::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
+ResourceManager &ResourceManager::copyBufferToImage(HardwareExecutor *executor, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
 {
     auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
         VkBufferImageCopy region{};
@@ -918,7 +918,7 @@ ResourceManager &ResourceManager::copyBufferToImage(VkBuffer buffer, VkImage ima
     return *this;
 }
 
-ResourceManager &ResourceManager::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+ResourceManager &ResourceManager::copyBuffer(HardwareExecutor *executor, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
 {
     auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
         VkBufferCopy copyRegion{};

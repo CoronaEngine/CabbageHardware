@@ -15,7 +15,7 @@ ComputePipeline::ComputePipeline(std::string shaderCode, EmbeddedShader::ShaderL
 }
 
 
-ComputePipeline &ComputePipeline::operator()(uint16_t groupCountX, uint16_t groupCountY, uint16_t groupCountZ)
+ComputePipeline &ComputePipeline::operator()(HardwareExecutor *executor, uint16_t groupCountX, uint16_t groupCountY, uint16_t groupCountZ)
 {
 	if (pipelineLayout == VK_NULL_HANDLE && pipeline == VK_NULL_HANDLE)
 	{

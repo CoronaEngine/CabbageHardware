@@ -490,8 +490,8 @@ int main()
                 computer["pushConsts.uniformBufferIndex"] = computeUniformBuffer.storeDescriptor();
 
                 executor(HardwareExecutor::ExecutorType::Graphics) 
-                    << rasterizer(1920, 1080) << rasterizer.record(indexBuffer)
-                    << computer(1920 / 8, 1080 / 8, 1) 
+                    << rasterizer(&executor, 1920, 1080) << rasterizer.record(&executor,indexBuffer)
+                    << computer(&executor,1920 / 8, 1080 / 8, 1) 
                     << executor.commit();
 
                 displayManager = finalOutputImage;

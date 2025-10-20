@@ -80,16 +80,16 @@ uint32_t HardwareImage::storeDescriptor()
 }
 
 
-HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
+HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer, HardwareExecutor *executor)
 {
-    *executor << globalHardwareContext.mainDevice->resourceManager.copyBufferToImage(bufferGlobalPool[*buffer.bufferID].bufferHandle, imageGlobalPool[*imageID].imageHandle, imageGlobalPool[*imageID].imageSize.x, imageGlobalPool[*imageID].imageSize.y);
+    *executor << globalHardwareContext.mainDevice->resourceManager.copyBufferToImage(executor, bufferGlobalPool[*buffer.bufferID].bufferHandle, imageGlobalPool[*imageID].imageHandle, imageGlobalPool[*imageID].imageSize.x, imageGlobalPool[*imageID].imageSize.y);
 	return *this;
 }
 
-HardwareImage &HardwareImage::copyFromData(const void *inputData)
+HardwareImage &HardwareImage::copyFromData(const void *inputData, HardwareExecutor *executor)
 {
 	HardwareBuffer stagingBuffer = HardwareBuffer(imageGlobalPool[*imageID].imageSize.x * imageGlobalPool[*imageID].imageSize.y * imageGlobalPool[*imageID].pixelSize, BufferUsage::StorageBuffer, inputData);
-	copyFromBuffer(stagingBuffer);
+    copyFromBuffer(stagingBuffer, executor);
 	return *this;
 }
 
@@ -180,6 +180,6 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
 	if (imageData != nullptr)
 	{
         HardwareExecutor tempExecutor;
-        tempExecutor(HardwareExecutor::ExecutorType::Transfer) << copyFromData(imageData) << tempExecutor.commit();
+        tempExecutor(HardwareExecutor::ExecutorType::Transfer) << copyFromData(imageData, &tempExecutor) << tempExecutor.commit();
 	}
 }
