@@ -7,9 +7,7 @@
 
 #include<Hardware/GlobalContext.h>
 
-#define USE_SAME_DEVICE
-
-#define TEST_CPU_DATA
+//#define USE_SAME_DEVICE
 
 //#if _WIN32 || _WIN64
 //#include<vulkan/vulkan_win32.h>
@@ -245,7 +243,7 @@ void DisplayManager::createSwapChain()
         queueFamilys[i] = i;
     }
 
-    if (queueFamilys.size() > 0)
+    if (queueFamilys.size() > 1)
     {
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = queueFamilys.size();
@@ -366,11 +364,17 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 sourceImage.imageSize.y);
 
 #ifdef USE_SAME_DEVICE
+            
+#else
             vkDeviceWaitIdle(displayDevice->deviceManager.logicalDevice);
             vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
 
             srcCpuData.resize(srcStaging.bufferAllocInfo.size);
             globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(srcStaging, srcCpuData.data());
+
+            dstCpuData.resize(dstStaging.bufferAllocInfo.size);
+            globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(dstStaging, dstCpuData.data());
+
 #endif
 
             // 在显示设备上：dstStaging -> 目标图像
@@ -381,8 +385,10 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 this->displayImage.imageSize.y);
 
 #ifdef USE_SAME_DEVICE
+
+#else
             dstCpuData.resize(dstStaging.bufferAllocInfo.size);
-            displayDevice->resourceManager.copyBufferToCpu(dstStaging.device->logicalDevice, dstStaging.bufferAllocInfo.deviceMemory, dstStaging.bufferAllocInfo.size, dstCpuData.data());
+            globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(dstStaging, dstCpuData.data());
 #endif
 
             auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
@@ -413,7 +419,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
             std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos;
             {
-                VkSemaphoreSubmitInfo waitInfo{};
+                 VkSemaphoreSubmitInfo waitInfo{};
                 waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
                 waitInfo.semaphore = imageAvailableSemaphores[currentFrame];
                 waitInfo.value = 0; // For binary semaphores, this must be 0

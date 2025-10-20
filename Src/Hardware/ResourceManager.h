@@ -92,7 +92,6 @@ struct ResourceManager
 	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
     void copyImageToBuffer(VkImage image, VkBuffer buffer, uint32_t width, uint32_t height);
     void copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData);
-    void copyBufferToCpu(VkDevice &device, VkDeviceMemory &memory, VkDeviceSize size, void *cpuData);
 
     ExternalMemoryHandle exportBufferMemory(BufferHardwareWrap &sourceBuffer);
     BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle &memHandle, const BufferHardwareWrap &sourceBuffer);
