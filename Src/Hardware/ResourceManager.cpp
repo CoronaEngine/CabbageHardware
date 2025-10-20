@@ -1153,7 +1153,8 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
 
     VkBuffer buf = VK_NULL_HANDLE;
     VmaAllocation alloc = VK_NULL_HANDLE;
-    vmaCreateBuffer(g_hAllocator, &bufferInfo, &allocCreateInfo, &buf, &alloc, nullptr);
+    VmaAllocationInfo allocInfo = {};
+    vmaCreateBuffer(g_hAllocator, &bufferInfo, &allocCreateInfo, &buf, &alloc, &allocInfo);
 
     /*if (vkCreateBuffer(this->device->logicalDevice, &bufferInfo, nullptr, &importedBuffer.bufferHandle) != VK_SUCCESS)
     {
