@@ -243,7 +243,7 @@ void DisplayManager::createSwapChain()
         queueFamilys[i] = i;
     }
 
-    if (queueFamilys.size() > 0)
+    if (queueFamilys.size() > 1)
     {
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = queueFamilys.size();
