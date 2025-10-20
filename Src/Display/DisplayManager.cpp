@@ -373,7 +373,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
             globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(srcStaging, srcCpuData.data());
 
             dstCpuData.resize(dstStaging.bufferAllocInfo.size);
-            displayDevice->resourceManager.copyBufferToCpu(dstStaging.device->logicalDevice, dstStaging.bufferAllocInfo.deviceMemory, dstStaging.bufferAllocInfo.size, dstCpuData.data());
+            globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(dstStaging, dstCpuData.data());
 
 #endif
 
@@ -384,12 +384,12 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 this->displayImage.imageSize.x,
                 this->displayImage.imageSize.y);
 
-//#ifdef USE_SAME_DEVICE
-//
-//#else
-//            dstCpuData.resize(dstStaging.bufferAllocInfo.size);
-//            displayDevice->resourceManager.copyBufferToCpu(dstStaging.device->logicalDevice, dstStaging.bufferAllocInfo.deviceMemory, dstStaging.bufferAllocInfo.size, dstCpuData.data());
-//#endif
+#ifdef USE_SAME_DEVICE
+
+#else
+            dstCpuData.resize(dstStaging.bufferAllocInfo.size);
+            globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(dstStaging, dstCpuData.data());
+#endif
 
             auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
 
