@@ -3,7 +3,7 @@
 #include <Hardware/GlobalContext.h>
 
 
-HardwareExecutor &HardwareExecutor::operator()(AbstractCommand::ExecutorType queueType, HardwareExecutor *waitExecutor)
+HardwareExecutor &HardwareExecutor::operator()(CommandRecord::ExecutorType queueType, HardwareExecutor *waitExecutor)
 {
     if (recordingBegan == false)
     {
@@ -15,15 +15,15 @@ HardwareExecutor &HardwareExecutor::operator()(AbstractCommand::ExecutorType que
         {
             switch (queueType)
             {
-            case AbstractCommand::ExecutorType::Graphics:
+            case CommandRecord::ExecutorType::Graphics:
                 queueIndex = hardwareContext->deviceManager.currentGraphicsQueueIndex.fetch_add(1) % hardwareContext->deviceManager.graphicsQueues.size();
                 currentRecordQueue = &hardwareContext->deviceManager.graphicsQueues[queueIndex];
                 break;
-            case AbstractCommand::ExecutorType::Compute:
+            case CommandRecord::ExecutorType::Compute:
                 queueIndex = hardwareContext->deviceManager.currentComputeQueueIndex.fetch_add(1) % hardwareContext->deviceManager.computeQueues.size();
                 currentRecordQueue = &hardwareContext->deviceManager.computeQueues[queueIndex];
                 break;
-            case AbstractCommand::ExecutorType::Transfer:
+            case CommandRecord::ExecutorType::Transfer:
                 queueIndex = hardwareContext->deviceManager.currentTransferQueueIndex.fetch_add(1) % hardwareContext->deviceManager.transferQueues.size();
                 currentRecordQueue = &hardwareContext->deviceManager.transferQueues[queueIndex];
                 break;

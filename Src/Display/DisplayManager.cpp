@@ -361,7 +361,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 		if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
         {
             // 在主设备上：源图像 -> srcStaging
-            hardwareExecutor(AbstractCommand::ExecutorType::Graphics) << globalHardwareContext.mainDevice->resourceManager.copyImageToBuffer(
+            hardwareExecutor(CommandRecord::ExecutorType::Graphics) << globalHardwareContext.mainDevice->resourceManager.copyImageToBuffer(
                 &hardwareExecutor,
                 sourceImage.imageHandle,
                 srcStaging.bufferHandle,
