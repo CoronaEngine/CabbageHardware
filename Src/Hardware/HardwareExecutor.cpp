@@ -5,15 +5,20 @@
 
 bool HardwareExecutor::beginRecording()
 {
-    vkResetCommandBuffer(currentRecordQueue->commandBuffer, 0);
+    if (recordingBegan == false)
+    {
+        vkResetCommandBuffer(currentRecordQueue->commandBuffer, 0);
 
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-    vkBeginCommandBuffer(currentRecordQueue->commandBuffer, &beginInfo);
+        vkBeginCommandBuffer(currentRecordQueue->commandBuffer, &beginInfo);
 
-    return true;
+        recordingBegan = true;
+    }
+
+    return recordingBegan;
 }
 
 HardwareExecutor &HardwareExecutor::operator()(ExecutorType queueType, HardwareExecutor *waitExecutor)
@@ -76,7 +81,7 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
     {
     }
 
-    if (rasterizerPipelineBegin || computePipelineBegin)
+    if (recordingBegan)
     {
         vkEndCommandBuffer(currentRecordQueue->commandBuffer);
 
