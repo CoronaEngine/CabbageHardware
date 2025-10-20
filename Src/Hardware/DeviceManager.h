@@ -29,12 +29,12 @@
 class DeviceManager
 {
   public:
-    enum QueueType
-    {
-        GraphicsQueue = 0,
-        ComputeQueue = 1,
-        TransferQueue = 2
-    };
+    //enum QueueType
+    //{
+    //    GraphicsQueue = 0,
+    //    ComputeQueue = 1,
+    //    TransferQueue = 2
+    //};
 
     struct QueueUtils
     {
@@ -75,19 +75,19 @@ class DeviceManager
 
     void cleanUpDeviceManager();
 
-    DeviceManager &startCommands(QueueType queueType = QueueType::GraphicsQueue);
-    DeviceManager &endCommands(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
-                               std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
-                               VkFence fence = VK_NULL_HANDLE);
+    //DeviceManager &startCommands(QueueType queueType = QueueType::GraphicsQueue);
+    //DeviceManager &endCommands(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
+    //                           std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
+    //                           VkFence fence = VK_NULL_HANDLE);
 
-    DeviceManager &operator<<(const DeviceManager &)
-    {
-        return *this;
-    }
+    //DeviceManager &operator<<(const DeviceManager &)
+    //{
+    //    return *this;
+    //}
 
-    DeviceManager &operator<<(std::function<void(const VkCommandBuffer &commandBuffer)> commandsFunction);
-    
-    QueueUtils *currentRecordQueue = nullptr;
+    //DeviceManager &operator<<(std::function<void(const VkCommandBuffer &commandBuffer)> commandsFunction);
+    //
+    //QueueUtils *currentRecordQueue = nullptr;
  
 
     std::vector<QueueUtils> pickAvailableQueues(std::function<bool(const QueueUtils &)> required)
@@ -123,6 +123,8 @@ class DeviceManager
     }
 
   private:
+    friend class HardwareExecutor;
+
     void createDevices(const CreateCallback &createInfo, const VkInstance &vkInstance);
 
     void chooseMainDevice();

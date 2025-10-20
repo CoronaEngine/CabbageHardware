@@ -65,10 +65,10 @@ struct RasterizerPipeline
         return std::move(HardwarePushConstant());
     }
 
-    RasterizerPipeline &operator()(uint16_t x, uint16_t y);
+    RasterizerPipeline &operator()(HardwareExecutor *executor, uint16_t x, uint16_t y);
     //HardwareExecutor &endRecord();
 
-    HardwareExecutor& record(const HardwareBuffer &indexBuffer);
+    HardwareExecutor &record(HardwareExecutor *executor, const HardwareBuffer &indexBuffer);
 
     // void recordGeomMesh()
     //{

@@ -9,6 +9,8 @@
 
 //#define USE_SAME_DEVICE
 
+//#define TEST_CPU_DATA
+
 //#if _WIN32 || _WIN64
 //#include<vulkan/vulkan_win32.h>
 //#elif __APPLE__
@@ -167,6 +169,8 @@ void DisplayManager::choosePresentDevice()
 		}
 	}
 #endif
+
+    hardwareExecutor = HardwareExecutor(displayDevice);
 }
 
 
@@ -357,13 +361,14 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 		if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
         {
             // 在主设备上：源图像 -> srcStaging
-            globalHardwareContext.mainDevice->resourceManager.copyImageToBuffer(
+            hardwareExecutor(HardwareExecutor::ExecutorType::Graphics) << globalHardwareContext.mainDevice->resourceManager.copyImageToBuffer(
+                &hardwareExecutor,
                 sourceImage.imageHandle,
                 srcStaging.bufferHandle,
                 sourceImage.imageSize.x,
                 sourceImage.imageSize.y);
 
-#ifdef USE_SAME_DEVICE
+#ifdef TEST_CPU_DATA
             
 #else
             vkDeviceWaitIdle(displayDevice->deviceManager.logicalDevice);
@@ -378,13 +383,14 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 #endif
 
             // 在显示设备上：dstStaging -> 目标图像
-            displayDevice->resourceManager.copyBufferToImage(
+            hardwareExecutor << displayDevice->resourceManager.copyBufferToImage(
+                &hardwareExecutor,
                 dstStaging.bufferHandle,
                 this->displayImage.imageHandle,
                 this->displayImage.imageSize.x,
                 this->displayImage.imageSize.y);
 
-#ifdef USE_SAME_DEVICE
+#ifdef TEST_CPU_DATA
 
 #else
             dstCpuData.resize(dstStaging.bufferAllocInfo.size);
@@ -438,8 +444,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 signalSemaphoreInfos.push_back(signalInfo);
             }
 
-             displayDevice->deviceManager.startCommands() << runCommand 
-                 << displayDevice->deviceManager.endCommands(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame]);
+             hardwareExecutor << runCommand  << hardwareExecutor.commit(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame]);
 
              // 准备呈现信息，等待 timeline semaphore
              VkPresentInfoKHR presentInfo{};
