@@ -1,12 +1,51 @@
-#include"HardwareExecutor.h"
+#include "HardwareExecutor.h"
 
 #include <Hardware/GlobalContext.h>
 
 
-bool HardwareExecutor::beginRecording()
+HardwareExecutor &HardwareExecutor::operator()(ExecutorType queueType, HardwareExecutor *waitExecutor)
 {
     if (recordingBegan == false)
     {
+        this->queueType = queueType;
+
+        uint16_t queueIndex = 0;
+
+        while (true)
+        {
+            switch (queueType)
+            {
+            case ExecutorType::Graphics:
+                queueIndex = hardwareContext->deviceManager.currentGraphicsQueueIndex.fetch_add(1) % hardwareContext->deviceManager.graphicsQueues.size();
+                currentRecordQueue = &hardwareContext->deviceManager.graphicsQueues[queueIndex];
+                break;
+            case ExecutorType::Compute:
+                queueIndex = hardwareContext->deviceManager.currentComputeQueueIndex.fetch_add(1) % hardwareContext->deviceManager.computeQueues.size();
+                currentRecordQueue = &hardwareContext->deviceManager.computeQueues[queueIndex];
+                break;
+            case ExecutorType::Transfer:
+                queueIndex = hardwareContext->deviceManager.currentTransferQueueIndex.fetch_add(1) % hardwareContext->deviceManager.transferQueues.size();
+                currentRecordQueue = &hardwareContext->deviceManager.transferQueues[queueIndex];
+                break;
+            }
+
+            if (currentRecordQueue->queueMutex->try_lock())
+            {
+                uint64_t timelineCounterValue = 0;
+                vkGetSemaphoreCounterValue(hardwareContext->deviceManager.logicalDevice, currentRecordQueue->timelineSemaphore, &timelineCounterValue);
+                if (timelineCounterValue >= currentRecordQueue->timelineValue)
+                {
+                    break;
+                }
+                else
+                {
+                    currentRecordQueue->queueMutex->unlock();
+                }
+            }
+
+            std::this_thread::yield();
+        }
+
         vkResetCommandBuffer(currentRecordQueue->commandBuffer, 0);
 
         VkCommandBufferBeginInfo beginInfo{};
@@ -18,53 +57,8 @@ bool HardwareExecutor::beginRecording()
         recordingBegan = true;
     }
 
-    return recordingBegan;
-}
-
-HardwareExecutor &HardwareExecutor::operator()(ExecutorType queueType, HardwareExecutor *waitExecutor)
-{
-    this->queueType = queueType;
-
-    uint16_t queueIndex = 0;
-
-    while (true)
-    {
-        switch (queueType)
-        {
-        case ExecutorType::Graphics:
-            queueIndex = hardwareContext->deviceManager.currentGraphicsQueueIndex.fetch_add(1) % hardwareContext->deviceManager.graphicsQueues.size();
-            currentRecordQueue = &hardwareContext->deviceManager.graphicsQueues[queueIndex];
-            break;
-        case ExecutorType::Compute:
-            queueIndex = hardwareContext->deviceManager.currentComputeQueueIndex.fetch_add(1) % hardwareContext->deviceManager.computeQueues.size();
-            currentRecordQueue = &hardwareContext->deviceManager.computeQueues[queueIndex];
-            break;
-        case ExecutorType::Transfer:
-            queueIndex = hardwareContext->deviceManager.currentTransferQueueIndex.fetch_add(1) % hardwareContext->deviceManager.transferQueues.size();
-            currentRecordQueue = &hardwareContext->deviceManager.transferQueues[queueIndex];
-            break;
-        }
-
-        if (currentRecordQueue->queueMutex->try_lock())
-        {
-            uint64_t timelineCounterValue = 0;
-            vkGetSemaphoreCounterValue(hardwareContext->deviceManager.logicalDevice, currentRecordQueue->timelineSemaphore, &timelineCounterValue);
-            if (timelineCounterValue >= currentRecordQueue->timelineValue)
-            {
-                break;
-            }
-            else
-            {
-                currentRecordQueue->queueMutex->unlock();
-            }
-        }
-
-        std::this_thread::yield();
-    }
-
     return *this;
 }
-
 
 HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos, std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos, VkFence fence)
 {
@@ -75,10 +69,13 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
         };
 
         *this << runCommand;
+
+        rasterizerPipelineBegin = false;
     }
 
     if (computePipelineBegin)
     {
+        computePipelineBegin = false;
     }
 
     if (recordingBegan)
@@ -120,8 +117,7 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
 
         currentRecordQueue->queueMutex->unlock();
 
-        computePipelineBegin = false;
-        rasterizerPipelineBegin = false;
+        recordingBegan = false;
     }
 
     return *this;

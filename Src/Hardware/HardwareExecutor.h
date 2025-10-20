@@ -39,8 +39,6 @@ struct HardwareExecutor
                              std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
                              VkFence fence = VK_NULL_HANDLE);
 
-    
-    bool beginRecording();
 
   private:
     friend HardwareExecutor &operator<<(HardwareExecutor &executor, RasterizerPipeline &other);
