@@ -236,15 +236,21 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
         vbInfo.size = size;
         vbInfo.usage = usage;
 
-        std::vector<uint32_t> queueFamilys(device->getQueueFamilyNumber());
-        for (size_t i = 0; i < queueFamilys.size(); i++)
+        if (device->getQueueFamilyNumber() > 1)
         {
-            queueFamilys[i] = i;
+            std::vector<uint32_t> queueFamilys(device->getQueueFamilyNumber());
+            for (size_t i = 0; i < queueFamilys.size(); i++)
+            {
+                queueFamilys[i] = i;
+            }
+            vbInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+            vbInfo.queueFamilyIndexCount = queueFamilys.size();
+            vbInfo.pQueueFamilyIndices = queueFamilys.data();
         }
-
-        vbInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-        vbInfo.queueFamilyIndexCount = queueFamilys.size();
-        vbInfo.pQueueFamilyIndices = queueFamilys.data();
+        else
+        {
+            vbInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        }
 
         VkExternalMemoryBufferCreateInfo externalMemoryBufferInfo = {};
         externalMemoryBufferInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO;
@@ -295,15 +301,21 @@ void ResourceManager::createExternalMemoryPool()
     bufferInfo.size = 0x10000; // 示例大小
     bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-    std::vector<uint32_t> queueFamilys(device->getQueueFamilyNumber());
-    for (size_t i = 0; i < queueFamilys.size(); i++)
+    if (device->getQueueFamilyNumber() > 1)
     {
-        queueFamilys[i] = i;
+        std::vector<uint32_t> queueFamilys(device->getQueueFamilyNumber());
+        for (size_t i = 0; i < queueFamilys.size(); i++)
+        {
+            queueFamilys[i] = i;
+        }
+        bufferInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        bufferInfo.queueFamilyIndexCount = queueFamilys.size();
+        bufferInfo.pQueueFamilyIndices = queueFamilys.data();
     }
-
-    bufferInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-    bufferInfo.queueFamilyIndexCount = queueFamilys.size();
-    bufferInfo.pQueueFamilyIndices = queueFamilys.data();
+    else
+    {
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
 
     VkExternalMemoryBufferCreateInfoKHR externalBufInfo{};
     externalBufInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO_KHR;
@@ -464,15 +476,32 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
         imageInfo.usage = imageUsage;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 
-        std::vector<uint32_t> queueFamilys(device->getQueueFamilyNumber());
-        for (size_t i = 0; i < queueFamilys.size(); i++)
+        //std::vector<uint32_t> queueFamilys(device->getQueueFamilyNumber());
+        //for (size_t i = 0; i < queueFamilys.size(); i++)
+        //{
+        //    queueFamilys[i] = i;
+        //}
+
+        //imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        //imageInfo.queueFamilyIndexCount = queueFamilys.size();
+        //imageInfo.pQueueFamilyIndices = queueFamilys.data();
+
+        if (device->getQueueFamilyNumber() > 1)
         {
-            queueFamilys[i] = i;
+            std::vector<uint32_t> queueFamilys(device->getQueueFamilyNumber());
+            for (size_t i = 0; i < queueFamilys.size(); i++)
+            {
+                queueFamilys[i] = i;
+            }
+            imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+            imageInfo.queueFamilyIndexCount = queueFamilys.size();
+            imageInfo.pQueueFamilyIndices = queueFamilys.data();
+        }
+        else
+        {
+            imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         }
 
-        imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-        imageInfo.queueFamilyIndexCount = queueFamilys.size();
-        imageInfo.pQueueFamilyIndices = queueFamilys.data();
 
         imageInfo.pNext = &externalInfo;
         //imageInfo.pNext = nullptr;
