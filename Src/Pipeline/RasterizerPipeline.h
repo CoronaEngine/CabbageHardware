@@ -67,7 +67,7 @@ struct RasterizerPipeline : public CommandRecord
 
     RasterizerPipeline &operator()(uint16_t x, uint16_t y);
 
-    HardwareExecutor &record(HardwareExecutor *executor, const HardwareBuffer &indexBuffer);
+    HardwareExecutor &record(const HardwareBuffer &indexBuffer);
 
     void commitCommand(HardwareExecutor &executor) override;
 
@@ -133,6 +133,5 @@ struct RasterizerPipeline : public CommandRecord
 inline HardwareExecutor &operator<<(HardwareExecutor &executor, RasterizerPipeline &other)
 {
     other.executor = &executor;
-    executor.rasterizerPipelineBegin = true;
     return executor;
 }

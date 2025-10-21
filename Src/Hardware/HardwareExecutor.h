@@ -55,8 +55,6 @@ struct HardwareExecutor
     friend HardwareExecutor &operator<<(HardwareExecutor &executor, ComputePipeline &other);
 
     bool recordingBegan = false;
-    bool computePipelineBegin = false;
-    bool rasterizerPipelineBegin = false;
 
     CommandRecord::ExecutorType queueType = CommandRecord::ExecutorType::Graphics;
     DeviceManager::QueueUtils *currentRecordQueue = nullptr;

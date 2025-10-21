@@ -62,22 +62,6 @@ HardwareExecutor &HardwareExecutor::operator()(CommandRecord::ExecutorType queue
 
 HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos, std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos, VkFence fence)
 {
-    if (rasterizerPipelineBegin)
-    {
-        auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
-            vkCmdEndRenderPass(commandBuffer);
-        };
-
-        *this << runCommand;
-
-        rasterizerPipelineBegin = false;
-    }
-
-    if (computePipelineBegin)
-    {
-        computePipelineBegin = false;
-    }
-
     if (recordingBegan)
     {
         vkEndCommandBuffer(currentRecordQueue->commandBuffer);

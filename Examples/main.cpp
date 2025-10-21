@@ -490,7 +490,7 @@ int main()
                 computer["pushConsts.uniformBufferIndex"] = computeUniformBuffer.storeDescriptor();
 
                 executor(CommandRecord::ExecutorType::Graphics) 
-                    << rasterizer(&executor, 1920, 1080) << rasterizer.record(&executor,indexBuffer)
+                    << rasterizer(1920, 1080) << rasterizer.record(indexBuffer)
                     << computer(1920 / 8, 1080 / 8, 1) 
                     << executor.commit();
 
