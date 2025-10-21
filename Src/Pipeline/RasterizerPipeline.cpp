@@ -393,6 +393,11 @@ RasterizerPipeline* RasterizerPipeline::operator()(uint16_t imageSizeX, uint16_t
 
 CommandRecord *RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
 {
+    TriangleGeomMesh temp;
+    temp.indexBuffer = indexBuffer;
+    temp.vertexBuffers = tempVertexBuffers;
+    temp.pushConstant = tempPushConstant;
+    geomMeshes.push_back(temp);
     return &dumpCommandRecord;
 }
 
