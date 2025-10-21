@@ -1592,3 +1592,42 @@ VkShaderModule ResourceManager::createShaderModule(const std::vector<unsigned in
     return shaderModule;
 }
 
+ResourceManager &ResourceManager::blitImage(
+    HardwareExecutor *executor,
+    ImageHardwareWrap &srcImage,
+    ImageHardwareWrap &dstImage)
+{
+    auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
+
+        VkImageBlit imageBlit;
+        imageBlit.dstOffsets[0] = VkOffset3D{0, 0, 0};
+        imageBlit.dstOffsets[1] = VkOffset3D{int32_t(dstImage.imageSize.x), int32_t(dstImage.imageSize.y), 1};
+
+        imageBlit.srcOffsets[0] = VkOffset3D{0, 0, 0};
+        imageBlit.srcOffsets[1] = VkOffset3D{int32_t(srcImage.imageSize.x), int32_t(srcImage.imageSize.y), 1};
+
+        imageBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+        imageBlit.dstSubresource.baseArrayLayer = 0;
+        imageBlit.srcSubresource.baseArrayLayer = 0;
+
+        imageBlit.dstSubresource.layerCount = 1;
+        imageBlit.srcSubresource.layerCount = 1;
+
+        imageBlit.dstSubresource.mipLevel = 0;
+        imageBlit.srcSubresource.mipLevel = 0;
+
+        vkCmdBlitImage(
+            commandBuffer,
+            srcImage.imageHandle, srcImage.imageLayout,
+            dstImage.imageHandle, dstImage.imageLayout,
+            1, &imageBlit,
+            VK_FILTER_LINEAR);
+    };
+
+    *executor << runCommand;
+
+    return *this;
+
+}

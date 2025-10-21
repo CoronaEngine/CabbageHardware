@@ -92,7 +92,9 @@ struct ResourceManager
 	ResourceManager &copyBuffer(HardwareExecutor *executor, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
     ResourceManager &copyImageMemory(HardwareExecutor *executor, ImageHardwareWrap &source, ImageHardwareWrap &destination);
 
-	ResourceManager &copyBufferToImage(HardwareExecutor *executor, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+    ResourceManager &blitImage(HardwareExecutor *executor, ImageHardwareWrap &srcImage, ImageHardwareWrap &dstImage);
+
+    ResourceManager &copyBufferToImage(HardwareExecutor *executor, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
     ResourceManager &copyImageToBuffer(HardwareExecutor *executor, VkImage image, VkBuffer buffer, uint32_t width, uint32_t height);
 
     void copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData);

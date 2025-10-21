@@ -397,32 +397,6 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
             globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(dstStaging, dstCpuData.data());
 #endif
 
-            auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
-
-                VkImageBlit imageBlit;
-                imageBlit.dstOffsets[0] = VkOffset3D{0, 0, 0};
-                imageBlit.dstOffsets[1] = VkOffset3D{int32_t(swapChainImages[imageIndex].imageSize.x), int32_t(swapChainImages[imageIndex].imageSize.y), 1};
-
-                imageBlit.srcOffsets[0] = VkOffset3D{0, 0, 0};
-                imageBlit.srcOffsets[1] = VkOffset3D{int32_t(this->displayImage.imageSize.x), int32_t(this->displayImage.imageSize.y), 1};
-
-                imageBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                imageBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-
-                imageBlit.dstSubresource.baseArrayLayer = 0;
-                imageBlit.srcSubresource.baseArrayLayer = 0;
-
-                imageBlit.dstSubresource.layerCount = 1;
-                imageBlit.srcSubresource.layerCount = 1;
-
-                imageBlit.dstSubresource.mipLevel = 0;
-                imageBlit.srcSubresource.mipLevel = 0;
-
-                vkCmdBlitImage(commandBuffer, this->displayImage.imageHandle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                               swapChainImages[imageIndex].imageHandle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
-                               &imageBlit, VK_FILTER_LINEAR);
-            };
-
             std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos;
             {
                  VkSemaphoreSubmitInfo waitInfo{};
@@ -444,7 +418,8 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 signalSemaphoreInfos.push_back(signalInfo);
             }
 
-             *hardwareExecutor << runCommand  << hardwareExecutor->commit(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame]);
+             *hardwareExecutor << displayDevice->resourceManager.blitImage(hardwareExecutor.get(), this->displayImage, swapChainImages[imageIndex])
+                 << hardwareExecutor->commit(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame]);
 
              // 准备呈现信息，等待 timeline semaphore
              VkPresentInfoKHR presentInfo{};
