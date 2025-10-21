@@ -10,7 +10,7 @@
 #include"../CabbageHardware.h"
 
 
-struct ComputePipeline
+struct ComputePipeline : public CommandRecord
 {
     ComputePipeline()
     {

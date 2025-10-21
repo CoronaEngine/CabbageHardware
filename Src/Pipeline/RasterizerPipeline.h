@@ -9,7 +9,7 @@
 #include "../CabbageHardware.h"
 
 
-struct RasterizerPipeline
+struct RasterizerPipeline : public CommandRecord
 {
     struct GeomMeshDrawIndexed
     {
