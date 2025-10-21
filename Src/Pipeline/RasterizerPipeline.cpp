@@ -453,34 +453,41 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
 
         vkCmdBindPipeline(hardwareExecutor.currentRecordQueue->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-        //std::vector<VkBuffer> vertexBuffers;
-        //std::vector<VkDeviceSize> offsets;
-        //for (size_t vertexBufferIndex = 0; vertexBufferIndex < tempVertexBuffers.size(); vertexBufferIndex++)
-        //{
-        //    vertexBuffers.push_back(bufferGlobalPool[*tempVertexBuffers[vertexBufferIndex].bufferID].bufferHandle);
-        //    offsets.push_back(0);
-        //}
+        for (size_t i = 0; i < geomMeshes.size(); i++)
+        {
+             std::vector<VkBuffer> vertexBuffers;
+             std::vector<VkDeviceSize> offsets;
+             for (size_t vertexBufferIndex = 0; vertexBufferIndex < geomMeshes[i].vertexBuffers.size(); vertexBufferIndex++)
+            {
+                 uint64_t bufferID= *geomMeshes[i].vertexBuffers[vertexBufferIndex].bufferID;
+                vertexBuffers.push_back(bufferGlobalPool[bufferID].bufferHandle);
+                 offsets.push_back(0);
+             }
 
-        //vkCmdBindVertexBuffers(commandBuffer, 0, (uint32_t)tempVertexBuffers.size(), vertexBuffers.data(), offsets.data());
+             vkCmdBindVertexBuffers(hardwareExecutor.currentRecordQueue->commandBuffer, 0, (uint32_t)geomMeshes[i].vertexBuffers.size(), vertexBuffers.data(), offsets.data());
 
-        //vkCmdBindIndexBuffer(commandBuffer, bufferGlobalPool[*indexBuffer.bufferID].bufferHandle, 0 * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
+             vkCmdBindIndexBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, bufferGlobalPool[*geomMeshes[i].indexBuffer.bufferID].bufferHandle, 0 * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
 
-        //std::vector<VkDescriptorSet> descriptorSets;
-        //for (size_t i = 0; i < 4; i++)
-        //{
-        //    descriptorSets.push_back(globalHardwareContext.mainDevice->resourceManager.bindlessDescriptors[i].descriptorSet);
-        //}
+             std::vector<VkDescriptorSet> descriptorSets;
+             for (size_t i = 0; i < 4; i++)
+            {
+                 descriptorSets.push_back(globalHardwareContext.mainDevice->resourceManager.bindlessDescriptors[i].descriptorSet);
+             }
 
-        //vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+             vkCmdBindDescriptorSets(hardwareExecutor.currentRecordQueue->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
-        //void *data = tempPushConstant.getData();
-        //vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, pushConstantSize, data);
+             void *data = geomMeshes[i].pushConstant.getData();
+             vkCmdPushConstants(hardwareExecutor.currentRecordQueue->commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, pushConstantSize, data);
 
-        //uint32_t indexCount = bufferGlobalPool[*indexBuffer.bufferID].bufferAllocInfo.size / sizeof(uint32_t);
-        //vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
+             uint32_t indexCount = bufferGlobalPool[*geomMeshes[i].indexBuffer.bufferID].bufferAllocInfo.size / sizeof(uint32_t);
+             vkCmdDrawIndexed(hardwareExecutor.currentRecordQueue->commandBuffer, indexCount, 1, 0, 0, 0);
+
+        }
 
 
         vkCmdEndRenderPass(hardwareExecutor.currentRecordQueue->commandBuffer);
+
+        geomMeshes.clear();
     //};
 
     //executor << runCommand;
