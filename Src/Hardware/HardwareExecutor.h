@@ -145,6 +145,41 @@ struct CopyImageToBufferCommand : public CommandRecord
     }
 };
 
+struct BlitImageCommand : public CommandRecord
+{
+    VkImage srcImage;
+    VkImageLayout srcImageLayout;
+    VkImage dstImage;
+    VkImageLayout dstImageLayout;
+    std::vector<VkImageBlit> regions;
+    VkFilter filter;
+
+    BlitImageCommand(
+        VkImage srcImg, VkImageLayout srcLayout,
+        VkImage dstImg, VkImageLayout dstLayout,
+        const std::vector<VkImageBlit> &blitRegions,
+        VkFilter blitFilter = VK_FILTER_LINEAR)
+        : srcImage(srcImg), srcImageLayout(srcLayout),
+          dstImage(dstImg), dstImageLayout(dstLayout),
+          regions(blitRegions), filter(blitFilter)
+    {
+        executorType = ExecutorType::Transfer;
+    }
+
+    void commitCommand(const VkCommandBuffer &commandBuffer) override
+    {
+        vkCmdBlitImage(
+            commandBuffer,
+            srcImage,
+            srcImageLayout,
+            dstImage,
+            dstImageLayout,
+            static_cast<uint32_t>(regions.size()),
+            regions.data(),
+            filter);
+    }
+};
+
 struct HardwareExecutor
 {
     HardwareExecutor(std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext = globalHardwareContext.mainDevice)
