@@ -107,6 +107,8 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
         }
 
         currentRecordQueue->queueMutex->unlock();
+
+        commandList.clear();
     }
 
     return *this;
