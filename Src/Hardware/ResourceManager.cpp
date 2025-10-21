@@ -1331,8 +1331,10 @@ void ResourceManager::TestWin32HandlesImport(BufferHardwareWrap &srcStaging, Buf
 
         dstStaging.bufferHandle = VK_NULL_HANDLE;
         dstStaging.bufferAlloc = VK_NULL_HANDLE;
-        vmaCreateDedicatedBuffer(g_hAllocator, &bufCreateInfo, &importAllocCreateInfo,
-                                 &importMemHandleInfo, &dstStaging.bufferHandle, &dstStaging.bufferAlloc, nullptr);
+        dstStaging.device = &dstResourceManager.getDeviceManager();
+        dstStaging.resourceManager = &dstResourceManager;
+        vmaCreateDedicatedBuffer(dstResourceManager.getVmaAllocator(), &bufCreateInfo, &importAllocCreateInfo,
+                                 &importMemHandleInfo, &dstStaging.bufferHandle, &dstStaging.bufferAlloc, &dstStaging.bufferAllocInfo);
 
     }
 
