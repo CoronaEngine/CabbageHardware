@@ -170,7 +170,8 @@ void DisplayManager::choosePresentDevice()
 	}
 #endif
 
-    hardwareExecutor = std::make_shared<HardwareExecutor>(displayDevice);
+    mainDeviceExecutor = std::make_shared<HardwareExecutor>(globalHardwareContext.mainDevice);
+    displayDeviceExecutor = std::make_shared<HardwareExecutor>(displayDevice);
 }
 
 
@@ -361,12 +362,13 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 		if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
         {
             // 在主设备上：源图像 -> srcStaging
-            (*hardwareExecutor)(CommandRecord::ExecutorType::Graphics) << globalHardwareContext.mainDevice->resourceManager.copyImageToBuffer(
-                hardwareExecutor.get(),
-                sourceImage.imageHandle,
-                srcStaging.bufferHandle,
-                sourceImage.imageSize.x,
-                sourceImage.imageSize.y);
+            (*mainDeviceExecutor)(CommandRecord::ExecutorType::Transfer) << globalHardwareContext.mainDevice->resourceManager.copyImageToBuffer(
+                                                                                mainDeviceExecutor.get(),
+                                                                                sourceImage.imageHandle,
+                                                                                srcStaging.bufferHandle,
+                                                                                sourceImage.imageSize.x,
+                                                                                sourceImage.imageSize.y)
+                                                                         << mainDeviceExecutor->commit();
 
 #ifdef TEST_CPU_DATA
             
@@ -383,12 +385,12 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 #endif
 
             // 在显示设备上：dstStaging -> 目标图像
-            (*hardwareExecutor) << displayDevice->resourceManager.copyBufferToImage(
-                hardwareExecutor.get(),
-                dstStaging.bufferHandle,
-                this->displayImage.imageHandle,
-                this->displayImage.imageSize.x,
-                this->displayImage.imageSize.y);
+            (*displayDeviceExecutor)(CommandRecord::ExecutorType::Graphics) << displayDevice->resourceManager.copyBufferToImage(
+                                            displayDeviceExecutor.get(),
+                                            dstStaging.bufferHandle,
+                                            this->displayImage.imageHandle,
+                                            this->displayImage.imageSize.x,
+                                            this->displayImage.imageSize.y);
 
 #ifdef TEST_CPU_DATA
 
@@ -418,8 +420,8 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 signalSemaphoreInfos.push_back(signalInfo);
             }
 
-             *hardwareExecutor << displayDevice->resourceManager.blitImage(hardwareExecutor.get(), this->displayImage, swapChainImages[imageIndex])
-                 << hardwareExecutor->commit(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame]);
+             *displayDeviceExecutor << displayDevice->resourceManager.blitImage(displayDeviceExecutor.get(), this->displayImage, swapChainImages[imageIndex])
+                                   << displayDeviceExecutor->commit(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame]);
 
              // 准备呈现信息，等待 timeline semaphore
              VkPresentInfoKHR presentInfo{};
