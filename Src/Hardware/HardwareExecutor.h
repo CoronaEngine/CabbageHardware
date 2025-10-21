@@ -13,16 +13,24 @@ struct CommandRecord
     {
         Graphics,
         Compute,
-        Transfer
+        Transfer,
+        Invalid
     };
 
+    CommandRecord() = default;
     virtual ~CommandRecord() = default;
 
-    virtual void commitCommand(HardwareExecutor &hardwareExecutor) = 0;
-    virtual ExecutorType getExecutorType() = 0;
+    virtual void commitCommand(HardwareExecutor& hardwareExecutor)
+    {
+    }
+
+    virtual ExecutorType getExecutorType()
+    {
+        return ExecutorType::Invalid;
+    }
 
 protected:
-    ExecutorType executorType;
+    ExecutorType executorType = ExecutorType::Invalid;
 };
 
 struct HardwareExecutor
