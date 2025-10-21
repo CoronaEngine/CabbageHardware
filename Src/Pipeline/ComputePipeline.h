@@ -39,7 +39,7 @@ struct ComputePipeline : public CommandRecord
         }
     }
 
-    ComputePipeline &operator()(HardwareExecutor *executor, uint16_t x, uint16_t y, uint16_t z);
+    ComputePipeline &operator()(uint16_t x, uint16_t y, uint16_t z);
 
     void commitCommand(HardwareExecutor &executor) override;
     
@@ -56,6 +56,8 @@ struct ComputePipeline : public CommandRecord
 
     //EmbeddedShader::ShaderCodeCompiler shaderCodeCompiler;
     EmbeddedShader::ShaderCodeModule shaderCode;
+
+    ktm::uvec3 groupCount = {0, 0, 0};
 
     HardwareExecutor *executor;
 };

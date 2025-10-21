@@ -491,7 +491,7 @@ int main()
 
                 executor(CommandRecord::ExecutorType::Graphics) 
                     << rasterizer(&executor, 1920, 1080) << rasterizer.record(&executor,indexBuffer)
-                    << computer(&executor,1920 / 8, 1080 / 8, 1) 
+                    << computer(1920 / 8, 1080 / 8, 1) 
                     << executor.commit();
 
                 displayManager = finalOutputImage;
