@@ -102,6 +102,7 @@ struct ResourceManager
 
     ExternalMemoryHandle exportBufferMemory(BufferHardwareWrap &sourceBuffer);
     BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle &memHandle, const BufferHardwareWrap &sourceBuffer);
+    void TestWin32HandlesImport(BufferHardwareWrap &srcStaging, BufferHardwareWrap &dstStaging, VkDeviceSize imageSizeBytes, ResourceManager &srcResourceManager, ResourceManager &dstResourceManager);
 
 	uint32_t findExternalMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     //void transitionImageLayoutUnblocked(const VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
@@ -119,6 +120,21 @@ struct ResourceManager
 	{
 		return deviceMemorySize;
 	}
+
+	DeviceManager& getDeviceManager()
+	{
+		return *device;
+    }
+
+	VmaAllocator getVmaAllocator()
+	{
+		return g_hAllocator;
+    }
+
+	VmaPool getVmaPool()
+	{
+		return g_hPool;
+    }
 
 private:
 	void createTextureSampler();
