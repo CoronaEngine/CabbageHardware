@@ -317,11 +317,11 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
             VkDeviceSize imageSizeBytes = this->displayImage.imageSize.x * this->displayImage.imageSize.y * this->displayImage.pixelSize;
 
-            srcStaging = globalHardwareContext.mainDevice->resourceManager.createBuffer(imageSizeBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+            //srcStaging = globalHardwareContext.mainDevice->resourceManager.createBuffer(imageSizeBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
             {
                 // 导出缓冲区内存
-                ResourceManager::ExternalMemoryHandle memHandle = globalHardwareContext.mainDevice->resourceManager.exportBufferMemory(srcStaging);
+                //ResourceManager::ExternalMemoryHandle memHandle = globalHardwareContext.mainDevice->resourceManager.exportBufferMemory(srcStaging);
 
                 // 确保在导入前释放旧的资源
                 if (dstStaging.bufferHandle != VK_NULL_HANDLE)
@@ -329,8 +329,15 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                     displayDevice->resourceManager.destroyBuffer(dstStaging);
                 }
 
+                globalHardwareContext.mainDevice->resourceManager.TestWin32HandlesImport(
+                    srcStaging,
+                    dstStaging,
+                    imageSizeBytes,
+                    globalHardwareContext.mainDevice->resourceManager,
+                    displayDevice->resourceManager);
+
                 // 导入到目标设备
-                dstStaging = displayDevice->resourceManager.importBufferMemory(memHandle, srcStaging);
+                //dstStaging = displayDevice->resourceManager.importBufferMemory(memHandle, srcStaging);
             }
         }
 
@@ -372,10 +379,10 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
             vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
 
             srcCpuData.resize(srcStaging.bufferAllocInfo.size);
-            globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(srcStaging, srcCpuData.data());
+            srcStaging.resourceManager->copyBufferToCpu(srcStaging, srcCpuData.data());
 
             dstCpuData.resize(dstStaging.bufferAllocInfo.size);
-            globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(dstStaging, dstCpuData.data());
+            dstStaging.resourceManager->copyBufferToCpu(dstStaging, dstCpuData.data());
 
 #endif
 
@@ -386,7 +393,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
 #else
             dstCpuData.resize(dstStaging.bufferAllocInfo.size);
-            globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(dstStaging, dstCpuData.data());
+            dstStaging.resourceManager->copyBufferToCpu(dstStaging, dstCpuData.data());
 #endif
 
             std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos;

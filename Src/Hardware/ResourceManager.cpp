@@ -1229,20 +1229,133 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
 
     return importedBuffer;
 
-} 
+}
+
+void ResourceManager::TestWin32HandlesImport(BufferHardwareWrap &srcStaging, BufferHardwareWrap &dstStaging, VkDeviceSize imageSizeBytes, ResourceManager &srcResourceManager, ResourceManager &dstResourceManager)
+{
+    constexpr VkExternalMemoryHandleTypeFlagBits handleType =
+        VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+
+    constexpr static VkExportMemoryAllocateInfoKHR exportMemAllocInfo{
+        VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR,
+        nullptr,
+        handleType};
+
+    constexpr static VkExternalMemoryBufferCreateInfoKHR externalMemBufCreateInfo{
+        VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO_KHR,
+        nullptr,
+        handleType};
+
+    //BufferHardwareWrap srcBuffer;
+    srcStaging.device = &srcResourceManager.getDeviceManager();
+    srcStaging.resourceManager = &srcResourceManager;
+
+    if (imageSizeBytes > 0)
+    {
+        srcStaging.bufferUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+        VkBufferCreateInfo bufCreateInfo = {};
+        bufCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufCreateInfo.size = imageSizeBytes;
+        bufCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+        if (device->getQueueFamilyNumber() > 1)
+        {
+            std::vector<uint32_t> queueFamilys(device->getQueueFamilyNumber());
+            for (size_t i = 0; i < queueFamilys.size(); i++)
+            {
+                queueFamilys[i] = i;
+            }
+            bufCreateInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+            bufCreateInfo.queueFamilyIndexCount = queueFamilys.size();
+            bufCreateInfo.pQueueFamilyIndices = queueFamilys.data();
+        }
+        else
+        {
+            bufCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        }
+
+        bufCreateInfo.pNext = &externalMemBufCreateInfo;
+
+        bool requiresDedicated = true;
+        {
+            VkPhysicalDeviceExternalBufferInfo externalBufferInfo = {
+                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO};
+            externalBufferInfo.flags = bufCreateInfo.flags;
+            externalBufferInfo.usage = bufCreateInfo.usage;
+            externalBufferInfo.handleType = handleType;
+
+            VkExternalBufferProperties externalBufferProperties = {
+                VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES};
+
+            vkGetPhysicalDeviceExternalBufferProperties(srcStaging.device->physicalDevice, &externalBufferInfo, &externalBufferProperties);
+            constexpr VkExternalMemoryFeatureFlags expectedFlags =VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT | VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT;
+            if ((externalBufferProperties.externalMemoryProperties.externalMemoryFeatures & expectedFlags) != expectedFlags)
+            {
+                return;
+            }
+            requiresDedicated = (externalBufferProperties.externalMemoryProperties.externalMemoryFeatures &
+                                 VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) != 0;
+        }
+
+        VmaAllocationCreateInfo vbAllocCreateInfo = {};
+        vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        vbAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        vbAllocCreateInfo.pool = srcResourceManager.getVmaPool();
+
+
+        VkResult res = vmaCreateBuffer(srcResourceManager.getVmaAllocator(), &bufCreateInfo, &vbAllocCreateInfo, &srcStaging.bufferHandle, &srcStaging.bufferAlloc, &srcStaging.bufferAllocInfo);
+        if (res != VK_SUCCESS)
+        {
+            switch (res)
+            {
+            case VK_ERROR_OUT_OF_HOST_MEMORY:
+                std::cerr << "Host memory allocation failed!" << std::endl;
+                break;
+            case VK_ERROR_OUT_OF_DEVICE_MEMORY:
+                std::cerr << "Device memory allocation failed!" << std::endl;
+                break;
+            default:
+                std::cerr << "VMA buffer creation failed with error code: " << res << std::endl;
+                break;
+            }
+        }
+
+        HANDLE handle = NULL;
+        VkResult result = vmaGetMemoryWin32Handle2(srcResourceManager.getVmaAllocator(), srcStaging.bufferAlloc, handleType, nullptr, &handle);
+
+        VkImportMemoryWin32HandleInfoKHR importMemHandleInfo = {
+            VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR};
+        importMemHandleInfo.handleType = handleType;
+        importMemHandleInfo.handle = handle;
+        importMemHandleInfo.name = nullptr;
+        VmaAllocationCreateInfo importAllocCreateInfo = {};
+        importAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        importAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+        dstStaging.bufferHandle = VK_NULL_HANDLE;
+        dstStaging.bufferAlloc = VK_NULL_HANDLE;
+        dstStaging.device = &dstResourceManager.getDeviceManager();
+        dstStaging.resourceManager = &dstResourceManager;
+        vmaCreateDedicatedBuffer(dstResourceManager.getVmaAllocator(), &bufCreateInfo, &importAllocCreateInfo,
+                                 &importMemHandleInfo, &dstStaging.bufferHandle, &dstStaging.bufferAlloc, &dstStaging.bufferAllocInfo);
+
+    }
+
+}
 
 void ResourceManager::copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData)
 {
     void *mappedData = nullptr;
-    VkResult result = vmaMapMemory(g_hAllocator, buffer.bufferAlloc, &mappedData);
+    VkResult result = vmaMapMemory(buffer.resourceManager->getVmaAllocator(), buffer.bufferAlloc, &mappedData);
     if (result != VK_SUCCESS)
     {
         throw std::runtime_error("Failed to map memory");
     }
 
-    vmaInvalidateAllocation(g_hAllocator, buffer.bufferAlloc, 0, VK_WHOLE_SIZE);
+    vmaInvalidateAllocation(buffer.resourceManager->getVmaAllocator(), buffer.bufferAlloc, 0, VK_WHOLE_SIZE);
     memcpy(cpuData, mappedData, buffer.bufferAllocInfo.size);
-    vmaUnmapMemory(g_hAllocator, buffer.bufferAlloc);
+    vmaUnmapMemory(buffer.resourceManager->getVmaAllocator(), buffer.bufferAlloc);
 }
 
 //void ResourceManager::copyBufferToCpu(VkDevice &device, VkDeviceMemory &memory, VkDeviceSize size, void *cpuData)
