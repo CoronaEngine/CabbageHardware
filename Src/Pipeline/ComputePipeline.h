@@ -41,6 +41,7 @@ struct ComputePipeline : public CommandRecord
 
     ComputePipeline &operator()(HardwareExecutor *executor, uint16_t x, uint16_t y, uint16_t z);
 
+    void commitCommand(HardwareExecutor &executor) override;
     
   private:
     friend HardwareExecutor &operator<<(HardwareExecutor &executor, ComputePipeline &other);

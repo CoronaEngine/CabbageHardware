@@ -100,3 +100,9 @@ ComputePipeline &ComputePipeline::operator()(HardwareExecutor *executor, uint16_
 
 	return *this;
 }
+
+
+
+void ComputePipeline::commitCommand(HardwareExecutor &executor)
+{
+}

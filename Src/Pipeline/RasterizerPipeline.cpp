@@ -475,3 +475,9 @@ HardwareExecutor &RasterizerPipeline::record(HardwareExecutor *executor, const H
 
     return *executor;
 }
+
+
+void RasterizerPipeline::commitCommand(HardwareExecutor &executor)
+{
+
+}

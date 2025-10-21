@@ -66,21 +66,10 @@ struct RasterizerPipeline : public CommandRecord
     }
 
     RasterizerPipeline &operator()(HardwareExecutor *executor, uint16_t x, uint16_t y);
-    //HardwareExecutor &endRecord();
 
     HardwareExecutor &record(HardwareExecutor *executor, const HardwareBuffer &indexBuffer);
 
-    // void recordGeomMesh()
-    //{
-    //     TriangleGeomMesh temp;
-    //     temp.indexOffset = indexOffset;
-    //     temp.indexCount = indexCount;
-    //     temp.indexBuffer = indexBuffer;
-    //     temp.vertexBuffers = tempVertexBuffers;
-    //     temp.pushConstant = tempPushConstant;
-    //     geomMeshes.push_back(temp);
-    // }
-
+    void commitCommand(HardwareExecutor &executor) override;
 
   private:
     friend HardwareExecutor &operator<<(HardwareExecutor &executor, RasterizerPipeline &other);
