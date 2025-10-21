@@ -6,8 +6,9 @@
 #include<volk.h>
 
 #include<Hardware/GlobalContext.h>
+#include<Hardware/ResourceCommand.h>
 
-//#define USE_SAME_DEVICE
+#define USE_SAME_DEVICE
 
 //#define TEST_CPU_DATA
 
@@ -316,28 +317,34 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                                                                             imageGlobalPool[*displayImage.imageID].pixelSize, imageGlobalPool[*displayImage.imageID].imageUsage);
 
             VkDeviceSize imageSizeBytes = this->displayImage.imageSize.x * this->displayImage.imageSize.y * this->displayImage.pixelSize;
-
-            //srcStaging = globalHardwareContext.mainDevice->resourceManager.createBuffer(imageSizeBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-
+            if (globalHardwareContext.mainDevice != displayDevice)
             {
-                // 导出缓冲区内存
-                //ResourceManager::ExternalMemoryHandle memHandle = globalHardwareContext.mainDevice->resourceManager.exportBufferMemory(srcStaging);
+                srcStaging = globalHardwareContext.mainDevice->resourceManager.createBuffer(imageSizeBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
-                // 确保在导入前释放旧的资源
-                if (dstStaging.bufferHandle != VK_NULL_HANDLE)
                 {
-                    displayDevice->resourceManager.destroyBuffer(dstStaging);
+                    // 导出缓冲区内存
+                    ResourceManager::ExternalMemoryHandle memHandle = globalHardwareContext.mainDevice->resourceManager.exportBufferMemory(srcStaging);
+
+                    // 确保在导入前释放旧的资源
+                    if (dstStaging.bufferHandle != VK_NULL_HANDLE)
+                    {
+                        displayDevice->resourceManager.destroyBuffer(dstStaging);
+                    }
+
+                    // globalHardwareContext.mainDevice->resourceManager.TestWin32HandlesImport(
+                    //     srcStaging,
+                    //     dstStaging,
+                    //     imageSizeBytes,
+                    //     globalHardwareContext.mainDevice->resourceManager,
+                    //     displayDevice->resourceManager);
+
+                    // 导入到目标设备
+                    dstStaging = displayDevice->resourceManager.importBufferMemory(memHandle, srcStaging);
                 }
-
-                globalHardwareContext.mainDevice->resourceManager.TestWin32HandlesImport(
-                    srcStaging,
-                    dstStaging,
-                    imageSizeBytes,
-                    globalHardwareContext.mainDevice->resourceManager,
-                    displayDevice->resourceManager);
-
-                // 导入到目标设备
-                //dstStaging = displayDevice->resourceManager.importBufferMemory(memHandle, srcStaging);
+            }
+            else
+            {
+                this->displayImage = sourceImage;
             }
         }
 
@@ -368,33 +375,34 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
 		if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
         {
-            // 在主设备上：源图像 -> srcStaging
-            (*mainDeviceExecutor)(CommandRecord::ExecutorType::Transfer) << globalHardwareContext.mainDevice->resourceManager.copyImageToBuffer(mainDeviceExecutor.get(), sourceImage, srcStaging)
-                                                                         << mainDeviceExecutor->commit();
+            if (globalHardwareContext.mainDevice != displayDevice)
+            {
+                // 在主设备上：源图像 -> srcStaging
+                CopyImageToBufferCommand copyCmd(sourceImage, srcStaging);
+                (*mainDeviceExecutor) << &copyCmd << mainDeviceExecutor->commit();
 
 #ifdef TEST_CPU_DATA
-            
-#else
-            vkDeviceWaitIdle(displayDevice->deviceManager.logicalDevice);
-            vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
+                vkDeviceWaitIdle(displayDevice->deviceManager.logicalDevice);
+                vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
 
-            srcCpuData.resize(srcStaging.bufferAllocInfo.size);
-            srcStaging.resourceManager->copyBufferToCpu(srcStaging, srcCpuData.data());
+                srcCpuData.resize(srcStaging.bufferAllocInfo.size);
+                srcStaging.resourceManager->copyBufferToCpu(srcStaging, srcCpuData.data());
 
-            dstCpuData.resize(dstStaging.bufferAllocInfo.size);
-            dstStaging.resourceManager->copyBufferToCpu(dstStaging, dstCpuData.data());
+                dstCpuData.resize(dstStaging.bufferAllocInfo.size);
+                dstStaging.resourceManager->copyBufferToCpu(dstStaging, dstCpuData.data());
 
 #endif
 
-            // 在显示设备上：dstStaging -> 目标图像
-            (*displayDeviceExecutor)(CommandRecord::ExecutorType::Graphics) << displayDevice->resourceManager.copyBufferToImage(displayDeviceExecutor.get(), dstStaging, this->displayImage);
+                // 在显示设备上：dstStaging -> 目标图像
+
+                CopyBufferToImageCommand copyCmd2(dstStaging, this->displayImage);
+                (*displayDeviceExecutor) << &copyCmd2;
 
 #ifdef TEST_CPU_DATA
-
-#else
-            dstCpuData.resize(dstStaging.bufferAllocInfo.size);
-            dstStaging.resourceManager->copyBufferToCpu(dstStaging, dstCpuData.data());
+                dstCpuData.resize(dstStaging.bufferAllocInfo.size);
+                dstStaging.resourceManager->copyBufferToCpu(dstStaging, dstCpuData.data());
 #endif
+            }
 
             std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos;
             {
@@ -417,7 +425,8 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 signalSemaphoreInfos.push_back(signalInfo);
             }
 
-             *displayDeviceExecutor << displayDevice->resourceManager.blitImage(displayDeviceExecutor.get(), this->displayImage, swapChainImages[imageIndex])
+            BlitImageCommand blitCmd(this->displayImage, swapChainImages[imageIndex]);
+            *displayDeviceExecutor << &blitCmd
                                    << displayDeviceExecutor->commit(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame]);
 
              // 准备呈现信息，等待 timeline semaphore

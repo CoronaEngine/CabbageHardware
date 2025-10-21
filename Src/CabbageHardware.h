@@ -109,18 +109,9 @@ struct HardwareImage
     std::shared_ptr<uint64_t> imageID;
 
   private:
-    friend HardwareExecutor &operator<<(HardwareExecutor &executor, HardwareImage &other);
-    HardwareExecutor *executor;
-
-    HardwareImage &copyFromBuffer(const HardwareBuffer &buffer, HardwareExecutor *executor);
-    HardwareImage &copyFromData(const void *inputData, HardwareExecutor *executor);
+    HardwareImage &copyFromBuffer(const HardwareBuffer &buffer);
+    HardwareImage &copyFromData(const void *inputData);
 };
-
-inline HardwareExecutor &operator<<(HardwareExecutor &executor, HardwareImage &other)
-{
-    other.executor = &executor;
-    return executor;
-}
 
 struct HardwarePushConstant
 {

@@ -66,9 +66,9 @@ private:
 
     
     ResourceManager::BufferHardwareWrap srcStaging;
-    std::vector<char> srcCpuData;
+    //std::vector<char> srcCpuData;
     ResourceManager::BufferHardwareWrap dstStaging;
-    std::vector<char> dstCpuData;
+    //std::vector<char> dstCpuData;
 
     std::shared_ptr<HardwareExecutor> mainDeviceExecutor;
     std::shared_ptr<HardwareExecutor> displayDeviceExecutor;

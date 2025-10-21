@@ -521,7 +521,7 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     return resultImage;
 }
 
-ResourceManager &ResourceManager::copyImage(HardwareExecutor *executor, ImageHardwareWrap &source, ImageHardwareWrap &destination)
+ResourceManager &ResourceManager::copyImage(VkCommandBuffer &commandBuffer, ImageHardwareWrap &source, ImageHardwareWrap &destination)
 {
     //if (source.pixelSize == destination.pixelSize)
     //{
@@ -593,7 +593,7 @@ ResourceManager &ResourceManager::copyImage(HardwareExecutor *executor, ImageHar
             }
             else*/
             {
-                auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
+                //auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
                     VkImageCopy imageCopyRegion{};
                     imageCopyRegion.srcSubresource.aspectMask = source.aspectMask;
                     imageCopyRegion.srcSubresource.layerCount = 1;
@@ -604,9 +604,9 @@ ResourceManager &ResourceManager::copyImage(HardwareExecutor *executor, ImageHar
                     imageCopyRegion.extent.depth = 1;
 
                     vkCmdCopyImage(commandBuffer, source.imageHandle, VK_IMAGE_LAYOUT_GENERAL, destination.imageHandle, VK_IMAGE_LAYOUT_GENERAL, 1, &imageCopyRegion);
-                };
+                //};
 
-                 *executor << runCommand;
+                 //*executor << runCommand;
 
                  return *this;
                 //return true;
@@ -766,11 +766,11 @@ ResourceManager &ResourceManager::copyImage(HardwareExecutor *executor, ImageHar
 //
 //}
 
-ResourceManager &ResourceManager::transitionImageLayout(HardwareExecutor *executor, ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage, VkPipelineStageFlags destinationStage)
+ResourceManager &ResourceManager::transitionImageLayout(VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage, VkPipelineStageFlags destinationStage)
 {
     if (image.imageLayout != newLayout)
     {
-        auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
+        //auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
             if (image.imageLayout != newLayout)
             {
                 VkImageMemoryBarrier barrier{};
@@ -889,17 +889,17 @@ ResourceManager &ResourceManager::transitionImageLayout(HardwareExecutor *execut
 
                 image.imageLayout = newLayout;
             }
-        };
+        //};
 
-        *executor << runCommand;
+        //*executor << runCommand;
 
         return *this;
     }
 }
 
-ResourceManager &ResourceManager::copyImageToBuffer(HardwareExecutor *executor, ImageHardwareWrap &image, BufferHardwareWrap &buffer)
+ResourceManager &ResourceManager::copyImageToBuffer(VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, BufferHardwareWrap &buffer)
 {
-    auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
+    //auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
         VkBufferImageCopy region{};
         region.bufferOffset = 0;
         region.bufferRowLength = 0;
@@ -915,16 +915,16 @@ ResourceManager &ResourceManager::copyImageToBuffer(HardwareExecutor *executor, 
             1};
 
         vkCmdCopyImageToBuffer(commandBuffer, image.imageHandle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer.bufferHandle, 1, &region);
-    };
+    //};
 
-    *executor << runCommand;
+    //*executor << runCommand;
 
     return *this;
 }
 
-ResourceManager &ResourceManager::copyBufferToImage(HardwareExecutor *executor, BufferHardwareWrap &buffer, ImageHardwareWrap &image)
+ResourceManager &ResourceManager::copyBufferToImage(VkCommandBuffer &commandBuffer, BufferHardwareWrap &buffer, ImageHardwareWrap &image)
 {
-    auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
+    //auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
         VkBufferImageCopy region{};
         region.bufferOffset = 0;
         region.bufferRowLength = 0;
@@ -940,24 +940,24 @@ ResourceManager &ResourceManager::copyBufferToImage(HardwareExecutor *executor, 
             1};
 
         vkCmdCopyBufferToImage(commandBuffer, buffer.bufferHandle, image.imageHandle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-    };
+    //};
 
-     *executor << runCommand;
+     //*executor << runCommand;
 
     return *this;
 }
 
-ResourceManager &ResourceManager::copyBuffer(HardwareExecutor *executor, BufferHardwareWrap &srcBuffer, BufferHardwareWrap &dstBuffer)
+ResourceManager &ResourceManager::copyBuffer(VkCommandBuffer &commandBuffer, BufferHardwareWrap &srcBuffer, BufferHardwareWrap &dstBuffer)
 {
     if (srcBuffer.bufferAllocInfo.size == dstBuffer.bufferAllocInfo.size)
     {
-        auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
+        //auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
             VkBufferCopy copyRegion{};
             copyRegion.size = srcBuffer.bufferAllocInfo.size;
             vkCmdCopyBuffer(commandBuffer, srcBuffer.bufferHandle, dstBuffer.bufferHandle, 1, &copyRegion);
-        };
+        //};
 
-        *executor << runCommand;
+        //*executor << runCommand;
     }
 
     return *this;
@@ -1709,11 +1709,11 @@ VkShaderModule ResourceManager::createShaderModule(const std::vector<unsigned in
 }
 
 ResourceManager &ResourceManager::blitImage(
-    HardwareExecutor *executor,
+    VkCommandBuffer &commandBuffer,
     ImageHardwareWrap &srcImage,
     ImageHardwareWrap &dstImage)
 {
-    auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
+    //auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
 
         VkImageBlit imageBlit;
         imageBlit.dstOffsets[0] = VkOffset3D{0, 0, 0};
@@ -1740,9 +1740,9 @@ ResourceManager &ResourceManager::blitImage(
             dstImage.imageHandle, dstImage.imageLayout,
             1, &imageBlit,
             VK_FILTER_LINEAR);
-    };
+    //};
 
-    *executor << runCommand;
+    //*executor << runCommand;
 
     return *this;
 

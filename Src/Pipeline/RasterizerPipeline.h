@@ -9,7 +9,7 @@
 #include "../CabbageHardware.h"
 
 
-struct RasterizerPipeline
+struct RasterizerPipeline : public CommandRecord
 {
     struct GeomMeshDrawIndexed
     {
@@ -23,6 +23,7 @@ struct RasterizerPipeline
 
     RasterizerPipeline()
     {
+        executorType = CommandRecord::ExecutorType::Graphics;
     }
 
     ~RasterizerPipeline()
@@ -65,27 +66,20 @@ struct RasterizerPipeline
         return std::move(HardwarePushConstant());
     }
 
-    RasterizerPipeline &operator()(HardwareExecutor *executor, uint16_t x, uint16_t y);
-    //HardwareExecutor &endRecord();
+    RasterizerPipeline* operator()(uint16_t x, uint16_t y);
 
-    HardwareExecutor &record(HardwareExecutor *executor, const HardwareBuffer &indexBuffer);
+    CommandRecord *record(const HardwareBuffer &indexBuffer);
 
-    // void recordGeomMesh()
-    //{
-    //     TriangleGeomMesh temp;
-    //     temp.indexOffset = indexOffset;
-    //     temp.indexCount = indexCount;
-    //     temp.indexBuffer = indexBuffer;
-    //     temp.vertexBuffers = tempVertexBuffers;
-    //     temp.pushConstant = tempPushConstant;
-    //     geomMeshes.push_back(temp);
-    // }
+    ExecutorType getExecutorType() override
+    {
+        return CommandRecord::ExecutorType::Graphics;
+    }
 
+    void commitCommand(HardwareExecutor &hardwareExecutor) override;
 
   private:
-    friend HardwareExecutor &operator<<(HardwareExecutor &executor, RasterizerPipeline &other);
 
-    HardwareExecutor *executor;
+    ktm::uvec2 imageSize = {0, 0};
 
 
     void createRenderPass(int multiviewCount = 1);
@@ -114,16 +108,16 @@ struct RasterizerPipeline
     // EmbeddedShader::ShaderCodeCompiler vertexShaderCompiler;
     // EmbeddedShader::ShaderCodeCompiler fragmentShaderCompiler;
 
-    // struct TriangleGeomMesh
-    //{
-    //     uint32_t indexOffset;
-    //     uint32_t indexCount;
-    //     HardwareBuffer indexBuffer;
-    //     std::vector<HardwareBuffer> vertexBuffers;
+    struct TriangleGeomMesh
+    {
+        HardwareBuffer indexBuffer;
+        std::vector<HardwareBuffer> vertexBuffers;
 
-    //    HardwarePushConstant pushConstant;
-    //};
-    // std::vector<TriangleGeomMesh> geomMeshes;
+        HardwarePushConstant pushConstant;
+    };
+    std::vector<TriangleGeomMesh> geomMeshes;
+
+    CommandRecord dumpCommandRecord;
 
     HardwarePushConstant tempPushConstant;
 
@@ -136,12 +130,4 @@ struct RasterizerPipeline
 
     EmbeddedShader::ShaderCodeModule::ShaderResources vertexResource;
     EmbeddedShader::ShaderCodeModule::ShaderResources fragmentResource;
-
 };
-
-inline HardwareExecutor &operator<<(HardwareExecutor &executor, RasterizerPipeline &other)
-{
-    other.executor = &executor;
-    executor.rasterizerPipelineBegin = true;
-    return executor;
-}

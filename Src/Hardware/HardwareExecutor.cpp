@@ -3,11 +3,23 @@
 #include <Hardware/GlobalContext.h>
 
 
-HardwareExecutor &HardwareExecutor::operator()(CommandRecord::ExecutorType queueType, HardwareExecutor *waitExecutor)
+HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos, std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos, VkFence fence)
 {
-    if (recordingBegan == false)
+    if (commandList.size() > 0)
     {
-        this->queueType = queueType;
+        CommandRecord::ExecutorType queueType = CommandRecord::ExecutorType::Transfer;
+        for (size_t i = 0; i < commandList.size(); i++)
+        {
+            if (commandList[i]->getExecutorType() == CommandRecord::ExecutorType::Graphics)
+            {
+                queueType = CommandRecord::ExecutorType::Graphics;
+                break;
+            }
+            else if (commandList[i]->getExecutorType() == CommandRecord::ExecutorType::Compute)
+            {
+                queueType = CommandRecord::ExecutorType::Compute;
+            }
+        }
 
         uint16_t queueIndex = 0;
 
@@ -54,32 +66,14 @@ HardwareExecutor &HardwareExecutor::operator()(CommandRecord::ExecutorType queue
 
         vkBeginCommandBuffer(currentRecordQueue->commandBuffer, &beginInfo);
 
-        recordingBegan = true;
-    }
+        for (size_t i = 0; i < commandList.size(); i++)
+        {
+            if (commandList[i]->getExecutorType() != CommandRecord::ExecutorType::Invalid)
+            {
+                commandList[i]->commitCommand(*this);
+            }
+        }
 
-    return *this;
-}
-
-HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos, std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos, VkFence fence)
-{
-    if (rasterizerPipelineBegin)
-    {
-        auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
-            vkCmdEndRenderPass(commandBuffer);
-        };
-
-        *this << runCommand;
-
-        rasterizerPipelineBegin = false;
-    }
-
-    if (computePipelineBegin)
-    {
-        computePipelineBegin = false;
-    }
-
-    if (recordingBegan)
-    {
         vkEndCommandBuffer(currentRecordQueue->commandBuffer);
 
         VkCommandBufferSubmitInfo commandBufferSubmitInfo{};
@@ -117,7 +111,7 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
 
         currentRecordQueue->queueMutex->unlock();
 
-        recordingBegan = false;
+        commandList.clear();
     }
 
     return *this;

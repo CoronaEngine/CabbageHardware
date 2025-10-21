@@ -1,5 +1,6 @@
 ﻿#include"CabbageHardware.h"
 #include<Hardware/GlobalContext.h>
+#include<Hardware/ResourceCommand.h>
 
 std::unordered_map<uint64_t, ResourceManager::BufferHardwareWrap> bufferGlobalPool;
 std::unordered_map<uint64_t, uint64_t> bufferRefCount;
@@ -111,7 +112,10 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareE
 {
     std::unique_lock<std::mutex> lock(bufferMutex);
 
-    globalHardwareContext.mainDevice->resourceManager.copyBuffer(executor,bufferGlobalPool[*inputBuffer.bufferID], bufferGlobalPool[*bufferID]);
+    HardwareExecutor tempExecutor;
+    CopyBufferCommand copyCmd(bufferGlobalPool[*inputBuffer.bufferID], bufferGlobalPool[*bufferID]);
+    tempExecutor << &copyCmd << tempExecutor.commit();
+
 	return true;
 }
 

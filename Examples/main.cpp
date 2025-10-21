@@ -489,9 +489,10 @@ int main()
                 computeUniformBuffer.copyFromData(&computeUniformData, sizeof(computeUniformData));
                 computer["pushConsts.uniformBufferIndex"] = computeUniformBuffer.storeDescriptor();
 
-                executor(CommandRecord::ExecutorType::Graphics) 
-                    << rasterizer(&executor, 1920, 1080) << rasterizer.record(&executor,indexBuffer)
-                    << computer(&executor,1920 / 8, 1080 / 8, 1) 
+                executor 
+                    << rasterizer(1920, 1080) 
+                    << rasterizer.record(indexBuffer)
+                    << computer(1920 / 8, 1080 / 8, 1) 
                     << executor.commit();
 
                 displayManager = finalOutputImage;
@@ -499,7 +500,7 @@ int main()
                 auto timeD = std::chrono::duration<float, std::chrono::milliseconds::period>(std::chrono::high_resolution_clock::now() - start);
                 totalTimeMs += timeD.count();
                 frameCount++;
-                if (frameCount >= 1000)
+                if (frameCount >= 100)
                 {
                     std::cout << "Average time over " << frameCount << " frames: " << totalTimeMs / frameCount << " ms" << std::endl;
                     totalTimeMs = 0.0;

@@ -10,11 +10,11 @@
 #include"../CabbageHardware.h"
 
 
-struct ComputePipeline
+struct ComputePipeline : public CommandRecord
 {
     ComputePipeline()
     {
-
+        executorType = CommandRecord::ExecutorType::Compute;
     }
 
     ~ComputePipeline()
@@ -39,11 +39,17 @@ struct ComputePipeline
         }
     }
 
-    ComputePipeline &operator()(HardwareExecutor *executor, uint16_t x, uint16_t y, uint16_t z);
+    ComputePipeline* operator()(uint16_t x, uint16_t y, uint16_t z);
 
+   
+    ExecutorType getExecutorType() override
+    {
+        return CommandRecord::ExecutorType::Compute;
+    }
+
+    void commitCommand(HardwareExecutor &hardwareExecutor) override;
     
   private:
-    friend HardwareExecutor &operator<<(HardwareExecutor &executor, ComputePipeline &other);
 
 	VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
 	VkPipeline pipeline = VK_NULL_HANDLE;
@@ -56,12 +62,5 @@ struct ComputePipeline
     //EmbeddedShader::ShaderCodeCompiler shaderCodeCompiler;
     EmbeddedShader::ShaderCodeModule shaderCode;
 
-    HardwareExecutor *executor;
+    ktm::uvec3 groupCount = {0, 0, 0};
 };
-
-inline HardwareExecutor &operator<<(HardwareExecutor &executor, ComputePipeline &other)
-{
-    other.executor = &executor;
-    executor.computePipelineBegin = true;
-    return executor;
-}
