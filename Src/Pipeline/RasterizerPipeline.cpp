@@ -391,13 +391,13 @@ RasterizerPipeline &RasterizerPipeline::operator()(uint16_t imageSizeX, uint16_t
 }
 
 
-HardwareExecutor &RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
+RasterizerPipeline &RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
 {
-    return *executor;
+    return *this;
 }
 
 
-void RasterizerPipeline::commitCommand(HardwareExecutor &executor)
+void RasterizerPipeline::commitCommand(VkCommandBuffer &commandBuffer)
 {
 
     if (!depthImage)
@@ -410,7 +410,7 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &executor)
         createFramebuffers(imageGlobalPool[*depthImage.imageID].imageSize);
     }
 
-    auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
+    //auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderPassInfo.renderPass = renderPass;
@@ -476,7 +476,7 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &executor)
 
 
         vkCmdEndRenderPass(commandBuffer);
-    };
+    //};
 
-    executor << runCommand;
+    //executor << runCommand;
 }

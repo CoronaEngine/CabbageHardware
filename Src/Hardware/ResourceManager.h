@@ -172,13 +172,4 @@ private:
 
 	DeviceManager *device;
 
-
-    friend HardwareExecutor &operator<<(HardwareExecutor &executor, ResourceManager &other);
-    HardwareExecutor *executor;
 };
-
-inline HardwareExecutor &operator<<(HardwareExecutor &executor, ResourceManager &other)
-{
-    other.executor = &executor;
-    return executor;
-}

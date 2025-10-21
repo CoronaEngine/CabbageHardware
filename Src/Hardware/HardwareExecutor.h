@@ -1,7 +1,7 @@
 #pragma once
 
-#include<Hardware/DeviceManager.h>
-#include<Hardware/GlobalContext.h>
+#include <Hardware/DeviceManager.h>
+#include <Hardware/GlobalContext.h>
 
 class RasterizerPipeline;
 class ComputePipeline;
@@ -18,7 +18,7 @@ struct CommandRecord
 
     virtual ~CommandRecord() = default;
 
-    virtual void commitCommand(HardwareExecutor &executor) = 0;
+    virtual void commitCommand(VkCommandBuffer &commandBuffer) = 0;
 
     ExecutorType executorType;
 };
@@ -27,34 +27,27 @@ struct HardwareExecutor
 {
     HardwareExecutor(std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext = globalHardwareContext.mainDevice)
         : hardwareContext(hardwareContext)
-    {
-    }
+    {}
 
     ~HardwareExecutor() = default;
 
-    HardwareExecutor &operator<<(const HardwareExecutor &other)
+
+    HardwareExecutor &operator<<(std::shared_ptr<CommandRecord> commandRecord)
     {
+        commandList.push_back(commandRecord);
         return *this;
     }
 
-    HardwareExecutor &operator()(CommandRecord::ExecutorType type = CommandRecord::ExecutorType::Graphics, HardwareExecutor *waitExecutor = nullptr);
-
-    HardwareExecutor &operator<<(std::function<void(const VkCommandBuffer &commandBuffer)> commandsFunction)
+    HardwareExecutor &operator<<(HardwareExecutor& other)
     {
-        commandsFunction(currentRecordQueue->commandBuffer);
-        return *this;
+        return other;
     }
 
     HardwareExecutor &commit(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
                              std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
                              VkFence fence = VK_NULL_HANDLE);
 
-
   private:
-    friend HardwareExecutor &operator<<(HardwareExecutor &executor, RasterizerPipeline &other);
-    friend HardwareExecutor &operator<<(HardwareExecutor &executor, ComputePipeline &other);
-
-    bool recordingBegan = false;
 
     CommandRecord::ExecutorType queueType = CommandRecord::ExecutorType::Graphics;
     DeviceManager::QueueUtils *currentRecordQueue = nullptr;
@@ -63,4 +56,3 @@ struct HardwareExecutor
 
     std::vector<std::shared_ptr<CommandRecord>> commandList;
 };
-

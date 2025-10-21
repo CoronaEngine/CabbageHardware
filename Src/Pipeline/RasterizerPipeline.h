@@ -67,14 +67,11 @@ struct RasterizerPipeline : public CommandRecord
 
     RasterizerPipeline &operator()(uint16_t x, uint16_t y);
 
-    HardwareExecutor &record(const HardwareBuffer &indexBuffer);
+    RasterizerPipeline &record(const HardwareBuffer &indexBuffer);
 
-    void commitCommand(HardwareExecutor &executor) override;
+    void commitCommand(VkCommandBuffer &commandBuffer) override;
 
   private:
-    friend HardwareExecutor &operator<<(HardwareExecutor &executor, RasterizerPipeline &other);
-
-    HardwareExecutor *executor;
 
     ktm::uvec2 imageSize = {0, 0};
 
@@ -127,11 +124,4 @@ struct RasterizerPipeline : public CommandRecord
 
     EmbeddedShader::ShaderCodeModule::ShaderResources vertexResource;
     EmbeddedShader::ShaderCodeModule::ShaderResources fragmentResource;
-
 };
-
-inline HardwareExecutor &operator<<(HardwareExecutor &executor, RasterizerPipeline &other)
-{
-    other.executor = &executor;
-    return executor;
-}

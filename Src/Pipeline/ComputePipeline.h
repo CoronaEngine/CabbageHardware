@@ -41,10 +41,9 @@ struct ComputePipeline : public CommandRecord
 
     ComputePipeline &operator()(uint16_t x, uint16_t y, uint16_t z);
 
-    void commitCommand(HardwareExecutor &executor) override;
+    void commitCommand(VkCommandBuffer &commandBuffer) override;
     
   private:
-    friend HardwareExecutor &operator<<(HardwareExecutor &executor, ComputePipeline &other);
 
 	VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
 	VkPipeline pipeline = VK_NULL_HANDLE;
@@ -58,12 +57,4 @@ struct ComputePipeline : public CommandRecord
     EmbeddedShader::ShaderCodeModule shaderCode;
 
     ktm::uvec3 groupCount = {0, 0, 0};
-
-    HardwareExecutor *executor;
 };
-
-inline HardwareExecutor &operator<<(HardwareExecutor &executor, ComputePipeline &other)
-{
-    other.executor = &executor;
-    return executor;
-}

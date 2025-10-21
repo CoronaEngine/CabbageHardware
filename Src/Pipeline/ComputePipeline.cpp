@@ -21,7 +21,7 @@ ComputePipeline &ComputePipeline::operator()(uint16_t groupCountX, uint16_t grou
 	return *this;
 }
 
-void ComputePipeline::commitCommand(HardwareExecutor &executor)
+void ComputePipeline::commitCommand(VkCommandBuffer &commandBuffer)
 {
     if (pipelineLayout == VK_NULL_HANDLE && pipeline == VK_NULL_HANDLE)
     {
@@ -79,7 +79,7 @@ void ComputePipeline::commitCommand(HardwareExecutor &executor)
 
     if (pipelineLayout != VK_NULL_HANDLE && pipeline != VK_NULL_HANDLE)
     {
-        auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
+        //auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 
             std::vector<VkDescriptorSet> descriptorSets;
@@ -98,8 +98,8 @@ void ComputePipeline::commitCommand(HardwareExecutor &executor)
             }
 
             vkCmdDispatch(commandBuffer, groupCount.x, groupCount.y, groupCount.z);
-        };
+        ////};
 
-        executor << runCommand;
+        //executor << runCommand;
     }
 }

@@ -13,7 +13,7 @@ struct CopyBufferCommand : public CommandRecord
         executorType = ExecutorType::Transfer;
     }
 
-    void commitCommand(HardwareExecutor &executor) override
+    void commitCommand(VkCommandBuffer &commandBuffer) override
     {
     }
 };
@@ -29,7 +29,7 @@ struct CopyImageCommand : public CommandRecord
         executorType = ExecutorType::Transfer;
     }
 
-    void commitCommand(HardwareExecutor &executor) override
+    void commitCommand(VkCommandBuffer &commandBuffer) override
     {
     }
 };
@@ -45,7 +45,7 @@ struct CopyBufferToImageCommand : public CommandRecord
         executorType = ExecutorType::Transfer;
     }
 
-    void commitCommand(HardwareExecutor &executor) override
+    void commitCommand(VkCommandBuffer &commandBuffer) override
     {
     }
 };
@@ -61,7 +61,7 @@ struct CopyImageToBufferCommand : public CommandRecord
         executorType = ExecutorType::Transfer;
     }
 
-    void commitCommand(HardwareExecutor &executor) override
+    void commitCommand(VkCommandBuffer &commandBuffer) override
     {
     }
 };
@@ -77,7 +77,7 @@ struct BlitImageCommand : public CommandRecord
         executorType = ExecutorType::Graphics;
     }
 
-    void commitCommand(HardwareExecutor &executor) override
+    void commitCommand(VkCommandBuffer &commandBuffer) override
     {
     }
 };

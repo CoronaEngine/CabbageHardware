@@ -3,9 +3,9 @@
 #include <Hardware/GlobalContext.h>
 
 
-HardwareExecutor &HardwareExecutor::operator()(CommandRecord::ExecutorType queueType, HardwareExecutor *waitExecutor)
+HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos, std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos, VkFence fence)
 {
-    if (recordingBegan == false)
+    if (commandList.size() > 0)
     {
         this->queueType = queueType;
 
@@ -54,16 +54,11 @@ HardwareExecutor &HardwareExecutor::operator()(CommandRecord::ExecutorType queue
 
         vkBeginCommandBuffer(currentRecordQueue->commandBuffer, &beginInfo);
 
-        recordingBegan = true;
-    }
+        for (size_t i = 0; i < commandList.size(); i++)
+        {
+            commandList[i]->commitCommand(*this);
+        }
 
-    return *this;
-}
-
-HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos, std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos, VkFence fence)
-{
-    if (recordingBegan)
-    {
         vkEndCommandBuffer(currentRecordQueue->commandBuffer);
 
         VkCommandBufferSubmitInfo commandBufferSubmitInfo{};
@@ -100,8 +95,6 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
         }
 
         currentRecordQueue->queueMutex->unlock();
-
-        recordingBegan = false;
     }
 
     return *this;
