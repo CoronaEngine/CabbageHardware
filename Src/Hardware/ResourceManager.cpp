@@ -947,12 +947,12 @@ ResourceManager &ResourceManager::copyBufferToImage(HardwareExecutor *executor, 
     return *this;
 }
 
-ResourceManager &ResourceManager::copyBuffer(HardwareExecutor *executor, VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+ResourceManager &ResourceManager::copyBuffer(HardwareExecutor *executor, BufferHardwareWrap &srcBuffer, BufferHardwareWrap &dstBuffer, uint64_t size)
 {
     auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
         VkBufferCopy copyRegion{};
         copyRegion.size = size;
-        vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+        vkCmdCopyBuffer(commandBuffer, srcBuffer.bufferHandle, dstBuffer.bufferHandle, 1, &copyRegion);
     };
 
      *executor << runCommand;

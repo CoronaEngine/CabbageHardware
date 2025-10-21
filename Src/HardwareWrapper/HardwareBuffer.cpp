@@ -111,7 +111,7 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, uint64_t 
 {
     std::unique_lock<std::mutex> lock(bufferMutex);
 
-    globalHardwareContext.mainDevice->resourceManager.copyBuffer(executor,bufferGlobalPool[*inputBuffer.bufferID].bufferHandle, bufferGlobalPool[*bufferID].bufferHandle, size);
+    globalHardwareContext.mainDevice->resourceManager.copyBuffer(executor,bufferGlobalPool[*inputBuffer.bufferID], bufferGlobalPool[*bufferID], size);
 	return true;
 }
 
