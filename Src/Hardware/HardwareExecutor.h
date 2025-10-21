@@ -185,5 +185,5 @@ struct HardwareExecutor
 
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
 
-    //std::vector<std::unique_ptr<CommandRecord>> commandList;
+    std::vector<std::shared_ptr<CommandRecord>> commandList;
 };

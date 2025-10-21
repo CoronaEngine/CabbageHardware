@@ -170,7 +170,7 @@ void DisplayManager::choosePresentDevice()
 	}
 #endif
 
-    hardwareExecutor = HardwareExecutor(displayDevice);
+    hardwareExecutor = std::make_shared<HardwareExecutor>(displayDevice);
 }
 
 
@@ -361,8 +361,8 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 		if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
         {
             // 在主设备上：源图像 -> srcStaging
-            hardwareExecutor(CommandRecord::ExecutorType::Graphics) << globalHardwareContext.mainDevice->resourceManager.copyImageToBuffer(
-                &hardwareExecutor,
+            (*hardwareExecutor)(CommandRecord::ExecutorType::Graphics) << globalHardwareContext.mainDevice->resourceManager.copyImageToBuffer(
+                hardwareExecutor.get(),
                 sourceImage.imageHandle,
                 srcStaging.bufferHandle,
                 sourceImage.imageSize.x,
@@ -383,8 +383,8 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 #endif
 
             // 在显示设备上：dstStaging -> 目标图像
-            hardwareExecutor << displayDevice->resourceManager.copyBufferToImage(
-                &hardwareExecutor,
+            (*hardwareExecutor) << displayDevice->resourceManager.copyBufferToImage(
+                hardwareExecutor.get(),
                 dstStaging.bufferHandle,
                 this->displayImage.imageHandle,
                 this->displayImage.imageSize.x,
@@ -444,7 +444,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 signalSemaphoreInfos.push_back(signalInfo);
             }
 
-             hardwareExecutor << runCommand  << hardwareExecutor.commit(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame]);
+             *hardwareExecutor << runCommand  << hardwareExecutor->commit(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame]);
 
              // 准备呈现信息，等待 timeline semaphore
              VkPresentInfoKHR presentInfo{};

@@ -70,5 +70,5 @@ private:
     ResourceManager::BufferHardwareWrap dstStaging;
     std::vector<char> dstCpuData;
 
-    HardwareExecutor hardwareExecutor;
+    std::shared_ptr<HardwareExecutor> hardwareExecutor;
 };
