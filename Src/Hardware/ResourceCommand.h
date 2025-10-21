@@ -1,7 +1,5 @@
 #include "HardwareExecutor.h"
 
-
-
 struct CopyBufferCommand : public CommandRecord
 {
     ResourceManager::BufferHardwareWrap &srcBuffer;
@@ -13,9 +11,14 @@ struct CopyBufferCommand : public CommandRecord
         executorType = ExecutorType::Transfer;
     }
 
+    ExecutorType getExecutorType() override
+    {
+        return CommandRecord::ExecutorType::Transfer;
+    }
+
     void commitCommand(HardwareExecutor &hardwareExecutor) override
     {
-        hardwareExecutor.hardwareContext->resourceManager.copyBuffer(hardwareExecutor.currentRecordQueue->commandBuffer,srcBuffer, dstBuffer);
+        hardwareExecutor.hardwareContext->resourceManager.copyBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, srcBuffer, dstBuffer);
     }
 };
 
@@ -28,6 +31,11 @@ struct CopyImageCommand : public CommandRecord
         : srcImage(srcImg), dstImage(dstImg)
     {
         executorType = ExecutorType::Transfer;
+    }
+
+    ExecutorType getExecutorType() override
+    {
+        return CommandRecord::ExecutorType::Transfer;
     }
 
     void commitCommand(HardwareExecutor &hardwareExecutor) override
@@ -47,6 +55,11 @@ struct CopyBufferToImageCommand : public CommandRecord
         executorType = ExecutorType::Transfer;
     }
 
+    ExecutorType getExecutorType() override
+    {
+        return CommandRecord::ExecutorType::Transfer;
+    }
+
     void commitCommand(HardwareExecutor &hardwareExecutor) override
     {
         hardwareExecutor.hardwareContext->resourceManager.copyBufferToImage(hardwareExecutor.currentRecordQueue->commandBuffer, srcBuffer, dstImage);
@@ -64,6 +77,11 @@ struct CopyImageToBufferCommand : public CommandRecord
         executorType = ExecutorType::Transfer;
     }
 
+    ExecutorType getExecutorType() override
+    {
+        return CommandRecord::ExecutorType::Transfer;
+    }
+
     void commitCommand(HardwareExecutor &hardwareExecutor) override
     {
         hardwareExecutor.hardwareContext->resourceManager.copyImageToBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, srcImage, dstBuffer);
@@ -79,6 +97,11 @@ struct BlitImageCommand : public CommandRecord
         : srcImage(srcImg), dstImage(dstImg)
     {
         executorType = ExecutorType::Graphics;
+    }
+
+    ExecutorType getExecutorType() override
+    {
+        return CommandRecord::ExecutorType::Graphics;
     }
 
     void commitCommand(HardwareExecutor &hardwareExecutor) override

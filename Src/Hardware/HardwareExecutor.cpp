@@ -7,7 +7,19 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
 {
     if (commandList.size() > 0)
     {
-        this->queueType = queueType;
+        CommandRecord::ExecutorType queueType = CommandRecord::ExecutorType::Transfer;
+        for (size_t i = 0; i < commandList.size(); i++)
+        {
+            if (commandList[i]->getExecutorType() == CommandRecord::ExecutorType::Graphics)
+            {
+                queueType = CommandRecord::ExecutorType::Graphics;
+                break;
+            }
+            else if (commandList[i]->getExecutorType() == CommandRecord::ExecutorType::Compute)
+            {
+                queueType = CommandRecord::ExecutorType::Compute;
+            }
+        }
 
         uint16_t queueIndex = 0;
 

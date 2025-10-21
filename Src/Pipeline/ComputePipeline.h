@@ -14,7 +14,7 @@ struct ComputePipeline : public CommandRecord
 {
     ComputePipeline()
     {
-
+        executorType = CommandRecord::ExecutorType::Compute;
     }
 
     ~ComputePipeline()
@@ -40,6 +40,12 @@ struct ComputePipeline : public CommandRecord
     }
 
     ComputePipeline* operator()(uint16_t x, uint16_t y, uint16_t z);
+
+   
+    ExecutorType getExecutorType() override
+    {
+        return CommandRecord::ExecutorType::Compute;
+    }
 
     void commitCommand(HardwareExecutor &hardwareExecutor) override;
     

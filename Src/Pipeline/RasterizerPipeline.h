@@ -23,6 +23,7 @@ struct RasterizerPipeline : public CommandRecord
 
     RasterizerPipeline()
     {
+        executorType = CommandRecord::ExecutorType::Graphics;
     }
 
     ~RasterizerPipeline()
@@ -68,6 +69,11 @@ struct RasterizerPipeline : public CommandRecord
     RasterizerPipeline* operator()(uint16_t x, uint16_t y);
 
     RasterizerPipeline* record(const HardwareBuffer &indexBuffer);
+
+    ExecutorType getExecutorType() override
+    {
+        return CommandRecord::ExecutorType::Graphics;
+    }
 
     void commitCommand(HardwareExecutor &hardwareExecutor) override;
 
