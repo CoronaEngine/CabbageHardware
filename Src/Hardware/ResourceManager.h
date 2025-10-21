@@ -89,13 +89,13 @@ struct ResourceManager
 	uint32_t storeDescriptor(BufferHardwareWrap buffer);
 	//uint32_t storeDescriptor(VkAccelerationStructureKHR m_tlas);
 
-	ResourceManager &copyBuffer(HardwareExecutor *executor, BufferHardwareWrap &srcBuffer, BufferHardwareWrap &dstBuffer);
-    ResourceManager &copyImage(HardwareExecutor *executor, ImageHardwareWrap &source, ImageHardwareWrap &destination);
+	ResourceManager &copyBuffer(VkCommandBuffer &commandBuffer, BufferHardwareWrap &srcBuffer, BufferHardwareWrap &dstBuffer);
+    ResourceManager &copyImage(VkCommandBuffer &commandBuffer, ImageHardwareWrap &source, ImageHardwareWrap &destination);
 
-    ResourceManager &blitImage(HardwareExecutor *executor, ImageHardwareWrap &srcImage, ImageHardwareWrap &dstImage);
+    ResourceManager &blitImage(VkCommandBuffer &commandBuffer, ImageHardwareWrap &srcImage, ImageHardwareWrap &dstImage);
 
-    ResourceManager &copyBufferToImage(HardwareExecutor *executor, BufferHardwareWrap& buffer, ImageHardwareWrap& image);
-    ResourceManager &copyImageToBuffer(HardwareExecutor *executor, ImageHardwareWrap& image, BufferHardwareWrap& buffer);
+    ResourceManager &copyBufferToImage(VkCommandBuffer &commandBuffer, BufferHardwareWrap& buffer, ImageHardwareWrap& image);
+    ResourceManager &copyImageToBuffer(VkCommandBuffer &commandBuffer, ImageHardwareWrap& image, BufferHardwareWrap& buffer);
 
     void copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData);
     //void copyBufferToCpu(VkDevice &device, VkDeviceMemory &memory, VkDeviceSize size, void *cpuData);
@@ -107,7 +107,7 @@ struct ResourceManager
 	uint32_t findExternalMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     //void transitionImageLayoutUnblocked(const VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
 
-	ResourceManager &transitionImageLayout(HardwareExecutor *executor, ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
+	ResourceManager &transitionImageLayout(VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
 
 	VkShaderModule createShaderModule(const std::vector<unsigned int> &code);
 
