@@ -108,16 +108,14 @@ struct RasterizerPipeline : public CommandRecord
     // EmbeddedShader::ShaderCodeCompiler vertexShaderCompiler;
     // EmbeddedShader::ShaderCodeCompiler fragmentShaderCompiler;
 
-    // struct TriangleGeomMesh
-    //{
-    //     uint32_t indexOffset;
-    //     uint32_t indexCount;
-    //     HardwareBuffer indexBuffer;
-    //     std::vector<HardwareBuffer> vertexBuffers;
+    struct TriangleGeomMesh
+    {
+        HardwareBuffer indexBuffer;
+        std::vector<HardwareBuffer> vertexBuffers;
 
-    //    HardwarePushConstant pushConstant;
-    //};
-    // std::vector<TriangleGeomMesh> geomMeshes;
+        HardwarePushConstant pushConstant;
+    };
+    std::vector<TriangleGeomMesh> geomMeshes;
 
     CommandRecord dumpCommandRecord;
 
