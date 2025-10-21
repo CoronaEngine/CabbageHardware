@@ -947,17 +947,20 @@ ResourceManager &ResourceManager::copyBufferToImage(HardwareExecutor *executor, 
     return *this;
 }
 
-ResourceManager &ResourceManager::copyBuffer(HardwareExecutor *executor, BufferHardwareWrap &srcBuffer, BufferHardwareWrap &dstBuffer, uint64_t size)
+ResourceManager &ResourceManager::copyBuffer(HardwareExecutor *executor, BufferHardwareWrap &srcBuffer, BufferHardwareWrap &dstBuffer)
 {
-    auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
-        VkBufferCopy copyRegion{};
-        copyRegion.size = size;
-        vkCmdCopyBuffer(commandBuffer, srcBuffer.bufferHandle, dstBuffer.bufferHandle, 1, &copyRegion);
-    };
+    if (srcBuffer.bufferAllocInfo.size == dstBuffer.bufferAllocInfo.size)
+    {
+        auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
+            VkBufferCopy copyRegion{};
+            copyRegion.size = srcBuffer.bufferAllocInfo.size;
+            vkCmdCopyBuffer(commandBuffer, srcBuffer.bufferHandle, dstBuffer.bufferHandle, 1, &copyRegion);
+        };
 
-     *executor << runCommand;
+        *executor << runCommand;
+    }
 
-     return *this;
+    return *this;
 }
 
 uint32_t ResourceManager::findExternalMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)

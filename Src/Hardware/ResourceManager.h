@@ -89,7 +89,7 @@ struct ResourceManager
 	uint32_t storeDescriptor(BufferHardwareWrap buffer);
 	//uint32_t storeDescriptor(VkAccelerationStructureKHR m_tlas);
 
-	ResourceManager &copyBuffer(HardwareExecutor *executor, BufferHardwareWrap &srcBuffer, BufferHardwareWrap &dstBuffer, uint64_t size);
+	ResourceManager &copyBuffer(HardwareExecutor *executor, BufferHardwareWrap &srcBuffer, BufferHardwareWrap &dstBuffer);
     ResourceManager &copyImage(HardwareExecutor *executor, ImageHardwareWrap &source, ImageHardwareWrap &destination);
 
     ResourceManager &blitImage(HardwareExecutor *executor, ImageHardwareWrap &srcImage, ImageHardwareWrap &dstImage);

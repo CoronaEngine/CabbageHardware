@@ -24,120 +24,65 @@ struct CommandRecord
 
 struct CopyBufferCommand : public CommandRecord
 {
-    ResourceManager::BufferHardwareWrap srcBuffer;
-    ResourceManager::BufferHardwareWrap dstBuffer;
-    std::vector<VkBufferCopy> regions;
+    ResourceManager::BufferHardwareWrap &srcBuffer;
+    ResourceManager::BufferHardwareWrap &dstBuffer;
 
-    CopyBufferCommand(const ResourceManager::BufferHardwareWrap &src, const ResourceManager::BufferHardwareWrap &dst, const std::vector<VkBufferCopy> &copyRegions)
-        : srcBuffer(src), dstBuffer(dst), regions(copyRegions)
+    CopyBufferCommand(ResourceManager::BufferHardwareWrap &src, ResourceManager::BufferHardwareWrap &dst)
+        : srcBuffer(src), dstBuffer(dst)
     {
         executorType = ExecutorType::Transfer;
     }
 
     void commitCommand(const VkCommandBuffer &commandBuffer) override
     {
-        vkCmdCopyBuffer(
-            commandBuffer,
-            srcBuffer.bufferHandle,
-            dstBuffer.bufferHandle,
-            static_cast<uint32_t>(regions.size()),
-            regions.data());
     }
 };
 
 struct CopyImageCommand : public CommandRecord
 {
-    ResourceManager::ImageHardwareWrap srcImage;
-    VkImageLayout srcImageLayout;
-    ResourceManager::ImageHardwareWrap dstImage;
-    VkImageLayout dstImageLayout;
-    std::vector<VkImageCopy> regions;
+    ResourceManager::ImageHardwareWrap &srcImage;
+    ResourceManager::ImageHardwareWrap &dstImage;
 
-    CopyImageCommand(
-        const ResourceManager::ImageHardwareWrap &srcImg, VkImageLayout srcLayout,
-        const ResourceManager::ImageHardwareWrap &dstImg, VkImageLayout dstLayout,
-        const std::vector<VkImageCopy> &copyRegions)
-        : srcImage(srcImg), srcImageLayout(srcLayout),
-          dstImage(dstImg), dstImageLayout(dstLayout),
-          regions(copyRegions)
+    CopyImageCommand(ResourceManager::ImageHardwareWrap &srcImg, ResourceManager::ImageHardwareWrap &dstImg)
+        : srcImage(srcImg), dstImage(dstImg)
     {
         executorType = ExecutorType::Transfer;
     }
 
     void commitCommand(const VkCommandBuffer &commandBuffer) override
     {
-        vkCmdCopyImage(
-            commandBuffer,
-            srcImage.imageHandle,
-            srcImageLayout,
-            dstImage.imageHandle,
-            dstImageLayout,
-            static_cast<uint32_t>(regions.size()),
-            regions.data());
     }
 };
 
 struct CopyBufferToImageCommand : public CommandRecord
 {
-    ResourceManager::BufferHardwareWrap srcBuffer;
-    ResourceManager::ImageHardwareWrap dstImage;
-    VkImageLayout dstImageLayout;
-    std::vector<VkBufferImageCopy> regions;
+    ResourceManager::BufferHardwareWrap &srcBuffer;
+    ResourceManager::ImageHardwareWrap &dstImage;
 
-    CopyBufferToImageCommand(
-        const ResourceManager::BufferHardwareWrap &srcBuf,
-        const ResourceManager::ImageHardwareWrap &dstImg,
-        VkImageLayout dstLayout,
-        const std::vector<VkBufferImageCopy> &copyRegions)
-        : srcBuffer(srcBuf),
-          dstImage(dstImg),
-          dstImageLayout(dstLayout),
-          regions(copyRegions)
+    CopyBufferToImageCommand(ResourceManager::BufferHardwareWrap &srcBuf, ResourceManager::ImageHardwareWrap &dstImg)
+        : srcBuffer(srcBuf), dstImage(dstImg)
     {
         executorType = ExecutorType::Transfer;
     }
 
     void commitCommand(const VkCommandBuffer &commandBuffer) override
     {
-        vkCmdCopyBufferToImage(
-            commandBuffer,
-            srcBuffer.bufferHandle,
-            dstImage.imageHandle,
-            dstImageLayout,
-            static_cast<uint32_t>(regions.size()),
-            regions.data());
     }
 };
 
 struct CopyImageToBufferCommand : public CommandRecord
 {
     ResourceManager::ImageHardwareWrap srcImage;
-    VkImageLayout srcImageLayout;
     ResourceManager::BufferHardwareWrap dstBuffer;
-    std::vector<VkBufferImageCopy> regions;
 
-    CopyImageToBufferCommand(
-        const ResourceManager::ImageHardwareWrap &srcImg,
-        VkImageLayout srcLayout,
-        const ResourceManager::BufferHardwareWrap &dstBuf,
-        const std::vector<VkBufferImageCopy> &copyRegions)
-        : srcImage(srcImg),
-          srcImageLayout(srcLayout),
-          dstBuffer(dstBuf),
-          regions(copyRegions)
+    CopyImageToBufferCommand(ResourceManager::ImageHardwareWrap &srcImg, ResourceManager::BufferHardwareWrap &dstBuf)
+        : srcImage(srcImg), dstBuffer(dstBuf)
     {
         executorType = ExecutorType::Transfer;
     }
 
     void commitCommand(const VkCommandBuffer &commandBuffer) override
     {
-        vkCmdCopyImageToBuffer(
-            commandBuffer,
-            srcImage.imageHandle,
-            srcImageLayout,
-            dstBuffer.bufferHandle,
-            static_cast<uint32_t>(regions.size()),
-            regions.data());
     }
 };
 

@@ -68,7 +68,7 @@ struct HardwareBuffer
 
     uint32_t storeDescriptor();
 
-    bool copyFromBuffer(const HardwareBuffer &inputBuffer, uint64_t size, HardwareExecutor *executor);
+    bool copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareExecutor *executor);
     bool copyFromData(const void *inputData, uint64_t size);
 
     template <typename Type>
