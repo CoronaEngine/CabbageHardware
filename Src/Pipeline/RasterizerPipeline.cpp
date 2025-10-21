@@ -384,11 +384,55 @@ void RasterizerPipeline::createFramebuffers(ktm::uvec2 imageSize)
     }
 }
 
-RasterizerPipeline &RasterizerPipeline::operator()(HardwareExecutor *executor, uint16_t imageSizeX, uint16_t imageSizeY)
+RasterizerPipeline &RasterizerPipeline::operator()(uint16_t imageSizeX, uint16_t imageSizeY)
 {
+    this->imageSize = {imageSizeX, imageSizeY};
+    return *this;
+}
+
+
+HardwareExecutor &RasterizerPipeline::record(HardwareExecutor *executor, const HardwareBuffer &indexBuffer)
+{
+    auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
+        std::vector<VkBuffer> vertexBuffers;
+        std::vector<VkDeviceSize> offsets;
+        for (size_t vertexBufferIndex = 0; vertexBufferIndex < tempVertexBuffers.size(); vertexBufferIndex++)
+        {
+            vertexBuffers.push_back(bufferGlobalPool[*tempVertexBuffers[vertexBufferIndex].bufferID].bufferHandle);
+            offsets.push_back(0);
+        }
+
+        vkCmdBindVertexBuffers(commandBuffer, 0, (uint32_t)tempVertexBuffers.size(), vertexBuffers.data(), offsets.data());
+
+        vkCmdBindIndexBuffer(commandBuffer, bufferGlobalPool[*indexBuffer.bufferID].bufferHandle, 0 * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
+
+        std::vector<VkDescriptorSet> descriptorSets;
+        for (size_t i = 0; i < 4; i++)
+        {
+            descriptorSets.push_back(globalHardwareContext.mainDevice->resourceManager.bindlessDescriptors[i].descriptorSet);
+        }
+
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+        
+        void *data = tempPushConstant.getData();
+        vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, pushConstantSize, data);
+
+        uint32_t indexCount = bufferGlobalPool[*indexBuffer.bufferID].bufferAllocInfo.size / sizeof(uint32_t);
+        vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
+    };
+
+    *executor << runCommand;
+
+    return *executor;
+}
+
+
+void RasterizerPipeline::commitCommand(HardwareExecutor &executor)
+{
+
     if (!depthImage)
     {
-        depthImage = HardwareImage(imageSizeX, imageSizeY, ImageFormat::D32_FLOAT, ImageUsage::DepthImage);
+        depthImage = HardwareImage(imageSize.x, imageSize.y, ImageFormat::D32_FLOAT, ImageUsage::DepthImage);
 
         createRenderPass(multiviewCount);
 
@@ -435,49 +479,7 @@ RasterizerPipeline &RasterizerPipeline::operator()(HardwareExecutor *executor, u
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
     };
 
-    *executor << runCommand;
+    executor << runCommand;
 
-    return *this;
-}
-
-
-HardwareExecutor &RasterizerPipeline::record(HardwareExecutor *executor, const HardwareBuffer &indexBuffer)
-{
-    auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
-        std::vector<VkBuffer> vertexBuffers;
-        std::vector<VkDeviceSize> offsets;
-        for (size_t vertexBufferIndex = 0; vertexBufferIndex < tempVertexBuffers.size(); vertexBufferIndex++)
-        {
-            vertexBuffers.push_back(bufferGlobalPool[*tempVertexBuffers[vertexBufferIndex].bufferID].bufferHandle);
-            offsets.push_back(0);
-        }
-
-        vkCmdBindVertexBuffers(commandBuffer, 0, (uint32_t)tempVertexBuffers.size(), vertexBuffers.data(), offsets.data());
-
-        vkCmdBindIndexBuffer(commandBuffer, bufferGlobalPool[*indexBuffer.bufferID].bufferHandle, 0 * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
-
-        std::vector<VkDescriptorSet> descriptorSets;
-        for (size_t i = 0; i < 4; i++)
-        {
-            descriptorSets.push_back(globalHardwareContext.mainDevice->resourceManager.bindlessDescriptors[i].descriptorSet);
-        }
-
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
-        
-        void *data = tempPushConstant.getData();
-        vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, pushConstantSize, data);
-
-        uint32_t indexCount = bufferGlobalPool[*indexBuffer.bufferID].bufferAllocInfo.size / sizeof(uint32_t);
-        vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
-    };
-
-    *executor << runCommand;
-
-    return *executor;
-}
-
-
-void RasterizerPipeline::commitCommand(HardwareExecutor &executor)
-{
 
 }

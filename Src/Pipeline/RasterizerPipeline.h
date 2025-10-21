@@ -65,7 +65,7 @@ struct RasterizerPipeline : public CommandRecord
         return std::move(HardwarePushConstant());
     }
 
-    RasterizerPipeline &operator()(HardwareExecutor *executor, uint16_t x, uint16_t y);
+    RasterizerPipeline &operator()(uint16_t x, uint16_t y);
 
     HardwareExecutor &record(HardwareExecutor *executor, const HardwareBuffer &indexBuffer);
 
@@ -75,6 +75,8 @@ struct RasterizerPipeline : public CommandRecord
     friend HardwareExecutor &operator<<(HardwareExecutor &executor, RasterizerPipeline &other);
 
     HardwareExecutor *executor;
+
+    ktm::uvec2 imageSize = {0, 0};
 
 
     void createRenderPass(int multiviewCount = 1);
