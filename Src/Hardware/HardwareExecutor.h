@@ -47,7 +47,7 @@ struct HardwareExecutor
                              std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
                              VkFence fence = VK_NULL_HANDLE);
 
-  private:
+  //private:
     friend struct CommandRecord;
 
     CommandRecord::ExecutorType queueType = CommandRecord::ExecutorType::Graphics;

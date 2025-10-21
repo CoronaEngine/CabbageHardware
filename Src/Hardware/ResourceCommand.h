@@ -30,8 +30,9 @@ struct CopyImageCommand : public CommandRecord
         executorType = ExecutorType::Transfer;
     }
 
-    void commitCommand(VkCommandBuffer &commandBuffer) override
+    void commitCommand(HardwareExecutor &hardwareExecutor) override
     {
+        hardwareExecutor.hardwareContext->resourceManager.copyImage(hardwareExecutor.currentRecordQueue->commandBuffer, srcImage, dstImage);
     }
 };
 
@@ -46,8 +47,9 @@ struct CopyBufferToImageCommand : public CommandRecord
         executorType = ExecutorType::Transfer;
     }
 
-    void commitCommand(VkCommandBuffer &commandBuffer) override
+    void commitCommand(HardwareExecutor &hardwareExecutor) override
     {
+        hardwareExecutor.hardwareContext->resourceManager.copyBufferToImage(hardwareExecutor.currentRecordQueue->commandBuffer, srcBuffer, dstImage);
     }
 };
 
@@ -62,8 +64,9 @@ struct CopyImageToBufferCommand : public CommandRecord
         executorType = ExecutorType::Transfer;
     }
 
-    void commitCommand(VkCommandBuffer &commandBuffer) override
+    void commitCommand(HardwareExecutor &hardwareExecutor) override
     {
+        hardwareExecutor.hardwareContext->resourceManager.copyImageToBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, srcImage, dstBuffer);
     }
 };
 
@@ -78,7 +81,8 @@ struct BlitImageCommand : public CommandRecord
         executorType = ExecutorType::Graphics;
     }
 
-    void commitCommand(VkCommandBuffer &commandBuffer) override
+    void commitCommand(HardwareExecutor &hardwareExecutor) override
     {
+        hardwareExecutor.hardwareContext->resourceManager.blitImage(hardwareExecutor.currentRecordQueue->commandBuffer, srcImage, dstImage);
     }
 };

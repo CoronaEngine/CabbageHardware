@@ -21,7 +21,7 @@ ComputePipeline &ComputePipeline::operator()(uint16_t groupCountX, uint16_t grou
 	return *this;
 }
 
-void ComputePipeline::commitCommand(VkCommandBuffer &commandBuffer)
+void ComputePipeline::commitCommand(HardwareExecutor &hardwareExecutor)
 {
     if (pipelineLayout == VK_NULL_HANDLE && pipeline == VK_NULL_HANDLE)
     {
@@ -80,7 +80,7 @@ void ComputePipeline::commitCommand(VkCommandBuffer &commandBuffer)
     if (pipelineLayout != VK_NULL_HANDLE && pipeline != VK_NULL_HANDLE)
     {
         //auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
-            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+        vkCmdBindPipeline(hardwareExecutor.currentRecordQueue->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 
             std::vector<VkDescriptorSet> descriptorSets;
             for (size_t i = 0; i < 4; i++)
@@ -88,16 +88,16 @@ void ComputePipeline::commitCommand(VkCommandBuffer &commandBuffer)
                 descriptorSets.push_back(globalHardwareContext.mainDevice->resourceManager.bindlessDescriptors[i].descriptorSet);
             }
 
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+            vkCmdBindDescriptorSets(hardwareExecutor.currentRecordQueue->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
             // void* pushContastValue = EmbededShader::testAst.getFinalPushConstBytes();
             void *data = pushConstant.getData();
             if (data != nullptr)
             {
-                vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, shaderCode.shaderResources.pushConstantSize, data);
+                vkCmdPushConstants(hardwareExecutor.currentRecordQueue->commandBuffer, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, shaderCode.shaderResources.pushConstantSize, data);
             }
 
-            vkCmdDispatch(commandBuffer, groupCount.x, groupCount.y, groupCount.z);
+            vkCmdDispatch(hardwareExecutor.currentRecordQueue->commandBuffer, groupCount.x, groupCount.y, groupCount.z);
         ////};
 
         //executor << runCommand;

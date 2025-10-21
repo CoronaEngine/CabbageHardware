@@ -69,7 +69,7 @@ struct RasterizerPipeline : public CommandRecord
 
     RasterizerPipeline &record(const HardwareBuffer &indexBuffer);
 
-    void commitCommand(VkCommandBuffer &commandBuffer) override;
+    void commitCommand(HardwareExecutor &hardwareExecutor) override;
 
   private:
 

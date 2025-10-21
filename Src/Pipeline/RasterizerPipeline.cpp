@@ -397,7 +397,7 @@ RasterizerPipeline &RasterizerPipeline::record(const HardwareBuffer &indexBuffer
 }
 
 
-void RasterizerPipeline::commitCommand(VkCommandBuffer &commandBuffer)
+void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
 {
 
     if (!depthImage)
@@ -429,7 +429,7 @@ void RasterizerPipeline::commitCommand(VkCommandBuffer &commandBuffer)
         renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
         renderPassInfo.pClearValues = clearValues.data();
 
-        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBeginRenderPass(hardwareExecutor.currentRecordQueue->commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
         VkViewport viewport{};
         viewport.x = 0.0f;
@@ -438,15 +438,15 @@ void RasterizerPipeline::commitCommand(VkCommandBuffer &commandBuffer)
         viewport.height = (float)imageGlobalPool[*depthImage.imageID].imageSize.y;
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
-        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        vkCmdSetViewport(hardwareExecutor.currentRecordQueue->commandBuffer, 0, 1, &viewport);
 
         VkRect2D scissor{};
         scissor.offset = {0, 0};
         scissor.extent.width = imageGlobalPool[*depthImage.imageID].imageSize.x;
         scissor.extent.height = imageGlobalPool[*depthImage.imageID].imageSize.y;
-        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+        vkCmdSetScissor(hardwareExecutor.currentRecordQueue->commandBuffer, 0, 1, &scissor);
 
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+        vkCmdBindPipeline(hardwareExecutor.currentRecordQueue->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
         //std::vector<VkBuffer> vertexBuffers;
         //std::vector<VkDeviceSize> offsets;
@@ -475,7 +475,7 @@ void RasterizerPipeline::commitCommand(VkCommandBuffer &commandBuffer)
         //vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
 
 
-        vkCmdEndRenderPass(commandBuffer);
+        vkCmdEndRenderPass(hardwareExecutor.currentRecordQueue->commandBuffer);
     //};
 
     //executor << runCommand;
