@@ -17,9 +17,7 @@ struct CommandRecord
 
     virtual ~CommandRecord() = default;
 
-    virtual void commitCommand(const VkCommandBuffer& commandBuffer)
-    {
-    }
+    virtual void commitCommand(const VkCommandBuffer &commandBuffer) = 0;
 
     ExecutorType executorType;
 };
