@@ -72,8 +72,8 @@ struct CopyBufferToImageCommand : public CommandRecord
 
 struct CopyImageToBufferCommand : public CommandRecord
 {
-    ResourceManager::ImageHardwareWrap srcImage;
-    ResourceManager::BufferHardwareWrap dstBuffer;
+    ResourceManager::ImageHardwareWrap &srcImage;
+    ResourceManager::BufferHardwareWrap &dstBuffer;
 
     CopyImageToBufferCommand(ResourceManager::ImageHardwareWrap &srcImg, ResourceManager::BufferHardwareWrap &dstBuf)
         : srcImage(srcImg), dstBuffer(dstBuf)
@@ -88,36 +88,17 @@ struct CopyImageToBufferCommand : public CommandRecord
 
 struct BlitImageCommand : public CommandRecord
 {
-    VkImage srcImage;
-    VkImageLayout srcImageLayout;
-    VkImage dstImage;
-    VkImageLayout dstImageLayout;
-    std::vector<VkImageBlit> regions;
-    VkFilter filter;
+    ResourceManager::ImageHardwareWrap &srcImage;
+    ResourceManager::ImageHardwareWrap &dstImage;
 
-    BlitImageCommand(
-        VkImage srcImg, VkImageLayout srcLayout,
-        VkImage dstImg, VkImageLayout dstLayout,
-        const std::vector<VkImageBlit> &blitRegions,
-        VkFilter blitFilter = VK_FILTER_LINEAR)
-        : srcImage(srcImg), srcImageLayout(srcLayout),
-          dstImage(dstImg), dstImageLayout(dstLayout),
-          regions(blitRegions), filter(blitFilter)
+    BlitImageCommand(ResourceManager::ImageHardwareWrap &srcImg, ResourceManager::ImageHardwareWrap &dstImg)
+        : srcImage(srcImg), dstImage(dstImg)
     {
-        executorType = ExecutorType::Transfer;
+        executorType = ExecutorType::Graphics;
     }
 
     void commitCommand(const VkCommandBuffer &commandBuffer) override
     {
-        vkCmdBlitImage(
-            commandBuffer,
-            srcImage,
-            srcImageLayout,
-            dstImage,
-            dstImageLayout,
-            static_cast<uint32_t>(regions.size()),
-            regions.data(),
-            filter);
     }
 };
 
