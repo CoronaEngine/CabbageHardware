@@ -65,9 +65,9 @@ struct RasterizerPipeline : public CommandRecord
         return std::move(HardwarePushConstant());
     }
 
-    RasterizerPipeline &operator()(uint16_t x, uint16_t y);
+    RasterizerPipeline* operator()(uint16_t x, uint16_t y);
 
-    RasterizerPipeline &record(const HardwareBuffer &indexBuffer);
+    RasterizerPipeline* record(const HardwareBuffer &indexBuffer);
 
     void commitCommand(HardwareExecutor &hardwareExecutor) override;
 

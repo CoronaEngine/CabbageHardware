@@ -32,7 +32,7 @@ struct HardwareExecutor
     ~HardwareExecutor() = default;
 
 
-    HardwareExecutor &operator<<(std::shared_ptr<CommandRecord> commandRecord)
+    HardwareExecutor &operator<<(CommandRecord* commandRecord)
     {
         commandList.push_back(commandRecord);
         return *this;
@@ -55,5 +55,5 @@ struct HardwareExecutor
 
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
 
-    std::vector<std::shared_ptr<CommandRecord>> commandList;
+    std::vector<CommandRecord*> commandList;
 };

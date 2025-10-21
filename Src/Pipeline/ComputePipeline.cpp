@@ -15,10 +15,10 @@ ComputePipeline::ComputePipeline(std::string shaderCode, EmbeddedShader::ShaderL
 }
 
 
-ComputePipeline &ComputePipeline::operator()(uint16_t groupCountX, uint16_t groupCountY, uint16_t groupCountZ)
+ComputePipeline* ComputePipeline::operator()(uint16_t groupCountX, uint16_t groupCountY, uint16_t groupCountZ)
 {
     groupCount = {groupCountX, groupCountY, groupCountZ};
-	return *this;
+	return this;
 }
 
 void ComputePipeline::commitCommand(HardwareExecutor &hardwareExecutor)

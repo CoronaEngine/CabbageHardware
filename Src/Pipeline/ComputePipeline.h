@@ -39,7 +39,7 @@ struct ComputePipeline : public CommandRecord
         }
     }
 
-    ComputePipeline &operator()(uint16_t x, uint16_t y, uint16_t z);
+    ComputePipeline* operator()(uint16_t x, uint16_t y, uint16_t z);
 
     void commitCommand(HardwareExecutor &hardwareExecutor) override;
     

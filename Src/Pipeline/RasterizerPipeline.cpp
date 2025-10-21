@@ -384,16 +384,16 @@ void RasterizerPipeline::createFramebuffers(ktm::uvec2 imageSize)
     }
 }
 
-RasterizerPipeline &RasterizerPipeline::operator()(uint16_t imageSizeX, uint16_t imageSizeY)
+RasterizerPipeline* RasterizerPipeline::operator()(uint16_t imageSizeX, uint16_t imageSizeY)
 {
     this->imageSize = {imageSizeX, imageSizeY};
-    return *this;
+    return this;
 }
 
 
-RasterizerPipeline &RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
+RasterizerPipeline* RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
 {
-    return *this;
+    return this;
 }
 
 

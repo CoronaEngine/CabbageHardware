@@ -369,7 +369,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 		if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
         {
             // 在主设备上：源图像 -> srcStaging
-            (*mainDeviceExecutor)(CommandRecord::ExecutorType::Transfer) << globalHardwareContext.mainDevice->resourceManager.copyImageToBuffer(mainDeviceExecutor.get(), sourceImage, srcStaging)
+            (*mainDeviceExecutor)<< globalHardwareContext.mainDevice->resourceManager.copyImageToBuffer(mainDeviceExecutor.get(), sourceImage, srcStaging)
                                                                          << mainDeviceExecutor->commit();
 
 #ifdef TEST_CPU_DATA
@@ -387,7 +387,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 #endif
 
             // 在显示设备上：dstStaging -> 目标图像
-            (*displayDeviceExecutor)(CommandRecord::ExecutorType::Graphics) << displayDevice->resourceManager.copyBufferToImage(displayDeviceExecutor.get(), dstStaging, this->displayImage);
+            (*displayDeviceExecutor) << displayDevice->resourceManager.copyBufferToImage(displayDeviceExecutor.get(), dstStaging, this->displayImage);
 
 #ifdef TEST_CPU_DATA
 
