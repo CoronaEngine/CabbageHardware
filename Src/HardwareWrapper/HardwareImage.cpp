@@ -82,7 +82,7 @@ uint32_t HardwareImage::storeDescriptor()
 
 HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer, HardwareExecutor *executor)
 {
-    *executor << globalHardwareContext.mainDevice->resourceManager.copyBufferToImage(executor, bufferGlobalPool[*buffer.bufferID].bufferHandle, imageGlobalPool[*imageID].imageHandle, imageGlobalPool[*imageID].imageSize.x, imageGlobalPool[*imageID].imageSize.y);
+    *executor << globalHardwareContext.mainDevice->resourceManager.copyBufferToImage(executor, bufferGlobalPool[*buffer.bufferID], imageGlobalPool[*imageID]);
 	return *this;
 }
 

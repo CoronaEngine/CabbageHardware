@@ -897,7 +897,7 @@ ResourceManager &ResourceManager::transitionImageLayout(HardwareExecutor *execut
     }
 }
 
-ResourceManager &ResourceManager::copyImageToBuffer(HardwareExecutor *executor, VkImage image, VkBuffer buffer, uint32_t width, uint32_t height)
+ResourceManager &ResourceManager::copyImageToBuffer(HardwareExecutor *executor, ImageHardwareWrap &image, BufferHardwareWrap &buffer)
 {
     auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
         VkBufferImageCopy region{};
@@ -910,11 +910,11 @@ ResourceManager &ResourceManager::copyImageToBuffer(HardwareExecutor *executor, 
         region.imageSubresource.layerCount = 1;
         region.imageOffset = {0, 0, 0};
         region.imageExtent = {
-            width,
-            height,
+            image.imageSize.x,
+            image.imageSize.y,
             1};
 
-        vkCmdCopyImageToBuffer(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer, 1, &region);
+        vkCmdCopyImageToBuffer(commandBuffer, image.imageHandle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer.bufferHandle, 1, &region);
     };
 
     *executor << runCommand;
@@ -922,7 +922,7 @@ ResourceManager &ResourceManager::copyImageToBuffer(HardwareExecutor *executor, 
     return *this;
 }
 
-ResourceManager &ResourceManager::copyBufferToImage(HardwareExecutor *executor, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
+ResourceManager &ResourceManager::copyBufferToImage(HardwareExecutor *executor, BufferHardwareWrap &buffer, ImageHardwareWrap &image)
 {
     auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
         VkBufferImageCopy region{};
@@ -935,11 +935,11 @@ ResourceManager &ResourceManager::copyBufferToImage(HardwareExecutor *executor, 
         region.imageSubresource.layerCount = 1;
         region.imageOffset = {0, 0, 0};
         region.imageExtent = {
-            width,
-            height,
+            image.imageSize.x,
+            image.imageSize.y,
             1};
 
-        vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+        vkCmdCopyBufferToImage(commandBuffer, buffer.bufferHandle, image.imageHandle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
     };
 
      *executor << runCommand;
