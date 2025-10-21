@@ -5,6 +5,7 @@
 
 class RasterizerPipeline;
 class ComputePipeline;
+struct HardwareExecutor;
 
 struct CommandRecord
 {
@@ -17,89 +18,9 @@ struct CommandRecord
 
     virtual ~CommandRecord() = default;
 
-    virtual void commitCommand(const VkCommandBuffer &commandBuffer) = 0;
+    virtual void commitCommand(HardwareExecutor &executor) = 0;
 
     ExecutorType executorType;
-};
-
-struct CopyBufferCommand : public CommandRecord
-{
-    ResourceManager::BufferHardwareWrap &srcBuffer;
-    ResourceManager::BufferHardwareWrap &dstBuffer;
-
-    CopyBufferCommand(ResourceManager::BufferHardwareWrap &src, ResourceManager::BufferHardwareWrap &dst)
-        : srcBuffer(src), dstBuffer(dst)
-    {
-        executorType = ExecutorType::Transfer;
-    }
-
-    void commitCommand(const VkCommandBuffer &commandBuffer) override
-    {
-    }
-};
-
-struct CopyImageCommand : public CommandRecord
-{
-    ResourceManager::ImageHardwareWrap &srcImage;
-    ResourceManager::ImageHardwareWrap &dstImage;
-
-    CopyImageCommand(ResourceManager::ImageHardwareWrap &srcImg, ResourceManager::ImageHardwareWrap &dstImg)
-        : srcImage(srcImg), dstImage(dstImg)
-    {
-        executorType = ExecutorType::Transfer;
-    }
-
-    void commitCommand(const VkCommandBuffer &commandBuffer) override
-    {
-    }
-};
-
-struct CopyBufferToImageCommand : public CommandRecord
-{
-    ResourceManager::BufferHardwareWrap &srcBuffer;
-    ResourceManager::ImageHardwareWrap &dstImage;
-
-    CopyBufferToImageCommand(ResourceManager::BufferHardwareWrap &srcBuf, ResourceManager::ImageHardwareWrap &dstImg)
-        : srcBuffer(srcBuf), dstImage(dstImg)
-    {
-        executorType = ExecutorType::Transfer;
-    }
-
-    void commitCommand(const VkCommandBuffer &commandBuffer) override
-    {
-    }
-};
-
-struct CopyImageToBufferCommand : public CommandRecord
-{
-    ResourceManager::ImageHardwareWrap &srcImage;
-    ResourceManager::BufferHardwareWrap &dstBuffer;
-
-    CopyImageToBufferCommand(ResourceManager::ImageHardwareWrap &srcImg, ResourceManager::BufferHardwareWrap &dstBuf)
-        : srcImage(srcImg), dstBuffer(dstBuf)
-    {
-        executorType = ExecutorType::Transfer;
-    }
-
-    void commitCommand(const VkCommandBuffer &commandBuffer) override
-    {
-    }
-};
-
-struct BlitImageCommand : public CommandRecord
-{
-    ResourceManager::ImageHardwareWrap &srcImage;
-    ResourceManager::ImageHardwareWrap &dstImage;
-
-    BlitImageCommand(ResourceManager::ImageHardwareWrap &srcImg, ResourceManager::ImageHardwareWrap &dstImg)
-        : srcImage(srcImg), dstImage(dstImg)
-    {
-        executorType = ExecutorType::Graphics;
-    }
-
-    void commitCommand(const VkCommandBuffer &commandBuffer) override
-    {
-    }
 };
 
 struct HardwareExecutor
@@ -143,4 +64,86 @@ struct HardwareExecutor
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
 
     std::vector<std::shared_ptr<CommandRecord>> commandList;
+};
+
+
+
+struct CopyBufferCommand : public CommandRecord
+{
+    ResourceManager::BufferHardwareWrap &srcBuffer;
+    ResourceManager::BufferHardwareWrap &dstBuffer;
+
+    CopyBufferCommand(ResourceManager::BufferHardwareWrap &src, ResourceManager::BufferHardwareWrap &dst)
+        : srcBuffer(src), dstBuffer(dst)
+    {
+        executorType = ExecutorType::Transfer;
+    }
+
+    void commitCommand(HardwareExecutor &executor) override
+    {
+    }
+};
+
+struct CopyImageCommand : public CommandRecord
+{
+    ResourceManager::ImageHardwareWrap &srcImage;
+    ResourceManager::ImageHardwareWrap &dstImage;
+
+    CopyImageCommand(ResourceManager::ImageHardwareWrap &srcImg, ResourceManager::ImageHardwareWrap &dstImg)
+        : srcImage(srcImg), dstImage(dstImg)
+    {
+        executorType = ExecutorType::Transfer;
+    }
+
+    void commitCommand(HardwareExecutor &executor) override
+    {
+    }
+};
+
+struct CopyBufferToImageCommand : public CommandRecord
+{
+    ResourceManager::BufferHardwareWrap &srcBuffer;
+    ResourceManager::ImageHardwareWrap &dstImage;
+
+    CopyBufferToImageCommand(ResourceManager::BufferHardwareWrap &srcBuf, ResourceManager::ImageHardwareWrap &dstImg)
+        : srcBuffer(srcBuf), dstImage(dstImg)
+    {
+        executorType = ExecutorType::Transfer;
+    }
+
+    void commitCommand(HardwareExecutor &executor) override
+    {
+    }
+};
+
+struct CopyImageToBufferCommand : public CommandRecord
+{
+    ResourceManager::ImageHardwareWrap &srcImage;
+    ResourceManager::BufferHardwareWrap &dstBuffer;
+
+    CopyImageToBufferCommand(ResourceManager::ImageHardwareWrap &srcImg, ResourceManager::BufferHardwareWrap &dstBuf)
+        : srcImage(srcImg), dstBuffer(dstBuf)
+    {
+        executorType = ExecutorType::Transfer;
+    }
+
+    void commitCommand(HardwareExecutor &executor) override
+    {
+    }
+};
+
+struct BlitImageCommand : public CommandRecord
+{
+    ResourceManager::ImageHardwareWrap &srcImage;
+    ResourceManager::ImageHardwareWrap &dstImage;
+
+    BlitImageCommand(ResourceManager::ImageHardwareWrap &srcImg, ResourceManager::ImageHardwareWrap &dstImg)
+        : srcImage(srcImg), dstImage(dstImg)
+    {
+        executorType = ExecutorType::Graphics;
+    }
+
+    void commitCommand(HardwareExecutor &executor) override
+    {
+    }
 };
