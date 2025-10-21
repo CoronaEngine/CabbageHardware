@@ -24,11 +24,11 @@ struct CommandRecord
 
 struct CopyBufferCommand : public CommandRecord
 {
-    VkBuffer srcBuffer;
-    VkBuffer dstBuffer;
+    ResourceManager::BufferHardwareWrap srcBuffer;
+    ResourceManager::BufferHardwareWrap dstBuffer;
     std::vector<VkBufferCopy> regions;
 
-    CopyBufferCommand(VkBuffer src, VkBuffer dst, const std::vector<VkBufferCopy> &copyRegions)
+    CopyBufferCommand(const ResourceManager::BufferHardwareWrap &src, const ResourceManager::BufferHardwareWrap &dst, const std::vector<VkBufferCopy> &copyRegions)
         : srcBuffer(src), dstBuffer(dst), regions(copyRegions)
     {
         executorType = ExecutorType::Transfer;
@@ -38,8 +38,8 @@ struct CopyBufferCommand : public CommandRecord
     {
         vkCmdCopyBuffer(
             commandBuffer,
-            srcBuffer,
-            dstBuffer,
+            srcBuffer.bufferHandle,
+            dstBuffer.bufferHandle,
             static_cast<uint32_t>(regions.size()),
             regions.data());
     }
@@ -47,15 +47,15 @@ struct CopyBufferCommand : public CommandRecord
 
 struct CopyImageCommand : public CommandRecord
 {
-    VkImage srcImage;
+    ResourceManager::ImageHardwareWrap srcImage;
     VkImageLayout srcImageLayout;
-    VkImage dstImage;
+    ResourceManager::ImageHardwareWrap dstImage;
     VkImageLayout dstImageLayout;
     std::vector<VkImageCopy> regions;
 
     CopyImageCommand(
-        VkImage srcImg, VkImageLayout srcLayout,
-        VkImage dstImg, VkImageLayout dstLayout,
+        const ResourceManager::ImageHardwareWrap &srcImg, VkImageLayout srcLayout,
+        const ResourceManager::ImageHardwareWrap &dstImg, VkImageLayout dstLayout,
         const std::vector<VkImageCopy> &copyRegions)
         : srcImage(srcImg), srcImageLayout(srcLayout),
           dstImage(dstImg), dstImageLayout(dstLayout),
@@ -68,9 +68,9 @@ struct CopyImageCommand : public CommandRecord
     {
         vkCmdCopyImage(
             commandBuffer,
-            srcImage,
+            srcImage.imageHandle,
             srcImageLayout,
-            dstImage,
+            dstImage.imageHandle,
             dstImageLayout,
             static_cast<uint32_t>(regions.size()),
             regions.data());
@@ -79,14 +79,14 @@ struct CopyImageCommand : public CommandRecord
 
 struct CopyBufferToImageCommand : public CommandRecord
 {
-    VkBuffer srcBuffer;
-    VkImage dstImage;
+    ResourceManager::BufferHardwareWrap srcBuffer;
+    ResourceManager::ImageHardwareWrap dstImage;
     VkImageLayout dstImageLayout;
-    std::vector<VkBufferImageCopy> regions; // 使用 VkBufferImageCopy
+    std::vector<VkBufferImageCopy> regions;
 
     CopyBufferToImageCommand(
-        VkBuffer srcBuf,
-        VkImage dstImg,
+        const ResourceManager::BufferHardwareWrap &srcBuf,
+        const ResourceManager::ImageHardwareWrap &dstImg,
         VkImageLayout dstLayout,
         const std::vector<VkBufferImageCopy> &copyRegions)
         : srcBuffer(srcBuf),
@@ -94,7 +94,6 @@ struct CopyBufferToImageCommand : public CommandRecord
           dstImageLayout(dstLayout),
           regions(copyRegions)
     {
-        // 拷贝操作通常在 Transfer 队列中执行
         executorType = ExecutorType::Transfer;
     }
 
@@ -102,8 +101,8 @@ struct CopyBufferToImageCommand : public CommandRecord
     {
         vkCmdCopyBufferToImage(
             commandBuffer,
-            srcBuffer,
-            dstImage,
+            srcBuffer.bufferHandle,
+            dstImage.imageHandle,
             dstImageLayout,
             static_cast<uint32_t>(regions.size()),
             regions.data());
@@ -112,22 +111,21 @@ struct CopyBufferToImageCommand : public CommandRecord
 
 struct CopyImageToBufferCommand : public CommandRecord
 {
-    VkImage srcImage;
+    ResourceManager::ImageHardwareWrap srcImage;
     VkImageLayout srcImageLayout;
-    VkBuffer dstBuffer;
-    std::vector<VkBufferImageCopy> regions; // 同样使用 VkBufferImageCopy
+    ResourceManager::BufferHardwareWrap dstBuffer;
+    std::vector<VkBufferImageCopy> regions;
 
     CopyImageToBufferCommand(
-        VkImage srcImg,
+        const ResourceManager::ImageHardwareWrap &srcImg,
         VkImageLayout srcLayout,
-        VkBuffer dstBuf,
+        const ResourceManager::BufferHardwareWrap &dstBuf,
         const std::vector<VkBufferImageCopy> &copyRegions)
         : srcImage(srcImg),
           srcImageLayout(srcLayout),
           dstBuffer(dstBuf),
           regions(copyRegions)
     {
-        // 拷贝操作通常在 Transfer 队列中执行
         executorType = ExecutorType::Transfer;
     }
 
@@ -135,9 +133,9 @@ struct CopyImageToBufferCommand : public CommandRecord
     {
         vkCmdCopyImageToBuffer(
             commandBuffer,
-            srcImage,
+            srcImage.imageHandle,
             srcImageLayout,
-            dstBuffer,
+            dstBuffer.bufferHandle,
             static_cast<uint32_t>(regions.size()),
             regions.data());
     }
