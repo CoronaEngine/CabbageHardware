@@ -380,14 +380,14 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 #ifdef TEST_CPU_DATA
             
 #else
-            //vkDeviceWaitIdle(displayDevice->deviceManager.logicalDevice);
-            //vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
+            vkDeviceWaitIdle(displayDevice->deviceManager.logicalDevice);
+            vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
 
-            //srcCpuData.resize(srcStaging.bufferAllocInfo.size);
-            //globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(srcStaging, srcCpuData.data());
+            srcCpuData.resize(srcStaging.bufferAllocInfo.size);
+            globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(srcStaging, srcCpuData.data());
 
-            //dstCpuData.resize(dstStaging.bufferAllocInfo.size);
-            //globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(dstStaging, dstCpuData.data());
+            dstCpuData.resize(dstStaging.bufferAllocInfo.size);
+            globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(dstStaging, dstCpuData.data());
 
 #endif
 
@@ -402,8 +402,8 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 #ifdef TEST_CPU_DATA
 
 #else
-            //dstCpuData.resize(dstStaging.bufferAllocInfo.size);
-            //globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(dstStaging, dstCpuData.data());
+            dstCpuData.resize(dstStaging.bufferAllocInfo.size);
+            globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(dstStaging, dstCpuData.data());
 #endif
 
             std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos;

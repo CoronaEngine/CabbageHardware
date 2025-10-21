@@ -1328,6 +1328,7 @@ void ResourceManager::TestWin32HandlesImport(BufferHardwareWrap &srcStaging, Buf
         importMemHandleInfo.name = nullptr;
         VmaAllocationCreateInfo importAllocCreateInfo = {};
         importAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        importAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
         dstStaging.bufferHandle = VK_NULL_HANDLE;
         dstStaging.bufferAlloc = VK_NULL_HANDLE;
@@ -1343,15 +1344,15 @@ void ResourceManager::TestWin32HandlesImport(BufferHardwareWrap &srcStaging, Buf
 void ResourceManager::copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData)
 {
     void *mappedData = nullptr;
-    VkResult result = vmaMapMemory(g_hAllocator, buffer.bufferAlloc, &mappedData);
+    VkResult result = vmaMapMemory(buffer.resourceManager->getVmaAllocator(), buffer.bufferAlloc, &mappedData);
     if (result != VK_SUCCESS)
     {
         throw std::runtime_error("Failed to map memory");
     }
 
-    vmaInvalidateAllocation(g_hAllocator, buffer.bufferAlloc, 0, VK_WHOLE_SIZE);
+    vmaInvalidateAllocation(buffer.resourceManager->getVmaAllocator(), buffer.bufferAlloc, 0, VK_WHOLE_SIZE);
     memcpy(cpuData, mappedData, buffer.bufferAllocInfo.size);
-    vmaUnmapMemory(g_hAllocator, buffer.bufferAlloc);
+    vmaUnmapMemory(buffer.resourceManager->getVmaAllocator(), buffer.bufferAlloc);
 }
 
 //void ResourceManager::copyBufferToCpu(VkDevice &device, VkDeviceMemory &memory, VkDeviceSize size, void *cpuData)
