@@ -13,8 +13,9 @@ struct CopyBufferCommand : public CommandRecord
         executorType = ExecutorType::Transfer;
     }
 
-    void commitCommand(VkCommandBuffer &commandBuffer) override
+    void commitCommand(HardwareExecutor &hardwareExecutor) override
     {
+        hardwareExecutor.hardwareContext->resourceManager.copyBuffer(hardwareExecutor.currentRecordQueue->commandBuffer,srcBuffer, dstBuffer);
     }
 };
 

@@ -18,7 +18,7 @@ struct CommandRecord
 
     virtual ~CommandRecord() = default;
 
-    virtual void commitCommand(VkCommandBuffer &commandBuffer) = 0;
+    virtual void commitCommand(HardwareExecutor &hardwareExecutor) = 0;
 
     ExecutorType executorType;
 };
@@ -48,6 +48,7 @@ struct HardwareExecutor
                              VkFence fence = VK_NULL_HANDLE);
 
   private:
+    friend struct CommandRecord;
 
     CommandRecord::ExecutorType queueType = CommandRecord::ExecutorType::Graphics;
     DeviceManager::QueueUtils *currentRecordQueue = nullptr;
