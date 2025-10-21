@@ -21,6 +21,7 @@ struct CommandRecord
     virtual void commitCommand(HardwareExecutor &hardwareExecutor) = 0;
     virtual ExecutorType getExecutorType() = 0;
 
+protected:
     ExecutorType executorType;
 };
 
