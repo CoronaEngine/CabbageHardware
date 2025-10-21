@@ -384,10 +384,10 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
             vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
 
             srcCpuData.resize(srcStaging.bufferAllocInfo.size);
-            globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(srcStaging, srcCpuData.data());
+            srcStaging.resourceManager->copyBufferToCpu(srcStaging, srcCpuData.data());
 
             dstCpuData.resize(dstStaging.bufferAllocInfo.size);
-            globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(dstStaging, dstCpuData.data());
+            dstStaging.resourceManager->copyBufferToCpu(dstStaging, dstCpuData.data());
 
 #endif
 
@@ -403,7 +403,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
 #else
             dstCpuData.resize(dstStaging.bufferAllocInfo.size);
-            globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(dstStaging, dstCpuData.data());
+            dstStaging.resourceManager->copyBufferToCpu(dstStaging, dstCpuData.data());
 #endif
 
             std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos;
