@@ -391,9 +391,9 @@ RasterizerPipeline* RasterizerPipeline::operator()(uint16_t imageSizeX, uint16_t
 }
 
 
-RasterizerPipeline* RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
+CommandRecord *RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
 {
-    return this;
+    return &dumpCommandRecord;
 }
 
 

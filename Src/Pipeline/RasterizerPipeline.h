@@ -68,7 +68,7 @@ struct RasterizerPipeline : public CommandRecord
 
     RasterizerPipeline* operator()(uint16_t x, uint16_t y);
 
-    RasterizerPipeline* record(const HardwareBuffer &indexBuffer);
+    CommandRecord *record(const HardwareBuffer &indexBuffer);
 
     ExecutorType getExecutorType() override
     {
@@ -118,6 +118,8 @@ struct RasterizerPipeline : public CommandRecord
     //    HardwarePushConstant pushConstant;
     //};
     // std::vector<TriangleGeomMesh> geomMeshes;
+
+    CommandRecord dumpCommandRecord;
 
     HardwarePushConstant tempPushConstant;
 

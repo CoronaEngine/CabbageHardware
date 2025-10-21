@@ -68,7 +68,10 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
 
         for (size_t i = 0; i < commandList.size(); i++)
         {
-            commandList[i]->commitCommand(*this);
+            if (commandList[i]->getExecutorType() != CommandRecord::ExecutorType::Invalid)
+            {
+                commandList[i]->commitCommand(*this);
+            }
         }
 
         vkEndCommandBuffer(currentRecordQueue->commandBuffer);
