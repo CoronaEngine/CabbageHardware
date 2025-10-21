@@ -109,8 +109,8 @@ struct HardwareImage
     std::shared_ptr<uint64_t> imageID;
 
   private:
-    HardwareImage &copyFromBuffer(const HardwareBuffer &buffer, HardwareExecutor *executor);
-    HardwareImage &copyFromData(const void *inputData, HardwareExecutor *executor);
+    HardwareImage &copyFromBuffer(const HardwareBuffer &buffer);
+    HardwareImage &copyFromData(const void *inputData);
 };
 
 struct HardwarePushConstant

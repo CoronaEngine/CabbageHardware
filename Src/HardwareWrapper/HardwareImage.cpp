@@ -1,5 +1,6 @@
 ﻿#include"CabbageHardware.h"
 #include<Hardware/GlobalContext.h>
+#include<Hardware/ResourceCommand.h>
 
 std::unordered_map<uint64_t, ResourceManager::ImageHardwareWrap> imageGlobalPool;
 std::unordered_map<uint64_t, uint64_t> imageRefCount;
@@ -80,16 +81,20 @@ uint32_t HardwareImage::storeDescriptor()
 }
 
 
-HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer, HardwareExecutor *executor)
+HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
 {
-    *executor << globalHardwareContext.mainDevice->resourceManager.copyBufferToImage(executor, bufferGlobalPool[*buffer.bufferID], imageGlobalPool[*imageID]);
+    HardwareExecutor tempExecutor;
+
+    CopyBufferToImageCommand copyCmd(bufferGlobalPool[*buffer.bufferID], imageGlobalPool[*imageID]);
+    tempExecutor << &copyCmd << tempExecutor.commit();
+
 	return *this;
 }
 
-HardwareImage &HardwareImage::copyFromData(const void *inputData, HardwareExecutor *executor)
+HardwareImage &HardwareImage::copyFromData(const void *inputData)
 {
 	HardwareBuffer stagingBuffer = HardwareBuffer(imageGlobalPool[*imageID].imageSize.x * imageGlobalPool[*imageID].imageSize.y * imageGlobalPool[*imageID].pixelSize, BufferUsage::StorageBuffer, inputData);
-    copyFromBuffer(stagingBuffer, executor);
+    copyFromBuffer(stagingBuffer);
 	return *this;
 }
 
@@ -179,7 +184,6 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
 
 	if (imageData != nullptr)
 	{
-        HardwareExecutor tempExecutor;
-        tempExecutor << copyFromData(imageData, &tempExecutor) << tempExecutor.commit();
+        copyFromData(imageData);
 	}
 }

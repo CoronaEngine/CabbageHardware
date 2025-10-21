@@ -6,6 +6,7 @@
 #include<volk.h>
 
 #include<Hardware/GlobalContext.h>
+#include<Hardware/ResourceCommand.h>
 
 //#define USE_SAME_DEVICE
 
@@ -369,8 +370,8 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 		if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
         {
             // 在主设备上：源图像 -> srcStaging
-            (*mainDeviceExecutor)<< globalHardwareContext.mainDevice->resourceManager.copyImageToBuffer(mainDeviceExecutor.get(), sourceImage, srcStaging)
-                                                                         << mainDeviceExecutor->commit();
+            CopyImageToBufferCommand copyCmd(sourceImage, srcStaging);
+            (*mainDeviceExecutor) << &copyCmd << mainDeviceExecutor->commit();
 
 #ifdef TEST_CPU_DATA
             
@@ -387,7 +388,9 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 #endif
 
             // 在显示设备上：dstStaging -> 目标图像
-            (*displayDeviceExecutor) << displayDevice->resourceManager.copyBufferToImage(displayDeviceExecutor.get(), dstStaging, this->displayImage);
+
+            CopyBufferToImageCommand copyCmd2(dstStaging, this->displayImage);
+            (*displayDeviceExecutor) << &copyCmd2;
 
 #ifdef TEST_CPU_DATA
 
@@ -417,7 +420,8 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 signalSemaphoreInfos.push_back(signalInfo);
             }
 
-             *displayDeviceExecutor << displayDevice->resourceManager.blitImage(displayDeviceExecutor.get(), this->displayImage, swapChainImages[imageIndex])
+            BlitImageCommand blitCmd(this->displayImage, swapChainImages[imageIndex]);
+            *displayDeviceExecutor << &blitCmd
                                    << displayDeviceExecutor->commit(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame]);
 
              // 准备呈现信息，等待 timeline semaphore
