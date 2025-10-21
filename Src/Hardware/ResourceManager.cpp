@@ -521,7 +521,7 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     return resultImage;
 }
 
-ResourceManager &ResourceManager::copyImageMemory(HardwareExecutor *executor, ImageHardwareWrap &source, ImageHardwareWrap &destination)
+ResourceManager &ResourceManager::copyImage(HardwareExecutor *executor, ImageHardwareWrap &source, ImageHardwareWrap &destination)
 {
     //if (source.pixelSize == destination.pixelSize)
     //{
