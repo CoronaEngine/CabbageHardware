@@ -444,7 +444,6 @@ int main()
             HardwareBuffer indexBuffer = HardwareBuffer(indices, BufferUsage::IndexBuffer);
 
             HardwareBuffer computeUniformBuffer = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::UniformBuffer);
-            HardwareBuffer rasterizerUniformBuffer = HardwareBuffer(sizeof(RasterizerUniformBufferObject), BufferUsage::UniformBuffer);
 
             int width, height, channels;
             unsigned char *data = stbi_load(std::string(shaderPath + "/awesomeface.png").c_str(), &width, &height, &channels, 0);
@@ -469,21 +468,34 @@ int main()
 
             HardwareExecutor executor;
 
+            std::vector<HardwareBuffer> rasterizerUniformBuffers(10);
+            std::vector<ktm::fmat4x4> modelMat(10);
+            for (size_t i = 0; i < modelMat.size(); i++)
+            {
+                modelMat[i] = ktm::translate3d(ktm::fvec3((i % 5) - 2.0f, 0.0f, (i / 5) - 0.5f));
+                rasterizerUniformBuffers[i] = HardwareBuffer(sizeof(RasterizerUniformBufferObject), BufferUsage::UniformBuffer);
+            }
+
             while (running.load())
             {
                 auto start = std::chrono::high_resolution_clock::now();
 
                 float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
-                rasterizerUniformBufferObject.textureIndex = texture.storeDescriptor();
-                rasterizerUniformBufferObject.model = ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
-                rasterizerUniformBuffer.copyFromData(&rasterizerUniformBufferObject, sizeof(rasterizerUniformBufferObject));
-                rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffer.storeDescriptor();
-                rasterizer["inPosition"] = postionBuffer;
-                rasterizer["inColor"] = colorBuffer;
-                rasterizer["inTexCoord"] = uvBuffer;
-                rasterizer["inNormal"] = normalBuffer;
-                rasterizer["outColor"] = finalOutputImage;
+                for (size_t i = 0; i < modelMat.size(); i++)
+                {
+                    rasterizerUniformBufferObject.textureIndex = texture.storeDescriptor();
+                    rasterizerUniformBufferObject.model = ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
+                    rasterizerUniformBuffers[i].copyFromData(&rasterizerUniformBufferObject, sizeof(rasterizerUniformBufferObject));
+                    rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffers[i].storeDescriptor();
+                    rasterizer["inPosition"] = postionBuffer;
+                    rasterizer["inColor"] = colorBuffer;
+                    rasterizer["inTexCoord"] = uvBuffer;
+                    rasterizer["inNormal"] = normalBuffer;
+                    rasterizer["outColor"] = finalOutputImage;
+
+                    rasterizer.record(indexBuffer);
+                }
 
                 computeUniformData.imageID = finalOutputImage.storeDescriptor();
                 computeUniformBuffer.copyFromData(&computeUniformData, sizeof(computeUniformData));
@@ -491,7 +503,6 @@ int main()
 
                 executor 
                     << rasterizer(1920, 1080) 
-                    << rasterizer.record(indexBuffer)
                     << computer(1920 / 8, 1080 / 8, 1) 
                     << executor.commit();
 
