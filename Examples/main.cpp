@@ -485,7 +485,7 @@ int main()
                 for (size_t i = 0; i < modelMat.size(); i++)
                 {
                     rasterizerUniformBufferObject.textureIndex = texture.storeDescriptor();
-                    rasterizerUniformBufferObject.model = ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
+                    rasterizerUniformBufferObject.model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
                     rasterizerUniformBuffers[i].copyFromData(&rasterizerUniformBufferObject, sizeof(rasterizerUniformBufferObject));
                     rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffers[i].storeDescriptor();
                     rasterizer["inPosition"] = postionBuffer;
