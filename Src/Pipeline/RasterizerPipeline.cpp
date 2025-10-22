@@ -397,6 +397,7 @@ CommandRecord *RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
     temp.indexBuffer = indexBuffer;
     temp.vertexBuffers = tempVertexBuffers;
     temp.pushConstant = tempPushConstant;
+    tempPushConstant = HardwarePushConstant(temp.pushConstant.getSize(), 0);
     geomMeshes.push_back(temp);
     return &dumpCommandRecord;
 }

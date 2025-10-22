@@ -11,15 +11,15 @@
 
 struct RasterizerPipeline : public CommandRecord
 {
-    struct GeomMeshDrawIndexed
-    {
-        uint32_t indexOffset;
-        uint32_t indexCount;
-        ResourceManager::BufferHardwareWrap indexBuffer;
-        std::vector<ResourceManager::BufferHardwareWrap> vertexBuffers;
+    //struct GeomMeshDrawIndexed
+    //{
+    //    uint32_t indexOffset;
+    //    uint32_t indexCount;
+    //    ResourceManager::BufferHardwareWrap indexBuffer;
+    //    std::vector<ResourceManager::BufferHardwareWrap> vertexBuffers;
 
-        HardwarePushConstant pushConstant;
-    };
+    //    HardwarePushConstant pushConstant;
+    //};
 
     RasterizerPipeline()
     {
