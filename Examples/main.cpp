@@ -472,7 +472,7 @@ int main()
             std::vector<ktm::fmat4x4> modelMat(10);
             for (size_t i = 0; i < modelMat.size(); i++)
             {
-                modelMat[i] = ktm::translate3d(ktm::fvec3((i % 5) - 2.0f, 0.0f, (i / 5) - 0.5f)) * ktm::scale3d(ktm::fvec3(0.1,0.1,0.1));
+                modelMat[i] = ktm::translate3d(ktm::fvec3((i % 5) - 2.0f, (i / 5) - 0.5f, 0.0f)) * ktm::scale3d(ktm::fvec3(0.1, 0.1, 0.1)) * ktm::rotate3d_axis(ktm::radians(i * 30.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
                 rasterizerUniformBuffers[i] = HardwareBuffer(sizeof(RasterizerUniformBufferObject), BufferUsage::UniformBuffer);
             }
 
