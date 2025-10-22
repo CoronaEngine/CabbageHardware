@@ -3,6 +3,7 @@
 - （紧急）exportBufferMemory、importBufferMemory导入导出后对齐问题
 - （紧急）解决命令行的Warning
 - （紧急）程序关闭时资源释放问题
+- （紧急）内存泄漏问题（延迟至替换并发容器后处理）
 - 多显卡间拷贝同步VK_KHR_external_semaphore
 - 多显卡间拷贝画面传输VK_EXT_external_memory
 - BUG：mutiview初始化黑屏
