@@ -74,17 +74,15 @@ struct ResourceManager
     void initResourceManager(DeviceManager &device);
     void cleanUpResourceManager();
 
-	void destroyImage(ImageHardwareWrap &image);
+	ImageHardwareWrap createImage(ktm::uvec2 imageSize, VkFormat imageFormat, uint32_t pixelSize,
+                                  VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                                  int arrayLayers = 1, int mipLevels = 1);
     VkImageView createImageView(ImageHardwareWrap &image);
-    ImageHardwareWrap createImage(ktm::uvec2 imageSize, VkFormat imageFormat, uint32_t pixelSize,
-		VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-		int arrayLayers = 1, int mipLevels = 1);
-
-
+	void destroyImage(ImageHardwareWrap &image);
+    
+    BufferHardwareWrap createBuffer(VkDeviceSize size, VkBufferUsageFlags usage);
 	void destroyBuffer(BufferHardwareWrap &buffer);
-	BufferHardwareWrap createBuffer(VkDeviceSize size, VkBufferUsageFlags usage);
-
-
+	
 	uint32_t storeDescriptor(ImageHardwareWrap image);
 	uint32_t storeDescriptor(BufferHardwareWrap buffer);
 	//uint32_t storeDescriptor(VkAccelerationStructureKHR m_tlas);
@@ -160,7 +158,6 @@ private:
 
 	std::mutex bindlessDescriptorMutex;
 
-
 	uint32_t UniformBindingIndex = 0;
     uint32_t TextureBindingIndex = 0;
     uint32_t StorageBufferBindingIndex = 0;
@@ -171,5 +168,4 @@ private:
 	uint64_t mutiInstanceMemorySize = 0;
 
 	DeviceManager *device;
-
 };

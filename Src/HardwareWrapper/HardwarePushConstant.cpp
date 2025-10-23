@@ -14,7 +14,6 @@ uint64_t currentPushConstantID = 0;
 
 std::mutex pushConstantMutex;
 
-
 HardwarePushConstant::HardwarePushConstant()
 {
     std::unique_lock<std::mutex> lock(pushConstantMutex);

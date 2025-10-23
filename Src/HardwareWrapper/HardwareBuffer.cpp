@@ -134,7 +134,6 @@ bool HardwareBuffer::copyFromData(const void* inputData, uint64_t size)
 	return true;
 }
 
-
 void* HardwareBuffer::getMappedData()
 {
     std::unique_lock<std::mutex> lock(bufferMutex);

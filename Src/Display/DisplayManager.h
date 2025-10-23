@@ -49,22 +49,14 @@ private:
 
 
 	void cleanUpDisplayManager();
-
-
 	void createVkSurface(void* surface);
-
 	void choosePresentDevice();
-
-
 	void createSyncObjects();
-
 	void createSwapChain();
-
     void recreateSwapChain();
 
 	uint32_t currentFrame = 0;
 
-    
     ResourceManager::BufferHardwareWrap srcStaging;
     //std::vector<char> srcCpuData;
     ResourceManager::BufferHardwareWrap dstStaging;

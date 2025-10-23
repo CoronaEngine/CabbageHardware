@@ -41,7 +41,6 @@ struct HardwareExecutor
 
     ~HardwareExecutor() = default;
 
-
     HardwareExecutor &operator<<(CommandRecord* commandRecord)
     {
         commandList.push_back(commandRecord);
@@ -57,8 +56,8 @@ struct HardwareExecutor
                              std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
                              VkFence fence = VK_NULL_HANDLE);
 
-  //private:
-    //friend struct CommandRecord;
+//private:
+//    friend struct CommandRecord;
     DeviceManager::QueueUtils *currentRecordQueue = nullptr;
 
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
