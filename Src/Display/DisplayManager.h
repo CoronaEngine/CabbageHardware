@@ -12,12 +12,12 @@ class DisplayManager
 {
 public:
 
-	DisplayManager();
-	~DisplayManager();
+    DisplayManager();
+    ~DisplayManager();
 
-	bool initDisplayManager(void* surface);
+    bool initDisplayManager(void* surface);
 
-	bool displayFrame(void *surface, HardwareImage displayImage);
+    bool displayFrame(void *surface, HardwareImage displayImage);
 
 private:
 
@@ -29,10 +29,10 @@ private:
 
     std::vector<ResourceManager::ImageHardwareWrap> swapChainImages;
 
-	VkSurfaceFormatKHR surfaceFormat;
+    VkSurfaceFormatKHR surfaceFormat;
 
 
-	ResourceManager::ImageHardwareWrap displayImage;
+    ResourceManager::ImageHardwareWrap displayImage;
 
     std::vector<VkSemaphore> imageAvailableSemaphores;
     std::vector<VkSemaphore> renderFinishedSemaphores;
@@ -48,14 +48,14 @@ private:
     std::shared_ptr<HardwareContext::HardwareUtils> displayDevice;
 
 
-	void cleanUpDisplayManager();
-	void createVkSurface(void* surface);
-	void choosePresentDevice();
-	void createSyncObjects();
-	void createSwapChain();
+    void cleanUpDisplayManager();
+    void createVkSurface(void* surface);
+    void choosePresentDevice();
+    void createSyncObjects();
+    void createSwapChain();
     void recreateSwapChain();
 
-	uint32_t currentFrame = 0;
+    uint32_t currentFrame = 0;
 
     ResourceManager::BufferHardwareWrap srcStaging;
     //std::vector<char> srcCpuData;

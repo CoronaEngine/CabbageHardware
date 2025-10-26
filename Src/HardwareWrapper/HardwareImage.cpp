@@ -16,8 +16,8 @@ HardwareImage& HardwareImage::operator= (const HardwareImage& other)
     {
         imageRefCount[*other.imageID]++;
     }
-	if (imageGlobalPool.count(*this->imageID))
-	{
+    if (imageGlobalPool.count(*this->imageID))
+    {
         imageRefCount[*imageID]--;
         if (imageRefCount[*imageID] == 0)
         {
@@ -25,9 +25,9 @@ HardwareImage& HardwareImage::operator= (const HardwareImage& other)
             imageGlobalPool.erase(*imageID);
             imageRefCount.erase(*imageID);
         }
-	}
-	*(this->imageID) = *(other.imageID);
-	return *this;
+    }
+    *(this->imageID) = *(other.imageID);
+    return *this;
 }
 
 HardwareImage::HardwareImage()
@@ -88,14 +88,14 @@ HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
     CopyBufferToImageCommand copyCmd(bufferGlobalPool[*buffer.bufferID], imageGlobalPool[*imageID]);
     tempExecutor << &copyCmd << tempExecutor.commit();
 
-	return *this;
+    return *this;
 }
 
 HardwareImage &HardwareImage::copyFromData(const void *inputData)
 {
-	HardwareBuffer stagingBuffer = HardwareBuffer(imageGlobalPool[*imageID].imageSize.x * imageGlobalPool[*imageID].imageSize.y * imageGlobalPool[*imageID].pixelSize, BufferUsage::StorageBuffer, inputData);
+    HardwareBuffer stagingBuffer = HardwareBuffer(imageGlobalPool[*imageID].imageSize.x * imageGlobalPool[*imageID].imageSize.y * imageGlobalPool[*imageID].pixelSize, BufferUsage::StorageBuffer, inputData);
     copyFromBuffer(stagingBuffer);
-	return *this;
+    return *this;
 }
 
 
@@ -105,85 +105,85 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
 
     this->imageID = std::make_shared<uint64_t>(currentImageID++);
 
-	imageRefCount[*this->imageID] = 1;
+    imageRefCount[*this->imageID] = 1;
 
-	VkImageUsageFlags vkImageUsageFlags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    VkImageUsageFlags vkImageUsageFlags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
-	switch (imageUsage)
-	{
-	case ImageUsage::SampledImage:
-		vkImageUsageFlags = vkImageUsageFlags | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-		break;
-	case ImageUsage::StorageImage:
-		vkImageUsageFlags = vkImageUsageFlags | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-		break;
-	case ImageUsage::DepthImage:
-		vkImageUsageFlags = vkImageUsageFlags | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-		break;
-	default:
-		break;
-	}
+    switch (imageUsage)
+    {
+    case ImageUsage::SampledImage:
+        vkImageUsageFlags = vkImageUsageFlags | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        break;
+    case ImageUsage::StorageImage:
+        vkImageUsageFlags = vkImageUsageFlags | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        break;
+    case ImageUsage::DepthImage:
+        vkImageUsageFlags = vkImageUsageFlags | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        break;
+    default:
+        break;
+    }
 
-	uint32_t pixelSize;
-	VkFormat vkImageFormat;
-	switch (imageFormat)
-	{
-	case ImageFormat::RGBA8_UINT:
-		vkImageFormat = VK_FORMAT_R8G8B8A8_UINT;
-		pixelSize = 8 * 4 / 8;
-		break;
-	case ImageFormat::RGBA8_SINT:
-		vkImageFormat = VK_FORMAT_R8G8B8A8_SINT;
-		pixelSize = 8 * 4 / 8;
-		break;
-	case ImageFormat::RGBA8_SRGB:
-		vkImageFormat = VK_FORMAT_R8G8B8A8_SRGB;
-		pixelSize = 8 * 4 / 8;
-		break;
-	case ImageFormat::RGBA16_UINT:
-		vkImageFormat = VK_FORMAT_R16G16B16A16_UINT;
-		pixelSize = 16 * 4 / 8;
-		break;
-	case ImageFormat::RGBA16_SINT:
-		vkImageFormat = VK_FORMAT_R16G16B16A16_SINT;
-		pixelSize = 16 * 4 / 8;
-		break;
-	case ImageFormat::RGBA16_FLOAT:
-		vkImageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
-		pixelSize = 16 * 4 / 8;
-		break;
-	case ImageFormat::RGBA32_UINT:
-		vkImageFormat = VK_FORMAT_R32G32B32A32_UINT;
-		pixelSize = 32 * 4 / 8;
-		break;
-	case ImageFormat::RGBA32_SINT:
-		vkImageFormat = VK_FORMAT_R32G32B32A32_SINT;
-		pixelSize = 32 * 4 / 8;
-		break;
-	case ImageFormat::RGBA32_FLOAT:
-		vkImageFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
-		pixelSize = 32 * 4 / 8;
-		break;
-	case ImageFormat::RG32_FLOAT:
-		vkImageFormat = VK_FORMAT_R32G32_SFLOAT;
-		pixelSize = 32 * 2 / 8;
-		break;
-	case ImageFormat::D16_UNORM:
-		vkImageFormat = VK_FORMAT_D16_UNORM;
-		pixelSize = 16 / 8;
-		break;
-	case ImageFormat::D32_FLOAT:
-		vkImageFormat = VK_FORMAT_D32_SFLOAT;
-		pixelSize = 32 / 8;
-		break;
-	default:
-		break;
-	}
+    uint32_t pixelSize;
+    VkFormat vkImageFormat;
+    switch (imageFormat)
+    {
+    case ImageFormat::RGBA8_UINT:
+        vkImageFormat = VK_FORMAT_R8G8B8A8_UINT;
+        pixelSize = 8 * 4 / 8;
+        break;
+    case ImageFormat::RGBA8_SINT:
+        vkImageFormat = VK_FORMAT_R8G8B8A8_SINT;
+        pixelSize = 8 * 4 / 8;
+        break;
+    case ImageFormat::RGBA8_SRGB:
+        vkImageFormat = VK_FORMAT_R8G8B8A8_SRGB;
+        pixelSize = 8 * 4 / 8;
+        break;
+    case ImageFormat::RGBA16_UINT:
+        vkImageFormat = VK_FORMAT_R16G16B16A16_UINT;
+        pixelSize = 16 * 4 / 8;
+        break;
+    case ImageFormat::RGBA16_SINT:
+        vkImageFormat = VK_FORMAT_R16G16B16A16_SINT;
+        pixelSize = 16 * 4 / 8;
+        break;
+    case ImageFormat::RGBA16_FLOAT:
+        vkImageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+        pixelSize = 16 * 4 / 8;
+        break;
+    case ImageFormat::RGBA32_UINT:
+        vkImageFormat = VK_FORMAT_R32G32B32A32_UINT;
+        pixelSize = 32 * 4 / 8;
+        break;
+    case ImageFormat::RGBA32_SINT:
+        vkImageFormat = VK_FORMAT_R32G32B32A32_SINT;
+        pixelSize = 32 * 4 / 8;
+        break;
+    case ImageFormat::RGBA32_FLOAT:
+        vkImageFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
+        pixelSize = 32 * 4 / 8;
+        break;
+    case ImageFormat::RG32_FLOAT:
+        vkImageFormat = VK_FORMAT_R32G32_SFLOAT;
+        pixelSize = 32 * 2 / 8;
+        break;
+    case ImageFormat::D16_UNORM:
+        vkImageFormat = VK_FORMAT_D16_UNORM;
+        pixelSize = 16 / 8;
+        break;
+    case ImageFormat::D32_FLOAT:
+        vkImageFormat = VK_FORMAT_D32_SFLOAT;
+        pixelSize = 32 / 8;
+        break;
+    default:
+        break;
+    }
 
-	imageGlobalPool[*imageID] = globalHardwareContext.mainDevice->resourceManager.createImage(ktm::uvec2(width,height), vkImageFormat, pixelSize, vkImageUsageFlags, arrayLayers);
+    imageGlobalPool[*imageID] = globalHardwareContext.mainDevice->resourceManager.createImage(ktm::uvec2(width,height), vkImageFormat, pixelSize, vkImageUsageFlags, arrayLayers);
 
-	if (imageData != nullptr)
-	{
+    if (imageData != nullptr)
+    {
         copyFromData(imageData);
-	}
+    }
 }
