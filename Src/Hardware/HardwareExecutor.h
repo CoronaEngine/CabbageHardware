@@ -29,6 +29,15 @@ struct CommandRecord
         return ExecutorType::Invalid;
     }
 
+    virtual bool useManualBarriers() const
+    {
+        return false;
+    }
+
+    virtual void recordBarriers(HardwareExecutor &hardwareExecutor, VkCommandBuffer commandBuffer)
+    {
+    }
+
 protected:
     ExecutorType executorType = ExecutorType::Invalid;
 };
@@ -40,7 +49,6 @@ struct HardwareExecutor
     {}
 
     ~HardwareExecutor() = default;
-
 
     HardwareExecutor &operator<<(CommandRecord* commandRecord)
     {
@@ -57,8 +65,8 @@ struct HardwareExecutor
                              std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
                              VkFence fence = VK_NULL_HANDLE);
 
-  //private:
-    //friend struct CommandRecord;
+//private:
+//    friend struct CommandRecord;
     DeviceManager::QueueUtils *currentRecordQueue = nullptr;
 
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;

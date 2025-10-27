@@ -449,12 +449,14 @@ int main()
             unsigned char *data = stbi_load(std::string(shaderPath + "/awesomeface.png").c_str(), &width, &height, &channels, 0);
             if (!data)
             {
-                std::cerr << "stbi_load failed: " << stbi_failure_reason() << std::endl;
                 // if the image fails to load, maby image encryption.
+                std::cerr << "stbi_load failed: " << stbi_failure_reason() << std::endl;
             }
 
+            // 创建纹理
             HardwareImage texture(width, height, ImageFormat::RGBA8_SRGB, ImageUsage::SampledImage, 1, data);
 
+            // 最后输出的图片
             HardwareImage finalOutputImage(1920, 1080, ImageFormat::RGBA16_FLOAT, ImageUsage::StorageImage);
 
             RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
@@ -468,6 +470,7 @@ int main()
 
             HardwareExecutor executor;
 
+            // 创建十个矩阵和UniformBuffer
             std::vector<HardwareBuffer> rasterizerUniformBuffers(10);
             std::vector<ktm::fmat4x4> modelMat(10);
             for (size_t i = 0; i < modelMat.size(); i++)
@@ -482,6 +485,7 @@ int main()
 
                 float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
+                // 这里为每一个物体记录光栅化管线的信息
                 for (size_t i = 0; i < modelMat.size(); i++)
                 {
                     rasterizerUniformBufferObject.textureIndex = texture.storeDescriptor();
@@ -495,15 +499,35 @@ int main()
                     rasterizer["outColor"] = finalOutputImage;
 
                     rasterizer.record(indexBuffer);
+                    // 这里记录完一条管线的各种绑定信息
+                    // 注意每次record之后，管线内的数据会被重置，所以每次都需要重新绑定
+                    // 如果想要多次使用同一套绑定数据，可以使用CommandRecord
                 }
 
                 computeUniformData.imageID = finalOutputImage.storeDescriptor();
                 computeUniformBuffer.copyFromData(&computeUniformData, sizeof(computeUniformData));
                 computer["pushConsts.uniformBufferIndex"] = computeUniformBuffer.storeDescriptor();
 
-                executor 
-                    << rasterizer(1920, 1080) 
-                    << computer(1920 / 8, 1080 / 8, 1) 
+                // 开始执行
+                // 注意这里的执行顺序是从上到下，也就是先光栅化后计算
+                // 每一个管线前面的<<操作符都会把管线内记录的命令添加到executor中
+                // 最后通过commit提交执行
+                // executor会自动处理管线间的资源同步问题
+                // 比如这里的finalOutputImage在光栅化管线中作为输出，在计算管线中作为输入
+                // executor会自动在两条管线间插入合适的内存屏障，确保数据正确性
+                // 当然你也可以手动添加内存屏障，覆盖executor的自动处理
+                // 具体用法请参考HardwareExecutor和CommandRecord的实现
+                // 注意这里的图像格式和用法必须匹配，否则会导致未定义行为
+                // 比如finalOutputImage作为光栅化的输出，必须包含VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+                // 作为计算的输入，必须包含VK_IMAGE_USAGE_STORAGE_BIT
+                // 这些都会在创建HardwareImage时自动处理
+                // 如果你需要更复杂的用法，可以参考HardwareImage的实现自行扩展
+                // 比如添加更多的图像用法标志，或者支持多层图像等
+                // 总之，HardwareExecutor和CommandRecord的设计目标是简化多管线协作的复杂性
+                // 让用户专注于管线本身的逻辑，而不必过多关心底层的同步和资源管理细节
+                executor
+                    << rasterizer(1920, 1080)
+                    << computer(1920 / 8, 1080 / 8, 1)
                     << executor.commit();
 
                 displayManager = finalOutputImage;
