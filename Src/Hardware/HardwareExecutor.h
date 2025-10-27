@@ -29,6 +29,15 @@ struct CommandRecord
         return ExecutorType::Invalid;
     }
 
+    virtual bool useManualBarriers() const
+    {
+        return false;
+    }
+
+    virtual void recordBarriers(HardwareExecutor &hardwareExecutor, VkCommandBuffer commandBuffer)
+    {
+    }
+
 protected:
     ExecutorType executorType = ExecutorType::Invalid;
 };

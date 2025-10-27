@@ -67,7 +67,7 @@ struct ResourceManager
         VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
         VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
     } bindlessDescriptors[4];
-    
+
     ResourceManager();
     ~ResourceManager();
 
@@ -79,10 +79,10 @@ struct ResourceManager
                                   int arrayLayers = 1, int mipLevels = 1);
     VkImageView createImageView(ImageHardwareWrap &image);
     void destroyImage(ImageHardwareWrap &image);
-    
+
     BufferHardwareWrap createBuffer(VkDeviceSize size, VkBufferUsageFlags usage);
     void destroyBuffer(BufferHardwareWrap &buffer);
-    
+
     uint32_t storeDescriptor(ImageHardwareWrap image);
     uint32_t storeDescriptor(BufferHardwareWrap buffer);
     //uint32_t storeDescriptor(VkAccelerationStructureKHR m_tlas);

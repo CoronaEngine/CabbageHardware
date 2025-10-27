@@ -414,7 +414,6 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 waitSemaphoreInfos.push_back(waitInfo);
             }
 
-
             std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos;
             {
                 VkSemaphoreSubmitInfo signalInfo{};

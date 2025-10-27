@@ -5,7 +5,7 @@
 
 HardwareContext globalHardwareContext;
 
-HardwareContext::HardwareContext() 
+HardwareContext::HardwareContext()
 {
     prepareFeaturesChain();
 
@@ -52,12 +52,12 @@ HardwareContext::HardwareContext()
     // demo of mutilple devices
 }
 
-HardwareContext::~HardwareContext() 
+HardwareContext::~HardwareContext()
 {
-    mainDevice.reset();
-    hardwareUtils.clear();
+    //mainDevice.reset();
+    //hardwareUtils.clear();
 
-    if (debugMessenger != VK_NULL_HANDLE)
+    /*if (debugMessenger != VK_NULL_HANDLE)
      {
          auto DestroyDebugUtilsMessengerEXT = [](VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks *pAllocator) -> VkResult {
              auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
@@ -71,8 +71,8 @@ HardwareContext::~HardwareContext()
                  return VK_ERROR_EXTENSION_NOT_PRESENT;
              }
          };
-     }
-    
+     }*/
+
     //vkDestroyInstance(vkInstance, nullptr);
 }
 
