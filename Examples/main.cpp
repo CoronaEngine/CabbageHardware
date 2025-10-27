@@ -498,7 +498,7 @@ int main()
                     rasterizer["inNormal"] = normalBuffer;
                     rasterizer["outColor"] = finalOutputImage;
 
-                    rasterizer.record(indexBuffer);
+                    executor << rasterizer.record(indexBuffer);
                     // 这里记录完一条管线的各种绑定信息
                     // 注意每次record之后，管线内的数据会被重置，所以每次都需要重新绑定
                     // 如果想要多次使用同一套绑定数据，可以使用CommandRecord

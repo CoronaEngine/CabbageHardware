@@ -52,7 +52,10 @@ struct HardwareExecutor
 
     HardwareExecutor &operator<<(CommandRecord* commandRecord)
     {
-        commandList.push_back(commandRecord);
+        if (commandRecord->getExecutorType() != CommandRecord::ExecutorType::Invalid)
+        {
+            commandList.push_back(commandRecord);
+        }
         return *this;
     }
 
