@@ -10,7 +10,7 @@ struct HardwareContext
 
     ~HardwareContext();
 
-    void shutdown();
+    //void shutdown();
 
     struct HardwareUtils
     {

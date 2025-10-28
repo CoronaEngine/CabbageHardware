@@ -8,7 +8,7 @@ uint64_t currentBufferID = 0;
 
 std::mutex bufferMutex;
 
-HardwareBuffer& HardwareBuffer::operator= (const HardwareBuffer& other)
+HardwareBuffer &HardwareBuffer::operator=(const HardwareBuffer &other)
 {
     std::unique_lock<std::mutex> lock(bufferMutex);
 
