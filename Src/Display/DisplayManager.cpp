@@ -23,7 +23,7 @@ DisplayManager::DisplayManager()
 
 DisplayManager::~DisplayManager()
 {
-    cleanUpDisplayManager();
+    //cleanUpDisplayManager();
 }
 
 void DisplayManager::cleanUpDisplayManager()

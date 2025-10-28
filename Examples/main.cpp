@@ -535,7 +535,7 @@ int main()
                     frameCount = 0;
                 }
             }
-        };
+        }; // 退出线程函数，临时对象会被销毁
 
         for (size_t i = 0; i < windows.size(); i++)
         {
@@ -562,6 +562,5 @@ int main()
         glfwTerminate();
     }
 
-    CabbageHardwareShutdown();
     return 0;
 }

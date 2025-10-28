@@ -54,7 +54,7 @@ HardwarePushConstant::~HardwarePushConstant()
 }
 
 HardwarePushConstant &HardwarePushConstant::operator=(const HardwarePushConstant &other)
-{   
+{
     std::unique_lock<std::mutex> lock(pushConstantMutex);
 
     if (pushConstantGlobalPool[*pushConstantID].isSub)

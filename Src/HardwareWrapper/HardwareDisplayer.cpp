@@ -1,10 +1,10 @@
-#include"CabbageHardware.h"
+ï»¿#include"CabbageHardware.h"
 #include<Display/DisplayManager.h>
 
 std::unordered_map<void*, std::shared_ptr<DisplayManager>> displayerGlobalPool;
 std::mutex displayerMutex;
 
-// Í¬Ò»¸ö´°¿ÚÖ»ÄÜÏÔÊ¾Ò»¸ö£¬ÕâÀïÃ»ÓĞ±ØÒªÒıÓÃ¼ÆÊı
+// åŒä¸€ä¸ªçª—å£åªèƒ½æ˜¾ç¤ºä¸€ä¸ªï¼Œè¿™é‡Œæ²¡æœ‰å¿…è¦å¼•ç”¨è®¡æ•°
 
 HardwareDisplayer::HardwareDisplayer(void* surface): displaySurface(surface)
 {
@@ -40,7 +40,7 @@ HardwareDisplayer::~HardwareDisplayer()
     {
         if (displayerGlobalPool.count(displaySurface))
         {
-            // ÕâÀïÖÇÄÜÖ¸Õë»á×Ô¶¯ÊÍ·Å£¬µ÷ÓÃÎö¹¹º¯Êı
+            // è¿™é‡Œæ™ºèƒ½æŒ‡é’ˆä¼šè‡ªåŠ¨é‡Šæ”¾ï¼Œè°ƒç”¨ææ„å‡½æ•°
             displayerGlobalPool.erase(displaySurface);
         }
 
@@ -64,7 +64,7 @@ HardwareDisplayer &HardwareDisplayer::operator=(const HardwareImage &image)
     std::unique_lock<std::mutex> lock(displayerMutex);
     if (displayerGlobalPool.count(displaySurface))
     {
-        displayerGlobalPool[displaySurface]->displayFrame(displaySurface,image);
+        displayerGlobalPool[displaySurface]->displayFrame(displaySurface, image);
     }
     return *this;
 }

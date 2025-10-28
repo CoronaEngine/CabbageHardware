@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Hardware/DeviceManager.h"
 #include "Hardware/ResourceManager.h"
@@ -9,8 +9,6 @@ struct HardwareContext
     HardwareContext();
 
     ~HardwareContext();
-
-    //void shutdown();
 
     struct HardwareUtils
     {
@@ -40,5 +38,4 @@ extern HardwareContext globalHardwareContext;
 
 extern std::unordered_map<uint64_t, ResourceManager::ImageHardwareWrap> imageGlobalPool;
 extern std::unordered_map<uint64_t, ResourceManager::BufferHardwareWrap> bufferGlobalPool;
-
-void CabbageHardwareShutdown();
+//extern std::unordered_map<void *, std::shared_ptr<DisplayManager>> displayerGlobalPool;

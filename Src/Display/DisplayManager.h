@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include <chrono>  
+#include <chrono>
 
 #include<Hardware/GlobalContext.h>
 #include<Hardware/HardwareExecutor.h>
@@ -18,9 +18,6 @@ public:
     bool initDisplayManager(void* surface);
 
     bool displayFrame(void *surface, HardwareImage displayImage);
-
-    // Public shutdown entry for centralized cleanup
-    void shutdown() { cleanUpDisplayManager(); }
 
 private:
 
@@ -44,7 +41,7 @@ private:
     //VkSemaphore timelineSemaphore = VK_NULL_HANDLE;
     //uint64_t timelineCounter = 0;
     //std::vector<uint64_t> frameTimelineValues;
-    
+
     std::atomic_uint16_t currentQueueIndex = 0;
     std::vector<DeviceManager::QueueUtils> presentQueues;
 
