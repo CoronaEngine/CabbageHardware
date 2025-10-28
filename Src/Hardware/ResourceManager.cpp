@@ -33,7 +33,13 @@ void ResourceManager::initResourceManager(DeviceManager &device)
 
 void ResourceManager::cleanUpResourceManager()
 {
-    /*for (int i = 0; i < 4; i++)
+    // This must be called when the device is still alive and idle.
+    if (!device || device->logicalDevice == VK_NULL_HANDLE)
+    {
+        return;
+    }
+
+    for (int i = 0; i < 4; i++)
     {
         if (bindlessDescriptors[i].descriptorPool != VK_NULL_HANDLE)
         {
@@ -48,14 +54,24 @@ void ResourceManager::cleanUpResourceManager()
         bindlessDescriptors[i].descriptorSet = VK_NULL_HANDLE;
     }
 
-    vkDestroySampler(device->logicalDevice, textureSampler, nullptr);
-    textureSampler = VK_NULL_HANDLE;
+    if (textureSampler != VK_NULL_HANDLE)
+    {
+        vkDestroySampler(device->logicalDevice, textureSampler, nullptr);
+        textureSampler = VK_NULL_HANDLE;
+    }
+
+    // Destroy VMA pool first (if created), then allocator
+    if (g_hPool != VK_NULL_HANDLE)
+    {
+        vmaDestroyPool(g_hAllocator, g_hPool);
+        g_hPool = VK_NULL_HANDLE;
+    }
 
     if (g_hAllocator != VK_NULL_HANDLE)
     {
         vmaDestroyAllocator(g_hAllocator);
         g_hAllocator = VK_NULL_HANDLE;
-    }*/
+    }
 }
 
 void ResourceManager::CreateVmaAllocator()

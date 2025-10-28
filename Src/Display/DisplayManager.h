@@ -19,6 +19,9 @@ public:
 
     bool displayFrame(void *surface, HardwareImage displayImage);
 
+    // Public shutdown entry for centralized cleanup
+    void shutdown() { cleanUpDisplayManager(); }
+
 private:
 
     VkSurfaceKHR vkSurface = VK_NULL_HANDLE;

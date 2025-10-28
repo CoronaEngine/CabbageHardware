@@ -2,12 +2,16 @@
 
 #include "Hardware/DeviceManager.h"
 #include "Hardware/ResourceManager.h"
+class DisplayManager;
 
 struct HardwareContext
 {
     HardwareContext();
 
     ~HardwareContext();
+
+    // Explicitly shutdown to deterministically release all Vulkan resources
+    void shutdown();
 
     struct HardwareUtils
     {
@@ -37,3 +41,9 @@ extern HardwareContext globalHardwareContext;
 
 extern std::unordered_map<uint64_t, ResourceManager::ImageHardwareWrap> imageGlobalPool;
 extern std::unordered_map<uint64_t, ResourceManager::BufferHardwareWrap> bufferGlobalPool;
+
+// Global displayer pool defined in HardwareDisplayer.cpp
+extern std::unordered_map<void *, std::shared_ptr<DisplayManager>> displayerGlobalPool;
+
+// Explicit shutdown API to deterministically release all resources
+void CabbageHardwareShutdown();

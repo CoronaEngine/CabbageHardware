@@ -28,6 +28,30 @@ struct RasterizerPipeline : public CommandRecord
 
     ~RasterizerPipeline()
     {
+        // Release Vulkan resources in reverse creation order
+        VkDevice device = globalHardwareContext.mainDevice->deviceManager.logicalDevice;
+
+        if (frameBuffers != VK_NULL_HANDLE)
+        {
+            vkDestroyFramebuffer(device, frameBuffers, nullptr);
+            frameBuffers = VK_NULL_HANDLE;
+        }
+
+        if (graphicsPipeline != VK_NULL_HANDLE)
+        {
+            vkDestroyPipeline(device, graphicsPipeline, nullptr);
+            graphicsPipeline = VK_NULL_HANDLE;
+        }
+        if (pipelineLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+            pipelineLayout = VK_NULL_HANDLE;
+        }
+        if (renderPass != VK_NULL_HANDLE)
+        {
+            vkDestroyRenderPass(device, renderPass, nullptr);
+            renderPass = VK_NULL_HANDLE;
+        }
     }
 
     RasterizerPipeline(std::string vertexShaderCode, std::string fragmentShaderCode, uint32_t multiviewCount = 1,
@@ -90,11 +114,11 @@ struct RasterizerPipeline : public CommandRecord
 
     int multiviewCount = 1;
 
-    VkRenderPass renderPass;
-    VkPipeline graphicsPipeline;
-    VkPipelineLayout pipelineLayout;
+    VkRenderPass renderPass = VK_NULL_HANDLE;
+    VkPipeline graphicsPipeline = VK_NULL_HANDLE;
+    VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
 
-    VkFramebuffer frameBuffers;
+    VkFramebuffer frameBuffers = VK_NULL_HANDLE;
 
     // std::vector<ResourceManager::ImageHardwareWrap> renderTarget;
     HardwareImage depthImage;

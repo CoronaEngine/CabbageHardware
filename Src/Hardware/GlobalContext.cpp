@@ -54,26 +54,15 @@ HardwareContext::HardwareContext()
 
 HardwareContext::~HardwareContext()
 {
-    //mainDevice.reset();
-    //hardwareUtils.clear();
-
-    /*if (debugMessenger != VK_NULL_HANDLE)
-     {
-         auto DestroyDebugUtilsMessengerEXT = [](VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks *pAllocator) -> VkResult {
-             auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-             if (func != nullptr)
-             {
-                 func(instance, debugMessenger, pAllocator);
-                 return VK_SUCCESS;
-             }
-             else
-             {
-                 return VK_ERROR_EXTENSION_NOT_PRESENT;
-             }
-         };
-     }*/
-
-    //vkDestroyInstance(vkInstance, nullptr);
+    // Prefer explicit shutdown via CabbageHardwareShutdown(), but clean up as a fallback
+    try
+    {
+        shutdown();
+    }
+    catch (...)
+    {
+        // swallow exceptions during static destruction
+    }
 }
 
 
@@ -310,6 +299,119 @@ void HardwareContext::createVkInstance(const CreateCallback &initInfo)
         }
     }
 #endif
+}
+
+// Centralized shutdown: destroy resources, devices, and instance in a safe order
+void HardwareContext::shutdown()
+{
+    static bool s_shutdown = false;
+    if (s_shutdown)
+        return;
+    s_shutdown = true;
+
+    // 1) Clean up display managers (swapchains/surfaces and sync objects)
+    try
+    {
+        for (auto &kv : displayerGlobalPool)
+        {
+            if (kv.second)
+            {
+                kv.second->shutdown();
+            }
+        }
+        displayerGlobalPool.clear();
+    }
+    catch (...)
+    {
+    }
+
+    // 2) Release any remaining global images/buffers to avoid referencing devices later
+    try
+    {
+        for (auto &kv : imageGlobalPool)
+        {
+            auto &img = kv.second;
+            if (img.resourceManager)
+            {
+                img.resourceManager->destroyImage(img);
+            }
+        }
+        imageGlobalPool.clear();
+    }
+    catch (...)
+    {
+    }
+
+    try
+    {
+        for (auto &kv : bufferGlobalPool)
+        {
+            auto &buf = kv.second;
+            if (buf.resourceManager)
+            {
+                buf.resourceManager->destroyBuffer(buf);
+            }
+        }
+        bufferGlobalPool.clear();
+    }
+    catch (...)
+    {
+    }
+
+    // 3) Tear down ResourceManagers and Devices for all hardware utils
+    for (auto &h : hardwareUtils)
+    {
+        if (!h)
+            continue;
+        // Wait idle and clean resource manager first
+        try
+        {
+            h->resourceManager.cleanUpResourceManager();
+        }
+        catch (...)
+        {
+        }
+        try
+        {
+            h->deviceManager.cleanUpDeviceManager();
+        }
+        catch (...)
+        {
+        }
+    }
+    hardwareUtils.clear();
+    mainDevice.reset();
+
+    // 4) Destroy debug messenger (if any), then the instance
+    if (vkInstance != VK_NULL_HANDLE)
+    {
+#ifdef CABBAGE_ENGINE_DEBUG
+        if (debugMessenger != VK_NULL_HANDLE)
+        {
+            auto DestroyDebugUtilsMessengerEXT = [](VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks *pAllocator) -> VkResult {
+                auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+                if (func != nullptr)
+                {
+                    func(instance, debugMessenger, pAllocator);
+                    return VK_SUCCESS;
+                }
+                else
+                {
+                    return VK_ERROR_EXTENSION_NOT_PRESENT;
+                }
+            };
+            DestroyDebugUtilsMessengerEXT(vkInstance, debugMessenger, nullptr);
+            debugMessenger = VK_NULL_HANDLE;
+        }
+#endif
+        vkDestroyInstance(vkInstance, nullptr);
+        vkInstance = VK_NULL_HANDLE;
+    }
+}
+
+void CabbageHardwareShutdown()
+{
+    globalHardwareContext.shutdown();
 }
 
 void HardwareContext::chooseMainDevice()

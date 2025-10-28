@@ -19,7 +19,17 @@ struct ComputePipeline : public CommandRecord
 
     ~ComputePipeline()
     {
-
+        // Destroy pipeline and layout if they were created
+        if (pipeline != VK_NULL_HANDLE)
+        {
+            vkDestroyPipeline(globalHardwareContext.mainDevice->deviceManager.logicalDevice, pipeline, nullptr);
+            pipeline = VK_NULL_HANDLE;
+        }
+        if (pipelineLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyPipelineLayout(globalHardwareContext.mainDevice->deviceManager.logicalDevice, pipelineLayout, nullptr);
+            pipelineLayout = VK_NULL_HANDLE;
+        }
     }
 
 	

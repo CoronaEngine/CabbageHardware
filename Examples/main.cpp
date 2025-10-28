@@ -568,5 +568,7 @@ int main()
         glfwTerminate();
     }
 
+    // Explicitly shutdown to release all Vulkan objects before process exit
+    CabbageHardwareShutdown();
     return 0;
 }
