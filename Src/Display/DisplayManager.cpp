@@ -1,16 +1,13 @@
 ﻿#include"DisplayManager.h"
-
 #include <algorithm>
 #include<vector>
-
 #include<volk.h>
-
 #include<Hardware/GlobalContext.h>
 #include<Hardware/ResourceCommand.h>
 
 #define USE_SAME_DEVICE
 
-//#define TEST_CPU_DATA
+//#define TEST_export_Memory
 
 //#if _WIN32 || _WIN64
 //#include<vulkan/vulkan_win32.h>
@@ -24,20 +21,10 @@ DisplayManager::DisplayManager()
 {
 }
 
-
 DisplayManager::~DisplayManager()
 {
     cleanUpDisplayManager();
-
-    //vkDestroySwapchainKHR(displayDevice.logicalDevice, swapChain, nullptr);
-    // Destroy the contexts
-    //if (m_UpscalingContext)
-    //{
-    //	ffx::DestroyContext(m_UpscalingContext);
-    //	m_UpscalingContext = nullptr;
-    //}
 }
-
 
 void DisplayManager::cleanUpDisplayManager()
 {
@@ -141,8 +128,6 @@ bool DisplayManager::initDisplayManager(void* surface)
 {
     if (surface != nullptr)
     {
-        //cleaarupDisplayManager();
-
         createVkSurface(surface);
 
         choosePresentDevice();
@@ -209,7 +194,6 @@ void DisplayManager::createVkSurface(void *surface)
 }
 
 
-
 void DisplayManager::choosePresentDevice()
 {
 #ifdef USE_SAME_DEVICE
@@ -263,7 +247,7 @@ void DisplayManager::createSwapChain()
     uint32_t formatCount;
     vkGetPhysicalDeviceSurfaceFormatsKHR(displayDevice->deviceManager.physicalDevice, vkSurface, &formatCount, nullptr);
     std::vector<VkSurfaceFormatKHR> formats(formatCount);
-    if (formatCount != 0) 
+    if (formatCount != 0)
     {
         vkGetPhysicalDeviceSurfaceFormatsKHR(displayDevice->deviceManager.physicalDevice, vkSurface, &formatCount, formats.data());
 
@@ -310,7 +294,7 @@ void DisplayManager::createSwapChain()
     createInfo.imageExtent = { this->displaySize.x, this->displaySize.y };
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    
+
     if ((capabilities.supportedUsageFlags & createInfo.imageUsage) != createInfo.imageUsage)
     {
         throw std::runtime_error("Swapchain does not support required image usage flags (COLOR_ATTACHMENT and TRANSFER_DST)!");
