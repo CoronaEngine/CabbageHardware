@@ -27,6 +27,7 @@ HardwareBuffer &HardwareBuffer::operator=(const HardwareBuffer &other)
             bufferRefCount.erase(*bufferID);
         }
     }
+
     *(this->bufferID) = *(other.bufferID);
     return *this;
 }
