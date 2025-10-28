@@ -485,7 +485,6 @@ int main()
 
                 float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
-                // 这里为每一个物体记录光栅化管线的信息
                 for (size_t i = 0; i < modelMat.size(); i++)
                 {
                     rasterizerUniformBufferObject.textureIndex = texture.storeDescriptor();
