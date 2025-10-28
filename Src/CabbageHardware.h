@@ -142,6 +142,7 @@ struct HardwarePushConstant
 struct HardwareDisplayer
 {
     HardwareDisplayer(void *surface = nullptr);
+    HardwareDisplayer(const HardwareDisplayer &other);
     ~HardwareDisplayer();
 
     HardwareDisplayer &operator=(const HardwareImage &image);

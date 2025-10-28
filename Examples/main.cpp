@@ -453,10 +453,8 @@ int main()
                 std::cerr << "stbi_load failed: " << stbi_failure_reason() << std::endl;
             }
 
-            // 创建纹理
             HardwareImage texture(width, height, ImageFormat::RGBA8_SRGB, ImageUsage::SampledImage, 1, data);
 
-            // 最后输出的图片
             HardwareImage finalOutputImage(1920, 1080, ImageFormat::RGBA16_FLOAT, ImageUsage::StorageImage);
 
             RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
@@ -470,7 +468,6 @@ int main()
 
             HardwareExecutor executor;
 
-            // 创建十个矩阵和UniformBuffer
             std::vector<HardwareBuffer> rasterizerUniformBuffers(10);
             std::vector<ktm::fmat4x4> modelMat(10);
             for (size_t i = 0; i < modelMat.size(); i++)
@@ -498,9 +495,6 @@ int main()
                     rasterizer["outColor"] = finalOutputImage;
 
                     executor << rasterizer.record(indexBuffer);
-                    // 这里记录完一条管线的各种绑定信息
-                    // 注意每次record之后，管线内的数据会被重置，所以每次都需要重新绑定
-                    // 如果想要多次使用同一套绑定数据，可以使用CommandRecord
                 }
 
                 computeUniformData.imageID = finalOutputImage.storeDescriptor();
@@ -568,7 +562,6 @@ int main()
         glfwTerminate();
     }
 
-    // Explicitly shutdown to release all Vulkan objects before process exit
     CabbageHardwareShutdown();
     return 0;
 }

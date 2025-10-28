@@ -16,6 +16,7 @@ HardwareBuffer& HardwareBuffer::operator= (const HardwareBuffer& other)
     {
         bufferRefCount[*other.bufferID]++;
     }
+
     if (bufferGlobalPool.count(*this->bufferID))
     {
         bufferRefCount[*bufferID]--;
