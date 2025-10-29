@@ -136,7 +136,6 @@ bool DisplayManager::initDisplayManager(void* surface)
     return true;
 }
 
-
 void DisplayManager::createSyncObjects()
 {
     imageAvailableSemaphores.resize(swapChainImages.size());
@@ -189,7 +188,6 @@ void DisplayManager::createVkSurface(void *surface)
 #endif
 }
 
-
 void DisplayManager::choosePresentDevice()
 {
 #ifdef USE_SAME_DEVICE
@@ -228,7 +226,6 @@ void DisplayManager::choosePresentDevice()
     displayDeviceExecutor = std::make_shared<HardwareExecutor>(displayDevice);
 }
 
-
 void DisplayManager::createSwapChain()
 {
     VkSurfaceCapabilitiesKHR capabilities;
@@ -238,7 +235,6 @@ void DisplayManager::createSwapChain()
         std::clamp(capabilities.currentExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
         std::clamp(capabilities.currentExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)
     };
-
 
     uint32_t formatCount;
     vkGetPhysicalDeviceSurfaceFormatsKHR(displayDevice->deviceManager.physicalDevice, vkSurface, &formatCount, nullptr);
@@ -258,7 +254,6 @@ void DisplayManager::createSwapChain()
         }
     }
 
-
     VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
     uint32_t presentModeCount;
     vkGetPhysicalDeviceSurfacePresentModesKHR(displayDevice->deviceManager.physicalDevice, vkSurface, &presentModeCount, nullptr);
@@ -275,7 +270,6 @@ void DisplayManager::createSwapChain()
             }
         }
     }
-
 
     uint32_t imageCount = (capabilities.maxImageCount > 0 && (capabilities.minImageCount + 1) > capabilities.maxImageCount) ?
         capabilities.maxImageCount : (capabilities.minImageCount + 1);
@@ -444,32 +438,14 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 CopyImageToBufferCommand copyCmd(sourceImage, srcStaging);
                 (*mainDeviceExecutor) << &copyCmd << mainDeviceExecutor->commit();
 
-#ifdef TEST_CPU_DATA
-                vkDeviceWaitIdle(displayDevice->deviceManager.logicalDevice);
-                vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
-
-                srcCpuData.resize(srcStaging.bufferAllocInfo.size);
-                srcStaging.resourceManager->copyBufferToCpu(srcStaging, srcCpuData.data());
-
-                dstCpuData.resize(dstStaging.bufferAllocInfo.size);
-                dstStaging.resourceManager->copyBufferToCpu(dstStaging, dstCpuData.data());
-
-#endif
-
                 // 在显示设备上：dstStaging -> 目标图像
-
                 CopyBufferToImageCommand copyCmd2(dstStaging, this->displayImage);
                 (*displayDeviceExecutor) << &copyCmd2;
-
-#ifdef TEST_CPU_DATA
-                dstCpuData.resize(dstStaging.bufferAllocInfo.size);
-                dstStaging.resourceManager->copyBufferToCpu(dstStaging, dstCpuData.data());
-#endif
             }
 
             std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos;
             {
-                 VkSemaphoreSubmitInfo waitInfo{};
+                VkSemaphoreSubmitInfo waitInfo{};
                 waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
                 waitInfo.semaphore = imageAvailableSemaphores[currentFrame];
                 waitInfo.value = 0; // For binary semaphores, this must be 0
@@ -558,3 +534,4 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
         return false;
     }
 }
+
