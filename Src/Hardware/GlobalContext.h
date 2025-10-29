@@ -2,6 +2,9 @@
 
 #include "Hardware/DeviceManager.h"
 #include "Hardware/ResourceManager.h"
+
+#define USE_EXPORT_MEMORY
+
 class DisplayManager;
 
 struct HardwareContext

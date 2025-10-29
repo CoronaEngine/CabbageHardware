@@ -8,8 +8,6 @@
 #include <Hardware/GlobalContext.h>
 #include"HardwareExecutor.h"
 
-#define USE_VMA_POOL
-
 ResourceManager::ResourceManager()
 {
 }
@@ -26,7 +24,7 @@ void ResourceManager::initResourceManager(DeviceManager &device)
     CreateVmaAllocator();
     createTextureSampler();
     createBindlessDescriptorSet();
-#ifdef USE_VMA_POOL
+#ifdef USE_EXPORT_MEMORY
     createExternalMemoryPool();
 #endif
 }
@@ -70,7 +68,7 @@ void ResourceManager::cleanUpResourceManager()
         StorageImageBindingIndex = 0;
     }
 
-#ifdef USE_VMA_POOL
+#ifdef USE_EXPORT_MEMORY
     if (g_hPool != VK_NULL_HANDLE && g_hAllocator != VK_NULL_HANDLE)
     {
         vmaDestroyPool(g_hAllocator, g_hPool);

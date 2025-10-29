@@ -25,9 +25,7 @@ private:
     void *displaySurface = nullptr;
 
     std::vector<ResourceManager::ImageHardwareWrap> swapChainImages;
-
     VkSurfaceFormatKHR surfaceFormat;
-
 
     ResourceManager::ImageHardwareWrap displayImage;
 
@@ -43,7 +41,6 @@ private:
     std::vector<DeviceManager::QueueUtils> presentQueues;
 
     std::shared_ptr<HardwareContext::HardwareUtils> displayDevice;
-
 
     void cleanUpDisplayManager();
     void createVkSurface(void* surface);

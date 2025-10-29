@@ -6,7 +6,6 @@
 #include<Hardware/ResourceCommand.h>
 
 #define USE_SAME_DEVICE
-#define USE_EXPORT_MEMORY
 
 //#if _WIN32 || _WIN64
 //#include<vulkan/vulkan_win32.h>
