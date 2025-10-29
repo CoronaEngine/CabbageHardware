@@ -54,8 +54,43 @@ HardwareContext::HardwareContext()
 
 HardwareContext::~HardwareContext()
 {
-}
+    imageGlobalPool.clear();
+    bufferGlobalPool.clear();
 
+    for (size_t i = 0; i < hardwareUtils.size(); i++)
+    {
+        hardwareUtils[i]->resourceManager.cleanUpResourceManager();
+        hardwareUtils[i]->deviceManager.cleanUpDeviceManager();
+    }
+
+    hardwareUtils.clear();
+    mainDevice.reset();
+
+    if (vkInstance != VK_NULL_HANDLE)
+    {
+#ifdef CABBAGE_ENGINE_DEBUG
+        if (debugMessenger != VK_NULL_HANDLE)
+        {
+            auto DestroyDebugUtilsMessengerEXT = [](VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks *pAllocator) -> VkResult {
+                auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+                if (func != nullptr)
+                {
+                    func(instance, debugMessenger, pAllocator);
+                    return VK_SUCCESS;
+                }
+                else
+                {
+                    return VK_ERROR_EXTENSION_NOT_PRESENT;
+                }
+            };
+            DestroyDebugUtilsMessengerEXT(vkInstance, debugMessenger, nullptr);
+            debugMessenger = VK_NULL_HANDLE;
+        }
+#endif
+        vkDestroyInstance(vkInstance, nullptr);
+        vkInstance = VK_NULL_HANDLE;
+    }
+}
 
 void HardwareContext::prepareFeaturesChain()
 {
@@ -291,75 +326,6 @@ void HardwareContext::createVkInstance(const CreateCallback &initInfo)
     }
 #endif
 }
-
-// 我觉得还是手动释放比较合理
-//void HardwareContext::shutdown()
-//{
-////    // TODO：这里设置一个标志，防止重复调用shutdown
-////    static bool s_shutdown = false;
-////    if (s_shutdown)
-////        return;
-////    s_shutdown = true;
-////
-////    //displayerGlobalPool.clear();
-////    //imageGlobalPool.clear();
-////    //bufferGlobalPool.clear();
-////
-////    // 3) Tear down ResourceManagers and Devices for all hardware utils
-////    for (auto &h : hardwareUtils)
-////    {
-////        if (!h)
-////            continue;
-////        // Wait idle and clean resource manager first
-////        try
-////        {
-////            h->resourceManager.cleanUpResourceManager();
-////        }
-////        catch (...)
-////        {
-////        }
-////        try
-////        {
-////            h->deviceManager.cleanUpDeviceManager();
-////        }
-////        catch (...)
-////        {
-////        }
-////    }
-////    hardwareUtils.clear();
-////    mainDevice.reset();
-////
-////    // 4) Destroy debug messenger (if any), then the instance
-////    if (vkInstance != VK_NULL_HANDLE)
-////    {
-////#ifdef CABBAGE_ENGINE_DEBUG
-////        if (debugMessenger != VK_NULL_HANDLE)
-////        {
-////            auto DestroyDebugUtilsMessengerEXT = [](VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks *pAllocator) -> VkResult {
-////                auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-////                if (func != nullptr)
-////                {
-////                    func(instance, debugMessenger, pAllocator);
-////                    return VK_SUCCESS;
-////                }
-////                else
-////                {
-////                    return VK_ERROR_EXTENSION_NOT_PRESENT;
-////                }
-////            };
-////            DestroyDebugUtilsMessengerEXT(vkInstance, debugMessenger, nullptr);
-////            debugMessenger = VK_NULL_HANDLE;
-////        }
-////#endif
-////        vkDestroyInstance(vkInstance, nullptr);
-////        vkInstance = VK_NULL_HANDLE;
-////    }
-//}
-//
-//void CabbageHardwareShutdown()
-//{
-//    globalHardwareContext.shutdown();
-//}
 
 void HardwareContext::chooseMainDevice()
 {
