@@ -23,25 +23,19 @@ DisplayManager::DisplayManager()
 
 DisplayManager::~DisplayManager()
 {
-    //cleanUpDisplayManager();
+    cleanUpDisplayManager();
 }
 
 void DisplayManager::cleanUpDisplayManager()
 {
-    if (!displayDevice)
-    {
-        return;
-    }
-
-    VkDevice device = displayDevice->deviceManager.logicalDevice;
+    // 即便 displayDevice 为空，也尽可能释放 surface 等与实例相关的资源
+    VkDevice device = (displayDevice ? displayDevice->deviceManager.logicalDevice : VK_NULL_HANDLE);
 
     if (device != VK_NULL_HANDLE)
     {
-        // Make sure GPU is idle regarding this device before we tear down swapchain resources
         vkDeviceWaitIdle(device);
     }
 
-    // Destroy per-frame sync objects
     for (auto &fence : inFlightFences)
     {
         if (fence != VK_NULL_HANDLE)
@@ -72,14 +66,12 @@ void DisplayManager::cleanUpDisplayManager()
     }
     renderFinishedSemaphores.clear();
 
-    // Destroy any display-local image if we created one (not aliasing external source)
     if (displayImage.imageHandle != VK_NULL_HANDLE && displayImage.imageAlloc != VK_NULL_HANDLE)
     {
         displayDevice->resourceManager.destroyImage(displayImage);
         displayImage = {};
     }
 
-    // Destroy staging buffers if created for cross-device copy
     if (srcStaging.bufferHandle != VK_NULL_HANDLE)
     {
         if (srcStaging.resourceManager)
@@ -97,7 +89,6 @@ void DisplayManager::cleanUpDisplayManager()
         dstStaging = {};
     }
 
-    // Destroy swapchain image views (don't destroy images allocated by swapchain)
     for (size_t i = 0; i < swapChainImages.size(); i++)
     {
         if (swapChainImages[i].imageView != VK_NULL_HANDLE)
@@ -105,7 +96,7 @@ void DisplayManager::cleanUpDisplayManager()
             vkDestroyImageView(device, swapChainImages[i].imageView, nullptr);
             swapChainImages[i].imageView = VK_NULL_HANDLE;
         }
-        // ensure we don't accidentally vmaDestroy later
+
         swapChainImages[i].imageAlloc = VK_NULL_HANDLE;
     }
     swapChainImages.clear();
@@ -121,8 +112,15 @@ void DisplayManager::cleanUpDisplayManager()
         vkDestroySurfaceKHR(globalHardwareContext.getVulkanInstance(), vkSurface, nullptr);
         vkSurface = VK_NULL_HANDLE;
     }
-}
 
+    // 清理执行器和状态
+    presentQueues.clear();
+    mainDeviceExecutor.reset();
+    displayDeviceExecutor.reset();
+    //displayDevice.reset();
+    displaySurface = nullptr;
+    displaySize = {0, 0};
+}
 
 bool DisplayManager::initDisplayManager(void* surface)
 {
@@ -367,6 +365,12 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
             //this->displaySize = displaySize;
             this->displaySurface = displaySurface;
 
+            // 如果之前已经创建过交换链/Surface，先完整清理，避免资源泄漏
+            if (vkSurface != VK_NULL_HANDLE || swapChain != VK_NULL_HANDLE)
+            {
+                cleanUpDisplayManager();
+            }
+
             initDisplayManager(displaySurface);
 
 
@@ -422,6 +426,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
             for (auto &image : swapChainImages)
             {
                displayDevice->resourceManager.destroyImage(image);
+               image.imageView = VK_NULL_HANDLE; // 防止后续重复销毁
             }
 
             createSwapChain();

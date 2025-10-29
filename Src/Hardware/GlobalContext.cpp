@@ -54,16 +54,6 @@ HardwareContext::HardwareContext()
 
 HardwareContext::~HardwareContext()
 {
-    // Prefer explicit shutdown via CabbageHardwareShutdown(), but clean up as a fallback
-    //try
-    //{
-    //    shutdown();
-    //}
-    //catch (...)
-    //{
-    //    // swallow exceptions during static destruction
-    //}
-
 }
 
 

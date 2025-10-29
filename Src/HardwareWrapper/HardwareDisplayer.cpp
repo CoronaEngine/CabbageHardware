@@ -4,8 +4,6 @@
 std::unordered_map<void*, std::shared_ptr<DisplayManager>> displayerGlobalPool;
 std::mutex displayerMutex;
 
-// 同一个窗口只能显示一个，这里没有必要引用计数
-
 HardwareDisplayer::HardwareDisplayer(void* surface): displaySurface(surface)
 {
     if (displaySurface != nullptr)
@@ -40,7 +38,7 @@ HardwareDisplayer::~HardwareDisplayer()
     {
         if (displayerGlobalPool.count(displaySurface))
         {
-            // 这里智能指针会自动释放，调用析构函数
+            // 清理过程中，确保DisplayManager被正确销毁
             displayerGlobalPool.erase(displaySurface);
         }
 

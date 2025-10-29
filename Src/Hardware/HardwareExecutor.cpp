@@ -1,4 +1,4 @@
-#include "HardwareExecutor.h"
+ï»¿#include "HardwareExecutor.h"
 #include <Hardware/GlobalContext.h>
 #include <thread>
 
@@ -40,10 +40,18 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
                 break;
             }
 
-            // Try to acquire exclusive access to this queue. If it's busy, try the next one.
             if (currentRecordQueue->queueMutex->try_lock())
             {
-                break;
+                uint64_t timelineCounterValue = 0;
+                vkGetSemaphoreCounterValue(hardwareContext->deviceManager.logicalDevice, currentRecordQueue->timelineSemaphore, &timelineCounterValue);
+                if (timelineCounterValue >= currentRecordQueue->timelineValue)
+                {
+                    break;
+                }
+                else
+                {
+                    currentRecordQueue->queueMutex->unlock();
+                }
             }
 
             std::this_thread::yield();
@@ -53,17 +61,17 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
         // by waiting on the per-queue timeline semaphore reaching the last signaled value.
         // This avoids busy-waiting and guarantees the command buffer is no longer in-flight
         // before resetting/re-recording it.
-        {
-            VkSemaphoreWaitInfo waitInfo{};
-            waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
-            waitInfo.flags = 0;
-            VkSemaphore semaphore = currentRecordQueue->timelineSemaphore;
-            uint64_t value = currentRecordQueue->timelineValue; // last signaled value
-            waitInfo.semaphoreCount = 1;
-            waitInfo.pSemaphores = &semaphore;
-            waitInfo.pValues = &value;
-            vkWaitSemaphores(hardwareContext->deviceManager.logicalDevice, &waitInfo, UINT64_MAX);
-        }
+        //{
+        //    VkSemaphoreWaitInfo waitInfo{};
+        //    waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+        //    waitInfo.flags = 0;
+        //    VkSemaphore semaphore = currentRecordQueue->timelineSemaphore;
+        //    uint64_t value = currentRecordQueue->timelineValue; // last signaled value
+        //    waitInfo.semaphoreCount = 1;
+        //    waitInfo.pSemaphores = &semaphore;
+        //    waitInfo.pValues = &value;
+        //    vkWaitSemaphores(hardwareContext->deviceManager.logicalDevice, &waitInfo, UINT64_MAX);
+        //}
 
         vkResetCommandBuffer(currentRecordQueue->commandBuffer, 0);
 
@@ -112,8 +120,8 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
 
         currentRecordQueue->queueMutex->unlock();
 
-        // Todo: ÀýÈç¿½±´Í¼Æ¬£¬Èç¹ûÖ±½Ó¿½±´ÃüÁîÌá½»ºó£¬ÂíÉÏclear£¬»áµ¼ÖÂÍ¼Æ¬×ÊÔ´±»Ïú»Ù£¬¿½±´ÃüÁîÎ´Ö´ÐÐÍê³É
-        // ÕâÀïÏÈ¼òµ¥Í¨¹ýµÈ´ý¶ÓÁÐ¿ÕÏÐ½â¾ö£¬ºóÐø¿ÉÒÔÍ¨¹ý¸ü¾«Ï¸µÄ×ÊÔ´ÉúÃüÖÜÆÚ¹ÜÀíÓÅ»¯
+        // Todo: ä¾‹å¦‚æ‹·è´å›¾ç‰‡ï¼Œå¦‚æžœç›´æŽ¥æ‹·è´å‘½ä»¤æäº¤åŽï¼Œé©¬ä¸Šclearï¼Œä¼šå¯¼è‡´å›¾ç‰‡èµ„æºè¢«é”€æ¯ï¼Œæ‹·è´å‘½ä»¤æœªæ‰§è¡Œå®Œæˆ
+        // è¿™é‡Œå…ˆç®€å•é€šè¿‡ç­‰å¾…é˜Ÿåˆ—ç©ºé—²è§£å†³ï¼ŒåŽç»­å¯ä»¥é€šè¿‡æ›´ç²¾ç»†çš„èµ„æºç”Ÿå‘½å‘¨æœŸç®¡ç†ä¼˜åŒ–
         vkQueueWaitIdle(currentRecordQueue->vkQueue);
         commandList.clear();
     }
