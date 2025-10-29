@@ -16,6 +16,7 @@ ComputePipeline::ComputePipeline(std::string shaderCode, EmbeddedShader::ShaderL
 
 ComputePipeline::~ComputePipeline()
 {
+    // Todo：销毁的时候，GPU端资源可能还在被使用，需改为延迟销毁
     // 确保在销毁前设备有效，并按顺序销毁 Pipeline 相关资源
     VkDevice device = VK_NULL_HANDLE;
     if (globalHardwareContext.mainDevice)

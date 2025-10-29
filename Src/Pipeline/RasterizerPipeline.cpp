@@ -56,6 +56,7 @@ RasterizerPipeline::RasterizerPipeline(std::string vertexShaderCode, std::string
 
 RasterizerPipeline::~RasterizerPipeline()
 {
+    // Todo：销毁的时候，GPU端资源可能还在被使用，需改为延迟销毁
     // 依赖设备销毁 Vulkan 资源，按从下至上的顺序：先 framebuffer，再 pipeline/layout，最后 render pass
     VkDevice device = VK_NULL_HANDLE;
     if (globalHardwareContext.mainDevice)

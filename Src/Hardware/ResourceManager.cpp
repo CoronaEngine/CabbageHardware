@@ -24,9 +24,9 @@ void ResourceManager::initResourceManager(DeviceManager &device)
     CreateVmaAllocator();
     createTextureSampler();
     createBindlessDescriptorSet();
-#ifdef USE_EXPORT_MEMORY
-    createExternalMemoryPool();
-#endif
+//#ifdef USE_EXPORT_MEMORY
+//    createExternalMemoryPool();
+//#endif
 }
 
 void ResourceManager::cleanUpResourceManager()
@@ -68,16 +68,17 @@ void ResourceManager::cleanUpResourceManager()
         StorageImageBindingIndex = 0;
     }
 
-#ifdef USE_EXPORT_MEMORY
-    if (g_hPool != VK_NULL_HANDLE && g_hAllocator != VK_NULL_HANDLE)
-    {
-        vmaDestroyPool(g_hAllocator, g_hPool);
-        g_hPool = VK_NULL_HANDLE;
-    }
-#endif
+//#ifdef USE_EXPORT_MEMORY
+//    if (g_hPool != VK_NULL_HANDLE && g_hAllocator != VK_NULL_HANDLE)
+//    {
+//        vmaDestroyPool(g_hAllocator, g_hPool);
+//        g_hPool = VK_NULL_HANDLE;
+//    }
+//#endif
 
     if (g_hAllocator != VK_NULL_HANDLE)
     {
+        //Todo：删除的时候有内存泄露，同时考虑多线程的问题
         vmaDestroyAllocator(g_hAllocator);
         g_hAllocator = VK_NULL_HANDLE;
     }
