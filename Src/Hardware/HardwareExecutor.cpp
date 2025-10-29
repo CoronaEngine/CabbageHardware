@@ -1,6 +1,7 @@
-﻿#include "HardwareExecutor.h"
+#include "HardwareExecutor.h"
+
 #include <Hardware/GlobalContext.h>
-#include <thread>
+
 
 HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos, std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos, VkFence fence)
 {
@@ -57,22 +58,6 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
             std::this_thread::yield();
         }
 
-        // Ensure the previous submission that used this per-queue command buffer has finished
-        // by waiting on the per-queue timeline semaphore reaching the last signaled value.
-        // This avoids busy-waiting and guarantees the command buffer is no longer in-flight
-        // before resetting/re-recording it.
-        //{
-        //    VkSemaphoreWaitInfo waitInfo{};
-        //    waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
-        //    waitInfo.flags = 0;
-        //    VkSemaphore semaphore = currentRecordQueue->timelineSemaphore;
-        //    uint64_t value = currentRecordQueue->timelineValue; // last signaled value
-        //    waitInfo.semaphoreCount = 1;
-        //    waitInfo.pSemaphores = &semaphore;
-        //    waitInfo.pValues = &value;
-        //    vkWaitSemaphores(hardwareContext->deviceManager.logicalDevice, &waitInfo, UINT64_MAX);
-        //}
-
         vkResetCommandBuffer(currentRecordQueue->commandBuffer, 0);
 
         VkCommandBufferBeginInfo beginInfo{};
@@ -95,11 +80,17 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
         commandBufferSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
         commandBufferSubmitInfo.commandBuffer = currentRecordQueue->commandBuffer;
 
+        VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
+        timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        timelineWaitSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
+        timelineWaitSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue++;
+        timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        waitSemaphoreInfos.push_back(timelineWaitSemaphoreSubmitInfo);
+
         VkSemaphoreSubmitInfo timelineSignalSemaphoreSubmitInfo{};
         timelineSignalSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
         timelineSignalSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
-        // Signal the next timeline value to mark completion of this submission
-        timelineSignalSemaphoreSubmitInfo.value = ++currentRecordQueue->timelineValue;
+        timelineSignalSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue;
         timelineSignalSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         signalSemaphoreInfos.push_back(timelineSignalSemaphoreSubmitInfo);
 
@@ -120,9 +111,6 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
 
         currentRecordQueue->queueMutex->unlock();
 
-        // Todo: 例如拷贝图片，如果直接拷贝命令提交后，马上clear，会导致图片资源被销毁，拷贝命令未执行完成
-        // 这里先简单通过等待队列空闲解决，后续可以通过更精细的资源生命周期管理优化
-        //vkQueueWaitIdle(currentRecordQueue->vkQueue);
         commandList.clear();
     }
 
