@@ -33,45 +33,58 @@ void ResourceManager::initResourceManager(DeviceManager &device)
 
 void ResourceManager::cleanUpResourceManager()
 {
-    // This must be called when the device is still alive and idle.
-    if (!device || device->logicalDevice == VK_NULL_HANDLE)
+    if (device && device->logicalDevice != VK_NULL_HANDLE)
     {
-        return;
-    }
-
-    for (int i = 0; i < 4; i++)
-    {
-        if (bindlessDescriptors[i].descriptorPool != VK_NULL_HANDLE)
+        for (auto &desc : bindlessDescriptors)
         {
-            vkDestroyDescriptorPool(device->logicalDevice, bindlessDescriptors[i].descriptorPool, nullptr);
-            bindlessDescriptors[i].descriptorPool = VK_NULL_HANDLE;
+            if (desc.descriptorPool != VK_NULL_HANDLE)
+            {
+                vkDestroyDescriptorPool(device->logicalDevice, desc.descriptorPool, nullptr);
+                desc.descriptorPool = VK_NULL_HANDLE;
+                desc.descriptorSet = VK_NULL_HANDLE;
+            }
+            if (desc.descriptorSetLayout != VK_NULL_HANDLE)
+            {
+                vkDestroyDescriptorSetLayout(device->logicalDevice, desc.descriptorSetLayout, nullptr);
+                desc.descriptorSetLayout = VK_NULL_HANDLE;
+            }
         }
-        if (bindlessDescriptors[i].descriptorSetLayout != VK_NULL_HANDLE)
+
+        if (textureSampler != VK_NULL_HANDLE)
         {
-            vkDestroyDescriptorSetLayout(device->logicalDevice, bindlessDescriptors[i].descriptorSetLayout, nullptr);
-            bindlessDescriptors[i].descriptorSetLayout = VK_NULL_HANDLE;
+            vkDestroySampler(device->logicalDevice, textureSampler, nullptr);
+            textureSampler = VK_NULL_HANDLE;
         }
-        bindlessDescriptors[i].descriptorSet = VK_NULL_HANDLE;
     }
 
-    if (textureSampler != VK_NULL_HANDLE)
     {
-        vkDestroySampler(device->logicalDevice, textureSampler, nullptr);
-        textureSampler = VK_NULL_HANDLE;
+        std::scoped_lock lock(bindlessDescriptorMutex);
+        UniformBindingList.clear();
+        TextureBindingList.clear();
+        StorageBufferBindingList.clear();
+        StorageImageBindingList.clear();
+
+        UniformBindingIndex = 0;
+        TextureBindingIndex = 0;
+        StorageBufferBindingIndex = 0;
+        StorageImageBindingIndex = 0;
     }
 
-    // Destroy VMA pool first (if created), then allocator
-    if (g_hPool != VK_NULL_HANDLE)
+#ifdef USE_VMA_POOL
+    if (g_hPool != VK_NULL_HANDLE && g_hAllocator != VK_NULL_HANDLE)
     {
         vmaDestroyPool(g_hAllocator, g_hPool);
         g_hPool = VK_NULL_HANDLE;
     }
+#endif
 
     if (g_hAllocator != VK_NULL_HANDLE)
     {
         vmaDestroyAllocator(g_hAllocator);
         g_hAllocator = VK_NULL_HANDLE;
     }
+
+    device = nullptr;
 }
 
 void ResourceManager::CreateVmaAllocator()
