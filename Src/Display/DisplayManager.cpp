@@ -6,8 +6,7 @@
 #include<Hardware/ResourceCommand.h>
 
 #define USE_SAME_DEVICE
-
-//#define TEST_export_Memory
+#define USE_EXPORT_MEMORY
 
 //#if _WIN32 || _WIN64
 //#include<vulkan/vulkan_win32.h>
@@ -373,7 +372,6 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
             initDisplayManager(displaySurface);
 
-
             this->displayImage = displayDevice->resourceManager.createImage(imageGlobalPool[*displayImage.imageID].imageSize, imageGlobalPool[*displayImage.imageID].imageFormat,
                                                                             imageGlobalPool[*displayImage.imageID].pixelSize, imageGlobalPool[*displayImage.imageID].imageUsage);
 
@@ -533,8 +531,8 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
              // std::cout << "Present Queue Index: " << queueIndex << std::endl;
 
              VkResult result;
-             auto commitToQueue = [&](DeviceManager::QueueUtils *currentRecordQueue) -> bool { 
-                 result = vkQueuePresentKHR(currentRecordQueue->vkQueue, &presentInfo); 
+             auto commitToQueue = [&](DeviceManager::QueueUtils *currentRecordQueue) -> bool {
+                 result = vkQueuePresentKHR(currentRecordQueue->vkQueue, &presentInfo);
                  return true;
                  };
 

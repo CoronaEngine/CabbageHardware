@@ -1,12 +1,9 @@
 ﻿#pragma once
 
 #include <chrono>
-
 #include<Hardware/GlobalContext.h>
 #include<Hardware/HardwareExecutor.h>
-
 #include<CabbageHardware.h>
-
 
 class DisplayManager
 {
