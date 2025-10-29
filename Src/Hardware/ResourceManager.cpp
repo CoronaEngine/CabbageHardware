@@ -285,7 +285,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
         VmaAllocationCreateInfo vbAllocCreateInfo = {};
         vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
         vbAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-#endif 
+#endif
 
         VkResult res = vmaCreateBuffer(g_hAllocator, &vbInfo, &vbAllocCreateInfo, &resultBuffer.bufferHandle, &resultBuffer.bufferAlloc, &resultBuffer.bufferAllocInfo);
         if (res != VK_SUCCESS)
@@ -879,7 +879,7 @@ ResourceManager &ResourceManager::copyImage(VkCommandBuffer &commandBuffer, Imag
     //    return false;
     //}
 }
-//
+
 //void ResourceManager::transitionImageLayoutUnblocked(const VkCommandBuffer &commandBuffer, ImageHardwareWrap &image,
 //                                                     VkImageLayout newLayout, VkPipelineStageFlags sourceStage,
 //                                                     VkPipelineStageFlags destinationStage)
@@ -891,8 +891,7 @@ ResourceManager &ResourceManager::transitionImageLayout(VkCommandBuffer &command
 {
     if (image.imageLayout != newLayout)
     {
-        //auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
-            if (image.imageLayout != newLayout)
+        if (image.imageLayout != newLayout)
             {
                 VkImageMemoryBarrier barrier{};
                 barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -1010,9 +1009,6 @@ ResourceManager &ResourceManager::transitionImageLayout(VkCommandBuffer &command
 
                 image.imageLayout = newLayout;
             }
-        //};
-
-        //*executor << runCommand;
 
         return *this;
     }
@@ -1020,7 +1016,7 @@ ResourceManager &ResourceManager::transitionImageLayout(VkCommandBuffer &command
 
 ResourceManager &ResourceManager::copyImageToBuffer(VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, BufferHardwareWrap &buffer)
 {
-    //auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
+
         VkBufferImageCopy region{};
         region.bufferOffset = 0;
         region.bufferRowLength = 0;
@@ -1036,16 +1032,14 @@ ResourceManager &ResourceManager::copyImageToBuffer(VkCommandBuffer &commandBuff
             1};
 
         vkCmdCopyImageToBuffer(commandBuffer, image.imageHandle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buffer.bufferHandle, 1, &region);
-    //};
 
-    //*executor << runCommand;
 
     return *this;
 }
 
 ResourceManager &ResourceManager::copyBufferToImage(VkCommandBuffer &commandBuffer, BufferHardwareWrap &buffer, ImageHardwareWrap &image)
 {
-    //auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
+
         VkBufferImageCopy region{};
         region.bufferOffset = 0;
         region.bufferRowLength = 0;
@@ -1061,9 +1055,6 @@ ResourceManager &ResourceManager::copyBufferToImage(VkCommandBuffer &commandBuff
             1};
 
         vkCmdCopyBufferToImage(commandBuffer, buffer.bufferHandle, image.imageHandle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-    //};
-
-     //*executor << runCommand;
 
     return *this;
 }
@@ -1072,13 +1063,9 @@ ResourceManager &ResourceManager::copyBuffer(VkCommandBuffer &commandBuffer, Buf
 {
     if (srcBuffer.bufferAllocInfo.size == dstBuffer.bufferAllocInfo.size)
     {
-        //auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
             VkBufferCopy copyRegion{};
             copyRegion.size = srcBuffer.bufferAllocInfo.size;
             vkCmdCopyBuffer(commandBuffer, srcBuffer.bufferHandle, dstBuffer.bufferHandle, 1, &copyRegion);
-        //};
-
-        //*executor << runCommand;
     }
 
     return *this;
@@ -1353,124 +1340,124 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     {
         std::cerr << "Warning: imported buffer allocation offset != 0 (" << basic.offset << ")" << std::endl;
     }
-    
+
 
     return importedBuffer;
 
 }
 
-void ResourceManager::TestWin32HandlesImport(BufferHardwareWrap &srcStaging, BufferHardwareWrap &dstStaging, VkDeviceSize imageSizeBytes, ResourceManager &srcResourceManager, ResourceManager &dstResourceManager)
-{
-    constexpr VkExternalMemoryHandleTypeFlagBits handleType =
-        VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-
-    constexpr static VkExportMemoryAllocateInfoKHR exportMemAllocInfo{
-        VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR,
-        nullptr,
-        handleType};
-
-    constexpr static VkExternalMemoryBufferCreateInfoKHR externalMemBufCreateInfo{
-        VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO_KHR,
-        nullptr,
-        handleType};
-
-    //BufferHardwareWrap srcBuffer;
-    srcStaging.device = &srcResourceManager.getDeviceManager();
-    srcStaging.resourceManager = &srcResourceManager;
-
-    if (imageSizeBytes > 0)
-    {
-        srcStaging.bufferUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-
-        VkBufferCreateInfo bufCreateInfo = {};
-        bufCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufCreateInfo.size = imageSizeBytes;
-        bufCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-
-        if (device->getQueueFamilyNumber() > 1)
-        {
-            std::vector<uint32_t> queueFamilys(device->getQueueFamilyNumber());
-            for (size_t i = 0; i < queueFamilys.size(); i++)
-            {
-                queueFamilys[i] = i;
-            }
-            bufCreateInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-            bufCreateInfo.queueFamilyIndexCount = queueFamilys.size();
-            bufCreateInfo.pQueueFamilyIndices = queueFamilys.data();
-        }
-        else
-        {
-            bufCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        }
-
-        bufCreateInfo.pNext = &externalMemBufCreateInfo;
-
-        bool requiresDedicated = true;
-        {
-            VkPhysicalDeviceExternalBufferInfo externalBufferInfo = {
-                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO};
-            externalBufferInfo.flags = bufCreateInfo.flags;
-            externalBufferInfo.usage = bufCreateInfo.usage;
-            externalBufferInfo.handleType = handleType;
-
-            VkExternalBufferProperties externalBufferProperties = {
-                VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES};
-
-            vkGetPhysicalDeviceExternalBufferProperties(srcStaging.device->physicalDevice, &externalBufferInfo, &externalBufferProperties);
-            constexpr VkExternalMemoryFeatureFlags expectedFlags =VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT | VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT;
-            if ((externalBufferProperties.externalMemoryProperties.externalMemoryFeatures & expectedFlags) != expectedFlags)
-            {
-                return;
-            }
-            requiresDedicated = (externalBufferProperties.externalMemoryProperties.externalMemoryFeatures &
-                                 VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) != 0;
-        }
-
-        VmaAllocationCreateInfo vbAllocCreateInfo = {};
-        vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
-        vbAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-        vbAllocCreateInfo.pool = srcResourceManager.getVmaPool();
-
-
-        VkResult res = vmaCreateBuffer(srcResourceManager.getVmaAllocator(), &bufCreateInfo, &vbAllocCreateInfo, &srcStaging.bufferHandle, &srcStaging.bufferAlloc, &srcStaging.bufferAllocInfo);
-        if (res != VK_SUCCESS)
-        {
-            switch (res)
-            {
-            case VK_ERROR_OUT_OF_HOST_MEMORY:
-                std::cerr << "Host memory allocation failed!" << std::endl;
-                break;
-            case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-                std::cerr << "Device memory allocation failed!" << std::endl;
-                break;
-            default:
-                std::cerr << "VMA buffer creation failed with error code: " << res << std::endl;
-                break;
-            }
-        }
-
-        HANDLE handle = NULL;
-        VkResult result = vmaGetMemoryWin32Handle2(srcResourceManager.getVmaAllocator(), srcStaging.bufferAlloc, handleType, nullptr, &handle);
-
-        VkImportMemoryWin32HandleInfoKHR importMemHandleInfo = {
-            VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR};
-        importMemHandleInfo.handleType = handleType;
-        importMemHandleInfo.handle = handle;
-        importMemHandleInfo.name = nullptr;
-        VmaAllocationCreateInfo importAllocCreateInfo = {};
-        importAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
-        importAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-
-        dstStaging.bufferHandle = VK_NULL_HANDLE;
-        dstStaging.bufferAlloc = VK_NULL_HANDLE;
-        dstStaging.device = &dstResourceManager.getDeviceManager();
-        dstStaging.resourceManager = &dstResourceManager;
-        vmaCreateDedicatedBuffer(dstResourceManager.getVmaAllocator(), &bufCreateInfo, &importAllocCreateInfo,
-                                 &importMemHandleInfo, &dstStaging.bufferHandle, &dstStaging.bufferAlloc, &dstStaging.bufferAllocInfo);
-
-    }
-
-}
+//void ResourceManager::TestWin32HandlesImport(BufferHardwareWrap &srcStaging, BufferHardwareWrap &dstStaging, VkDeviceSize imageSizeBytes, ResourceManager &srcResourceManager, ResourceManager &dstResourceManager)
+//{
+//    constexpr VkExternalMemoryHandleTypeFlagBits handleType =
+//        VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+//
+//    constexpr static VkExportMemoryAllocateInfoKHR exportMemAllocInfo{
+//        VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR,
+//        nullptr,
+//        handleType};
+//
+//    constexpr static VkExternalMemoryBufferCreateInfoKHR externalMemBufCreateInfo{
+//        VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO_KHR,
+//        nullptr,
+//        handleType};
+//
+//    //BufferHardwareWrap srcBuffer;
+//    srcStaging.device = &srcResourceManager.getDeviceManager();
+//    srcStaging.resourceManager = &srcResourceManager;
+//
+//    if (imageSizeBytes > 0)
+//    {
+//        srcStaging.bufferUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+//
+//        VkBufferCreateInfo bufCreateInfo = {};
+//        bufCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+//        bufCreateInfo.size = imageSizeBytes;
+//        bufCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+//
+//        if (device->getQueueFamilyNumber() > 1)
+//        {
+//            std::vector<uint32_t> queueFamilys(device->getQueueFamilyNumber());
+//            for (size_t i = 0; i < queueFamilys.size(); i++)
+//            {
+//                queueFamilys[i] = i;
+//            }
+//            bufCreateInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+//            bufCreateInfo.queueFamilyIndexCount = queueFamilys.size();
+//            bufCreateInfo.pQueueFamilyIndices = queueFamilys.data();
+//        }
+//        else
+//        {
+//            bufCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+//        }
+//
+//        bufCreateInfo.pNext = &externalMemBufCreateInfo;
+//
+//        bool requiresDedicated = true;
+//        {
+//            VkPhysicalDeviceExternalBufferInfo externalBufferInfo = {
+//                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO};
+//            externalBufferInfo.flags = bufCreateInfo.flags;
+//            externalBufferInfo.usage = bufCreateInfo.usage;
+//            externalBufferInfo.handleType = handleType;
+//
+//            VkExternalBufferProperties externalBufferProperties = {
+//                VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES};
+//
+//            vkGetPhysicalDeviceExternalBufferProperties(srcStaging.device->physicalDevice, &externalBufferInfo, &externalBufferProperties);
+//            constexpr VkExternalMemoryFeatureFlags expectedFlags =VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT | VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT;
+//            if ((externalBufferProperties.externalMemoryProperties.externalMemoryFeatures & expectedFlags) != expectedFlags)
+//            {
+//                return;
+//            }
+//            requiresDedicated = (externalBufferProperties.externalMemoryProperties.externalMemoryFeatures &
+//                                 VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) != 0;
+//        }
+//
+//        VmaAllocationCreateInfo vbAllocCreateInfo = {};
+//        vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+//        vbAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+//        vbAllocCreateInfo.pool = srcResourceManager.getVmaPool();
+//
+//
+//        VkResult res = vmaCreateBuffer(srcResourceManager.getVmaAllocator(), &bufCreateInfo, &vbAllocCreateInfo, &srcStaging.bufferHandle, &srcStaging.bufferAlloc, &srcStaging.bufferAllocInfo);
+//        if (res != VK_SUCCESS)
+//        {
+//            switch (res)
+//            {
+//            case VK_ERROR_OUT_OF_HOST_MEMORY:
+//                std::cerr << "Host memory allocation failed!" << std::endl;
+//                break;
+//            case VK_ERROR_OUT_OF_DEVICE_MEMORY:
+//                std::cerr << "Device memory allocation failed!" << std::endl;
+//                break;
+//            default:
+//                std::cerr << "VMA buffer creation failed with error code: " << res << std::endl;
+//                break;
+//            }
+//        }
+//
+//        HANDLE handle = NULL;
+//        VkResult result = vmaGetMemoryWin32Handle2(srcResourceManager.getVmaAllocator(), srcStaging.bufferAlloc, handleType, nullptr, &handle);
+//
+//        VkImportMemoryWin32HandleInfoKHR importMemHandleInfo = {
+//            VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR};
+//        importMemHandleInfo.handleType = handleType;
+//        importMemHandleInfo.handle = handle;
+//        importMemHandleInfo.name = nullptr;
+//        VmaAllocationCreateInfo importAllocCreateInfo = {};
+//        importAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+//        importAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+//
+//        dstStaging.bufferHandle = VK_NULL_HANDLE;
+//        dstStaging.bufferAlloc = VK_NULL_HANDLE;
+//        dstStaging.device = &dstResourceManager.getDeviceManager();
+//        dstStaging.resourceManager = &dstResourceManager;
+//        vmaCreateDedicatedBuffer(dstResourceManager.getVmaAllocator(), &bufCreateInfo, &importAllocCreateInfo,
+//                                 &importMemHandleInfo, &dstStaging.bufferHandle, &dstStaging.bufferAlloc, &dstStaging.bufferAllocInfo);
+//
+//    }
+//
+//}
 
 void ResourceManager::copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData)
 {
@@ -1502,7 +1489,7 @@ void ResourceManager::copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData)
 ResourceManager::ExternalMemoryHandle ResourceManager::exportBufferMemory(BufferHardwareWrap &sourceBuffer)
 {
     ExternalMemoryHandle memHandle{};
-    
+
     if (sourceBuffer.bufferHandle == VK_NULL_HANDLE || sourceBuffer.bufferAlloc == VK_NULL_HANDLE)
     {
         throw std::runtime_error("Cannot export memory from invalid buffer!");
@@ -1516,14 +1503,14 @@ ResourceManager::ExternalMemoryHandle ResourceManager::exportBufferMemory(Buffer
             throw std::runtime_error("exportBufferMemory: allocation is not dedicated (offset != 0). Use createExportableBuffer to allocate a dedicated, exportable buffer.");
         }
     }
-    
+
 #if _WIN32 || _WIN64
     VkResult result = vmaGetMemoryWin32Handle2(g_hAllocator, sourceBuffer.bufferAlloc, VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT, nullptr, &memHandle.handle);
     if (result != VK_SUCCESS)
     {
         throw std::runtime_error("failed to export memory handle! VkResult: " + std::to_string(result));
     }
-    
+
     if (memHandle.handle == nullptr || memHandle.handle == INVALID_HANDLE_VALUE)
     {
         throw std::runtime_error("Exported memory handle is invalid!");
@@ -1605,7 +1592,7 @@ void ResourceManager::createBindlessDescriptorSet()
         {
             throw std::runtime_error("failed to create descriptor set layout!");
         }
- 
+
         {
             std::array<VkDescriptorPoolSize, 1> poolSizes{};
             poolSizes[0].type = types[i];
@@ -1790,7 +1777,7 @@ uint32_t ResourceManager::storeDescriptor(BufferHardwareWrap buffer)
 
     return bufferIndex;
 }
-//
+
 // uint32_t ResourceManager::storeDescriptor(VkAccelerationStructureKHR m_tlas)
 //{
 //	uint32_t asIndex = -1;
@@ -1850,7 +1837,6 @@ ResourceManager &ResourceManager::blitImage(
     ImageHardwareWrap &srcImage,
     ImageHardwareWrap &dstImage)
 {
-    //auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
 
         VkImageBlit imageBlit;
         imageBlit.dstOffsets[0] = VkOffset3D{0, 0, 0};
@@ -1877,9 +1863,6 @@ ResourceManager &ResourceManager::blitImage(
             dstImage.imageHandle, dstImage.imageLayout,
             1, &imageBlit,
             VK_FILTER_LINEAR);
-    //};
-
-    //*executor << runCommand;
 
     return *this;
 
