@@ -81,6 +81,13 @@ struct ResourceManager
     void destroyImage(ImageHardwareWrap &image);
 
     BufferHardwareWrap createBuffer(VkDeviceSize size, VkBufferUsageFlags usage);
+    // 创建用于跨设备导出/导入的专用缓冲区：
+    // - 使用 ExternalMemory + Dedicated 分配，保证导出句柄对应的内存偏移为 0
+    // - 可选映射到 host（默认顺序写 + 映射）
+    BufferHardwareWrap createExportableBuffer(
+        VkDeviceSize size,
+        VkBufferUsageFlags usage,
+        bool hostVisibleMapped = true);
     void destroyBuffer(BufferHardwareWrap &buffer);
 
     uint32_t storeDescriptor(ImageHardwareWrap image);
@@ -117,21 +124,6 @@ struct ResourceManager
     uint64_t getDeviceMemorySize()
     {
         return deviceMemorySize;
-    }
-
-    DeviceManager& getDeviceManager()
-    {
-        return *device;
-    }
-
-    VmaAllocator getVmaAllocator()
-    {
-        return g_hAllocator;
-    }
-
-    VmaPool getVmaPool()
-    {
-        return g_hPool;
     }
 
 private:

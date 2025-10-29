@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <array>
 #include <chrono>
@@ -45,6 +45,7 @@ class DeviceManager
         VkQueue vkQueue = VK_NULL_HANDLE;
         VkCommandPool commandPool = VK_NULL_HANDLE;
         VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+        DeviceManager *deviceManager = nullptr;
     };
 
     struct FeaturesUtils
@@ -70,7 +71,7 @@ class DeviceManager
     DeviceManager();
 
     ~DeviceManager();
-     
+
     void initDeviceManager(const CreateCallback &createCallback, const VkInstance &vkInstance, const VkPhysicalDevice &physicalDevice);
 
     void cleanUpDeviceManager();
@@ -88,7 +89,7 @@ class DeviceManager
     //DeviceManager &operator<<(std::function<void(const VkCommandBuffer &commandBuffer)> commandsFunction);
     //
     //QueueUtils *currentRecordQueue = nullptr;
- 
+
 
     std::vector<QueueUtils> pickAvailableQueues(std::function<bool(const QueueUtils &)> required)
     {
@@ -134,8 +135,6 @@ class DeviceManager
     bool createCommandBuffers();
 
     void createTimelineSemaphore();
-
-    void cleanUpQueueUtils(std::vector<QueueUtils> &queues);
 
     std::atomic_uint16_t currentGraphicsQueueIndex = 0;
     std::atomic_uint16_t currentComputeQueueIndex = 0;

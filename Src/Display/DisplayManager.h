@@ -1,12 +1,9 @@
 ﻿#pragma once
 
-#include <chrono>  
-
+#include <chrono>
 #include<Hardware/GlobalContext.h>
 #include<Hardware/HardwareExecutor.h>
-
 #include<CabbageHardware.h>
-
 
 class DisplayManager
 {
@@ -28,9 +25,7 @@ private:
     void *displaySurface = nullptr;
 
     std::vector<ResourceManager::ImageHardwareWrap> swapChainImages;
-
     VkSurfaceFormatKHR surfaceFormat;
-
 
     ResourceManager::ImageHardwareWrap displayImage;
 
@@ -41,12 +36,11 @@ private:
     //VkSemaphore timelineSemaphore = VK_NULL_HANDLE;
     //uint64_t timelineCounter = 0;
     //std::vector<uint64_t> frameTimelineValues;
-    
+
     std::atomic_uint16_t currentQueueIndex = 0;
     std::vector<DeviceManager::QueueUtils> presentQueues;
 
     std::shared_ptr<HardwareContext::HardwareUtils> displayDevice;
-
 
     void cleanUpDisplayManager();
     void createVkSurface(void* surface);

@@ -8,7 +8,7 @@ uint64_t currentBufferID = 0;
 
 std::mutex bufferMutex;
 
-HardwareBuffer& HardwareBuffer::operator= (const HardwareBuffer& other)
+HardwareBuffer &HardwareBuffer::operator=(const HardwareBuffer &other)
 {
     std::unique_lock<std::mutex> lock(bufferMutex);
 
@@ -16,6 +16,7 @@ HardwareBuffer& HardwareBuffer::operator= (const HardwareBuffer& other)
     {
         bufferRefCount[*other.bufferID]++;
     }
+
     if (bufferGlobalPool.count(*this->bufferID))
     {
         bufferRefCount[*bufferID]--;
@@ -26,6 +27,7 @@ HardwareBuffer& HardwareBuffer::operator= (const HardwareBuffer& other)
             bufferRefCount.erase(*bufferID);
         }
     }
+
     *(this->bufferID) = *(other.bufferID);
     return *this;
 }

@@ -26,9 +26,7 @@ struct RasterizerPipeline : public CommandRecord
         executorType = CommandRecord::ExecutorType::Graphics;
     }
 
-    ~RasterizerPipeline()
-    {
-    }
+    ~RasterizerPipeline();
 
     RasterizerPipeline(std::string vertexShaderCode, std::string fragmentShaderCode, uint32_t multiviewCount = 1,
                        EmbeddedShader::ShaderLanguage vertexShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL, EmbeddedShader::ShaderLanguage fragmentShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
@@ -81,7 +79,6 @@ struct RasterizerPipeline : public CommandRecord
 
     ktm::uvec2 imageSize = {0, 0};
 
-
     void createRenderPass(int multiviewCount = 1);
     void createGraphicsPipeline(EmbeddedShader::ShaderCodeModule vertShaderCode, EmbeddedShader::ShaderCodeModule fragShaderCode);
     void createFramebuffers(ktm::uvec2 imageSize);
@@ -90,11 +87,11 @@ struct RasterizerPipeline : public CommandRecord
 
     int multiviewCount = 1;
 
-    VkRenderPass renderPass;
-    VkPipeline graphicsPipeline;
-    VkPipelineLayout pipelineLayout;
+    VkRenderPass renderPass = VK_NULL_HANDLE;
+    VkPipeline graphicsPipeline = VK_NULL_HANDLE;
+    VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
 
-    VkFramebuffer frameBuffers;
+    VkFramebuffer frameBuffers = VK_NULL_HANDLE;
 
     // std::vector<ResourceManager::ImageHardwareWrap> renderTarget;
     HardwareImage depthImage;

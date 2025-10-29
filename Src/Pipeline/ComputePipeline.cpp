@@ -14,6 +14,30 @@ ComputePipeline::ComputePipeline(std::string shaderCode, EmbeddedShader::ShaderL
 	shaderResource = shaderCodeCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV).shaderResources;
 }
 
+ComputePipeline::~ComputePipeline()
+{
+    // Todo：销毁的时候，GPU端资源可能还在被使用，需改为延迟销毁
+    // 确保在销毁前设备有效，并按顺序销毁 Pipeline 相关资源
+    VkDevice device = VK_NULL_HANDLE;
+    if (globalHardwareContext.mainDevice)
+    {
+        device = globalHardwareContext.mainDevice->deviceManager.logicalDevice;
+    }
+
+    if (device != VK_NULL_HANDLE)
+    {
+        if (pipeline != VK_NULL_HANDLE)
+        {
+            vkDestroyPipeline(device, pipeline, nullptr);
+            pipeline = VK_NULL_HANDLE;
+        }
+        if (pipelineLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+            pipelineLayout = VK_NULL_HANDLE;
+        }
+    }
+}
 
 ComputePipeline* ComputePipeline::operator()(uint16_t groupCountX, uint16_t groupCountY, uint16_t groupCountZ)
 {
@@ -79,6 +103,22 @@ void ComputePipeline::commitCommand(HardwareExecutor &hardwareExecutor)
 
     if (pipelineLayout != VK_NULL_HANDLE && pipeline != VK_NULL_HANDLE)
     {
+        // 在绑定/调度前加入一次通用内存屏障，确保此前写入对计算着色器可见
+        {
+            VkMemoryBarrier barrier{};
+            barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+            barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+            vkCmdPipelineBarrier(
+                hardwareExecutor.currentRecordQueue->commandBuffer,
+                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                0,
+                1, &barrier,
+                0, nullptr,
+                0, nullptr);
+        }
+
         //auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
         vkCmdBindPipeline(hardwareExecutor.currentRecordQueue->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 

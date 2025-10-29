@@ -1,4 +1,4 @@
-#include<Hardware/GlobalContext.h>
+﻿#include<Hardware/GlobalContext.h>
 
 #define VOLK_IMPLEMENTATION
 #include <volk.h>
@@ -54,28 +54,46 @@ HardwareContext::HardwareContext()
 
 HardwareContext::~HardwareContext()
 {
-    //mainDevice.reset();
-    //hardwareUtils.clear();
+    imageGlobalPool.clear();
+    bufferGlobalPool.clear();
 
-    /*if (debugMessenger != VK_NULL_HANDLE)
-     {
-         auto DestroyDebugUtilsMessengerEXT = [](VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks *pAllocator) -> VkResult {
-             auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-             if (func != nullptr)
-             {
-                 func(instance, debugMessenger, pAllocator);
-                 return VK_SUCCESS;
-             }
-             else
-             {
-                 return VK_ERROR_EXTENSION_NOT_PRESENT;
-             }
-         };
-     }*/
+    for (size_t i = 0; i < hardwareUtils.size(); i++)
+    {
+        // 这里要先清理 ResourceManager，再清理 DeviceManager
+        // 因为 ResourceManager 里可能会用到 DeviceManager 的一些资源
+        // 比如 Vma 分配器就是依赖于 VkDevice 的
+        hardwareUtils[i]->resourceManager.cleanUpResourceManager();
+        hardwareUtils[i]->deviceManager.cleanUpDeviceManager();
+    }
 
-    //vkDestroyInstance(vkInstance, nullptr);
+    hardwareUtils.clear();
+    mainDevice.reset();
+
+    if (vkInstance != VK_NULL_HANDLE)
+    {
+#ifdef CABBAGE_ENGINE_DEBUG
+        if (debugMessenger != VK_NULL_HANDLE)
+        {
+            auto DestroyDebugUtilsMessengerEXT = [](VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks *pAllocator) -> VkResult {
+                auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+                if (func != nullptr)
+                {
+                    func(instance, debugMessenger, pAllocator);
+                    return VK_SUCCESS;
+                }
+                else
+                {
+                    return VK_ERROR_EXTENSION_NOT_PRESENT;
+                }
+            };
+            DestroyDebugUtilsMessengerEXT(vkInstance, debugMessenger, nullptr);
+            debugMessenger = VK_NULL_HANDLE;
+        }
+#endif
+        vkDestroyInstance(vkInstance, nullptr);
+        vkInstance = VK_NULL_HANDLE;
+    }
 }
-
 
 void HardwareContext::prepareFeaturesChain()
 {

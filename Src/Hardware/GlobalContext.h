@@ -1,7 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include "Hardware/DeviceManager.h"
 #include "Hardware/ResourceManager.h"
+
+#define USE_EXPORT_MEMORY
+
+class DisplayManager;
 
 struct HardwareContext
 {
@@ -37,3 +41,4 @@ extern HardwareContext globalHardwareContext;
 
 extern std::unordered_map<uint64_t, ResourceManager::ImageHardwareWrap> imageGlobalPool;
 extern std::unordered_map<uint64_t, ResourceManager::BufferHardwareWrap> bufferGlobalPool;
+//extern std::unordered_map<void *, std::shared_ptr<DisplayManager>> displayerGlobalPool;

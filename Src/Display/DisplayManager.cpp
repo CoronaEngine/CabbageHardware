@@ -1,16 +1,11 @@
 ﻿#include"DisplayManager.h"
-
 #include <algorithm>
 #include<vector>
-
 #include<volk.h>
-
 #include<Hardware/GlobalContext.h>
 #include<Hardware/ResourceCommand.h>
 
 #define USE_SAME_DEVICE
-
-//#define TEST_CPU_DATA
 
 //#if _WIN32 || _WIN64
 //#include<vulkan/vulkan_win32.h>
@@ -24,52 +19,111 @@ DisplayManager::DisplayManager()
 {
 }
 
-
 DisplayManager::~DisplayManager()
 {
-    //cleaarupDisplayManager();
-
-    //vkDestroySwapchainKHR(displayDevice.logicalDevice, swapChain, nullptr);
-    // Destroy the contexts
-    //if (m_UpscalingContext)
-    //{
-    //	ffx::DestroyContext(m_UpscalingContext);
-    //	m_UpscalingContext = nullptr;
-    //}
+    cleanUpDisplayManager();
 }
-
 
 void DisplayManager::cleanUpDisplayManager()
 {
-    //if (displayDevice.logicalDevice != VK_NULL_HANDLE)
-    //{
+    // 即便 displayDevice 为空，也尽可能释放 surface 等与实例相关的资源
+    VkDevice device = (displayDevice ? displayDevice->deviceManager.logicalDevice : VK_NULL_HANDLE);
 
-    //	for (size_t i = 0; i < swapChainImages.size(); i++)
-    //	{
- //          displayDevice->deviceManager->resourceManager.destroyImage(swapChainImages[i]);
-    //	}
-    //	swapChainImages.clear();
+    if (device != VK_NULL_HANDLE)
+    {
+        vkDeviceWaitIdle(device);
+    }
 
-    //	if (swapChain != VK_NULL_HANDLE)
-    //	{
-    //		vkDestroySwapchainKHR(displayDevice.logicalDevice, swapChain, nullptr);
-    //		swapChain = VK_NULL_HANDLE;
-    //	}
-    //	if (vkSurface != VK_NULL_HANDLE)
-    //	{
- //           vkDestroySurfaceKHR(globalHardwareContext.getVulkanInstance(), vkSurface, nullptr);
-    //		vkSurface = VK_NULL_HANDLE;
-    //	}
-    //}
+    for (auto &fence : inFlightFences)
+    {
+        if (fence != VK_NULL_HANDLE)
+        {
+            vkDestroyFence(device, fence, nullptr);
+            fence = VK_NULL_HANDLE;
+        }
+    }
+    inFlightFences.clear();
+
+    for (auto &sem : imageAvailableSemaphores)
+    {
+        if (sem != VK_NULL_HANDLE)
+        {
+            vkDestroySemaphore(device, sem, nullptr);
+            sem = VK_NULL_HANDLE;
+        }
+    }
+    imageAvailableSemaphores.clear();
+
+    for (auto &sem : renderFinishedSemaphores)
+    {
+        if (sem != VK_NULL_HANDLE)
+        {
+            vkDestroySemaphore(device, sem, nullptr);
+            sem = VK_NULL_HANDLE;
+        }
+    }
+    renderFinishedSemaphores.clear();
+
+    if (displayImage.imageHandle != VK_NULL_HANDLE && displayImage.imageAlloc != VK_NULL_HANDLE)
+    {
+        //displayDevice->resourceManager.destroyImage(displayImage);
+        //displayImage = {};
+    }
+
+    if (srcStaging.bufferHandle != VK_NULL_HANDLE)
+    {
+        if (srcStaging.resourceManager)
+        {
+            srcStaging.resourceManager->destroyBuffer(srcStaging);
+        }
+        srcStaging = {};
+    }
+    if (dstStaging.bufferHandle != VK_NULL_HANDLE)
+    {
+        if (dstStaging.resourceManager)
+        {
+            dstStaging.resourceManager->destroyBuffer(dstStaging);
+        }
+        dstStaging = {};
+    }
+
+    for (size_t i = 0; i < swapChainImages.size(); i++)
+    {
+        if (swapChainImages[i].imageView != VK_NULL_HANDLE)
+        {
+            vkDestroyImageView(device, swapChainImages[i].imageView, nullptr);
+            swapChainImages[i].imageView = VK_NULL_HANDLE;
+        }
+
+        swapChainImages[i].imageAlloc = VK_NULL_HANDLE;
+    }
+    swapChainImages.clear();
+
+    if (swapChain != VK_NULL_HANDLE)
+    {
+        vkDestroySwapchainKHR(device, swapChain, nullptr);
+        swapChain = VK_NULL_HANDLE;
+    }
+
+    if (vkSurface != VK_NULL_HANDLE)
+    {
+        vkDestroySurfaceKHR(globalHardwareContext.getVulkanInstance(), vkSurface, nullptr);
+        vkSurface = VK_NULL_HANDLE;
+    }
+
+    // 清理执行器和状态
+    presentQueues.clear();
+    mainDeviceExecutor.reset();
+    displayDeviceExecutor.reset();
+    //displayDevice.reset();
+    displaySurface = nullptr;
+    displaySize = {0, 0};
 }
-
 
 bool DisplayManager::initDisplayManager(void* surface)
 {
     if (surface != nullptr)
     {
-        //cleaarupDisplayManager();
-
         createVkSurface(surface);
 
         choosePresentDevice();
@@ -81,7 +135,6 @@ bool DisplayManager::initDisplayManager(void* surface)
 
     return true;
 }
-
 
 void DisplayManager::createSyncObjects()
 {
@@ -135,8 +188,6 @@ void DisplayManager::createVkSurface(void *surface)
 #endif
 }
 
-
-
 void DisplayManager::choosePresentDevice()
 {
 #ifdef USE_SAME_DEVICE
@@ -175,7 +226,6 @@ void DisplayManager::choosePresentDevice()
     displayDeviceExecutor = std::make_shared<HardwareExecutor>(displayDevice);
 }
 
-
 void DisplayManager::createSwapChain()
 {
     VkSurfaceCapabilitiesKHR capabilities;
@@ -186,11 +236,10 @@ void DisplayManager::createSwapChain()
         std::clamp(capabilities.currentExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)
     };
 
-
     uint32_t formatCount;
     vkGetPhysicalDeviceSurfaceFormatsKHR(displayDevice->deviceManager.physicalDevice, vkSurface, &formatCount, nullptr);
     std::vector<VkSurfaceFormatKHR> formats(formatCount);
-    if (formatCount != 0) 
+    if (formatCount != 0)
     {
         vkGetPhysicalDeviceSurfaceFormatsKHR(displayDevice->deviceManager.physicalDevice, vkSurface, &formatCount, formats.data());
 
@@ -204,7 +253,6 @@ void DisplayManager::createSwapChain()
             }
         }
     }
-
 
     VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
     uint32_t presentModeCount;
@@ -223,7 +271,6 @@ void DisplayManager::createSwapChain()
         }
     }
 
-
     uint32_t imageCount = (capabilities.maxImageCount > 0 && (capabilities.minImageCount + 1) > capabilities.maxImageCount) ?
         capabilities.maxImageCount : (capabilities.minImageCount + 1);
 
@@ -237,7 +284,7 @@ void DisplayManager::createSwapChain()
     createInfo.imageExtent = { this->displaySize.x, this->displaySize.y };
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    
+
     if ((capabilities.supportedUsageFlags & createInfo.imageUsage) != createInfo.imageUsage)
     {
         throw std::runtime_error("Swapchain does not support required image usage flags (COLOR_ATTACHMENT and TRANSFER_DST)!");
@@ -310,8 +357,13 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
             //this->displaySize = displaySize;
             this->displaySurface = displaySurface;
 
-            initDisplayManager(displaySurface);
+            // 如果之前已经创建过交换链/Surface，先完整清理，避免资源泄漏
+            if (vkSurface != VK_NULL_HANDLE || swapChain != VK_NULL_HANDLE)
+            {
+                cleanUpDisplayManager();
+            }
 
+            initDisplayManager(displaySurface);
 
             this->displayImage = displayDevice->resourceManager.createImage(imageGlobalPool[*displayImage.imageID].imageSize, imageGlobalPool[*displayImage.imageID].imageFormat,
                                                                             imageGlobalPool[*displayImage.imageID].pixelSize, imageGlobalPool[*displayImage.imageID].imageUsage);
@@ -319,7 +371,11 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
             VkDeviceSize imageSizeBytes = this->displayImage.imageSize.x * this->displayImage.imageSize.y * this->displayImage.pixelSize;
             if (globalHardwareContext.mainDevice != displayDevice)
             {
-                srcStaging = globalHardwareContext.mainDevice->resourceManager.createBuffer(imageSizeBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+                // 使用专用且可导出的缓冲，保证导出句柄对应内存从偏移0开始，避免导入后的对齐/偏移问题
+                srcStaging = globalHardwareContext.mainDevice->resourceManager.createExportableBuffer(
+                    imageSizeBytes,
+                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                    /*hostVisibleMapped*/ true);
 
                 {
                     // 导出缓冲区内存
@@ -361,6 +417,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
             for (auto &image : swapChainImages)
             {
                displayDevice->resourceManager.destroyImage(image);
+               image.imageView = VK_NULL_HANDLE; // 防止后续重复销毁
             }
 
             createSwapChain();
@@ -381,32 +438,14 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 CopyImageToBufferCommand copyCmd(sourceImage, srcStaging);
                 (*mainDeviceExecutor) << &copyCmd << mainDeviceExecutor->commit();
 
-#ifdef TEST_CPU_DATA
-                vkDeviceWaitIdle(displayDevice->deviceManager.logicalDevice);
-                vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
-
-                srcCpuData.resize(srcStaging.bufferAllocInfo.size);
-                srcStaging.resourceManager->copyBufferToCpu(srcStaging, srcCpuData.data());
-
-                dstCpuData.resize(dstStaging.bufferAllocInfo.size);
-                dstStaging.resourceManager->copyBufferToCpu(dstStaging, dstCpuData.data());
-
-#endif
-
                 // 在显示设备上：dstStaging -> 目标图像
-
                 CopyBufferToImageCommand copyCmd2(dstStaging, this->displayImage);
                 (*displayDeviceExecutor) << &copyCmd2;
-
-#ifdef TEST_CPU_DATA
-                dstCpuData.resize(dstStaging.bufferAllocInfo.size);
-                dstStaging.resourceManager->copyBufferToCpu(dstStaging, dstCpuData.data());
-#endif
             }
 
             std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos;
             {
-                 VkSemaphoreSubmitInfo waitInfo{};
+                VkSemaphoreSubmitInfo waitInfo{};
                 waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
                 waitInfo.semaphore = imageAvailableSemaphores[currentFrame];
                 waitInfo.value = 0; // For binary semaphores, this must be 0
@@ -439,36 +478,41 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
              presentInfo.pSwapchains = swapChains;
              presentInfo.pImageIndices = &imageIndex;
 
-             DeviceManager::QueueUtils *queue;
-             uint16_t queueIndex = 0;
+             //DeviceManager::QueueUtils *queue;
+             //uint16_t queueIndex = 0;
 
-             while (true)
-             {
-                 uint16_t queueIndex = currentQueueIndex.fetch_add(1) % presentQueues.size();
-                 queue = &presentQueues[queueIndex];
+             //while (true)
+             //{
+             //    uint16_t queueIndex = currentQueueIndex.fetch_add(1) % presentQueues.size();
+             //    queue = &presentQueues[queueIndex];
 
-                 if (queue->queueMutex->try_lock())
-                 {
-                     uint64_t timelineCounterValue = 0;
-                     vkGetSemaphoreCounterValue(displayDevice->deviceManager.logicalDevice, queue->timelineSemaphore, &timelineCounterValue);
-                     if (timelineCounterValue >= queue->timelineValue)
-                     {
-                         break;
-                     }
-                     else
-                     {
-                         queue->queueMutex->unlock();
-                     }
-                 }
+             //    if (queue->queueMutex->try_lock())
+             //    {
+             //        uint64_t timelineCounterValue = 0;
+             //        vkGetSemaphoreCounterValue(displayDevice->deviceManager.logicalDevice, queue->timelineSemaphore, &timelineCounterValue);
+             //        if (timelineCounterValue >= queue->timelineValue)
+             //        {
+             //            break;
+             //        }
+             //        else
+             //        {
+             //            queue->queueMutex->unlock();
+             //        }
+             //    }
 
-                 std::this_thread::yield();
-             }
+             //    std::this_thread::yield();
+             //}
 
              // std::cout << "Present Queue Index: " << queueIndex << std::endl;
 
-             VkResult result = vkQueuePresentKHR(queue->vkQueue, &presentInfo);
+             VkResult result;
+             auto commitToQueue = [&](DeviceManager::QueueUtils *currentRecordQueue) -> bool {
+                 result = vkQueuePresentKHR(currentRecordQueue->vkQueue, &presentInfo);
+                 return true;
+                 };
 
-             queue->queueMutex->unlock();
+             DeviceManager::QueueUtils *queue = HardwareExecutor::pickQueueAndCommit(currentQueueIndex, presentQueues, commitToQueue);
+
 
              if (result == VK_ERROR_OUT_OF_DATE_KHR)
              {
@@ -490,3 +534,4 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
         return false;
     }
 }
+

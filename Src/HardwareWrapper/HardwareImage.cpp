@@ -8,7 +8,7 @@ uint64_t currentImageID = 0;
 
 std::mutex imageMutex;
 
-HardwareImage& HardwareImage::operator= (const HardwareImage& other)
+HardwareImage &HardwareImage::operator=(const HardwareImage &other)
 {
     std::unique_lock<std::mutex> lock(imageMutex);
 
