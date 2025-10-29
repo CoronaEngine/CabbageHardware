@@ -546,7 +546,6 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     ImageHardwareWrap resultImage;
 
     resultImage.pixelSize = pixelSize;
-
     resultImage.device = this->device;
     resultImage.resourceManager = this;
 
@@ -586,14 +585,15 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
 
     if (imageSize.x != 0 || imageSize.y != 0)
     {
-        VkExternalMemoryImageCreateInfo externalInfo = {};
+        // Todo: 后面重写，先关掉
+        /*VkExternalMemoryImageCreateInfo externalInfo = {};
         externalInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
 #if _WIN32 || _WIN64
         externalInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #elif __APPLE__
 #elif __linux__
 #endif
-        externalInfo.pNext = nullptr;
+        externalInfo.pNext = nullptr;*/
 
         VkImageCreateInfo imageInfo = {};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -636,7 +636,7 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
         }
 
 
-        imageInfo.pNext = &externalInfo;
+        //imageInfo.pNext = &externalInfo;
         //imageInfo.pNext = nullptr;
 
         VmaAllocationCreateInfo imageAllocCreateInfo = {};
