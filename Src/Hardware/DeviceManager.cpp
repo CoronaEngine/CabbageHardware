@@ -246,7 +246,7 @@ bool DeviceManager::createCommandBuffers()
 
     return true;
 }
-//
+
 //DeviceManager &DeviceManager::startCommands(QueueType queueType)
 //{
 //    uint16_t queueIndex = 0;
