@@ -59,6 +59,9 @@ HardwareContext::~HardwareContext()
 
     for (size_t i = 0; i < hardwareUtils.size(); i++)
     {
+        // 这里要先清理 ResourceManager，再清理 DeviceManager
+        // 因为 ResourceManager 里可能会用到 DeviceManager 的一些资源
+        // 比如 Vma 分配器就是依赖于 VkDevice 的
         hardwareUtils[i]->resourceManager.cleanUpResourceManager();
         hardwareUtils[i]->deviceManager.cleanUpDeviceManager();
     }
