@@ -532,10 +532,14 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
              // std::cout << "Present Queue Index: " << queueIndex << std::endl;
 
-             DeviceManager::QueueUtils *queue = HardwareExecutor::pickCommitQueue(currentQueueIndex, presentQueues);
-             VkResult result = vkQueuePresentKHR(queue->vkQueue, &presentInfo);
+             VkResult result;
+             auto commitToQueue = [&](DeviceManager::QueueUtils *currentRecordQueue) -> bool { 
+                 result = vkQueuePresentKHR(currentRecordQueue->vkQueue, &presentInfo); 
+                 return true;
+                 };
 
-             queue->queueMutex->unlock();
+             DeviceManager::QueueUtils *queue = HardwareExecutor::pickQueueAndCommit(currentQueueIndex, presentQueues, commitToQueue);
+
 
              if (result == VK_ERROR_OUT_OF_DATE_KHR)
              {

@@ -60,7 +60,7 @@ struct HardwareExecutor
                              std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
                              VkFence fence = VK_NULL_HANDLE);
 
-    static DeviceManager::QueueUtils *pickCommitQueue(std::atomic_uint16_t& queueIndex, std::vector<DeviceManager::QueueUtils>& queues);
+    static DeviceManager::QueueUtils *pickQueueAndCommit(std::atomic_uint16_t &queueIndex, std::vector<DeviceManager::QueueUtils> &queues, std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand);
 
     // private:
     //     friend struct CommandRecord;
