@@ -280,7 +280,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
             vbInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         }
 
-        VkExternalMemoryBufferCreateInfo externalMemoryBufferInfo = {};
+        /*VkExternalMemoryBufferCreateInfo externalMemoryBufferInfo = {};
         externalMemoryBufferInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO;
 #if _WIN32 || _WIN64
         externalMemoryBufferInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
@@ -292,11 +292,11 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
         vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
         vbAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
         vbAllocCreateInfo.pool = g_hPool;
-#else
+#else*/
         VmaAllocationCreateInfo vbAllocCreateInfo = {};
         vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
         vbAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-#endif
+//#endif
 
         VkResult res = vmaCreateBuffer(g_hAllocator, &vbInfo, &vbAllocCreateInfo, &resultBuffer.bufferHandle, &resultBuffer.bufferAlloc, &resultBuffer.bufferAllocInfo);
         if (res != VK_SUCCESS)
@@ -634,7 +634,6 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
         {
             imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         }
-
 
         //imageInfo.pNext = &externalInfo;
         //imageInfo.pNext = nullptr;
