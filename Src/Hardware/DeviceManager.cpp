@@ -205,6 +205,7 @@ void DeviceManager::choosePresentQueueFamily()
     {
         QueueUtils tempQueueUtils;
         tempQueueUtils.queueFamilyIndex = i;
+        tempQueueUtils.deviceManager = this;
 
         for (uint32_t queueIndex = 0; queueIndex < queueFamilies[i].queueCount; queueIndex++)
         {

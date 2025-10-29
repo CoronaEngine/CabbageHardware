@@ -3,6 +3,38 @@
 #include <Hardware/GlobalContext.h>
 
 
+DeviceManager::QueueUtils *HardwareExecutor::pickCommitQueue(std::atomic_uint16_t& currentQueueIndex, std::vector<DeviceManager::QueueUtils>& currentQueues)
+{
+    DeviceManager::QueueUtils *queue;
+    uint16_t queueIndex = 0;
+
+    while (true)
+    {
+        uint16_t queueIndex = currentQueueIndex.fetch_add(1) % currentQueues.size();
+        queue = &currentQueues[queueIndex];
+
+        if (queue->queueMutex->try_lock())
+        {
+            uint64_t timelineCounterValue = 0;
+            vkGetSemaphoreCounterValue(queue->deviceManager->logicalDevice, queue->timelineSemaphore, &timelineCounterValue);
+            if (timelineCounterValue >= queue->timelineValue)
+            {
+                break;
+            }
+            else
+            {
+                queue->queueMutex->unlock();
+            }
+        }
+
+        std::this_thread::yield();
+    }
+
+    return queue;
+}
+
+
+
 HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos, std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos, VkFence fence)
 {
     if (commandList.size() > 0)
@@ -21,42 +53,55 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
             }
         }
 
-        uint16_t queueIndex = 0;
-
-        while (true)
+        switch (queueType)
         {
-            switch (queueType)
-            {
-            case CommandRecord::ExecutorType::Graphics:
-                queueIndex = hardwareContext->deviceManager.currentGraphicsQueueIndex.fetch_add(1) % hardwareContext->deviceManager.graphicsQueues.size();
-                currentRecordQueue = &hardwareContext->deviceManager.graphicsQueues[queueIndex];
-                break;
-            case CommandRecord::ExecutorType::Compute:
-                queueIndex = hardwareContext->deviceManager.currentComputeQueueIndex.fetch_add(1) % hardwareContext->deviceManager.computeQueues.size();
-                currentRecordQueue = &hardwareContext->deviceManager.computeQueues[queueIndex];
-                break;
-            case CommandRecord::ExecutorType::Transfer:
-                queueIndex = hardwareContext->deviceManager.currentTransferQueueIndex.fetch_add(1) % hardwareContext->deviceManager.transferQueues.size();
-                currentRecordQueue = &hardwareContext->deviceManager.transferQueues[queueIndex];
-                break;
-            }
-
-            if (currentRecordQueue->queueMutex->try_lock())
-            {
-                uint64_t timelineCounterValue = 0;
-                vkGetSemaphoreCounterValue(hardwareContext->deviceManager.logicalDevice, currentRecordQueue->timelineSemaphore, &timelineCounterValue);
-                if (timelineCounterValue >= currentRecordQueue->timelineValue)
-                {
-                    break;
-                }
-                else
-                {
-                    currentRecordQueue->queueMutex->unlock();
-                }
-            }
-
-            std::this_thread::yield();
+        case CommandRecord::ExecutorType::Graphics:
+            currentRecordQueue = pickCommitQueue(hardwareContext->deviceManager.currentGraphicsQueueIndex, hardwareContext->deviceManager.graphicsQueues);
+            break;
+        case CommandRecord::ExecutorType::Compute:
+            currentRecordQueue = pickCommitQueue(hardwareContext->deviceManager.currentComputeQueueIndex, hardwareContext->deviceManager.computeQueues);
+            break;
+        case CommandRecord::ExecutorType::Transfer:
+            currentRecordQueue = pickCommitQueue(hardwareContext->deviceManager.currentTransferQueueIndex, hardwareContext->deviceManager.transferQueues);
+            break;
         }
+
+        //uint16_t queueIndex = 0;
+
+        //while (true)
+        //{
+        //    switch (queueType)
+        //    {
+        //    case CommandRecord::ExecutorType::Graphics:
+        //        queueIndex = hardwareContext->deviceManager.currentGraphicsQueueIndex.fetch_add(1) % hardwareContext->deviceManager.graphicsQueues.size();
+        //        currentRecordQueue = &hardwareContext->deviceManager.graphicsQueues[queueIndex];
+        //        break;
+        //    case CommandRecord::ExecutorType::Compute:
+        //        queueIndex = hardwareContext->deviceManager.currentComputeQueueIndex.fetch_add(1) % hardwareContext->deviceManager.computeQueues.size();
+        //        currentRecordQueue = &hardwareContext->deviceManager.computeQueues[queueIndex];
+        //        break;
+        //    case CommandRecord::ExecutorType::Transfer:
+        //        queueIndex = hardwareContext->deviceManager.currentTransferQueueIndex.fetch_add(1) % hardwareContext->deviceManager.transferQueues.size();
+        //        currentRecordQueue = &hardwareContext->deviceManager.transferQueues[queueIndex];
+        //        break;
+        //    }
+
+        //    if (currentRecordQueue->queueMutex->try_lock())
+        //    {
+        //        uint64_t timelineCounterValue = 0;
+        //        vkGetSemaphoreCounterValue(hardwareContext->deviceManager.logicalDevice, currentRecordQueue->timelineSemaphore, &timelineCounterValue);
+        //        if (timelineCounterValue >= currentRecordQueue->timelineValue)
+        //        {
+        //            break;
+        //        }
+        //        else
+        //        {
+        //            currentRecordQueue->queueMutex->unlock();
+        //        }
+        //    }
+
+        //    std::this_thread::yield();
+        //}
 
         vkResetCommandBuffer(currentRecordQueue->commandBuffer, 0);
 
