@@ -63,6 +63,39 @@ RasterizerPipeline::RasterizerPipeline(std::string vertexShaderCode, std::string
 
 RasterizerPipeline::~RasterizerPipeline()
 {
+    // 依赖设备销毁 Vulkan 资源，按从下至上的顺序：先 framebuffer，再 pipeline/layout，最后 render pass
+    VkDevice device = VK_NULL_HANDLE;
+    if (globalHardwareContext.mainDevice)
+    {
+        device = globalHardwareContext.mainDevice->deviceManager.logicalDevice;
+    }
+
+    if (device != VK_NULL_HANDLE)
+    {
+        if (frameBuffers != VK_NULL_HANDLE)
+        {
+            vkDestroyFramebuffer(device, frameBuffers, nullptr);
+            frameBuffers = VK_NULL_HANDLE;
+        }
+
+        if (graphicsPipeline != VK_NULL_HANDLE)
+        {
+            vkDestroyPipeline(device, graphicsPipeline, nullptr);
+            graphicsPipeline = VK_NULL_HANDLE;
+        }
+
+        if (pipelineLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+            pipelineLayout = VK_NULL_HANDLE;
+        }
+
+        if (renderPass != VK_NULL_HANDLE)
+        {
+            vkDestroyRenderPass(device, renderPass, nullptr);
+            renderPass = VK_NULL_HANDLE;
+        }
+    }
 }
 
 void RasterizerPipeline::createRenderPass(int multiviewCount)

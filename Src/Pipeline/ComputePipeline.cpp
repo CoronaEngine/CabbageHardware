@@ -16,6 +16,26 @@ ComputePipeline::ComputePipeline(std::string shaderCode, EmbeddedShader::ShaderL
 
 ComputePipeline::~ComputePipeline()
 {
+    // 确保在销毁前设备有效，并按顺序销毁 Pipeline 相关资源
+    VkDevice device = VK_NULL_HANDLE;
+    if (globalHardwareContext.mainDevice)
+    {
+        device = globalHardwareContext.mainDevice->deviceManager.logicalDevice;
+    }
+
+    if (device != VK_NULL_HANDLE)
+    {
+        if (pipeline != VK_NULL_HANDLE)
+        {
+            vkDestroyPipeline(device, pipeline, nullptr);
+            pipeline = VK_NULL_HANDLE;
+        }
+        if (pipelineLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+            pipelineLayout = VK_NULL_HANDLE;
+        }
+    }
 }
 
 ComputePipeline* ComputePipeline::operator()(uint16_t groupCountX, uint16_t groupCountY, uint16_t groupCountZ)
