@@ -26,33 +26,7 @@ struct RasterizerPipeline : public CommandRecord
         executorType = CommandRecord::ExecutorType::Graphics;
     }
 
-    ~RasterizerPipeline()
-    {
-        // Release Vulkan resources in reverse creation order
-        VkDevice device = globalHardwareContext.mainDevice->deviceManager.logicalDevice;
-
-        if (frameBuffers != VK_NULL_HANDLE)
-        {
-            vkDestroyFramebuffer(device, frameBuffers, nullptr);
-            frameBuffers = VK_NULL_HANDLE;
-        }
-
-        if (graphicsPipeline != VK_NULL_HANDLE)
-        {
-            vkDestroyPipeline(device, graphicsPipeline, nullptr);
-            graphicsPipeline = VK_NULL_HANDLE;
-        }
-        if (pipelineLayout != VK_NULL_HANDLE)
-        {
-            vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-            pipelineLayout = VK_NULL_HANDLE;
-        }
-        if (renderPass != VK_NULL_HANDLE)
-        {
-            vkDestroyRenderPass(device, renderPass, nullptr);
-            renderPass = VK_NULL_HANDLE;
-        }
-    }
+    ~RasterizerPipeline();
 
     RasterizerPipeline(std::string vertexShaderCode, std::string fragmentShaderCode, uint32_t multiviewCount = 1,
                        EmbeddedShader::ShaderLanguage vertexShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL, EmbeddedShader::ShaderLanguage fragmentShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
@@ -104,7 +78,6 @@ struct RasterizerPipeline : public CommandRecord
   private:
 
     ktm::uvec2 imageSize = {0, 0};
-
 
     void createRenderPass(int multiviewCount = 1);
     void createGraphicsPipeline(EmbeddedShader::ShaderCodeModule vertShaderCode, EmbeddedShader::ShaderCodeModule fragShaderCode);

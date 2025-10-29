@@ -14,6 +14,9 @@ ComputePipeline::ComputePipeline(std::string shaderCode, EmbeddedShader::ShaderL
 	shaderResource = shaderCodeCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV).shaderResources;
 }
 
+ComputePipeline::~ComputePipeline()
+{
+}
 
 ComputePipeline* ComputePipeline::operator()(uint16_t groupCountX, uint16_t groupCountY, uint16_t groupCountZ)
 {

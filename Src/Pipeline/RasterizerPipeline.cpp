@@ -61,6 +61,10 @@ RasterizerPipeline::RasterizerPipeline(std::string vertexShaderCode, std::string
     }
 }
 
+RasterizerPipeline::~RasterizerPipeline()
+{
+}
+
 void RasterizerPipeline::createRenderPass(int multiviewCount)
 {
     std::vector<VkAttachmentDescription> attachments;
