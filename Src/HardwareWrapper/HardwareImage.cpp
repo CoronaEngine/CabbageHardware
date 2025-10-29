@@ -85,8 +85,30 @@ HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
 {
     HardwareExecutor tempExecutor;
 
+    // 使用栅栏确保提交完成后再返回，避免临时 staging buffer 在 GPU 仍然读取时被析构
     CopyBufferToImageCommand copyCmd(bufferGlobalPool[*buffer.bufferID], imageGlobalPool[*imageID]);
-    tempExecutor << &copyCmd << tempExecutor.commit();
+    //tempExecutor << &copyCmd << tempExecutor.commit();
+
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.flags = 0; // 未信号状态
+
+    VkDevice device = globalHardwareContext.mainDevice->deviceManager.logicalDevice;
+    VkFence fence = VK_NULL_HANDLE;
+    if (vkCreateFence(device, &fenceInfo, nullptr, &fence) != VK_SUCCESS)
+    {
+        // 创建失败则退化为同步 DeviceIdle，保证安全性
+        tempExecutor << &copyCmd << tempExecutor.commit();
+        vkDeviceWaitIdle(device);
+        return *this;
+    }
+
+    // 记录命令并以 fence 提交
+    tempExecutor << &copyCmd << tempExecutor.commit({}, {}, fence);
+
+    // 等待 GPU 完成该次提交，确保源 buffer 生命周期安全
+    vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
+    vkDestroyFence(device, fence, nullptr);
 
     return *this;
 }
