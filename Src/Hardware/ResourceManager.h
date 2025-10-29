@@ -126,21 +126,6 @@ struct ResourceManager
         return deviceMemorySize;
     }
 
-    DeviceManager& getDeviceManager()
-    {
-        return *device;
-    }
-
-    VmaAllocator getVmaAllocator()
-    {
-        return g_hAllocator;
-    }
-
-    VmaPool getVmaPool()
-    {
-        return g_hPool;
-    }
-
 private:
     void createTextureSampler();
     void CreateVmaAllocator();
