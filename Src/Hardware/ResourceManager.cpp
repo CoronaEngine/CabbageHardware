@@ -1,6 +1,6 @@
 ﻿#include "ResourceManager.h"
 
-// #define VMA_STATS_STRING_ENABLED 0
+#define VMA_STATS_STRING_ENABLED 1
 #define VK_NO_PROTOTYPES
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
