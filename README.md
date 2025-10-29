@@ -1,6 +1,5 @@
 # TODO（按优先级排序）
 - （紧急）程序关闭时资源释放问题
-- （紧急）exportBufferMemory、importBufferMemory导入导出后对齐问题
 - （紧急）解决命令行的Warning
 - （紧急）内存泄漏问题
 - （紧急）待测试：多线程运行时是否有问题
