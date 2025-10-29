@@ -1,4 +1,4 @@
-#include "DeviceManager.h"
+﻿#include "DeviceManager.h"
 
 DeviceManager::DeviceManager()
 {
@@ -24,49 +24,7 @@ void DeviceManager::initDeviceManager(const CreateCallback &createCallback, cons
 
 void DeviceManager::cleanUpDeviceManager()
 {
-    if (logicalDevice != VK_NULL_HANDLE)
-    {
-        // Ensure no in-flight operations before destroying queues and pools
-        vkDeviceWaitIdle(logicalDevice);
-    }
 
-    cleanUpQueueUtils(graphicsQueues);
-    cleanUpQueueUtils(computeQueues);
-    cleanUpQueueUtils(transferQueues);
-
-    if (logicalDevice != VK_NULL_HANDLE)
-    {
-        vkDestroyDevice(logicalDevice, nullptr);
-        logicalDevice = VK_NULL_HANDLE;
-    }
-
-    //physicalDevice = VK_NULL_HANDLE;
-}
-
-void DeviceManager::cleanUpQueueUtils(std::vector<QueueUtils> &queues)
-{
-    for (size_t i = 0; i < queues.size(); i++)
-    {
-        if (queues[i].timelineSemaphore != VK_NULL_HANDLE)
-        {
-            vkDestroySemaphore(logicalDevice, queues[i].timelineSemaphore, nullptr);
-            queues[i].timelineSemaphore = VK_NULL_HANDLE;
-        }
-
-        if (queues[i].commandBuffer != VK_NULL_HANDLE && queues[i].commandPool != VK_NULL_HANDLE)
-        {
-            vkFreeCommandBuffers(logicalDevice, queues[i].commandPool, 1, &queues[i].commandBuffer);
-            queues[i].commandBuffer = VK_NULL_HANDLE;
-        }
-
-        if (queues[i].commandPool != VK_NULL_HANDLE)
-        {
-            vkDestroyCommandPool(logicalDevice, queues[i].commandPool, nullptr);
-            queues[i].commandPool = VK_NULL_HANDLE;
-        }
-
-        queues[i].vkQueue = VK_NULL_HANDLE;
-    }
 }
 
 void DeviceManager::createTimelineSemaphore()
@@ -86,7 +44,7 @@ void DeviceManager::createTimelineSemaphore()
             throw std::runtime_error("failed to create synchronization objects for a frame!");
         }
     };
-    
+
     for (size_t i = 0; i < graphicsQueues.size(); i++)
     {
         createTimelineSemaphore(graphicsQueues[i]);
