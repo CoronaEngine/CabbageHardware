@@ -122,7 +122,7 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
 
         // Todo: 例如拷贝图片，如果直接拷贝命令提交后，马上clear，会导致图片资源被销毁，拷贝命令未执行完成
         // 这里先简单通过等待队列空闲解决，后续可以通过更精细的资源生命周期管理优化
-        vkQueueWaitIdle(currentRecordQueue->vkQueue);
+        //vkQueueWaitIdle(currentRecordQueue->vkQueue);
         commandList.clear();
     }
 
