@@ -4,7 +4,6 @@
 RasterizerPipeline::RasterizerPipeline(std::string vertexShaderCode, std::string fragmentShaderCode, uint32_t multiviewCount,
                                        EmbeddedShader::ShaderLanguage vertexShaderLanguage, EmbeddedShader::ShaderLanguage fragmentShaderLanguage, const std::source_location &sourceLocation)
 {
-    // 这里应该是引擎内部对shader脚本进行编译
     EmbeddedShader::ShaderCodeCompiler vertexShaderCompiler(EmbeddedShader::ShaderCodeCompiler(vertexShaderCode, EmbeddedShader::ShaderStage::VertexShader, vertexShaderLanguage, EmbeddedShader::CompilerOption(), sourceLocation));
     EmbeddedShader::ShaderCodeCompiler fragmentShaderCompiler(EmbeddedShader::ShaderCodeCompiler(fragmentShaderCode, EmbeddedShader::ShaderStage::FragmentShader, fragmentShaderLanguage, EmbeddedShader::CompilerOption(), sourceLocation));
 
@@ -18,9 +17,6 @@ RasterizerPipeline::RasterizerPipeline(std::string vertexShaderCode, std::string
 
     auto vertexResources = vertexShaderCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV).shaderResources;
     auto fragmentResources = fragmentShaderCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV).shaderResources;
-
-    // 引擎内部解析shader文本信息，并封装了一个结构体 ShaderBindInfo 用于描述shader资源绑定信息
-    // 有点像json的序列化
 
     for (auto &[name, bindInfo] : vertexResources.bindInfoPool)
     {
@@ -45,9 +41,6 @@ RasterizerPipeline::RasterizerPipeline(std::string vertexShaderCode, std::string
         }
     }
 
-    // 通过解析，知道了顶点输入需要多少个缓冲区
-    // 输出多少张图片
-    // 一定程度上知道了管线的布局信息
     tempVertexBuffers.resize(vertexStageInputs.size());
     renderTargets.resize(fragmentStageOutputs.size());
 
@@ -477,14 +470,13 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
             0, nullptr);
     }
 
-    //auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
-        VkRenderPassBeginInfo renderPassInfo{};
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = renderPass;
-        renderPassInfo.framebuffer = frameBuffers;
-        renderPassInfo.renderArea.offset = {0, 0};
-        renderPassInfo.renderArea.extent.width = imageGlobalPool[*depthImage.imageID].imageSize.x;
-        renderPassInfo.renderArea.extent.height = imageGlobalPool[*depthImage.imageID].imageSize.y;
+    VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = renderPass;
+    renderPassInfo.framebuffer = frameBuffers;
+    renderPassInfo.renderArea.offset = {0, 0};
+    renderPassInfo.renderArea.extent.width = imageGlobalPool[*depthImage.imageID].imageSize.x;
+    renderPassInfo.renderArea.extent.height = imageGlobalPool[*depthImage.imageID].imageSize.y;
 
         std::vector<VkClearValue> clearValues;
         for (size_t i = 0; i < renderTargets.size(); i++)
@@ -549,7 +541,4 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
         vkCmdEndRenderPass(hardwareExecutor.currentRecordQueue->commandBuffer);
 
         geomMeshes.clear();
-    //};
-
-    //executor << runCommand;
 }
