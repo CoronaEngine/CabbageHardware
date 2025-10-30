@@ -365,12 +365,12 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
             initDisplayManager(displaySurface);
 
-            this->displayImage = displayDevice->resourceManager.createImage(imageGlobalPool[*displayImage.imageID].imageSize, imageGlobalPool[*displayImage.imageID].imageFormat,
-                                                                            imageGlobalPool[*displayImage.imageID].pixelSize, imageGlobalPool[*displayImage.imageID].imageUsage);
-
-            VkDeviceSize imageSizeBytes = this->displayImage.imageSize.x * this->displayImage.imageSize.y * this->displayImage.pixelSize;
             if (globalHardwareContext.mainDevice != displayDevice)
             {
+                this->displayImage = displayDevice->resourceManager.createImage(imageGlobalPool[*displayImage.imageID].imageSize, imageGlobalPool[*displayImage.imageID].imageFormat,
+                                                                                imageGlobalPool[*displayImage.imageID].pixelSize, imageGlobalPool[*displayImage.imageID].imageUsage);
+
+                VkDeviceSize imageSizeBytes = this->displayImage.imageSize.x * this->displayImage.imageSize.y * this->displayImage.pixelSize;
                 // 使用专用且可导出的缓冲，保证导出句柄对应内存从偏移0开始，避免导入后的对齐/偏移问题
                 srcStaging = globalHardwareContext.mainDevice->resourceManager.createExportableBuffer(
                     imageSizeBytes,
