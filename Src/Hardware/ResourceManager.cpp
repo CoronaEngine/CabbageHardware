@@ -1,6 +1,6 @@
 ﻿#include "ResourceManager.h"
 
-#define VMA_STATS_STRING_ENABLED 1
+// #define VMA_STATS_STRING_ENABLED 0
 #define VK_NO_PROTOTYPES
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
@@ -566,9 +566,10 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     // imageFormatInfo.usage = imageUsage;
     // imageFormatInfo.flags = 0;
 
-    // if (vkGetPhysicalDeviceImageFormatProperties2(deviceManager.mainDevice.physicalDevice, &imageFormatInfo, &imageFormatProperties) != VK_SUCCESS) {
-    //	throw std::runtime_error("Image format not supported for the given usage.");
-    // }
+     /*if (vkGetPhysicalDeviceImageFormatProperties2(deviceManager.mainDevice.physicalDevice, &imageFormatInfo, &imageFormatProperties) != VK_SUCCESS)
+     {
+    	throw std::runtime_error("Image format not supported for the given usage.");
+     }*/
 
     if (imageUsage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
     {

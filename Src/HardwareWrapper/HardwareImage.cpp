@@ -87,7 +87,6 @@ HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
 
     // 使用栅栏确保提交完成后再返回，避免临时 staging buffer 在 GPU 仍然读取时被析构
     CopyBufferToImageCommand copyCmd(bufferGlobalPool[*buffer.bufferID], imageGlobalPool[*imageID]);
-    //tempExecutor << &copyCmd << tempExecutor.commit();
 
     VkFenceCreateInfo fenceInfo{};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -103,7 +102,6 @@ HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
         return *this;
     }
 
-    // 记录命令并以 fence 提交
     tempExecutor << &copyCmd << tempExecutor.commit({}, {}, fence);
 
     // 等待 GPU 完成该次提交，确保源 buffer 生命周期安全
