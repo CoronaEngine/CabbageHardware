@@ -66,7 +66,7 @@ void DisplayManager::cleanUpDisplayManager()
 
     if (displayImage.imageHandle != VK_NULL_HANDLE && displayImage.imageAlloc != VK_NULL_HANDLE)
     {
-        displayDevice->resourceManager.destroyImage(displayImage);
+        //displayDevice->resourceManager.destroyImage(displayImage);
         displayImage = {};
     }
 
