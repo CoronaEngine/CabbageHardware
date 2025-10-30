@@ -499,13 +499,19 @@ void ResourceManager::createExternalMemoryPool()
 
 void ResourceManager::destroyImage(ImageHardwareWrap &image)
 {
-    if (image.imageView != VK_NULL_HANDLE)
-    {
-        vkDestroyImageView(this->device->logicalDevice, image.imageView, nullptr);
-    }
+    // VkImageView依赖于VkImage，必须按（先销毁视图，再销毁图像）的顺序释放资源
+
     if (image.imageAlloc != VK_NULL_HANDLE && image.imageHandle != VK_NULL_HANDLE)
     {
         vmaDestroyImage(g_hAllocator, image.imageHandle, image.imageAlloc);
+        image.imageHandle = VK_NULL_HANDLE;
+        image.imageAlloc = VK_NULL_HANDLE;
+    }
+
+    if (image.imageView != VK_NULL_HANDLE)
+    {
+        vkDestroyImageView(this->device->logicalDevice, image.imageView, nullptr);
+        image.imageView = VK_NULL_HANDLE;
     }
 }
 
@@ -566,9 +572,10 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     // imageFormatInfo.usage = imageUsage;
     // imageFormatInfo.flags = 0;
 
-    // if (vkGetPhysicalDeviceImageFormatProperties2(deviceManager.mainDevice.physicalDevice, &imageFormatInfo, &imageFormatProperties) != VK_SUCCESS) {
-    //	throw std::runtime_error("Image format not supported for the given usage.");
-    // }
+     /*if (vkGetPhysicalDeviceImageFormatProperties2(deviceManager.mainDevice.physicalDevice, &imageFormatInfo, &imageFormatProperties) != VK_SUCCESS)
+     {
+    	throw std::runtime_error("Image format not supported for the given usage.");
+     }*/
 
     if (imageUsage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
     {
