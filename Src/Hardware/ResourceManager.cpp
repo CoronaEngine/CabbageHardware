@@ -74,13 +74,6 @@ void ResourceManager::cleanUpResourceManager()
             g_hBufferPool = VK_NULL_HANDLE;
             g_exportBufferPoolMemTypeIndex = UINT32_MAX;
         }
-
-        if (g_hImagePool != VK_NULL_HANDLE)
-        {
-            vmaDestroyPool(g_hAllocator, g_hImagePool);
-            g_hImagePool = VK_NULL_HANDLE;
-            g_exportImagePoolMemTypeIndex = UINT32_MAX;
-        }
     }
 
     if (g_hAllocator != VK_NULL_HANDLE)
@@ -454,46 +447,6 @@ void ResourceManager::createExternalBufferMemoryPool(const VkBufferCreateInfo &b
      g_exportBufferPoolMemTypeIndex = memTypeIndex;
  }
 
-void ResourceManager::createExternalImageMemoryPool(const VkImageCreateInfo &imageInfo)
-{
-#if _WIN32 || _WIN64
-    const VkExternalMemoryHandleTypeFlagsKHR handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-#elif __APPLE__
-    const VkExternalMemoryHandleTypeFlagsKHR handleType = 0;
-#elif __linux__
-    const VkExternalMemoryHandleTypeFlagsKHR handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
-#endif
-
-    VmaAllocationCreateInfo allocInfo{};
-    allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-
-    uint32_t memTypeIndex = VK_MAX_MEMORY_TYPES;
-    VkResult res = vmaFindMemoryTypeIndexForImageInfo(g_hAllocator, &imageInfo, &allocInfo, &memTypeIndex);
-    if (res != VK_SUCCESS || memTypeIndex == VK_MAX_MEMORY_TYPES)
-    {
-        throw std::runtime_error("vmaFindMemoryTypeIndexForImageInfo failed for external image pool");
-    }
-
-    VkExportMemoryAllocateInfoKHR exportInfo{};
-    exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR;
-    exportInfo.pNext = nullptr;
-    exportInfo.handleTypes = handleType;
-
-    VmaPoolCreateInfo poolInfo{};
-    poolInfo.memoryTypeIndex = memTypeIndex;
-    poolInfo.pMemoryAllocateNext = &exportInfo;
-    poolInfo.blockSize = 0;
-    poolInfo.minBlockCount = 1;
-    poolInfo.maxBlockCount = 0;
-
-    res = vmaCreatePool(g_hAllocator, &poolInfo, &g_hImagePool);
-    if (res != VK_SUCCESS)
-    {
-        throw std::runtime_error("vmaCreatePool (image) failed!");
-    }
-    g_exportImagePoolMemTypeIndex = memTypeIndex;
-}
-
 void ResourceManager::destroyImage(ImageHardwareWrap &image)
 {
     // VkImageView依赖于VkImage，必须按（先销毁视图，再销毁图像）的顺序释放资源
@@ -699,12 +652,6 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
 
             resultImage.imageView = createImageView(resultImage);
             return resultImage;
-        }
-
-        // 否则，尝试为 image 创建独立的导出池并子分配
-        if (g_hImagePool == VK_NULL_HANDLE)
-        {
-            createExternalImageMemoryPool(imageInfo);
         }
 
         // 确保图像创建时也声明为可外部内存类型

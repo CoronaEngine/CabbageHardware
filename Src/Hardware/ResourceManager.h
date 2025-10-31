@@ -127,9 +127,7 @@ private:
 
     VmaAllocator g_hAllocator = VK_NULL_HANDLE;
     VmaPool g_hBufferPool = VK_NULL_HANDLE;
-    VmaPool g_hImagePool = VK_NULL_HANDLE;
     uint32_t g_exportBufferPoolMemTypeIndex = UINT32_MAX;
-    uint32_t g_exportImagePoolMemTypeIndex = UINT32_MAX;
 
     VkSampler textureSampler;
 
