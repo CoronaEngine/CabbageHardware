@@ -248,71 +248,67 @@ void ResourceManager::destroyBuffer(BufferHardwareWrap &buffer)
     }
 }
 
-ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage)
+ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, bool hostVisibleMapped)
 {
     BufferHardwareWrap resultBuffer;
     resultBuffer.device = this->device;
     resultBuffer.resourceManager = this;
 
-    if (size > 0)
+    /*if (size > 0)
     {
-        resultBuffer.bufferUsage = usage;
+        return resultBuffer;
+    }*/
 
-        VkBufferCreateInfo vbInfo = {};
-        vbInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        vbInfo.size = size;
-        vbInfo.usage = usage;
+    resultBuffer.bufferUsage = usage;
 
-        if (device->getQueueFamilyNumber() > 1)
+    VkBufferCreateInfo bufCreateInfo = {};
+    bufCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufCreateInfo.size = size;
+    bufCreateInfo.usage = usage;
+
+    if (device->getQueueFamilyNumber() > 1)
+    {
+        std::vector<uint32_t> queueFamilys(device->getQueueFamilyNumber());
+        for (size_t i = 0; i < queueFamilys.size(); i++)
         {
-            std::vector<uint32_t> queueFamilys(device->getQueueFamilyNumber());
-            for (size_t i = 0; i < queueFamilys.size(); i++)
-            {
-                queueFamilys[i] = i;
-            }
-            vbInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-            vbInfo.queueFamilyIndexCount = queueFamilys.size();
-            vbInfo.pQueueFamilyIndices = queueFamilys.data();
+            queueFamilys[i] = i;
         }
-        else
-        {
-            vbInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        }
+        bufCreateInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        bufCreateInfo.queueFamilyIndexCount = queueFamilys.size();
+        bufCreateInfo.pQueueFamilyIndices = queueFamilys.data();
+    }
+    else
+    {
+        bufCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
 
-        /*VkExternalMemoryBufferCreateInfo externalMemoryBufferInfo = {};
-        externalMemoryBufferInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO;
+    // External compatibility query
+    VkExternalMemoryBufferCreateInfoKHR externalMemBufCreateInfo = {};
+    externalMemBufCreateInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO_KHR;
 #if _WIN32 || _WIN64
-        externalMemoryBufferInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+    externalMemBufCreateInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #endif
-        vbInfo.pNext = &externalMemoryBufferInfo;
+    bufCreateInfo.pNext = &externalMemBufCreateInfo;
 
-#ifdef USE_VMA_POOL
-        VmaAllocationCreateInfo vbAllocCreateInfo = {};
-        vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
-        vbAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-        vbAllocCreateInfo.pool = g_hPool;
-#else*/
-        VmaAllocationCreateInfo vbAllocCreateInfo = {};
-        vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
-        vbAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-//#endif
+    VkPhysicalDeviceExternalBufferInfo externalBufferInfo = {};
+    externalBufferInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO;
+    externalBufferInfo.flags = bufCreateInfo.flags;
+    externalBufferInfo.usage = bufCreateInfo.usage;
+    externalBufferInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 
-        VkResult res = vmaCreateBuffer(g_hAllocator, &vbInfo, &vbAllocCreateInfo, &resultBuffer.bufferHandle, &resultBuffer.bufferAlloc, &resultBuffer.bufferAllocInfo);
-        if (res != VK_SUCCESS)
-        {
-            switch (res)
-            {
-            case VK_ERROR_OUT_OF_HOST_MEMORY:
-                std::cerr << "Host memory allocation failed!" << std::endl;
-                break;
-            case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-                std::cerr << "Device memory allocation failed!" << std::endl;
-                break;
-            default:
-                std::cerr << "VMA buffer creation failed with error code: " << res << std::endl;
-                break;
-            }
-        }
+    VkExternalBufferProperties externalBufferProperties = {};
+    externalBufferProperties.sType = VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES;
+
+    vkGetPhysicalDeviceExternalBufferProperties(this->device->physicalDevice, &externalBufferInfo, &externalBufferProperties);
+
+    const auto feats = externalBufferProperties.externalMemoryProperties.externalMemoryFeatures;
+    const bool exportable = (feats & VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT) != 0;
+    const bool importable = (feats & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT) != 0;
+    const bool dedicatedOnly = (feats & VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) != 0;
+
+    if (!exportable || !importable)
+    {
+
     }
 
     return resultBuffer;

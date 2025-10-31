@@ -80,7 +80,7 @@ struct ResourceManager
     VkImageView createImageView(ImageHardwareWrap &image);
     void destroyImage(ImageHardwareWrap &image);
 
-    BufferHardwareWrap createBuffer(VkDeviceSize size, VkBufferUsageFlags usage);
+    BufferHardwareWrap createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, bool hostVisibleMapped = true);
     void destroyBuffer(BufferHardwareWrap &buffer);
 
     //// 创建支持外部内存导出的图像；若格式/tiling/usage 不要求 dedicated-only，优先尝试使用导出内存池；否则使用 dedicated 分配
