@@ -248,6 +248,7 @@ void ResourceManager::destroyBuffer(BufferHardwareWrap &buffer)
     }
 }
 
+// Todo: 方法有待重构
 ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, bool hostVisibleMapped)
 {
     BufferHardwareWrap resultBuffer;
@@ -396,111 +397,6 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
     vmaGetAllocationInfo(g_hAllocator, resultBuffer.bufferAlloc, &allocInfoBasic);
     if (allocInfoBasic.offset != 0)
     {
-        std::cerr << "Warning: exportable buffer allocation offset != 0 (" << allocInfoBasic.offset << ")" << std::endl;
-    }
-
-    return resultBuffer;
-}
-
-ResourceManager::BufferHardwareWrap ResourceManager::createExportableBuffer(
-    VkDeviceSize size,
-    VkBufferUsageFlags usage,
-    bool hostVisibleMapped)
-{
-    BufferHardwareWrap resultBuffer;
-    resultBuffer.device = this->device;
-    resultBuffer.resourceManager = this;
-
-    if (size == 0)
-    {
-        return resultBuffer;
-    }
-
-    resultBuffer.bufferUsage = usage;
-
-    // Create buffer with external memory flag
-    VkBufferCreateInfo vbInfo{};
-    vbInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    vbInfo.size = size;
-    vbInfo.usage = usage;
-
-    if (device->getQueueFamilyNumber() > 1)
-    {
-        std::vector<uint32_t> queueFamilys(device->getQueueFamilyNumber());
-        for (size_t i = 0; i < queueFamilys.size(); i++)
-            queueFamilys[i] = static_cast<uint32_t>(i);
-        vbInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-        vbInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueFamilys.size());
-        vbInfo.pQueueFamilyIndices = queueFamilys.data();
-    }
-    else
-    {
-        vbInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    }
-
-    VkExternalMemoryBufferCreateInfo externalBufferInfo{};
-    externalBufferInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO;
-#if _WIN32 || _WIN64
-    externalBufferInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-#elif __APPLE__
-    // Not used in this repo
-#elif __linux__
-    externalBufferInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
-#endif
-    vbInfo.pNext = &externalBufferInfo;
-
-    // Dedicated + exportable allocation
-    VkExportMemoryAllocateInfo exportMemoryInfo{};
-    exportMemoryInfo.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
-#if _WIN32 || _WIN64
-    exportMemoryInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-#elif __APPLE__
-    // Not used in this repo
-#elif __linux__
-    exportMemoryInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
-#endif
-
-    VmaAllocationCreateInfo allocInfo{};
-    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
-    allocInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
-    if (hostVisibleMapped)
-    {
-        allocInfo.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-    }
-    // Don't use pool to ensure dedicated. Use vmaCreateDedicatedBuffer to pass exportMemoryInfo via pNext
-    allocInfo.pUserData = nullptr;
-    allocInfo.pool = VK_NULL_HANDLE;
-
-    VkResult res = vmaCreateDedicatedBuffer(
-        g_hAllocator,
-        &vbInfo,
-        &allocInfo,
-        &exportMemoryInfo, // pNext for VkMemoryAllocateInfo
-        &resultBuffer.bufferHandle,
-        &resultBuffer.bufferAlloc,
-        &resultBuffer.bufferAllocInfo);
-    if (res != VK_SUCCESS)
-    {
-        switch (res)
-        {
-        case VK_ERROR_OUT_OF_HOST_MEMORY:
-            std::cerr << "Host memory allocation failed for exportable buffer!" << std::endl;
-            break;
-        case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-            std::cerr << "Device memory allocation failed for exportable buffer!" << std::endl;
-            break;
-        default:
-            std::cerr << "VMA createExportableBuffer failed, code: " << res << std::endl;
-            break;
-        }
-    }
-
-    // Optional: sanity check alignment (offset must be 0 for dedicated)
-    VmaAllocationInfo allocInfoBasic{};
-    vmaGetAllocationInfo(g_hAllocator, resultBuffer.bufferAlloc, &allocInfoBasic);
-    if (allocInfoBasic.offset != 0)
-    {
-        // This should not happen with dedicated allocation; if it did, report
         std::cerr << "Warning: exportable buffer allocation offset != 0 (" << allocInfoBasic.offset << ")" << std::endl;
     }
 
