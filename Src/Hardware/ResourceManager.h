@@ -74,9 +74,7 @@ struct ResourceManager
     void initResourceManager(DeviceManager &device);
     void cleanUpResourceManager();
 
-    ImageHardwareWrap createImage(ktm::uvec2 imageSize, VkFormat imageFormat, uint32_t pixelSize,
-                                  VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                                  int arrayLayers = 1, int mipLevels = 1);
+    ImageHardwareWrap createImage(ktm::uvec2 imageSize, VkFormat imageFormat, uint32_t pixelSize, VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, int arrayLayers = 1, int mipLevels = 1);
     VkImageView createImageView(ImageHardwareWrap &image);
     void destroyImage(ImageHardwareWrap &image);
 
@@ -106,8 +104,8 @@ struct ResourceManager
     ResourceManager &copyImageToBuffer(VkCommandBuffer &commandBuffer, ImageHardwareWrap& image, BufferHardwareWrap& buffer);
 
     // Todo：需要重构
-    void copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData);
-    void copyBufferToCpu(VkDevice &device, VkDeviceMemory &memory, VkDeviceSize size, void *cpuData);
+    //void copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData);
+    //void copyBufferToCpu(VkDevice &device, VkDeviceMemory &memory, VkDeviceSize size, void *cpuData);
     ExternalMemoryHandle exportBufferMemory(BufferHardwareWrap &sourceBuffer);
     BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle &memHandle, const BufferHardwareWrap &sourceBuffer);
     //ExternalMemoryHandle exportImageMemory(ImageHardwareWrap &sourceImage);
@@ -115,13 +113,6 @@ struct ResourceManager
     void TestWin32HandlesImport(BufferHardwareWrap &srcStaging, BufferHardwareWrap &dstStaging, VkDeviceSize imageSizeBytes, ResourceManager &srcResourceManager, ResourceManager &dstResourceManager);
     uint32_t findExternalMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     void transitionImageLayoutUnblocked(const VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
-    // 创建用于跨设备导出/导入的专用缓冲区：
-    // - 使用 ExternalMemory + Dedicated 分配，保证导出句柄对应的内存偏移为 0
-    // - 可选映射到 host（默认顺序写 + 映射）
-    BufferHardwareWrap createExportableBuffer(
-        VkDeviceSize size,
-        VkBufferUsageFlags usage,
-        bool hostVisibleMapped = true);
 
     ResourceManager &transitionImageLayout(VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
 
