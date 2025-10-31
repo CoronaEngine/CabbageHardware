@@ -498,7 +498,6 @@ VkImageView ResourceManager::createImageView(ImageHardwareWrap &image)
     }
 }
 
-// Todo: 方法写的很丑，有待重构
 ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 imageSize, VkFormat imageFormat, uint32_t pixelSize, VkImageUsageFlags imageUsage, int arrayLayers, int mipLevels, VkImageTiling tiling)
 {
     ImageHardwareWrap resultImage;
@@ -525,194 +524,49 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     imageUsage = imageUsage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     resultImage.imageUsage = imageUsage;
 
-    if (imageSize.x == 0 || imageSize.y == 0)
+    if (imageSize.x != 0 || imageSize.y != 0)
     {
-        return resultImage;
-    }
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.extent = {imageSize.x, imageSize.y, 1};
+        imageInfo.mipLevels = mipLevels;
+        imageInfo.arrayLayers = arrayLayers;
+        imageInfo.format = imageFormat;
+        imageInfo.tiling = tiling;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.usage = imageUsage;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 
-    // Build VkImageCreateInfo
-    VkImageCreateInfo imageInfo{};
-    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageInfo.extent = {imageSize.x, imageSize.y, 1};
-    imageInfo.mipLevels = mipLevels;
-    imageInfo.arrayLayers = arrayLayers;
-    imageInfo.format = imageFormat;
-    imageInfo.tiling = tiling;
-    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageInfo.usage = imageUsage;
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-
-    // Keep queue family indices alive until after vkCreateImage/vmaCreateImage
-    std::vector<uint32_t> imageQueueFamilyIndices;
-    if (device->getQueueFamilyNumber() > 1)
-    {
-        imageQueueFamilyIndices.resize(device->getQueueFamilyNumber());
-        for (size_t i = 0; i < imageQueueFamilyIndices.size(); i++)
+        // Keep queue family indices alive until after vkCreateImage/vmaCreateImage
+        std::vector<uint32_t> imageQueueFamilyIndices;
+        if (device->getQueueFamilyNumber() > 1)
         {
-            imageQueueFamilyIndices[i] = static_cast<uint32_t>(i);
-        }
-        imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-        imageInfo.queueFamilyIndexCount = static_cast<uint32_t>(imageQueueFamilyIndices.size());
-        imageInfo.pQueueFamilyIndices = imageQueueFamilyIndices.data();
-    }
-    else
-    {
-        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    }
-
-    // External compatibility query
-    VkPhysicalDeviceExternalImageFormatInfo extImgInfo{};
-    extImgInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO;
-#if _WIN32 || _WIN64
-    extImgInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-#elif __APPLE__
-    extImgInfo.handleType = (VkExternalMemoryHandleTypeFlagBits)0;
-#elif __linux__
-    extImgInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
-#endif
-
-    VkPhysicalDeviceImageFormatInfo2 imgInfo2{};
-    imgInfo2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2;
-    imgInfo2.pNext = &extImgInfo;
-    imgInfo2.format = imageFormat;
-    imgInfo2.type = VK_IMAGE_TYPE_2D;
-    imgInfo2.tiling = tiling;
-    imgInfo2.usage = imageUsage;
-    imgInfo2.flags = 0;
-
-    VkExternalImageFormatProperties extImgProps{};
-    extImgProps.sType = VK_STRUCTURE_TYPE_EXTERNAL_IMAGE_FORMAT_PROPERTIES;
-
-    VkImageFormatProperties2 props2{};
-    props2.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2;
-    props2.pNext = &extImgProps;
-
-    VkResult qres = vkGetPhysicalDeviceImageFormatProperties2(this->device->physicalDevice, &imgInfo2, &props2);
-    if (qres != VK_SUCCESS)
-    {
-        // 格式不支持外部内存
-        VmaAllocationCreateInfo imageAllocCreateInfo = {};
-        imageAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-        if (vmaCreateImage(g_hAllocator, &imageInfo, &imageAllocCreateInfo, &resultImage.imageHandle, &resultImage.imageAlloc, &resultImage.imageAllocInfo) != VK_SUCCESS)
-        {
-            throw std::runtime_error("failed to create image!");
-        }
-        resultImage.imageView = createImageView(resultImage);
-
-        return resultImage;
-    }
-
-    const auto feats = extImgProps.externalMemoryProperties.externalMemoryFeatures;
-    const bool exportable = (feats & VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT) != 0;
-    const bool importable = (feats & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT) != 0;
-    const bool dedicatedOnly = (feats & VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) != 0;
-
-    if (!exportable || !importable)
-    {
-        VmaAllocationCreateInfo imageAllocCreateInfo = {};
-        imageAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-        if (vmaCreateImage(g_hAllocator, &imageInfo, &imageAllocCreateInfo, &resultImage.imageHandle, &resultImage.imageAlloc, &resultImage.imageAllocInfo) != VK_SUCCESS)
-        {
-            throw std::runtime_error("failed to create image!");
-        }
-        resultImage.imageView = createImageView(resultImage);
-        return resultImage;
-    }
-
-    if (!dedicatedOnly)
-    {
-        VmaAllocationCreateInfo findAlloc{};
-        findAlloc.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-        uint32_t imgMemType = VK_MAX_MEMORY_TYPES;
-        // 如果image的memoryType和buffer pool的memoryType匹配，则复用buffer pool
-        if (vmaFindMemoryTypeIndexForImageInfo(g_hAllocator, &imageInfo, &findAlloc, &imgMemType) == VK_SUCCESS && imgMemType == g_exportBufferPoolMemTypeIndex)
-        {
-            // 确保图像创建时也声明为可外部内存类型
-#if _WIN32 || _WIN64
-            const VkExternalMemoryHandleTypeFlagsKHR handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-#elif __APPLE__
-            const VkExternalMemoryHandleTypeFlagsKHR handleType = 0;
-#elif __linux__
-            const VkExternalMemoryHandleTypeFlagsKHR handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
-#endif
-            VkExternalMemoryImageCreateInfoKHR externalMemImageCreateInfo{};
-            externalMemImageCreateInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO_KHR;
-            externalMemImageCreateInfo.handleTypes = handleType;
-            imageInfo.pNext = &externalMemImageCreateInfo;
-
-            VmaAllocationCreateInfo allocCI{};
-            allocCI.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-            allocCI.pool = g_hBufferPool; // 复用 Buffer 导出池（同一 memoryTypeIndex）
-
-            if (vmaCreateImage(g_hAllocator, &imageInfo, &allocCI, &resultImage.imageHandle, &resultImage.imageAlloc, &resultImage.imageAllocInfo) != VK_SUCCESS)
+            imageQueueFamilyIndices.resize(device->getQueueFamilyNumber());
+            for (size_t i = 0; i < imageQueueFamilyIndices.size(); i++)
             {
-                throw std::runtime_error("failed to create exportable image from shared pool");
+                imageQueueFamilyIndices[i] = static_cast<uint32_t>(i);
             }
-
-            resultImage.imageView = createImageView(resultImage);
-            return resultImage;
+            imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+            imageInfo.queueFamilyIndexCount = static_cast<uint32_t>(imageQueueFamilyIndices.size());
+            imageInfo.pQueueFamilyIndices = imageQueueFamilyIndices.data();
+        }
+        else
+        {
+            imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         }
 
-        // 确保图像创建时也声明为可外部内存类型
-#if _WIN32 || _WIN64
-        const VkExternalMemoryHandleTypeFlagsKHR handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-#elif __APPLE__
-        const VkExternalMemoryHandleTypeFlagsKHR handleType = 0;
-#elif __linux__
-        const VkExternalMemoryHandleTypeFlagsKHR handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
-#endif
-        VkExternalMemoryImageCreateInfoKHR externalMemImageCreateInfo{};
-        externalMemImageCreateInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO_KHR;
-        externalMemImageCreateInfo.handleTypes = handleType;
-        imageInfo.pNext = &externalMemImageCreateInfo;
+        VmaAllocationCreateInfo imageAllocCreateInfo = {};
+        imageAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
 
-        VmaAllocationCreateInfo allocCI{};
-        allocCI.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-        allocCI.pool = g_hImagePool;
-        if (vmaCreateImage(g_hAllocator, &imageInfo, &allocCI, &resultImage.imageHandle, &resultImage.imageAlloc, &resultImage.imageAllocInfo) != VK_SUCCESS)
+        if (vmaCreateImage(g_hAllocator, &imageInfo, &imageAllocCreateInfo, &resultImage.imageHandle, &resultImage.imageAlloc, &resultImage.imageAllocInfo) != VK_SUCCESS)
         {
-            throw std::runtime_error("failed to create exportable image from image pool");
+            throw std::runtime_error("failed to create image!");
         }
 
         resultImage.imageView = createImageView(resultImage);
-        return resultImage;
     }
 
-    // Dedicated allocation
-    VkExportMemoryAllocateInfo exportAlloc{};
-    exportAlloc.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
-#if _WIN32 || _WIN64
-    exportAlloc.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-#elif __APPLE__
-    exportAlloc.handleTypes = (VkExternalMemoryHandleTypeFlags)0;
-#elif __linux__
-    exportAlloc.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
-#endif
-
-    // 确保专用分配路径中图像也带有外部内存创建信息
-#if _WIN32 || _WIN64
-    const VkExternalMemoryHandleTypeFlagsKHR handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-#elif __APPLE__
-    const VkExternalMemoryHandleTypeFlagsKHR handleType = 0;
-#elif __linux__
-    const VkExternalMemoryHandleTypeFlagsKHR handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
-#endif
-    VkExternalMemoryImageCreateInfoKHR externalMemImageCreateInfo{};
-    externalMemImageCreateInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO_KHR;
-    externalMemImageCreateInfo.handleTypes = handleType;
-    imageInfo.pNext = &externalMemImageCreateInfo;
-
-    VmaAllocationCreateInfo allocCI{};
-    allocCI.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-    allocCI.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
-
-    if (vmaCreateDedicatedImage(g_hAllocator, &imageInfo, &allocCI, &exportAlloc, &resultImage.imageHandle, &resultImage.imageAlloc, &resultImage.imageAllocInfo) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create dedicated exportable image");
-    }
-
-    resultImage.imageView = createImageView(resultImage);
     return resultImage;
 }
 

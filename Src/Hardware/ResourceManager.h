@@ -74,7 +74,7 @@ struct ResourceManager
     void initResourceManager(DeviceManager &device);
     void cleanUpResourceManager();
 
-    ImageHardwareWrap createImage(ktm::uvec2 imageSize, VkFormat imageFormat, uint32_t pixelSize, VkImageUsageFlags imageUsage, int arrayLayers = 1, int mipLevels = 1, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
+    ImageHardwareWrap createImage(ktm::uvec2 imageSize, VkFormat imageFormat, uint32_t pixelSize, VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, int arrayLayers = 1, int mipLevels = 1, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
     VkImageView createImageView(ImageHardwareWrap &image);
     void destroyImage(ImageHardwareWrap &image);
 
@@ -123,7 +123,6 @@ private:
     void CreateVmaAllocator();
     void createBindlessDescriptorSet();
     void createExternalBufferMemoryPool(const VkBufferCreateInfo& bufferInfo);
-    void createExternalImageMemoryPool(const VkImageCreateInfo& imageInfo);
 
     VmaAllocator g_hAllocator = VK_NULL_HANDLE;
     VmaPool g_hBufferPool = VK_NULL_HANDLE;
