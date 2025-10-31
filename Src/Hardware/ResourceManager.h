@@ -74,22 +74,12 @@ struct ResourceManager
     void initResourceManager(DeviceManager &device);
     void cleanUpResourceManager();
 
-    ImageHardwareWrap createImage(ktm::uvec2 imageSize, VkFormat imageFormat, uint32_t pixelSize, VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, int arrayLayers = 1, int mipLevels = 1);
+    ImageHardwareWrap createImage(ktm::uvec2 imageSize, VkFormat imageFormat, uint32_t pixelSize, VkImageUsageFlags imageUsage, int arrayLayers = 1, int mipLevels = 1, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
     VkImageView createImageView(ImageHardwareWrap &image);
     void destroyImage(ImageHardwareWrap &image);
 
     BufferHardwareWrap createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, bool hostVisibleMapped = true);
     void destroyBuffer(BufferHardwareWrap &buffer);
-
-    //// 创建支持外部内存导出的图像；若格式/tiling/usage 不要求 dedicated-only，优先尝试使用导出内存池；否则使用 dedicated 分配
-    //ImageHardwareWrap createExportableImage(
-    //    ktm::uvec2 imageSize,
-    //    VkFormat imageFormat,
-    //    uint32_t pixelSize,
-    //    VkImageUsageFlags imageUsage,
-    //    VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL,
-    //    int arrayLayers = 1,
-    //    int mipLevels = 1);
 
     uint32_t storeDescriptor(ImageHardwareWrap image);
     uint32_t storeDescriptor(BufferHardwareWrap buffer);
