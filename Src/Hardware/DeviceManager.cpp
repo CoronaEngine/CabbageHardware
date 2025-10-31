@@ -240,22 +240,22 @@ void DeviceManager::choosePresentQueueFamily()
                 transferQueues.push_back(tempQueueUtils);
             }
         }
+    }
 
-        if (!graphicsQueues.empty())
+    if (!graphicsQueues.empty())
+    {
+        if (computeQueues.empty())
         {
-            if (computeQueues.empty())
-            {
-                computeQueues.push_back(graphicsQueues[0]);
-            }
-            if (transferQueues.empty())
-            {
-                transferQueues.push_back(graphicsQueues[0]);
-            }
+            computeQueues.push_back(graphicsQueues[0]);
         }
-        else
+        if (transferQueues.empty())
         {
-            throw std::runtime_error("No graphics queues found!");
+            transferQueues.push_back(graphicsQueues[0]);
         }
+    }
+    else
+    {
+        throw std::runtime_error("No graphics queues found!");
     }
 }
 
