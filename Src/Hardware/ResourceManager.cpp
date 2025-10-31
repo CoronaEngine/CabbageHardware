@@ -205,22 +205,13 @@ void ResourceManager::CreateVmaAllocator()
         {
             hostSharedMemorySize += heap.size;
         }
+    }
 
 #ifdef CABBAGE_ENGINE_DEBUG
-        if (heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
-        {
-            std::cout << "Device Memory Size: " << (deviceMemorySize / 1048576.0f) << " MB " << std::endl;
-        }
-        if (heap.flags & VK_MEMORY_HEAP_MULTI_INSTANCE_BIT)
-        {
-            std::cout << "Multi Instance Memory Size: " << (mutiInstanceMemorySize / 1048576.0f) << " MB " << std::endl;
-        }
-        else
-        {
-            std::cout << "Host Shared Memory Size: " << (hostSharedMemorySize / 1048576.0f) << " MB " << std::endl;
-        }
+    std::cout << "Device Memory Size: " << (deviceMemorySize / 1073741824.0f) << " GB " << std::endl;
+    std::cout << "Multi Instance Memory Size: " << (mutiInstanceMemorySize / 1073741824.0f) << " GB " << std::endl;
+    std::cout << "Host Shared Memory Size: " << (hostSharedMemorySize / 1073741824.0f) << " GB " << std::endl;
 #endif
-    }
 }
 
 void ResourceManager::createTextureSampler()
