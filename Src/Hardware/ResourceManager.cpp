@@ -24,9 +24,6 @@ void ResourceManager::initResourceManager(DeviceManager &device)
     CreateVmaAllocator();
     createTextureSampler();
     createBindlessDescriptorSet();
-//#ifdef USE_EXPORT_MEMORY
-//    createExternalMemoryPool();
-//#endif
 }
 
 void ResourceManager::cleanUpResourceManager()
