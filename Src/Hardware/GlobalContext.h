@@ -3,6 +3,7 @@
 #include "Hardware/DeviceManager.h"
 #include "Hardware/ResourceManager.h"
 
+// 增加宏以启用导出内存功能
 #define USE_EXPORT_MEMORY
 
 class DisplayManager;
