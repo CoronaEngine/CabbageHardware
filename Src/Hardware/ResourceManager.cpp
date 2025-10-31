@@ -248,7 +248,7 @@ void ResourceManager::destroyBuffer(BufferHardwareWrap &buffer)
     }
 }
 
-// Todo: 方法有待重构
+// Todo: 方法写的很丑，有待重构
 ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, bool hostVisibleMapped)
 {
     BufferHardwareWrap resultBuffer;
@@ -2127,10 +2127,7 @@ VkShaderModule ResourceManager::createShaderModule(const std::vector<unsigned in
     return shaderModule;
 }
 
-ResourceManager &ResourceManager::blitImage(
-    VkCommandBuffer &commandBuffer,
-    ImageHardwareWrap &srcImage,
-    ImageHardwareWrap &dstImage)
+ResourceManager &ResourceManager::blitImage(VkCommandBuffer &commandBuffer, ImageHardwareWrap &srcImage, ImageHardwareWrap &dstImage)
 {
 
         VkImageBlit imageBlit;

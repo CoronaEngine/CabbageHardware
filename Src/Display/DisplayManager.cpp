@@ -371,11 +371,8 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                                                                                 imageGlobalPool[*displayImage.imageID].pixelSize, imageGlobalPool[*displayImage.imageID].imageUsage);
 
                 VkDeviceSize imageSizeBytes = this->displayImage.imageSize.x * this->displayImage.imageSize.y * this->displayImage.pixelSize;
-                // 使用专用且可导出的缓冲，保证导出句柄对应内存从偏移0开始，避免导入后的对齐/偏移问题
-                srcStaging = globalHardwareContext.mainDevice->resourceManager.createExportableBuffer(
-                    imageSizeBytes,
-                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                    /*hostVisibleMapped*/ true);
+
+                srcStaging = globalHardwareContext.mainDevice->resourceManager.createBuffer(imageSizeBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, true);
 
                 {
                     // 导出缓冲区内存
