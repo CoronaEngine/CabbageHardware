@@ -83,6 +83,16 @@ struct ResourceManager
     BufferHardwareWrap createBuffer(VkDeviceSize size, VkBufferUsageFlags usage);
     void destroyBuffer(BufferHardwareWrap &buffer);
 
+    //// 创建支持外部内存导出的图像；若格式/tiling/usage 不要求 dedicated-only，优先尝试使用导出内存池；否则使用 dedicated 分配
+    //ImageHardwareWrap createExportableImage(
+    //    ktm::uvec2 imageSize,
+    //    VkFormat imageFormat,
+    //    uint32_t pixelSize,
+    //    VkImageUsageFlags imageUsage,
+    //    VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL,
+    //    int arrayLayers = 1,
+    //    int mipLevels = 1);
+
     uint32_t storeDescriptor(ImageHardwareWrap image);
     uint32_t storeDescriptor(BufferHardwareWrap buffer);
     //uint32_t storeDescriptor(VkAccelerationStructureKHR m_tlas);
@@ -100,6 +110,8 @@ struct ResourceManager
     void copyBufferToCpu(VkDevice &device, VkDeviceMemory &memory, VkDeviceSize size, void *cpuData);
     ExternalMemoryHandle exportBufferMemory(BufferHardwareWrap &sourceBuffer);
     BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle &memHandle, const BufferHardwareWrap &sourceBuffer);
+    //ExternalMemoryHandle exportImageMemory(ImageHardwareWrap &sourceImage);
+    //ImageHardwareWrap importImageMemory(const ExternalMemoryHandle &memHandle, const ImageHardwareWrap &sourceImage);
     void TestWin32HandlesImport(BufferHardwareWrap &srcStaging, BufferHardwareWrap &dstStaging, VkDeviceSize imageSizeBytes, ResourceManager &srcResourceManager, ResourceManager &dstResourceManager);
     uint32_t findExternalMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     void transitionImageLayoutUnblocked(const VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
@@ -129,11 +141,14 @@ private:
     void createTextureSampler();
     void CreateVmaAllocator();
     void createBindlessDescriptorSet();
-    void createExternalMemoryPool();
+    void createExternalBufferMemoryPool(const VkBufferCreateInfo& bufferInfo);
+    void createExternalImageMemoryPool(const VkImageCreateInfo& imageInfo);
 
-    VmaAllocator g_hAllocator;
-
-    VmaPool g_hPool;
+    VmaAllocator g_hAllocator = VK_NULL_HANDLE;
+    VmaPool g_hBufferPool = VK_NULL_HANDLE;
+    VmaPool g_hImagePool = VK_NULL_HANDLE;
+    uint32_t g_exportBufferPoolMemTypeIndex = UINT32_MAX;
+    uint32_t g_exportImagePoolMemTypeIndex = UINT32_MAX;
 
     VkSampler textureSampler;
 
