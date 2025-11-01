@@ -238,6 +238,18 @@ void ResourceManager::destroyBuffer(BufferHardwareWrap &buffer)
     if (buffer.bufferAlloc != VK_NULL_HANDLE && buffer.bufferHandle != VK_NULL_HANDLE)
     {
         vmaDestroyBuffer(g_hAllocator, buffer.bufferHandle, buffer.bufferAlloc);
+        buffer.bufferHandle = VK_NULL_HANDLE;
+        buffer.bufferAlloc = VK_NULL_HANDLE;
+        buffer.bufferAllocInfo = {};
+    }
+    else if (buffer.bufferMemory != VK_NULL_HANDLE && buffer.bufferHandle != VK_NULL_HANDLE)
+    {
+        // Manual (non-VMA) allocation path, e.g., imported host pointer memory
+        vkDestroyBuffer(this->device->logicalDevice, buffer.bufferHandle, nullptr);
+        vkFreeMemory(this->device->logicalDevice, buffer.bufferMemory, nullptr);
+        buffer.bufferHandle = VK_NULL_HANDLE;
+        buffer.bufferMemory = VK_NULL_HANDLE;
+        buffer.bufferAllocInfo = {};
     }
 }
 
@@ -1230,44 +1242,173 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
 
 ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *hostPtr, uint64_t size)
 {
-    BufferHardwareWrap bufferWrap;
+    BufferHardwareWrap bufferWrap{};
     bufferWrap.device = this->device;
     bufferWrap.resourceManager = this;
     bufferWrap.bufferUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 
-    // 1. 创建 VkBuffer
+    if (hostPtr == nullptr || size == 0)
+    {
+        throw std::runtime_error("importHostBuffer: hostPtr is null or size is zero");
+    }
+
+    // 查询 minImportedHostPointerAlignment 并检查指针对齐
+    VkPhysicalDeviceExternalMemoryHostPropertiesEXT hostProps{};
+    hostProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_HOST_PROPERTIES_EXT;
+
+    VkPhysicalDeviceProperties2 props2{};
+    props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    props2.pNext = &hostProps;
+    vkGetPhysicalDeviceProperties2(this->device->physicalDevice, &props2);
+
+    VkDeviceSize requiredAlign = hostProps.minImportedHostPointerAlignment;
+    if (requiredAlign == 0)
+    {
+        // 规范保证该值非零，但为稳妥处理
+        requiredAlign = 4096;
+    }
+    if ((reinterpret_cast<uintptr_t>(hostPtr) % static_cast<size_t>(requiredAlign)) != 0)
+    {
+        throw std::runtime_error("importHostBuffer: hostPtr is not aligned to minImportedHostPointerAlignment");
+    }
+
+    // 创建 VkBuffer
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size;
     bufferInfo.usage = bufferWrap.bufferUsage;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    // 2. 设置导入主机指针信息
+    if (vkCreateBuffer(this->device->logicalDevice, &bufferInfo, nullptr, &bufferWrap.bufferHandle) != VK_SUCCESS)
+    {
+        throw std::runtime_error("importHostBuffer: vkCreateBuffer failed");
+    }
+
+    // 查询内存需求
+    VkMemoryRequirements memReq{};
+    vkGetBufferMemoryRequirements(this->device->logicalDevice, bufferWrap.bufferHandle, &memReq);
+
+    // 选择主机可见且最好是 COHERENT 的内存类型
+    VkPhysicalDeviceMemoryProperties memProps;
+    vkGetPhysicalDeviceMemoryProperties(this->device->physicalDevice, &memProps);
+
+    uint32_t memoryTypeIndex = UINT32_MAX;
+    const VkMemoryPropertyFlags desiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
+    {
+        if ((memReq.memoryTypeBits & (1u << i)) &&
+            (memProps.memoryTypes[i].propertyFlags & desiredFlags) == desiredFlags)
+        {
+            memoryTypeIndex = i;
+            break;
+        }
+    }
+
+    // 如果找不到 COHERENT，就退化为 HOST_VISIBLE
+    if (memoryTypeIndex == UINT32_MAX)
+    {
+        for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
+        {
+            if ((memReq.memoryTypeBits & (1u << i)) &&
+                (memProps.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
+            {
+                memoryTypeIndex = i;
+                break;
+            }
+        }
+    }
+
+    if (memoryTypeIndex == UINT32_MAX)
+    {
+        vkDestroyBuffer(this->device->logicalDevice, bufferWrap.bufferHandle, nullptr);
+        throw std::runtime_error("importHostBuffer: no HOST_VISIBLE memory type found for imported host pointer");
+    }
+
+    // 使用 VK_EXT_external_memory_host 导入主机指针作为设备内存
     VkImportMemoryHostPointerInfoEXT importInfo{};
     importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT;
     importInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
     importInfo.pHostPointer = hostPtr;
 
-    // 3. VMA 分配参数
-    VmaAllocationCreateInfo allocCreateInfo{};
-    allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
-    allocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-    allocCreateInfo.pUserData = nullptr;
-
-    // 4. 创建 Buffer
-    VkResult res = vmaCreateBuffer(
-        g_hAllocator,
-        &bufferInfo,
-        &allocCreateInfo,
-        &bufferWrap.bufferHandle,
-        &bufferWrap.bufferAlloc,
-        &bufferWrap.bufferAllocInfo);
-    if (res != VK_SUCCESS)
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.pNext = &importInfo;
+    // 按要求对齐分配大小
+    VkDeviceSize allocSize = memReq.size;
+    if (allocSize % requiredAlign)
     {
-        throw std::runtime_error("vmaCreateBuffer with host pointer import failed!");
+        allocSize = ((allocSize + requiredAlign - 1) / requiredAlign) * requiredAlign;
+    }
+    allocInfo.allocationSize = allocSize;
+    allocInfo.memoryTypeIndex = memoryTypeIndex;
+
+    if (vkAllocateMemory(this->device->logicalDevice, &allocInfo, nullptr, &bufferWrap.bufferMemory) != VK_SUCCESS)
+    {
+        vkDestroyBuffer(this->device->logicalDevice, bufferWrap.bufferHandle, nullptr);
+        throw std::runtime_error("importHostBuffer: vkAllocateMemory failed for host pointer import");
     }
 
+    // 绑定内存到缓冲
+    if (vkBindBufferMemory(this->device->logicalDevice, bufferWrap.bufferHandle, bufferWrap.bufferMemory, 0) != VK_SUCCESS)
+    {
+        vkFreeMemory(this->device->logicalDevice, bufferWrap.bufferMemory, nullptr);
+        vkDestroyBuffer(this->device->logicalDevice, bufferWrap.bufferHandle, nullptr);
+        throw std::runtime_error("importHostBuffer: vkBindBufferMemory failed");
+    }
+
+    // 填充尺寸信息以便后续 copyBuffer 使用
+    bufferWrap.bufferAllocInfo.size = size;
+
     return bufferWrap;
+}
+
+void *ResourceManager::allocateHostSharedPointer(uint64_t size)
+{
+#if _WIN32 || _WIN64
+    // VirtualAlloc 返回页面对齐的内存，满足对齐要求
+    void *ptr = VirtualAlloc(nullptr, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    if (!ptr)
+    {
+        throw std::runtime_error("allocateHostSharedPointer: VirtualAlloc failed");
+    }
+    return ptr;
+#elif __APPLE__ || __linux__
+    // 简化实现：使用 posix_memalign/aligned_alloc 进行对齐，具体对齐值可进一步查询并适配
+    // 这里取 4096 作为通用页大小对齐
+    const size_t align = 4096;
+    void *ptr = nullptr;
+#if defined(__APPLE__)
+    // macOS 没有 aligned_alloc，使用 posix_memalign
+    if (posix_memalign(&ptr, align, size) != 0)
+    {
+        throw std::runtime_error("allocateHostSharedPointer: posix_memalign failed");
+    }
+#else
+    ptr = aligned_alloc(align, ((size + align - 1) / align) * align);
+    if (!ptr)
+    {
+        throw std::runtime_error("allocateHostSharedPointer: aligned_alloc failed");
+    }
+#endif
+    return ptr;
+#else
+    return nullptr;
+#endif
+}
+
+void ResourceManager::freeHostSharedPointer(void *ptr, uint64_t /*size*/)
+{
+#if _WIN32 || _WIN64
+    if (ptr)
+    {
+        VirtualFree(ptr, 0, MEM_RELEASE);
+    }
+#elif __APPLE__ || __linux__
+    if (ptr)
+    {
+        free(ptr);
+    }
+#endif
 }
 
 //void ResourceManager::TestWin32HandlesImport(BufferHardwareWrap &srcStaging, BufferHardwareWrap &dstStaging, VkDeviceSize imageSizeBytes, ResourceManager &srcResourceManager, ResourceManager &dstResourceManager)

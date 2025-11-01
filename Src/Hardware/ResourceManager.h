@@ -26,9 +26,14 @@ struct ResourceManager
         VkAccessFlags accessMask;
 
         VkBuffer bufferHandle = VK_NULL_HANDLE;
+
+        // VMA allocation when managed by VMA
         VmaAllocation bufferAlloc = VK_NULL_HANDLE;
         VmaAllocationInfo bufferAllocInfo = {};
         VkBufferUsageFlags bufferUsage = VK_BUFFER_USAGE_FLAG_BITS_MAX_ENUM;
+
+        // Raw Vulkan allocation when NOT using VMA (e.g., host pointer import)
+        VkDeviceMemory bufferMemory = VK_NULL_HANDLE;
 
         DeviceManager *device;
         ResourceManager *resourceManager;
@@ -100,6 +105,11 @@ struct ResourceManager
     BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle &memHandle, const BufferHardwareWrap &sourceBuffer);
 
     BufferHardwareWrap importHostBuffer(void *hostPtr, uint64_t size);
+
+    // 为 VK_EXT_external_memory_host 提供的主机内存分配/释放助手。
+    // 注意：返回的指针需在所有使用它的设备释放或闲置后再释放。
+    void *allocateHostSharedPointer(uint64_t size);
+    void freeHostSharedPointer(void *ptr, uint64_t size = 0);
 
     //void TestWin32HandlesImport(BufferHardwareWrap &srcStaging, BufferHardwareWrap &dstStaging, VkDeviceSize imageSizeBytes, ResourceManager &srcResourceManager, ResourceManager &dstResourceManager);
     uint32_t findExternalMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
