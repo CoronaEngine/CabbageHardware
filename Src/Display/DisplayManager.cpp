@@ -2,6 +2,10 @@
 #include <algorithm>
 #include<vector>
 #include<volk.h>
+
+#include <cstdlib>
+#include <memory>
+
 #include<Hardware/GlobalContext.h>
 #include<Hardware/ResourceCommand.h>
 
@@ -28,7 +32,7 @@ void DisplayManager::cleanUpDisplayManager()
 {
     if (hostBufferPtr != nullptr)
     {
-        free(hostBufferPtr);
+        _aligned_free(hostBufferPtr);
         hostBufferPtr = nullptr;
     }
 
@@ -379,8 +383,31 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
                 VkDeviceSize imageSizeBytes = this->displayImage.imageSize.x * this->displayImage.imageSize.y * this->displayImage.pixelSize;
 
-                hostBufferPtr = malloc(imageSizeBytes);
 
+                uint64_t requiredAlign = 0;
+                {
+                    VkPhysicalDeviceExternalMemoryHostPropertiesEXT hostProps{};
+                    hostProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_HOST_PROPERTIES_EXT;
+
+                    VkPhysicalDeviceProperties2 props2{};
+                    props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+                    props2.pNext = &hostProps;
+                    vkGetPhysicalDeviceProperties2(globalHardwareContext.mainDevice->deviceManager.physicalDevice, &props2);
+
+                    requiredAlign = hostProps.minImportedHostPointerAlignment;
+
+                    vkGetPhysicalDeviceProperties2(displayDevice->deviceManager.physicalDevice, &props2);
+
+                    requiredAlign = std::max(requiredAlign, hostProps.minImportedHostPointerAlignment);
+                }
+
+                if (imageSizeBytes % requiredAlign != 0)
+                {
+                    imageSizeBytes = ((imageSizeBytes + requiredAlign - 1) / requiredAlign) * requiredAlign;
+                }
+#if _WIN32 || _WIN64
+                hostBufferPtr = _aligned_malloc(imageSizeBytes, requiredAlign);
+#endif
                 //srcStaging = globalHardwareContext.mainDevice->resourceManager.createBuffer(imageSizeBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, true);
 
                 srcStaging = globalHardwareContext.mainDevice->resourceManager.importHostBuffer(hostBufferPtr, imageSizeBytes);

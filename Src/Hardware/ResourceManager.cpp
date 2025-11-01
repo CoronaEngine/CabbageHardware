@@ -1252,25 +1252,6 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *host
         throw std::runtime_error("importHostBuffer: hostPtr is null or size is zero");
     }
 
-    // 查询 minImportedHostPointerAlignment 并检查指针对齐
-    VkPhysicalDeviceExternalMemoryHostPropertiesEXT hostProps{};
-    hostProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_HOST_PROPERTIES_EXT;
-
-    VkPhysicalDeviceProperties2 props2{};
-    props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-    props2.pNext = &hostProps;
-    vkGetPhysicalDeviceProperties2(this->device->physicalDevice, &props2);
-
-    VkDeviceSize requiredAlign = hostProps.minImportedHostPointerAlignment;
-    if (requiredAlign == 0)
-    {
-        requiredAlign = 4096;
-    }
-    if ((reinterpret_cast<uintptr_t>(hostPtr) % static_cast<size_t>(requiredAlign)) != 0)
-    {
-        throw std::runtime_error("importHostBuffer: hostPtr is not aligned to minImportedHostPointerAlignment");
-    }
-
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size;
