@@ -1264,7 +1264,6 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *host
     VkDeviceSize requiredAlign = hostProps.minImportedHostPointerAlignment;
     if (requiredAlign == 0)
     {
-        // 规范保证该值非零，但为稳妥处理
         requiredAlign = 4096;
     }
     if ((reinterpret_cast<uintptr_t>(hostPtr) % static_cast<size_t>(requiredAlign)) != 0)
@@ -1272,93 +1271,36 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *host
         throw std::runtime_error("importHostBuffer: hostPtr is not aligned to minImportedHostPointerAlignment");
     }
 
-    // 创建 VkBuffer
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size;
     bufferInfo.usage = bufferWrap.bufferUsage;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateBuffer(this->device->logicalDevice, &bufferInfo, nullptr, &bufferWrap.bufferHandle) != VK_SUCCESS)
-    {
-        throw std::runtime_error("importHostBuffer: vkCreateBuffer failed");
-    }
-
-    // 查询内存需求
-    VkMemoryRequirements memReq{};
-    vkGetBufferMemoryRequirements(this->device->logicalDevice, bufferWrap.bufferHandle, &memReq);
-
-    // 选择主机可见且最好是 COHERENT 的内存类型
-    VkPhysicalDeviceMemoryProperties memProps;
-    vkGetPhysicalDeviceMemoryProperties(this->device->physicalDevice, &memProps);
-
-    uint32_t memoryTypeIndex = UINT32_MAX;
-    const VkMemoryPropertyFlags desiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
-    {
-        if ((memReq.memoryTypeBits & (1u << i)) &&
-            (memProps.memoryTypes[i].propertyFlags & desiredFlags) == desiredFlags)
-        {
-            memoryTypeIndex = i;
-            break;
-        }
-    }
-
-    // 如果找不到 COHERENT，就退化为 HOST_VISIBLE
-    if (memoryTypeIndex == UINT32_MAX)
-    {
-        for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
-        {
-            if ((memReq.memoryTypeBits & (1u << i)) &&
-                (memProps.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
-            {
-                memoryTypeIndex = i;
-                break;
-            }
-        }
-    }
-
-    if (memoryTypeIndex == UINT32_MAX)
-    {
-        vkDestroyBuffer(this->device->logicalDevice, bufferWrap.bufferHandle, nullptr);
-        throw std::runtime_error("importHostBuffer: no HOST_VISIBLE memory type found for imported host pointer");
-    }
-
-    // 使用 VK_EXT_external_memory_host 导入主机指针作为设备内存
     VkImportMemoryHostPointerInfoEXT importInfo{};
     importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT;
     importInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
     importInfo.pHostPointer = hostPtr;
 
-    VkMemoryAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.pNext = &importInfo;
-    // 按要求对齐分配大小
-    VkDeviceSize allocSize = memReq.size;
-    if (allocSize % requiredAlign)
-    {
-        allocSize = ((allocSize + requiredAlign - 1) / requiredAlign) * requiredAlign;
-    }
-    allocInfo.allocationSize = allocSize;
-    allocInfo.memoryTypeIndex = memoryTypeIndex;
+    VmaAllocationCreateInfo allocInfo{};
+    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    allocInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
-    if (vkAllocateMemory(this->device->logicalDevice, &allocInfo, nullptr, &bufferWrap.bufferMemory) != VK_SUCCESS)
-    {
-        vkDestroyBuffer(this->device->logicalDevice, bufferWrap.bufferHandle, nullptr);
-        throw std::runtime_error("importHostBuffer: vkAllocateMemory failed for host pointer import");
-    }
+    VkResult res = vmaCreateDedicatedBuffer(
+        g_hAllocator,
+        &bufferInfo,
+        &allocInfo,
+        &importInfo,
+        &bufferWrap.bufferHandle,
+        &bufferWrap.bufferAlloc,
+        &bufferWrap.bufferAllocInfo);
 
-    // 绑定内存到缓冲
-    if (vkBindBufferMemory(this->device->logicalDevice, bufferWrap.bufferHandle, bufferWrap.bufferMemory, 0) != VK_SUCCESS)
+    if (res != VK_SUCCESS)
     {
-        vkFreeMemory(this->device->logicalDevice, bufferWrap.bufferMemory, nullptr);
-        vkDestroyBuffer(this->device->logicalDevice, bufferWrap.bufferHandle, nullptr);
-        throw std::runtime_error("importHostBuffer: vkBindBufferMemory failed");
+        throw std::runtime_error("importHostBuffer: vmaCreateDedicatedBuffer failed");
     }
 
-    // 填充尺寸信息以便后续 copyBuffer 使用
     bufferWrap.bufferAllocInfo.size = size;
-
     return bufferWrap;
 }
 
