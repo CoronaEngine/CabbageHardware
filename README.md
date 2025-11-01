@@ -1,5 +1,5 @@
 # TODO（按优先级排序）
-- （紧急）对齐问题：importBufferMemory、exportBufferMemory、importHostBuffer
+- （紧急）对齐问题：importBufferMemory、exportBufferMemory
 - （紧急）解决命令行的Warning
 - （紧急）多线程资源释放
 - （紧急）重构queue的任务间同步、vkCmdPipelineBarrier、自动记录Barrier
