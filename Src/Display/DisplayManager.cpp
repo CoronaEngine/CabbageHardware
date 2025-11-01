@@ -385,13 +385,6 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                         displayDevice->resourceManager.destroyBuffer(dstStaging);
                     }
 
-                    // globalHardwareContext.mainDevice->resourceManager.TestWin32HandlesImport(
-                    //     srcStaging,
-                    //     dstStaging,
-                    //     imageSizeBytes,
-                    //     globalHardwareContext.mainDevice->resourceManager,
-                    //     displayDevice->resourceManager);
-
                     // 导入到目标设备
                     dstStaging = displayDevice->resourceManager.importBufferMemory(memHandle, srcStaging);
                 }
@@ -437,9 +430,17 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 CopyImageToBufferCommand copyCmd(sourceImage, srcStaging);
                 (*mainDeviceExecutor) << &copyCmd << mainDeviceExecutor->commit();
 
+                vkDeviceWaitIdle(globalHardwareContext.mainDevice->deviceManager.logicalDevice);
+                srcCpuData.resize(srcStaging.bufferAllocInfo.size);
+                globalHardwareContext.mainDevice->resourceManager.copyBufferToCpu(srcStaging, srcCpuData.data());
+
                 // 在显示设备上：dstStaging -> 目标图像
                 CopyBufferToImageCommand copyCmd2(dstStaging, this->displayImage);
                 (*displayDeviceExecutor) << &copyCmd2;
+
+                vkDeviceWaitIdle(displayDevice->deviceManager.logicalDevice);
+                dstCpuData.resize(dstStaging.bufferAllocInfo.size);
+                displayDevice->resourceManager.copyBufferToCpu(dstStaging, dstCpuData.data());
             }
 
             std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos;

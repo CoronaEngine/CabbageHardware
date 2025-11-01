@@ -94,8 +94,8 @@ struct ResourceManager
     ResourceManager &copyImageToBuffer(VkCommandBuffer &commandBuffer, ImageHardwareWrap& image, BufferHardwareWrap& buffer);
 
     // Todo：需要重构
-    //void copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData);
-    //void copyBufferToCpu(VkDevice &device, VkDeviceMemory &memory, VkDeviceSize size, void *cpuData);
+    void copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData);
+    void copyBufferToCpu(VkDevice &device, VkDeviceMemory &memory, VkDeviceSize size, void *cpuData);
     ExternalMemoryHandle exportBufferMemory(BufferHardwareWrap &sourceBuffer);
     BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle &memHandle, const BufferHardwareWrap &sourceBuffer);
 
