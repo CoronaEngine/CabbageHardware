@@ -1227,6 +1227,49 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     return importedBuffer;
 }
 
+
+ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *hostPtr, uint64_t size)
+{
+    BufferHardwareWrap bufferWrap;
+    bufferWrap.device = this->device;
+    bufferWrap.resourceManager = this;
+    bufferWrap.bufferUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+
+    // 1. 创建 VkBuffer
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = size;
+    bufferInfo.usage = bufferWrap.bufferUsage;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    // 2. 设置导入主机指针信息
+    VkImportMemoryHostPointerInfoEXT importInfo{};
+    importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT;
+    importInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
+    importInfo.pHostPointer = hostPtr;
+
+    // 3. VMA 分配参数
+    VmaAllocationCreateInfo allocCreateInfo{};
+    allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    allocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    allocCreateInfo.pUserData = nullptr;
+
+    // 4. 创建 Buffer
+    VkResult res = vmaCreateBuffer(
+        g_hAllocator,
+        &bufferInfo,
+        &allocCreateInfo,
+        &bufferWrap.bufferHandle,
+        &bufferWrap.bufferAlloc,
+        &bufferWrap.bufferAllocInfo);
+    if (res != VK_SUCCESS)
+    {
+        throw std::runtime_error("vmaCreateBuffer with host pointer import failed!");
+    }
+
+    return bufferWrap;
+}
+
 //void ResourceManager::TestWin32HandlesImport(BufferHardwareWrap &srcStaging, BufferHardwareWrap &dstStaging, VkDeviceSize imageSizeBytes, ResourceManager &srcResourceManager, ResourceManager &dstResourceManager)
 //{
 //    constexpr VkExternalMemoryHandleTypeFlagBits handleType =
