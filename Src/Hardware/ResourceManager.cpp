@@ -1466,7 +1466,7 @@ void ResourceManager::freeHostSharedPointer(void *ptr, uint64_t /*size*/)
 //
 //}
 
-void ResourceManager::copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData)
+void ResourceManager::copyBufferToHost(BufferHardwareWrap &buffer, void *cpuData)
 {
     void *mappedData = nullptr;
     VkResult result = vmaMapMemory(buffer.resourceManager->g_hAllocator, buffer.bufferAlloc, &mappedData);
@@ -1478,19 +1478,6 @@ void ResourceManager::copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData)
     vmaInvalidateAllocation(buffer.resourceManager->g_hAllocator, buffer.bufferAlloc, 0, VK_WHOLE_SIZE);
     memcpy(cpuData, mappedData, buffer.bufferAllocInfo.size);
     vmaUnmapMemory(buffer.resourceManager->g_hAllocator, buffer.bufferAlloc);
-}
-
-void ResourceManager::copyBufferToCpu(VkDevice &device, VkDeviceMemory &memory, VkDeviceSize size, void *cpuData)
-{
-    void *mappedData = nullptr;
-    VkResult result = vkMapMemory(device, memory, 0, size, 0, &mappedData);
-    if (result != VK_SUCCESS)
-    {
-        throw std::runtime_error("Failed to map memory");
-    }
-
-    memcpy(cpuData, mappedData, size);
-    vkUnmapMemory(device, memory);
 }
 
 ResourceManager::ExternalMemoryHandle ResourceManager::exportBufferMemory(BufferHardwareWrap &sourceBuffer)
