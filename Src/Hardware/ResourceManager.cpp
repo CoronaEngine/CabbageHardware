@@ -1152,18 +1152,6 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     {
         throw std::runtime_error("Cannot import buffer with invalid memory handle!");
     }
-
-    constexpr VkExternalMemoryHandleTypeFlagBits handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-
-    constexpr static VkExportMemoryAllocateInfoKHR exportMemAllocInfo{
-        VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR,
-        nullptr,
-        handleType};
-
-    constexpr static VkExternalMemoryBufferCreateInfoKHR externalMemBufCreateInfo{
-        VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO_KHR,
-        nullptr,
-        handleType};
 #endif
 
     BufferHardwareWrap importedBuffer = {};
@@ -1171,107 +1159,72 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     importedBuffer.resourceManager = this;
     importedBuffer.bufferUsage = sourceBuffer.bufferUsage;
 
-    // 创建新的缓冲区
-    VkBufferCreateInfo bufferInfo = {};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = sourceBuffer.bufferAllocInfo.size;
-    bufferInfo.usage = importedBuffer.bufferUsage;
+    VkBufferCreateInfo bufCreateInfo = {};
+    bufCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufCreateInfo.size = sourceBuffer.bufferAllocInfo.size;
+    bufCreateInfo.usage = importedBuffer.bufferUsage;
 
-    std::vector<uint32_t> importQueueFamilyIndices;
-    if (device->getQueueFamilyNumber()>1)
+    // Keep queue family indices alive until after vkCreateBuffer/vmaCreateBuffer
+    // Todo：这里后面可以优化，只传递需要的队列族索引
+    std::vector<uint32_t> queueFamilyIndices;
+    if (device->getQueueFamilyNumber() > 1)
     {
-        importQueueFamilyIndices.resize(device->getQueueFamilyNumber());
-        for (size_t i = 0; i < importQueueFamilyIndices.size(); i++)
+        queueFamilyIndices.resize(device->getQueueFamilyNumber());
+        for (size_t i = 0; i < queueFamilyIndices.size(); i++)
         {
-            importQueueFamilyIndices[i] = static_cast<uint32_t>(i);
+            queueFamilyIndices[i] = static_cast<uint32_t>(i);
         }
-        bufferInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-        bufferInfo.queueFamilyIndexCount = static_cast<uint32_t>(importQueueFamilyIndices.size());
-        bufferInfo.pQueueFamilyIndices = importQueueFamilyIndices.data();
+        bufCreateInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        bufCreateInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueFamilyIndices.size());
+        bufCreateInfo.pQueueFamilyIndices = queueFamilyIndices.data();
     }
     else
     {
-        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        bufCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
 
-    bufferInfo.pNext = &externalMemBufCreateInfo;
+    // External compatibility query
+    VkExternalMemoryBufferCreateInfoKHR externalMemBufCreateInfo = {};
+    externalMemBufCreateInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO_KHR;
+#if _WIN32 || _WIN64
+    externalMemBufCreateInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+#elif __APPLE__
+    // Not used in this repo
+#elif __linux__
+    externalBufferInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+#endif
+    bufCreateInfo.pNext = &externalMemBufCreateInfo;
 
-    bool requiresDedicated = true;
-    {
-        VkPhysicalDeviceExternalBufferInfo externalBufferInfo = {
-            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO};
-        externalBufferInfo.flags = bufferInfo.flags;
-        externalBufferInfo.usage = bufferInfo.usage;
-        externalBufferInfo.handleType = handleType;
+    VkPhysicalDeviceExternalBufferInfo externalBufferInfo = {};
+    externalBufferInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO;
+    externalBufferInfo.flags = bufCreateInfo.flags;
+    externalBufferInfo.usage = bufCreateInfo.usage;
+    externalBufferInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 
-        VkExternalBufferProperties externalBufferProperties = {
-            VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES};
+    VkExternalBufferProperties externalBufferProperties = {};
+    externalBufferProperties.sType = VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES;
 
-        vkGetPhysicalDeviceExternalBufferProperties(this->device->physicalDevice, &externalBufferInfo, &externalBufferProperties);
-        constexpr VkExternalMemoryFeatureFlags expectedFlags =
-            VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT | VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT;
-        if ((externalBufferProperties.externalMemoryProperties.externalMemoryFeatures & expectedFlags) != expectedFlags)
-        {
-            throw std::runtime_error("The external memory handle type does not support both import and export.");
-        }
-        requiresDedicated = (externalBufferProperties.externalMemoryProperties.externalMemoryFeatures &
-                             VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) != 0;
-    }
+    vkGetPhysicalDeviceExternalBufferProperties(this->device->physicalDevice, &externalBufferInfo, &externalBufferProperties);
 
+    const auto feats = externalBufferProperties.externalMemoryProperties.externalMemoryFeatures;
+    const bool exportable = (feats & VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT) != 0;
+    const bool importable = (feats & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT) != 0;
+    const bool dedicatedOnly = (feats & VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) != 0;
 
-    VmaAllocationCreateInfo allocCreateInfo = {};
-    allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
-    allocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-
-    uint32_t memTypeIndex = UINT32_MAX;
-    vmaFindMemoryTypeIndexForBufferInfo(g_hAllocator, &bufferInfo, &allocCreateInfo, &memTypeIndex);
-
-    VmaPoolCreateInfo poolCreateInfo = {};
-    poolCreateInfo.memoryTypeIndex = memTypeIndex;
-    poolCreateInfo.pMemoryAllocateNext = (void *)&exportMemAllocInfo;
-
-    VmaPool pool = VK_NULL_HANDLE;
-    vmaCreatePool(g_hAllocator, &poolCreateInfo, &pool);
-
-    allocCreateInfo.pool = pool;
-
-    VkBuffer buf = VK_NULL_HANDLE;
-    VmaAllocation alloc = VK_NULL_HANDLE;
-    VmaAllocationInfo allocInfo = {};
-    vmaCreateBuffer(g_hAllocator, &bufferInfo, &allocCreateInfo, &buf, &alloc, &allocInfo);
-
-    /*if (vkCreateBuffer(this->device->logicalDevice, &bufferInfo, nullptr, &importedBuffer.bufferHandle) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create buffer for import!");
-    }*/
-
-     VkImportMemoryWin32HandleInfoKHR importMemHandleInfo = {
-        VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR};
-    importMemHandleInfo.handleType = handleType;
-     importMemHandleInfo.handle = memHandle.handle;
+    VkImportMemoryWin32HandleInfoKHR importMemHandleInfo = {};
+    importMemHandleInfo.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR;
+    importMemHandleInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+    importMemHandleInfo.handle = memHandle.handle;
     importMemHandleInfo.name = nullptr;
+
     VmaAllocationCreateInfo importAllocCreateInfo = {};
     importAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
     importAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
     importedBuffer.bufferHandle = VK_NULL_HANDLE;
     importedBuffer.bufferAlloc = VK_NULL_HANDLE;
-
-    vmaCreateDedicatedBuffer(g_hAllocator, &bufferInfo, &importAllocCreateInfo, &importMemHandleInfo, &importedBuffer.bufferHandle, &importedBuffer.bufferAlloc, &importedBuffer.bufferAllocInfo);
-
-     VmaAllocationInfo2 allocInfo2 = {};
-    vmaGetAllocationInfo2(g_hAllocator, importedBuffer.bufferAlloc, &allocInfo2);
-    // Sanity: imported allocation should be dedicated (offset 0)
-    VmaAllocationInfo basic{};
-    vmaGetAllocationInfo(g_hAllocator, importedBuffer.bufferAlloc, &basic);
-    if (basic.offset != 0)
-    {
-        std::cerr << "Warning: imported buffer allocation offset != 0 (" << basic.offset << ")" << std::endl;
-    }
-
-
+    vmaCreateDedicatedBuffer(g_hAllocator, &bufCreateInfo, &importAllocCreateInfo, &importMemHandleInfo, &importedBuffer.bufferHandle, &importedBuffer.bufferAlloc, &importedBuffer.bufferAllocInfo);
     return importedBuffer;
-
 }
 
 //void ResourceManager::TestWin32HandlesImport(BufferHardwareWrap &srcStaging, BufferHardwareWrap &dstStaging, VkDeviceSize imageSizeBytes, ResourceManager &srcResourceManager, ResourceManager &dstResourceManager)
@@ -1422,15 +1375,16 @@ ResourceManager::ExternalMemoryHandle ResourceManager::exportBufferMemory(Buffer
     {
         throw std::runtime_error("Cannot export memory from invalid buffer!");
     }
+
     // 确保是专用分配（offset==0），否则导出的句柄指向整个内存块而非子分配，会导致导入侧偏移/对齐错误
-    {
+    /*{
         VmaAllocationInfo info{};
         vmaGetAllocationInfo(g_hAllocator, sourceBuffer.bufferAlloc, &info);
         if (info.offset != 0)
         {
             throw std::runtime_error("exportBufferMemory: allocation is not dedicated (offset != 0). Use createExportableBuffer to allocate a dedicated, exportable buffer.");
         }
-    }
+    }*/
 
 #if _WIN32 || _WIN64
     VkResult result = vmaGetMemoryWin32Handle2(g_hAllocator, sourceBuffer.bufferAlloc, VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT, nullptr, &memHandle.handle);

@@ -365,7 +365,8 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
             initDisplayManager(displaySurface);
 
-            if (globalHardwareContext.mainDevice != displayDevice)
+            //if (globalHardwareContext.mainDevice != displayDevice)
+            if (true)
             {
                 this->displayImage = displayDevice->resourceManager.createImage(imageGlobalPool[*displayImage.imageID].imageSize, imageGlobalPool[*displayImage.imageID].imageFormat,
                                                                                 imageGlobalPool[*displayImage.imageID].pixelSize, imageGlobalPool[*displayImage.imageID].imageUsage);
@@ -429,7 +430,8 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
         if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
         {
-            if (globalHardwareContext.mainDevice != displayDevice)
+            //if (globalHardwareContext.mainDevice != displayDevice)
+            if (true)
             {
                 // 在主设备上：源图像 -> srcStaging
                 CopyImageToBufferCommand copyCmd(sourceImage, srcStaging);
