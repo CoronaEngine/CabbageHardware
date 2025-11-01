@@ -1340,32 +1340,32 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
 //
 //}
 
-//void ResourceManager::copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData)
-//{
-//    void *mappedData = nullptr;
-//    VkResult result = vmaMapMemory(buffer.resourceManager->getVmaAllocator(), buffer.bufferAlloc, &mappedData);
-//    if (result != VK_SUCCESS)
-//    {
-//        throw std::runtime_error("Failed to map memory");
-//    }
-//
-//    vmaInvalidateAllocation(buffer.resourceManager->getVmaAllocator(), buffer.bufferAlloc, 0, VK_WHOLE_SIZE);
-//    memcpy(cpuData, mappedData, buffer.bufferAllocInfo.size);
-//    vmaUnmapMemory(buffer.resourceManager->getVmaAllocator(), buffer.bufferAlloc);
-//}
+void ResourceManager::copyBufferToCpu(BufferHardwareWrap &buffer, void *cpuData)
+{
+    void *mappedData = nullptr;
+    VkResult result = vmaMapMemory(buffer.resourceManager->g_hAllocator, buffer.bufferAlloc, &mappedData);
+    if (result != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to map memory");
+    }
 
-//void ResourceManager::copyBufferToCpu(VkDevice &device, VkDeviceMemory &memory, VkDeviceSize size, void *cpuData)
-//{
-//    void *mappedData = nullptr;
-//    VkResult result = vkMapMemory(device, memory, 0, size, 0, &mappedData);
-//    if (result != VK_SUCCESS)
-//    {
-//        throw std::runtime_error("Failed to map memory");
-//    }
-//
-//    memcpy(cpuData, mappedData, size);
-//    vkUnmapMemory(device, memory);
-//}
+    vmaInvalidateAllocation(buffer.resourceManager->g_hAllocator, buffer.bufferAlloc, 0, VK_WHOLE_SIZE);
+    memcpy(cpuData, mappedData, buffer.bufferAllocInfo.size);
+    vmaUnmapMemory(buffer.resourceManager->g_hAllocator, buffer.bufferAlloc);
+}
+
+void ResourceManager::copyBufferToCpu(VkDevice &device, VkDeviceMemory &memory, VkDeviceSize size, void *cpuData)
+{
+    void *mappedData = nullptr;
+    VkResult result = vkMapMemory(device, memory, 0, size, 0, &mappedData);
+    if (result != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to map memory");
+    }
+
+    memcpy(cpuData, mappedData, size);
+    vkUnmapMemory(device, memory);
+}
 
 ResourceManager::ExternalMemoryHandle ResourceManager::exportBufferMemory(BufferHardwareWrap &sourceBuffer)
 {
