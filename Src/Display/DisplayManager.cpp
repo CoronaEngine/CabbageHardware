@@ -26,6 +26,12 @@ DisplayManager::~DisplayManager()
 
 void DisplayManager::cleanUpDisplayManager()
 {
+    if (hostBufferPtr != nullptr)
+    {
+        free(hostBufferPtr);
+        hostBufferPtr = nullptr;
+    }
+
     // 即便 displayDevice 为空，也尽可能释放 surface 等与实例相关的资源
     VkDevice device = (displayDevice ? displayDevice->deviceManager.logicalDevice : VK_NULL_HANDLE);
 
@@ -373,11 +379,11 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
                 VkDeviceSize imageSizeBytes = this->displayImage.imageSize.x * this->displayImage.imageSize.y * this->displayImage.pixelSize;
 
-                void *ptr = globalHardwareContext.mainDevice->resourceManager.allocateHostSharedPointer(imageSizeBytes);
+                hostBufferPtr = malloc(imageSizeBytes);
 
                 //srcStaging = globalHardwareContext.mainDevice->resourceManager.createBuffer(imageSizeBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, true);
 
-                srcStaging = globalHardwareContext.mainDevice->resourceManager.importHostBuffer(ptr, imageSizeBytes);
+                srcStaging = globalHardwareContext.mainDevice->resourceManager.importHostBuffer(hostBufferPtr, imageSizeBytes);
 
                 {
                     // 导出缓冲区内存
@@ -392,7 +398,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                     // 导入到目标设备
                     //dstStaging = displayDevice->resourceManager.importBufferMemory(memHandle, srcStaging);
 
-                    dstStaging = displayDevice->resourceManager.importHostBuffer(ptr, imageSizeBytes);
+                    dstStaging = displayDevice->resourceManager.importHostBuffer(hostBufferPtr, imageSizeBytes);
                 }
             }
             else

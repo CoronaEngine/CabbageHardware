@@ -1304,54 +1304,6 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *host
     return bufferWrap;
 }
 
-void *ResourceManager::allocateHostSharedPointer(uint64_t size)
-{
-#if _WIN32 || _WIN64
-    // VirtualAlloc 返回页面对齐的内存，满足对齐要求
-    void *ptr = VirtualAlloc(nullptr, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    if (!ptr)
-    {
-        throw std::runtime_error("allocateHostSharedPointer: VirtualAlloc failed");
-    }
-    return ptr;
-#elif __APPLE__ || __linux__
-    // 简化实现：使用 posix_memalign/aligned_alloc 进行对齐，具体对齐值可进一步查询并适配
-    // 这里取 4096 作为通用页大小对齐
-    const size_t align = 4096;
-    void *ptr = nullptr;
-#if defined(__APPLE__)
-    // macOS 没有 aligned_alloc，使用 posix_memalign
-    if (posix_memalign(&ptr, align, size) != 0)
-    {
-        throw std::runtime_error("allocateHostSharedPointer: posix_memalign failed");
-    }
-#else
-    ptr = aligned_alloc(align, ((size + align - 1) / align) * align);
-    if (!ptr)
-    {
-        throw std::runtime_error("allocateHostSharedPointer: aligned_alloc failed");
-    }
-#endif
-    return ptr;
-#else
-    return nullptr;
-#endif
-}
-
-void ResourceManager::freeHostSharedPointer(void *ptr, uint64_t /*size*/)
-{
-#if _WIN32 || _WIN64
-    if (ptr)
-    {
-        VirtualFree(ptr, 0, MEM_RELEASE);
-    }
-#elif __APPLE__ || __linux__
-    if (ptr)
-    {
-        free(ptr);
-    }
-#endif
-}
 
 //void ResourceManager::TestWin32HandlesImport(BufferHardwareWrap &srcStaging, BufferHardwareWrap &dstStaging, VkDeviceSize imageSizeBytes, ResourceManager &srcResourceManager, ResourceManager &dstResourceManager)
 //{

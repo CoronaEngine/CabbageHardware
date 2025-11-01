@@ -106,11 +106,6 @@ struct ResourceManager
 
     BufferHardwareWrap importHostBuffer(void *hostPtr, uint64_t size);
 
-    // 为 VK_EXT_external_memory_host 提供的主机内存分配/释放助手。
-    // 注意：返回的指针需在所有使用它的设备释放或闲置后再释放。
-    void *allocateHostSharedPointer(uint64_t size);
-    void freeHostSharedPointer(void *ptr, uint64_t size = 0);
-
     //void TestWin32HandlesImport(BufferHardwareWrap &srcStaging, BufferHardwareWrap &dstStaging, VkDeviceSize imageSizeBytes, ResourceManager &srcResourceManager, ResourceManager &dstResourceManager);
     uint32_t findExternalMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     //void transitionImageLayoutUnblocked(const VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
