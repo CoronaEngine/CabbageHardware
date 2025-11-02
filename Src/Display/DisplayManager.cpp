@@ -9,6 +9,8 @@
 #include<Hardware/GlobalContext.h>
 #include<Hardware/ResourceCommand.h>
 
+#include<corona/kernel/memory/cache_aligned_allocator.h>
+
 //#define USE_SAME_DEVICE
 
 //#if _WIN32 || _WIN64
@@ -32,7 +34,7 @@ void DisplayManager::cleanUpDisplayManager()
 {
     if (hostBufferPtr != nullptr)
     {
-        _aligned_free(hostBufferPtr);
+        Corona::Kernal::Memory::aligned_free(hostBufferPtr);
         hostBufferPtr = nullptr;
     }
 
@@ -405,9 +407,9 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 {
                     imageSizeBytes = ((imageSizeBytes + requiredAlign - 1) / requiredAlign) * requiredAlign;
                 }
-#if _WIN32 || _WIN64
-                hostBufferPtr = _aligned_malloc(imageSizeBytes, requiredAlign);
-#endif
+
+                Corona::Kernal::Memory::aligned_malloc(imageSizeBytes, requiredAlign);
+
                 //srcStaging = globalHardwareContext.mainDevice->resourceManager.createBuffer(imageSizeBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, true);
 
                 srcStaging = globalHardwareContext.mainDevice->resourceManager.importHostBuffer(hostBufferPtr, imageSizeBytes);
