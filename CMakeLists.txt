@@ -44,6 +44,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Helicon)
 
+FetchContent_Declare(CoronaFramework
+    GIT_REPOSITORY https://github.com/CoronaEngine/CoronaFramework.git
+    GIT_TAG main
+    GIT_SHALLOW TRUE
+    EXCLUDE_FROM_ALL
+)
+FetchContent_MakeAvailable(CoronaFramework)
+
 FetchContent_Declare(
     volk
     GIT_REPOSITORY https://github.com/zeux/volk.git
