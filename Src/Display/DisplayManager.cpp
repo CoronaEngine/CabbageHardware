@@ -403,12 +403,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                     requiredAlign = std::max(requiredAlign, hostProps.minImportedHostPointerAlignment);
                 }
 
-                if (imageSizeBytes % requiredAlign != 0)
-                {
-                    imageSizeBytes = ((imageSizeBytes + requiredAlign - 1) / requiredAlign) * requiredAlign;
-                }
-
-                Corona::Kernal::Memory::aligned_malloc(imageSizeBytes, requiredAlign);
+                hostBufferPtr = Corona::Kernal::Memory::aligned_malloc(imageSizeBytes, requiredAlign);
 
                 //srcStaging = globalHardwareContext.mainDevice->resourceManager.createBuffer(imageSizeBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, true);
 
