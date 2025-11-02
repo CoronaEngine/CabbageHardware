@@ -17,7 +17,7 @@ target_link_libraries(volk PUBLIC Vulkan-Headers)
 
 target_link_libraries(CabbageHardware PUBLIC
     Helicon
-    CoronaFramework
+    corona::kernel
     volk
     Vulkan-Headers
     VulkanMemoryAllocator)
