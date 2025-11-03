@@ -33,7 +33,7 @@ struct CommandRecord
 
     virtual RequiredBarriers getRequiredBarriers(VkAccessFlags2 srcAccessMask, VkPipelineStageFlags2 srcStageMask)
     {
-        return RequiredBarriers();
+        return RequiredBarriers{};
     }
 
     virtual ExecutorType getExecutorType()

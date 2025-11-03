@@ -45,6 +45,15 @@ ComputePipeline* ComputePipeline::operator()(uint16_t groupCountX, uint16_t grou
 	return this;
 }
 
+
+CommandRecord::RequiredBarriers ComputePipeline::getRequiredBarriers(VkAccessFlags2 srcAccessMask, VkPipelineStageFlags2 srcStageMask)
+{
+    CommandRecord::RequiredBarriers requiredBarriers;
+
+    return requiredBarriers;
+}
+
+
 void ComputePipeline::commitCommand(HardwareExecutor &hardwareExecutor)
 {
     if (pipelineLayout == VK_NULL_HANDLE && pipeline == VK_NULL_HANDLE)

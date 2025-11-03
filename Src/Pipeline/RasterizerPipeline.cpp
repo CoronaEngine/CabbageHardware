@@ -442,6 +442,22 @@ CommandRecord *RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
 }
 
 
+CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(VkAccessFlags2 srcAccessMask, VkPipelineStageFlags2 srcStageMask)
+{
+    CommandRecord::RequiredBarriers requiredBarriers;
+    //requiredBarriers.memoryBarriers.resize(1);
+
+    //requiredBarriers.memoryBarriers[0].sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+    //requiredBarriers.memoryBarriers[0].srcAccessMask = srcAccessMask;
+    //requiredBarriers.memoryBarriers[0].srcStageMask = srcStageMask;
+    //requiredBarriers.memoryBarriers[0].dstAccessMask = ;
+    //requiredBarriers.memoryBarriers[0].dstStageMask = ;
+    //requiredBarriers.memoryBarriers[0].pNext = nullptr;
+
+    return requiredBarriers;
+}
+
+
 void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
 {
 
