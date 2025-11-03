@@ -454,28 +454,56 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
     requiredBarriers.memoryBarriers[0].dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
     requiredBarriers.memoryBarriers[0].pNext = nullptr;
 
-    //requiredBarriers.imageBarriers.resize(renderTargets.size());
-    for (size_t i = 0; i < renderTargets.size(); i++)
-    {
-        VkImageMemoryBarrier2 imageBarrier;
-        imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        imageBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-        imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        imageBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-        imageBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-        imageBarrier.pNext = nullptr;
-    }
+    //{
+    //    VkImageMemoryBarrier2 imageBarrier;
+    //    imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+    //    imageBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+    //    imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    //    imageBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+    //    imageBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+    //    imageBarrier.subresourceRange.baseMipLevel = 0;
+    //    imageBarrier.subresourceRange.levelCount = 1;
+    //    imageBarrier.subresourceRange.baseArrayLayer = 0;
+    //    imageBarrier.subresourceRange.layerCount = 1;
+    //    imageBarrier.pNext = nullptr;
 
-    for (size_t i = 0; i < geomMeshes.size(); i++)
-    {
-        VkBufferMemoryBarrier2 bufferBarrier;
-        bufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-        bufferBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-        bufferBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        bufferBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-        bufferBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-        bufferBarrier.pNext = nullptr;
-    }
+    //    for (size_t i = 0; i < renderTargets.size() - 1; i++)
+    //    {
+    //        imageBarrier.image = imageGlobalPool[*renderTargets[i].imageID].imageHandle;
+    //        imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    //        imageBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+    //        imageBarrier.oldLayout = imageGlobalPool[*renderTargets[i].imageID].imageLayout;
+    //        imageBarrier.newLayout = (imageGlobalPool[*renderTargets[i].imageID].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    //        imageBarrier.subresourceRange.aspectMask = imageGlobalPool[*renderTargets[i].imageID].aspectMask;
+
+    //        requiredBarriers.imageBarriers.push_back(imageBarrier);
+    //    }
+
+    //    imageBarrier.image = imageGlobalPool[*renderTargets[renderTargets.size() - 1].imageID].imageHandle;
+    //    imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+    //    imageBarrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    //    imageBarrier.oldLayout = imageGlobalPool[*renderTargets[renderTargets.size() - 1].imageID].imageLayout;
+    //    imageBarrier.newLayout = (imageGlobalPool[*renderTargets[renderTargets.size() - 1].imageID].imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    //    imageBarrier.subresourceRange.aspectMask = imageGlobalPool[*renderTargets[renderTargets.size() - 1].imageID].aspectMask;
+    //    requiredBarriers.imageBarriers.push_back(imageBarrier);
+    //}
+
+    //{
+    //    VkBufferMemoryBarrier2 bufferBarrier;
+    //    bufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+    //    bufferBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+    //    bufferBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    //    bufferBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+    //    bufferBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+    //    bufferBarrier.pNext = nullptr;
+
+    //    for (size_t i = 0; i < geomMeshes.size(); i++)
+    //    {
+    //        bufferBarrier.offset = bufferGlobalPool[*geomMeshes[i].indexBuffer.bufferID].bufferAllocInfo.offset;
+    //        bufferBarrier.size = bufferGlobalPool[*geomMeshes[i].indexBuffer.bufferID].bufferAllocInfo.size;
+    //        requiredBarriers.bufferBarriers.push_back(bufferBarrier);
+    //    }
+    //}
 
     return requiredBarriers;
 }

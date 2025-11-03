@@ -22,8 +22,8 @@ struct ResourceManager
 
     struct BufferHardwareWrap
     {
-        VkPipelineStageFlags2 srcStageMask;
-        VkAccessFlags2 srcAccessMask;
+        //VkPipelineStageFlags2 srcStageMask;
+        //VkAccessFlags2 srcAccessMask;
 
         VkBuffer bufferHandle = VK_NULL_HANDLE;
 
@@ -41,8 +41,8 @@ struct ResourceManager
 
     struct ImageHardwareWrap
     {
-        VkPipelineStageFlags2 srcStageMask;
-        VkAccessFlags2 srcAccessMask;
+        //VkPipelineStageFlags2 srcStageMask;
+        //VkAccessFlags2 srcAccessMask;
         VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
         uint32_t pixelSize = 0;
