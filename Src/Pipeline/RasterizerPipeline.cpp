@@ -445,14 +445,14 @@ CommandRecord *RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
 CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(VkAccessFlags2 srcAccessMask, VkPipelineStageFlags2 srcStageMask)
 {
     CommandRecord::RequiredBarriers requiredBarriers;
-    //requiredBarriers.memoryBarriers.resize(1);
+    requiredBarriers.memoryBarriers.resize(1);
 
-    //requiredBarriers.memoryBarriers[0].sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
-    //requiredBarriers.memoryBarriers[0].srcAccessMask = srcAccessMask;
-    //requiredBarriers.memoryBarriers[0].srcStageMask = srcStageMask;
-    //requiredBarriers.memoryBarriers[0].dstAccessMask = ;
-    //requiredBarriers.memoryBarriers[0].dstStageMask = ;
-    //requiredBarriers.memoryBarriers[0].pNext = nullptr;
+    requiredBarriers.memoryBarriers[0].sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+    requiredBarriers.memoryBarriers[0].srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+    requiredBarriers.memoryBarriers[0].srcStageMask = srcStageMask;
+    requiredBarriers.memoryBarriers[0].dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT;
+    requiredBarriers.memoryBarriers[0].dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    requiredBarriers.memoryBarriers[0].pNext = nullptr;
 
     return requiredBarriers;
 }
