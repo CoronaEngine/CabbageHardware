@@ -83,8 +83,7 @@ struct ResourceManager
     VkImageView createImageView(ImageHardwareWrap &image);
     void destroyImage(ImageHardwareWrap &image);
 
-    BufferHardwareWrap createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, bool hostVisibleMapped = true);
-    BufferHardwareWrap createExportBuffer(VkDeviceSize size);
+    BufferHardwareWrap createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, bool hostVisibleMapped = true, bool useDedicated = false);
     void destroyBuffer(BufferHardwareWrap &buffer);
 
     uint32_t storeDescriptor(ImageHardwareWrap image);
