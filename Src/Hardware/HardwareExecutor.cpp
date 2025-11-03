@@ -59,6 +59,9 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
 
             vkBeginCommandBuffer(currentRecordQueue->commandBuffer, &beginInfo);
 
+            VkPipelineStageFlags2 accumulatedStageMask = VK_PIPELINE_STAGE_2_NONE;
+            VkAccessFlags2 accumulatedAccessMask = VK_ACCESS_2_NONE;
+
             for (size_t i = 0; i < commandList.size(); i++)
             {
                 std::vector<VkMemoryBarrier2> memoryBarriers;
@@ -84,6 +87,24 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
                         {
                             imageBarriers[j].srcAccessMask = VK_ACCESS_2_NONE;
                             imageBarriers[j].srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                        }
+                    }
+                    else
+                    {
+                        for (size_t j = 0; j < memoryBarriers.size(); j++)
+                        {
+                            accumulatedAccessMask |= memoryBarriers[j].dstAccessMask;
+                            accumulatedStageMask |= memoryBarriers[j].dstStageMask;
+                        }
+                        for (size_t j = 0; j < bufferBarriers.size(); j++)
+                        {
+                            accumulatedAccessMask |= bufferBarriers[j].dstAccessMask;
+                            accumulatedStageMask |= bufferBarriers[j].dstStageMask;
+                        }
+                        for (size_t j = 0; j < imageBarriers.size(); j++)
+                        {
+                            accumulatedAccessMask |= imageBarriers[j].dstAccessMask;
+                            accumulatedStageMask |= imageBarriers[j].dstStageMask;
                         }
                     }
 
