@@ -59,63 +59,50 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
 
             vkBeginCommandBuffer(currentRecordQueue->commandBuffer, &beginInfo);
 
-            VkPipelineStageFlags2 accumulatedStageMask = VK_PIPELINE_STAGE_2_NONE;
             VkAccessFlags2 accumulatedAccessMask = VK_ACCESS_2_NONE;
+            VkPipelineStageFlags2 accumulatedStageMask = VK_PIPELINE_STAGE_2_NONE;
 
             for (size_t i = 0; i < commandList.size(); i++)
             {
-                std::vector<VkMemoryBarrier2> memoryBarriers;
-                std::vector<VkBufferMemoryBarrier2> bufferBarriers;
-                std::vector<VkImageMemoryBarrier2> imageBarriers;
-                commandList[i]->getRequiredBarriers(memoryBarriers, bufferBarriers, imageBarriers);
-
-                if (!memoryBarriers.empty() || !bufferBarriers.empty() || !imageBarriers.empty())
+                CommandRecord::RequiredBarriers requiredBarriers;
+                if (i == 0)
                 {
-                    if (i == 0)
+                    commandList[i]->getRequiredBarriers(VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
+                }
+                else
+                {
+                    commandList[i]->getRequiredBarriers(accumulatedAccessMask, accumulatedStageMask);
+                }
+
+                if (!requiredBarriers.memoryBarriers.empty() || !requiredBarriers.bufferBarriers.empty() || !requiredBarriers.imageBarriers.empty())
+                {
+                    if (i != 0)
                     {
-                        for (size_t j = 0; j < memoryBarriers.size(); j++)
+                        for (size_t j = 0; j < requiredBarriers.memoryBarriers.size(); j++)
                         {
-                            memoryBarriers[j].srcAccessMask = VK_ACCESS_2_NONE;
-                            memoryBarriers[j].srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                            accumulatedAccessMask |= requiredBarriers.memoryBarriers[j].dstAccessMask;
+                            accumulatedStageMask |= requiredBarriers.memoryBarriers[j].dstStageMask;
                         }
-                        for (size_t j = 0; j < bufferBarriers.size(); j++)
+                        for (size_t j = 0; j < requiredBarriers.bufferBarriers.size(); j++)
                         {
-                            bufferBarriers[j].srcAccessMask = VK_ACCESS_2_NONE;
-                            bufferBarriers[j].srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                            accumulatedAccessMask |= requiredBarriers.bufferBarriers[j].dstAccessMask;
+                            accumulatedStageMask |= requiredBarriers.bufferBarriers[j].dstStageMask;
                         }
-                        for (size_t j = 0; j < imageBarriers.size(); j++)
+                        for (size_t j = 0; j < requiredBarriers.imageBarriers.size(); j++)
                         {
-                            imageBarriers[j].srcAccessMask = VK_ACCESS_2_NONE;
-                            imageBarriers[j].srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-                        }
-                    }
-                    else
-                    {
-                        for (size_t j = 0; j < memoryBarriers.size(); j++)
-                        {
-                            accumulatedAccessMask |= memoryBarriers[j].dstAccessMask;
-                            accumulatedStageMask |= memoryBarriers[j].dstStageMask;
-                        }
-                        for (size_t j = 0; j < bufferBarriers.size(); j++)
-                        {
-                            accumulatedAccessMask |= bufferBarriers[j].dstAccessMask;
-                            accumulatedStageMask |= bufferBarriers[j].dstStageMask;
-                        }
-                        for (size_t j = 0; j < imageBarriers.size(); j++)
-                        {
-                            accumulatedAccessMask |= imageBarriers[j].dstAccessMask;
-                            accumulatedStageMask |= imageBarriers[j].dstStageMask;
+                            accumulatedAccessMask |= requiredBarriers.imageBarriers[j].dstAccessMask;
+                            accumulatedStageMask |= requiredBarriers.imageBarriers[j].dstStageMask;
                         }
                     }
 
                     VkDependencyInfo dependencyInfo{};
                     dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-                    dependencyInfo.memoryBarrierCount = static_cast<uint32_t>(memoryBarriers.size());
-                    dependencyInfo.pMemoryBarriers = memoryBarriers.data();
-                    dependencyInfo.bufferMemoryBarrierCount = static_cast<uint32_t>(bufferBarriers.size());
-                    dependencyInfo.pBufferMemoryBarriers = bufferBarriers.data();
-                    dependencyInfo.imageMemoryBarrierCount = static_cast<uint32_t>(imageBarriers.size());
-                    dependencyInfo.pImageMemoryBarriers = imageBarriers.data();
+                    dependencyInfo.memoryBarrierCount = static_cast<uint32_t>(requiredBarriers.memoryBarriers.size());
+                    dependencyInfo.pMemoryBarriers = requiredBarriers.memoryBarriers.data();
+                    dependencyInfo.bufferMemoryBarrierCount = static_cast<uint32_t>(requiredBarriers.bufferBarriers.size());
+                    dependencyInfo.pBufferMemoryBarriers = requiredBarriers.bufferBarriers.data();
+                    dependencyInfo.imageMemoryBarrierCount = static_cast<uint32_t>(requiredBarriers.imageBarriers.size());
+                    dependencyInfo.pImageMemoryBarriers = requiredBarriers.imageBarriers.data();
                     dependencyInfo.pNext = nullptr;
 
                     vkCmdPipelineBarrier2(currentRecordQueue->commandBuffer, &dependencyInfo);

@@ -17,6 +17,13 @@ struct CommandRecord
         Invalid
     };
 
+    struct RequiredBarriers
+    {
+        std::vector<VkMemoryBarrier2> memoryBarriers;
+        std::vector<VkBufferMemoryBarrier2> bufferBarriers;
+        std::vector<VkImageMemoryBarrier2> imageBarriers;
+    };
+
     CommandRecord() = default;
     virtual ~CommandRecord() = default;
 
@@ -24,8 +31,9 @@ struct CommandRecord
     {
     }
 
-    virtual void getRequiredBarriers(std::vector<VkMemoryBarrier2> &memoryBarriers, std::vector<VkBufferMemoryBarrier2> &bufferBarriers, std::vector<VkImageMemoryBarrier2> &imageBarriers)
+    virtual RequiredBarriers getRequiredBarriers(VkAccessFlags2 srcAccessMask, VkPipelineStageFlags2 srcStageMask)
     {
+        return RequiredBarriers();
     }
 
     virtual ExecutorType getExecutorType()
