@@ -76,6 +76,7 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
                     dependencyInfo.pBufferMemoryBarriers = bufferBarriers.data();
                     dependencyInfo.imageMemoryBarrierCount = static_cast<uint32_t>(imageBarriers.size());
                     dependencyInfo.pImageMemoryBarriers = imageBarriers.data();
+                    dependencyInfo.pNext = nullptr;
 
                     vkCmdPipelineBarrier2(currentRecordQueue->commandBuffer, &dependencyInfo);
                 }
