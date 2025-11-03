@@ -459,6 +459,8 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers()
     {
         VkImageMemoryBarrier2 imageBarrier;
         imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        imageBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+        imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         imageBarrier.pNext = nullptr;
     }
 
@@ -466,6 +468,8 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers()
     {
         VkBufferMemoryBarrier2 bufferBarrier;
         bufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+        bufferBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+        bufferBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         bufferBarrier.pNext = nullptr;
     }
 
