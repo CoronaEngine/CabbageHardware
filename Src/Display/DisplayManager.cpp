@@ -78,7 +78,7 @@ void DisplayManager::cleanUpDisplayManager()
 
     if (displayImage.imageHandle != VK_NULL_HANDLE && displayImage.imageAlloc != VK_NULL_HANDLE)
     {
-        //displayDevice->resourceManager.destroyImage(displayImage);
+        displayDevice->resourceManager.destroyImage(displayImage);
         displayImage = {};
     }
 
@@ -378,7 +378,6 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
             initDisplayManager(displaySurface);
 
             if (globalHardwareContext.mainDevice != displayDevice)
-            //if (true)
             {
                 this->displayImage = displayDevice->resourceManager.createImage(imageGlobalPool[*displayImage.imageID].imageSize, imageGlobalPool[*displayImage.imageID].imageFormat,
                                                                                 imageGlobalPool[*displayImage.imageID].pixelSize, imageGlobalPool[*displayImage.imageID].imageUsage);
@@ -386,7 +385,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 VkDeviceSize imageSizeBytes = this->displayImage.imageSize.x * this->displayImage.imageSize.y * this->displayImage.pixelSize;
 
 
-                uint64_t requiredAlign = 0;
+                /*uint64_t requiredAlign = 0;
                 {
                     VkPhysicalDeviceExternalMemoryHostPropertiesEXT hostProps{};
                     hostProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_HOST_PROPERTIES_EXT;
@@ -403,15 +402,15 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                     requiredAlign = std::max(requiredAlign, hostProps.minImportedHostPointerAlignment);
                 }
 
-                hostBufferPtr = Corona::Kernal::Memory::aligned_malloc(imageSizeBytes, requiredAlign);
+                hostBufferPtr = Corona::Kernal::Memory::aligned_malloc(imageSizeBytes, requiredAlign);*/
 
                 //srcStaging = globalHardwareContext.mainDevice->resourceManager.createBuffer(imageSizeBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, true);
-
-                srcStaging = globalHardwareContext.mainDevice->resourceManager.importHostBuffer(hostBufferPtr, imageSizeBytes);
+                srcStaging = globalHardwareContext.mainDevice->resourceManager.createExportBuffer(imageSizeBytes);
+                //srcStaging = globalHardwareContext.mainDevice->resourceManager.importHostBuffer(hostBufferPtr, imageSizeBytes);
 
                 {
                     // 导出缓冲区内存
-                    //ResourceManager::ExternalMemoryHandle memHandle = globalHardwareContext.mainDevice->resourceManager.exportBufferMemory(srcStaging);
+                    ResourceManager::ExternalMemoryHandle memHandle = globalHardwareContext.mainDevice->resourceManager.exportBufferMemory(srcStaging);
 
                     // 确保在导入前释放旧的资源
                     if (dstStaging.bufferHandle != VK_NULL_HANDLE)
@@ -420,9 +419,9 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                     }
 
                     // 导入到目标设备
-                    //dstStaging = displayDevice->resourceManager.importBufferMemory(memHandle, srcStaging);
+                    dstStaging = displayDevice->resourceManager.importBufferMemory(memHandle, srcStaging);
 
-                    dstStaging = displayDevice->resourceManager.importHostBuffer(hostBufferPtr, imageSizeBytes);
+                    //dstStaging = displayDevice->resourceManager.importHostBuffer(hostBufferPtr, imageSizeBytes);
                 }
             }
             else
@@ -460,7 +459,6 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
         if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
         {
             if (globalHardwareContext.mainDevice != displayDevice)
-            //if (true)
             {
                 // 在主设备上：源图像 -> srcStaging
                 CopyImageToBufferCommand copyCmd(sourceImage, srcStaging);
