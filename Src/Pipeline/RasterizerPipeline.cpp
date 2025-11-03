@@ -458,11 +458,15 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers()
     for (size_t i = 0; i < renderTargets.size(); i++)
     {
         VkImageMemoryBarrier2 imageBarrier;
+        imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        imageBarrier.pNext = nullptr;
     }
 
     for (size_t i = 0; i < geomMeshes.size(); i++)
     {
         VkBufferMemoryBarrier2 bufferBarrier;
+        bufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+        bufferBarrier.pNext = nullptr;
     }
 
     return requiredBarriers;
