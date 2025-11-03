@@ -1070,51 +1070,51 @@ ResourceManager &ResourceManager::copyBuffer(VkCommandBuffer &commandBuffer, Buf
     return *this;
 }
 
-uint32_t ResourceManager::findExternalMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
-{
-    VkPhysicalDeviceMemoryProperties memProperties;
-    vkGetPhysicalDeviceMemoryProperties(this->device->physicalDevice, &memProperties);
-
-    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
-    {
-        if ((typeFilter & (1 << i)) &&
-            (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
-        {
-
-            // 添加详细的外部内存类型验证
-            VkPhysicalDeviceExternalImageFormatInfo extFormatInfo = {};
-            extFormatInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO;
-            extFormatInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-
-            VkPhysicalDeviceImageFormatInfo2 formatInfo = {};
-            formatInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2;
-            formatInfo.pNext = &extFormatInfo;
-            formatInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-            formatInfo.type = VK_IMAGE_TYPE_2D;
-            formatInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-            formatInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-
-            VkImageFormatProperties2 formatProps = {};
-            formatProps.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2;
-
-            VkResult result = vkGetPhysicalDeviceImageFormatProperties2(
-                this->device->physicalDevice,
-                &formatInfo,
-                &formatProps);
-
-            if (result == VK_SUCCESS)
-            {
-                std::cout << "Found compatible memory type index: " << i << std::endl;
-                std::cout << "Memory type flags: " << memProperties.memoryTypes[i].propertyFlags << std::endl;
-                return i;
-            }
-
-            std::cout << "Memory type " << i << " not compatible with external memory" << std::endl;
-        }
-    }
-
-    throw std::runtime_error("failed to find suitable external memory type!");
-}
+//uint32_t ResourceManager::findExternalMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+//{
+//    VkPhysicalDeviceMemoryProperties memProperties;
+//    vkGetPhysicalDeviceMemoryProperties(this->device->physicalDevice, &memProperties);
+//
+//    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+//    {
+//        if ((typeFilter & (1 << i)) &&
+//            (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+//        {
+//
+//            // 添加详细的外部内存类型验证
+//            VkPhysicalDeviceExternalImageFormatInfo extFormatInfo = {};
+//            extFormatInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO;
+//            extFormatInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+//
+//            VkPhysicalDeviceImageFormatInfo2 formatInfo = {};
+//            formatInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2;
+//            formatInfo.pNext = &extFormatInfo;
+//            formatInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+//            formatInfo.type = VK_IMAGE_TYPE_2D;
+//            formatInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+//            formatInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+//
+//            VkImageFormatProperties2 formatProps = {};
+//            formatProps.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2;
+//
+//            VkResult result = vkGetPhysicalDeviceImageFormatProperties2(
+//                this->device->physicalDevice,
+//                &formatInfo,
+//                &formatProps);
+//
+//            if (result == VK_SUCCESS)
+//            {
+//                std::cout << "Found compatible memory type index: " << i << std::endl;
+//                std::cout << "Memory type flags: " << memProperties.memoryTypes[i].propertyFlags << std::endl;
+//                return i;
+//            }
+//
+//            std::cout << "Memory type " << i << " not compatible with external memory" << std::endl;
+//        }
+//    }
+//
+//    throw std::runtime_error("failed to find suitable external memory type!");
+//}
 
 //ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const ExternalMemoryHandle &memHandle, const BufferHardwareWrap &sourceBuffer)
 //{
