@@ -61,6 +61,25 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
 
             for (size_t i = 0; i < commandList.size(); i++)
             {
+                std::vector<VkMemoryBarrier2> memoryBarriers;
+                std::vector<VkBufferMemoryBarrier2> bufferBarriers;
+                std::vector<VkImageMemoryBarrier2> imageBarriers;
+                commandList[i]->getBarriers(memoryBarriers, bufferBarriers, imageBarriers);
+
+                if (!memoryBarriers.empty() || !bufferBarriers.empty() || !imageBarriers.empty())
+                {
+                    VkDependencyInfo dependencyInfo{};
+                    dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                    dependencyInfo.memoryBarrierCount = static_cast<uint32_t>(memoryBarriers.size());
+                    dependencyInfo.pMemoryBarriers = memoryBarriers.data();
+                    dependencyInfo.bufferMemoryBarrierCount = static_cast<uint32_t>(bufferBarriers.size());
+                    dependencyInfo.pBufferMemoryBarriers = bufferBarriers.data();
+                    dependencyInfo.imageMemoryBarrierCount = static_cast<uint32_t>(imageBarriers.size());
+                    dependencyInfo.pImageMemoryBarriers = imageBarriers.data();
+
+                    vkCmdPipelineBarrier2(currentRecordQueue->commandBuffer, &dependencyInfo);
+                }
+
                 if (commandList[i]->getExecutorType() != CommandRecord::ExecutorType::Invalid)
                 {
                     commandList[i]->commitCommand(*this);

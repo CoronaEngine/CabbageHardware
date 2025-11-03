@@ -24,6 +24,10 @@ struct CommandRecord
     {
     }
 
+    virtual void getBarriers(std::vector<VkMemoryBarrier2> &memoryBarriers, std::vector<VkBufferMemoryBarrier2> &bufferBarriers, std::vector<VkImageMemoryBarrier2> &imageBarriers)
+    {
+    }
+
     virtual ExecutorType getExecutorType()
     {
         return ExecutorType::Invalid;
