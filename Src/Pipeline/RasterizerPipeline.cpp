@@ -488,22 +488,34 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
         requiredBarriers.imageBarriers.push_back(imageBarrier);
     }
 
-    //{
-    //    VkBufferMemoryBarrier2 bufferBarrier;
-    //    bufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-    //    bufferBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-    //    bufferBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-    //    bufferBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-    //    bufferBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-    //    bufferBarrier.pNext = nullptr;
+    {
+        VkBufferMemoryBarrier2 bufferBarrier;
+        bufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+        bufferBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+        bufferBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        bufferBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+        bufferBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+        bufferBarrier.pNext = nullptr;
 
-    //    for (size_t i = 0; i < geomMeshes.size(); i++)
-    //    {
-    //        bufferBarrier.offset = bufferGlobalPool[*geomMeshes[i].indexBuffer.bufferID].bufferAllocInfo.offset;
-    //        bufferBarrier.size = bufferGlobalPool[*geomMeshes[i].indexBuffer.bufferID].bufferAllocInfo.size;
-    //        requiredBarriers.bufferBarriers.push_back(bufferBarrier);
-    //    }
-    //}
+        for (size_t i = 0; i < geomMeshes.size(); i++)
+        {
+            bufferBarrier.buffer = bufferGlobalPool[*geomMeshes[i].indexBuffer.bufferID].bufferHandle;
+            bufferBarrier.offset = bufferGlobalPool[*geomMeshes[i].indexBuffer.bufferID].bufferAllocInfo.offset;
+            bufferBarrier.size = bufferGlobalPool[*geomMeshes[i].indexBuffer.bufferID].bufferAllocInfo.size;
+            bufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
+            bufferBarrier.dstAccessMask = VK_ACCESS_2_INDEX_READ_BIT;
+            requiredBarriers.bufferBarriers.push_back(bufferBarrier);
+            for (size_t j = 0; j < geomMeshes[i].vertexBuffers.size(); j++)
+            {
+                bufferBarrier.buffer = bufferGlobalPool[*geomMeshes[i].vertexBuffers[j].bufferID].bufferHandle;
+                bufferBarrier.offset = bufferGlobalPool[*geomMeshes[i].vertexBuffers[j].bufferID].bufferAllocInfo.offset;
+                bufferBarrier.size = bufferGlobalPool[*geomMeshes[i].vertexBuffers[j].bufferID].bufferAllocInfo.size;
+                bufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
+                bufferBarrier.dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
+                requiredBarriers.bufferBarriers.push_back(bufferBarrier);
+            }
+        }
+    }
 
     return requiredBarriers;
 }
