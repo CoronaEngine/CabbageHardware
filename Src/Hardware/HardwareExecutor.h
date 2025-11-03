@@ -31,7 +31,7 @@ struct CommandRecord
     {
     }
 
-    virtual RequiredBarriers getRequiredBarriers()
+    virtual RequiredBarriers getRequiredBarriers(HardwareExecutor &hardwareExecutor)
     {
         return RequiredBarriers{};
     }

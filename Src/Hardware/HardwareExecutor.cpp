@@ -61,7 +61,7 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
 
             for (size_t i = 0; i < commandList.size(); i++)
             {
-                CommandRecord::RequiredBarriers requiredBarriers = commandList[i]->getRequiredBarriers();
+                CommandRecord::RequiredBarriers requiredBarriers = commandList[i]->getRequiredBarriers(*this);
 
                 if (!requiredBarriers.memoryBarriers.empty() || !requiredBarriers.bufferBarriers.empty() || !requiredBarriers.imageBarriers.empty())
                 {

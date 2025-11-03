@@ -442,7 +442,7 @@ CommandRecord *RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
 }
 
 
-CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers()
+CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(HardwareExecutor &hardwareExecutor)
 {
     CommandRecord::RequiredBarriers requiredBarriers;
     requiredBarriers.memoryBarriers.resize(1);
@@ -461,6 +461,8 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers()
         imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
         imageBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
         imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        imageBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+        imageBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
         imageBarrier.pNext = nullptr;
     }
 
@@ -470,6 +472,8 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers()
         bufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
         bufferBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
         bufferBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        bufferBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+        bufferBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
         bufferBarrier.pNext = nullptr;
     }
 

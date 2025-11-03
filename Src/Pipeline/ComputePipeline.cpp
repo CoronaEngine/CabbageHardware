@@ -46,7 +46,7 @@ ComputePipeline* ComputePipeline::operator()(uint16_t groupCountX, uint16_t grou
 }
 
 
-CommandRecord::RequiredBarriers ComputePipeline::getRequiredBarriers()
+CommandRecord::RequiredBarriers ComputePipeline::getRequiredBarriers(HardwareExecutor &hardwareExecutor)
 {
     CommandRecord::RequiredBarriers requiredBarriers;
     requiredBarriers.memoryBarriers.resize(1);

@@ -75,7 +75,7 @@ struct RasterizerPipeline : public CommandRecord
 
     void commitCommand(HardwareExecutor &hardwareExecutor) override;
 
-    RequiredBarriers getRequiredBarriers() override;
+    RequiredBarriers getRequiredBarriers(HardwareExecutor &hardwareExecutor) override;
 
   private:
 
