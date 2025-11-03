@@ -64,10 +64,29 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
                 std::vector<VkMemoryBarrier2> memoryBarriers;
                 std::vector<VkBufferMemoryBarrier2> bufferBarriers;
                 std::vector<VkImageMemoryBarrier2> imageBarriers;
-                commandList[i]->getBarriers(memoryBarriers, bufferBarriers, imageBarriers);
+                commandList[i]->getRequiredBarriers(memoryBarriers, bufferBarriers, imageBarriers);
 
                 if (!memoryBarriers.empty() || !bufferBarriers.empty() || !imageBarriers.empty())
                 {
+                    if (i == 0)
+                    {
+                        for (size_t j = 0; j < memoryBarriers.size(); j++)
+                        {
+                            memoryBarriers[j].srcAccessMask = VK_ACCESS_2_NONE;
+                            memoryBarriers[j].srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                        }
+                        for (size_t j = 0; j < bufferBarriers.size(); j++)
+                        {
+                            bufferBarriers[j].srcAccessMask = VK_ACCESS_2_NONE;
+                            bufferBarriers[j].srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                        }
+                        for (size_t j = 0; j < imageBarriers.size(); j++)
+                        {
+                            imageBarriers[j].srcAccessMask = VK_ACCESS_2_NONE;
+                            imageBarriers[j].srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                        }
+                    }
+
                     VkDependencyInfo dependencyInfo{};
                     dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
                     dependencyInfo.memoryBarrierCount = static_cast<uint32_t>(memoryBarriers.size());
