@@ -31,7 +31,7 @@ struct CommandRecord
     {
     }
 
-    virtual RequiredBarriers getRequiredBarriers(VkAccessFlags2 srcAccessMask, VkPipelineStageFlags2 srcStageMask)
+    virtual RequiredBarriers getRequiredBarriers()
     {
         return RequiredBarriers{};
     }

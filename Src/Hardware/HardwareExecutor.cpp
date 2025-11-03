@@ -59,42 +59,12 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
 
             vkBeginCommandBuffer(currentRecordQueue->commandBuffer, &beginInfo);
 
-            VkAccessFlags2 accumulatedAccessMask = VK_ACCESS_2_NONE;
-            VkPipelineStageFlags2 accumulatedStageMask = VK_PIPELINE_STAGE_2_NONE;
-
             for (size_t i = 0; i < commandList.size(); i++)
             {
-                CommandRecord::RequiredBarriers requiredBarriers;
-                if (i == 0)
-                {
-                    commandList[i]->getRequiredBarriers(VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
-                }
-                else
-                {
-                    commandList[i]->getRequiredBarriers(accumulatedAccessMask, accumulatedStageMask);
-                }
+                CommandRecord::RequiredBarriers requiredBarriers = commandList[i]->getRequiredBarriers();
 
                 if (!requiredBarriers.memoryBarriers.empty() || !requiredBarriers.bufferBarriers.empty() || !requiredBarriers.imageBarriers.empty())
                 {
-                    if (i != 0)
-                    {
-                        for (size_t j = 0; j < requiredBarriers.memoryBarriers.size(); j++)
-                        {
-                            accumulatedAccessMask |= requiredBarriers.memoryBarriers[j].dstAccessMask;
-                            accumulatedStageMask |= requiredBarriers.memoryBarriers[j].dstStageMask;
-                        }
-                        for (size_t j = 0; j < requiredBarriers.bufferBarriers.size(); j++)
-                        {
-                            accumulatedAccessMask |= requiredBarriers.bufferBarriers[j].dstAccessMask;
-                            accumulatedStageMask |= requiredBarriers.bufferBarriers[j].dstStageMask;
-                        }
-                        for (size_t j = 0; j < requiredBarriers.imageBarriers.size(); j++)
-                        {
-                            accumulatedAccessMask |= requiredBarriers.imageBarriers[j].dstAccessMask;
-                            accumulatedStageMask |= requiredBarriers.imageBarriers[j].dstStageMask;
-                        }
-                    }
-
                     VkDependencyInfo dependencyInfo{};
                     dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
                     dependencyInfo.memoryBarrierCount = static_cast<uint32_t>(requiredBarriers.memoryBarriers.size());

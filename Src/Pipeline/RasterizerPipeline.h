@@ -75,7 +75,7 @@ struct RasterizerPipeline : public CommandRecord
 
     void commitCommand(HardwareExecutor &hardwareExecutor) override;
 
-    RequiredBarriers getRequiredBarriers(VkAccessFlags2 srcAccessMask, VkPipelineStageFlags2 srcStageMask) override;
+    RequiredBarriers getRequiredBarriers() override;
 
   private:
 
