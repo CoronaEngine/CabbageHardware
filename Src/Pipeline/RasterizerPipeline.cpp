@@ -456,21 +456,21 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
     }
 
     // 在图形渲染前插入通用内存屏障，确保此前任何写入对图形流水线阶段可见
-    {
-        VkMemoryBarrier barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-        barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-                                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        vkCmdPipelineBarrier(
-            hardwareExecutor.currentRecordQueue->commandBuffer,
-            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-            VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-            0,
-            1, &barrier,
-            0, nullptr,
-            0, nullptr);
-    }
+    //{
+    //    VkMemoryBarrier barrier{};
+    //    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    //    barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
+    //    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+    //                            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    //    vkCmdPipelineBarrier(
+    //        hardwareExecutor.currentRecordQueue->commandBuffer,
+    //        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+    //        VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+    //        0,
+    //        1, &barrier,
+    //        0, nullptr,
+    //        0, nullptr);
+    //}
 
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
