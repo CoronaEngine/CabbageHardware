@@ -16,6 +16,8 @@
 #include "Pipeline/RasterizerPipeline.h"
 #include <Hardware/GlobalContext.h>
 
+#include "corona/kernel/utils/storage.h"
+
 std::string readStringFile(const std::string_view file_path)
 {
     std::ifstream file(file_path.data());
@@ -418,6 +420,10 @@ struct ComputeUniformBufferObject
 
 int main()
 {
+    Corona::Kernel::Utils::Storage<RasterizerUniformBufferObject> testStronge;
+
+    //test.
+
     if (glfwInit() >= 0)
     {
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
