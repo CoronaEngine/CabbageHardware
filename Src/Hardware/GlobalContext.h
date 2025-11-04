@@ -2,6 +2,7 @@
 
 #include "Hardware/DeviceManager.h"
 #include "Hardware/ResourceManager.h"
+#include "../VulkanUtils.h"
 
 // 增加宏以启用导出内存功能
 #define USE_EXPORT_MEMORY

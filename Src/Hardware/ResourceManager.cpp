@@ -227,10 +227,7 @@ void ResourceManager::createTextureSampler()
     samplerInfo.maxLod = static_cast<float>(1);
     samplerInfo.mipLodBias = 0.0f;
 
-    if (vkCreateSampler(this->device->logicalDevice, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create texture sampler!");
-    }
+    coronaHardwareCheck(vkCreateSampler(this->device->logicalDevice, &samplerInfo, nullptr, &textureSampler));
 }
 
 void ResourceManager::destroyBuffer(BufferHardwareWrap &buffer)
@@ -322,10 +319,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
         allocInfo.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
         // 专用导出内存，不使用内存池
-        if (vmaCreateDedicatedBuffer(g_hAllocator, &bufCreateInfo, &allocInfo, &exportAlloc, &resultBuffer.bufferHandle, &resultBuffer.bufferAlloc, &resultBuffer.bufferAllocInfo) != VK_SUCCESS)
-        {
-            throw std::runtime_error("failed to create dedicated exportable buffer!");
-        }
+        coronaHardwareCheck(vmaCreateDedicatedBuffer(g_hAllocator, &bufCreateInfo, &allocInfo, &exportAlloc, &resultBuffer.bufferHandle, &resultBuffer.bufferAlloc, &resultBuffer.bufferAllocInfo));
 
         return resultBuffer;
 
@@ -393,22 +387,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
             vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
             vbAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
-            VkResult res = vmaCreateBuffer(g_hAllocator, &bufCreateInfo, &vbAllocCreateInfo, &resultBuffer.bufferHandle, &resultBuffer.bufferAlloc, &resultBuffer.bufferAllocInfo);
-            if (res != VK_SUCCESS)
-            {
-                switch (res)
-                {
-                case VK_ERROR_OUT_OF_HOST_MEMORY:
-                    std::cerr << "Host memory allocation failed!" << std::endl;
-                    break;
-                case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-                    std::cerr << "Device memory allocation failed!" << std::endl;
-                    break;
-                default:
-                    std::cerr << "VMA buffer creation failed with error code: " << res << std::endl;
-                    break;
-                }
-            }
+            coronaHardwareCheck(vmaCreateBuffer(g_hAllocator, &bufCreateInfo, &vbAllocCreateInfo, &resultBuffer.bufferHandle, &resultBuffer.bufferAlloc, &resultBuffer.bufferAllocInfo));
         }
         else if (!dedicatedOnly)
         {
@@ -423,22 +402,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
             vbAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
             vbAllocCreateInfo.pool = g_hBufferPool;
 
-            VkResult res = vmaCreateBuffer(g_hAllocator, &bufCreateInfo, &vbAllocCreateInfo, &resultBuffer.bufferHandle, &resultBuffer.bufferAlloc, &resultBuffer.bufferAllocInfo);
-            if (res != VK_SUCCESS)
-            {
-                switch (res)
-                {
-                case VK_ERROR_OUT_OF_HOST_MEMORY:
-                    std::cerr << "Host memory allocation failed!" << std::endl;
-                    break;
-                case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-                    std::cerr << "Device memory allocation failed!" << std::endl;
-                    break;
-                default:
-                    std::cerr << "VMA buffer creation failed with error code: " << res << std::endl;
-                    break;
-                }
-            }
+            coronaHardwareCheck(vmaCreateBuffer(g_hAllocator, &bufCreateInfo, &vbAllocCreateInfo, &resultBuffer.bufferHandle, &resultBuffer.bufferAlloc, &resultBuffer.bufferAllocInfo));
         }
         else
         {
@@ -462,10 +426,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
             }
 
             // 专用导出内存，不使用内存池
-            if (vmaCreateDedicatedBuffer(g_hAllocator, &bufCreateInfo, &allocInfo, &exportAlloc, &resultBuffer.bufferHandle, &resultBuffer.bufferAlloc, &resultBuffer.bufferAllocInfo) != VK_SUCCESS)
-            {
-                throw std::runtime_error("failed to create dedicated exportable buffer!");
-            }
+            coronaHardwareCheck(vmaCreateDedicatedBuffer(g_hAllocator, &bufCreateInfo, &allocInfo, &exportAlloc, &resultBuffer.bufferHandle, &resultBuffer.bufferAlloc, &resultBuffer.bufferAllocInfo));
         }
 
         return resultBuffer;
@@ -513,11 +474,7 @@ void ResourceManager::createExternalBufferMemoryPool(const VkBufferCreateInfo &b
      poolInfo.maxBlockCount = 0; // 无限制
 
      // 创建内存池（导出 Buffer 池）
-     res = vmaCreatePool(g_hAllocator, &poolInfo, &g_hBufferPool);
-     if (res != VK_SUCCESS)
-     {
-         throw std::runtime_error("vmaCreatePool failed!");
-     }
+     coronaHardwareCheck(vmaCreatePool(g_hAllocator, &poolInfo, &g_hBufferPool));
      g_exportBufferPoolMemTypeIndex = memTypeIndex;
  }
 
@@ -561,15 +518,8 @@ VkImageView ResourceManager::createImageView(ImageHardwareWrap &image)
     viewInfo.subresourceRange.layerCount = image.arrayLayers;
     viewInfo.flags = 0;
 
-    if (vkCreateImageView(this->device->logicalDevice, &viewInfo, nullptr, &image.imageView) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create texture image view!");
-        return VK_NULL_HANDLE;
-    }
-    else
-    {
-        return image.imageView;
-    }
+    coronaHardwareCheck(vkCreateImageView(this->device->logicalDevice, &viewInfo, nullptr, &image.imageView));
+    return image.imageView;
 }
 
 ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 imageSize, VkFormat imageFormat, uint32_t pixelSize, VkImageUsageFlags imageUsage, int arrayLayers, int mipLevels, VkImageTiling tiling)
@@ -633,10 +583,7 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
         VmaAllocationCreateInfo imageAllocCreateInfo = {};
         imageAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
 
-        if (vmaCreateImage(g_hAllocator, &imageInfo, &imageAllocCreateInfo, &resultImage.imageHandle, &resultImage.imageAlloc, &resultImage.imageAllocInfo) != VK_SUCCESS)
-        {
-            throw std::runtime_error("failed to create image!");
-        }
+        coronaHardwareCheck(vmaCreateImage(g_hAllocator, &imageInfo, &imageAllocCreateInfo, &resultImage.imageHandle, &resultImage.imageAlloc, &resultImage.imageAllocInfo));
 
         resultImage.imageView = createImageView(resultImage);
     }
@@ -1303,22 +1250,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     importedBuffer.bufferHandle = VK_NULL_HANDLE;
     importedBuffer.bufferAlloc = VK_NULL_HANDLE;
 
-#if _WIN32 || _WIN64
-    VkResult vres = vmaCreateDedicatedBuffer(
-        g_hAllocator,
-        &bufCreateInfo,
-        &importAllocCI,
-        &importHandleInfo,
-        &importedBuffer.bufferHandle,
-        &importedBuffer.bufferAlloc,
-        &importedBuffer.bufferAllocInfo);
-#else
-    VkResult vres = VK_ERROR_FEATURE_NOT_PRESENT;
-#endif
-    if (vres != VK_SUCCESS)
-    {
-        throw std::runtime_error("importBufferMemory: vmaCreateDedicatedBuffer failed");
-    }
+    coronaHardwareCheck(vmaCreateDedicatedBuffer(g_hAllocator, &bufCreateInfo, &importAllocCI, &importHandleInfo, &importedBuffer.bufferHandle, &importedBuffer.bufferAlloc, &importedBuffer.bufferAllocInfo));
 
     return importedBuffer;
 }
@@ -1351,19 +1283,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *host
     allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
     allocInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
-    VkResult res = vmaCreateDedicatedBuffer(
-        g_hAllocator,
-        &bufferInfo,
-        &allocInfo,
-        &importInfo,
-        &bufferWrap.bufferHandle,
-        &bufferWrap.bufferAlloc,
-        &bufferWrap.bufferAllocInfo);
-
-    if (res != VK_SUCCESS)
-    {
-        throw std::runtime_error("importHostBuffer: vmaCreateDedicatedBuffer failed");
-    }
+    coronaHardwareCheck(vmaCreateDedicatedBuffer(g_hAllocator, &bufferInfo, &allocInfo, &importInfo, &bufferWrap.bufferHandle, &bufferWrap.bufferAlloc, &bufferWrap.bufferAllocInfo));
 
     bufferWrap.bufferAllocInfo.size = size;
     return bufferWrap;
@@ -1507,11 +1427,7 @@ ResourceManager::ExternalMemoryHandle ResourceManager::exportBufferMemory(Buffer
     }
 
 #if _WIN32 || _WIN64
-    VkResult result = vmaGetMemoryWin32Handle2(g_hAllocator, sourceBuffer.bufferAlloc, VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT, nullptr, &memHandle.handle);
-    if (result != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to export memory handle! VkResult: " + std::to_string(result));
-    }
+    coronaHardwareCheck(vmaGetMemoryWin32Handle2(g_hAllocator, sourceBuffer.bufferAlloc, VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT, nullptr, &memHandle.handle));
 
     if (memHandle.handle == nullptr || memHandle.handle == INVALID_HANDLE_VALUE)
     {
@@ -1699,11 +1615,7 @@ void ResourceManager::createBindlessDescriptorSet()
         descriptorSetLayoutCreateInfos[i].flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
         descriptorSetLayoutCreateInfos[i].pNext = &descriptorSetLayoutBindingFlagsCreateInfo[i];
 
-        VkResult result = vkCreateDescriptorSetLayout(this->device->logicalDevice, &descriptorSetLayoutCreateInfos[i], nullptr, &bindlessDescriptors[i].descriptorSetLayout);
-        if (result != VK_SUCCESS)
-        {
-            throw std::runtime_error("failed to create descriptor set layout!");
-        }
+        coronaHardwareCheck(vkCreateDescriptorSetLayout(this->device->logicalDevice, &descriptorSetLayoutCreateInfos[i], nullptr, &bindlessDescriptors[i].descriptorSetLayout));
 
         {
             std::array<VkDescriptorPoolSize, 1> poolSizes{};
@@ -1717,10 +1629,7 @@ void ResourceManager::createBindlessDescriptorSet()
             poolInfo.maxSets = k_max_bindless_resources[i];
             poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
 
-            if (vkCreateDescriptorPool(this->device->logicalDevice, &poolInfo, nullptr, &bindlessDescriptors[i].descriptorPool) != VK_SUCCESS)
-            {
-                throw std::runtime_error("failed to create descriptor pool!");
-            }
+            coronaHardwareCheck(vkCreateDescriptorPool(this->device->logicalDevice, &poolInfo, nullptr, &bindlessDescriptors[i].descriptorPool));
         }
 
         {
@@ -1737,11 +1646,7 @@ void ResourceManager::createBindlessDescriptorSet()
             allocInfo.pSetLayouts = &bindlessDescriptors[i].descriptorSetLayout;
             allocInfo.pNext = &count_info;
 
-            VkResult result = vkAllocateDescriptorSets(this->device->logicalDevice, &allocInfo, &bindlessDescriptors[i].descriptorSet);
-            if (result != VK_SUCCESS)
-            {
-                throw std::runtime_error("failed to allocate descriptor sets!");
-            }
+            coronaHardwareCheck(vkAllocateDescriptorSets(this->device->logicalDevice, &allocInfo, &bindlessDescriptors[i].descriptorSet));
         }
     }
 }
@@ -1936,10 +1841,7 @@ VkShaderModule ResourceManager::createShaderModule(const std::vector<unsigned in
     createInfo.pCode = code.data();
 
     VkShaderModule shaderModule;
-    if (vkCreateShaderModule(this->device->logicalDevice, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create shader module!");
-    }
+    coronaHardwareCheck(vkCreateShaderModule(this->device->logicalDevice, &createInfo, nullptr, &shaderModule));
 
     return shaderModule;
 }

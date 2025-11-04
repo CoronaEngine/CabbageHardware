@@ -137,11 +137,8 @@ bool DisplayManager::initDisplayManager(void* surface)
     if (surface != nullptr)
     {
         createVkSurface(surface);
-
         choosePresentDevice();
-
         createSwapChain();
-
         createSyncObjects();
     }
 
@@ -286,7 +283,6 @@ void DisplayManager::createSwapChain()
     uint32_t imageCount = (capabilities.maxImageCount > 0 && (capabilities.minImageCount + 1) > capabilities.maxImageCount) ?
         capabilities.maxImageCount : (capabilities.minImageCount + 1);
 
-
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     createInfo.surface = vkSurface;
@@ -325,10 +321,7 @@ void DisplayManager::createSwapChain()
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = swapChain;
 
-    if (vkCreateSwapchainKHR(displayDevice->deviceManager.logicalDevice, &createInfo, nullptr, &swapChain) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create swap chain!");
-    }
+    coronaHardwareCheck(vkCreateSwapchainKHR(displayDevice->deviceManager.logicalDevice, &createInfo, nullptr, &swapChain));
 
     std::vector<VkImage> swapChainVkImages;
     vkGetSwapchainImagesKHR(displayDevice->deviceManager.logicalDevice, swapChain, &imageCount, nullptr);

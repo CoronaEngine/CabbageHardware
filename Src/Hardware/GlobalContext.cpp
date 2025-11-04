@@ -301,11 +301,7 @@ void HardwareContext::createVkInstance(const CreateCallback &initInfo)
     }
 #endif
 
-    VkResult result = vkCreateInstance(&createInfo, nullptr, &vkInstance);
-    if (result != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create instance!");
-    }
+    coronaHardwareCheck(vkCreateInstance(&createInfo, nullptr, &vkInstance));
 
 #ifdef CABBAGE_ENGINE_DEBUG
     if (enableDebugLayer)

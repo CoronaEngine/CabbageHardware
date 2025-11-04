@@ -1,7 +1,7 @@
 ﻿#pragma once
-#include <source_location>
-#include "Hardware/GlobalContext.h"
 
+#include <source_location>
+//#include "Hardware/GlobalContext.h"
 
 static inline const char *coronaHardwareResultStr(VkResult ret)
 {
@@ -70,10 +70,11 @@ static inline const char *coronaHardwareResultStr(VkResult ret)
   }
 }
 
-static inline void coronaHardwareCheck(VkResult result)
+static inline void coronaHardwareCheck(VkResult result, const std::source_location &loc = std::source_location::current())
 {
     if (result != VK_SUCCESS)
     {
-        throw std::runtime_error(coronaHardwareResultStr(result));
+        std::fprintf(stderr, "VkResult: %s, %s:%d, %s\n", coronaHardwareResultStr(result), loc.file_name(), static_cast<int>(loc.line()), loc.function_name());
+        throw std::runtime_error("Vulkan error encountered. See stderr for details.");
     }
 }

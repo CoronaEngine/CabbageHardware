@@ -15,11 +15,8 @@ void DeviceManager::initDeviceManager(const CreateCallback &createCallback, cons
     this->physicalDevice = physicalDevice;
 
     createDevices(createCallback, vkInstance);
-
     choosePresentQueueFamily();
-
     createCommandBuffers();
-
     createTimelineSemaphore();
 }
 
@@ -178,7 +175,6 @@ void DeviceManager::createDevices(const CreateCallback &initInfo, const VkInstan
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 
         std::vector<std::vector<float>> queuePriorities(queueFamilies.size());
-
         for (int i = 0; i < queueFamilies.size(); i++)
         {
             queuePriorities[i].resize(queueFamilies[i].queueCount);

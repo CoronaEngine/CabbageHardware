@@ -4,6 +4,7 @@
 #include"DeviceManager.h"
 #include<vk_mem_alloc.h>
 #include <ktm/ktm.h>
+#include "../VulkanUtils.h"
 
 //#include"HardwareExecutor.h"
 
