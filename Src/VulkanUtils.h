@@ -1,7 +1,6 @@
 ﻿#pragma once
 
 #include <source_location>
-//#include "Hardware/GlobalContext.h"
 
 static inline const char *coronaHardwareResultStr(VkResult ret)
 {
