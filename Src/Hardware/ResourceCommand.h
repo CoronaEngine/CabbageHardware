@@ -365,43 +365,7 @@ struct TransitionImageLayoutCommand : public CommandRecord
 
     void commitCommand(HardwareExecutor &hardwareExecutor) override
     {
-        std::vector<VkMemoryBarrier2> memoryBarriers;
-        std::vector<VkBufferMemoryBarrier2> bufferBarriers;
-        std::vector<VkImageMemoryBarrier2> imageBarriers;
-
-        VkImageMemoryBarrier2 imageBarrier;
-        imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        imageBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-        imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        imageBarrier.image = image.imageHandle;
-        imageBarrier.dstStageMask = dstStageMask;
-        imageBarrier.dstAccessMask = dstAccessMask;
-        imageBarrier.oldLayout = image.imageLayout;
-        imageBarrier.newLayout = imageLayout;
-        imageBarrier.subresourceRange.aspectMask = image.aspectMask;
-        imageBarrier.subresourceRange.baseMipLevel = 0;
-        imageBarrier.subresourceRange.levelCount = 1;
-        imageBarrier.subresourceRange.baseArrayLayer = 0;
-        imageBarrier.subresourceRange.layerCount = 1;
-        imageBarrier.pNext = nullptr;
-
-        image.imageLayout = imageBarrier.newLayout;
-
-        imageBarriers.push_back(imageBarrier);
-
-        VkDependencyInfo dependencyInfo{};
-        dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-        dependencyInfo.memoryBarrierCount = static_cast<uint32_t>(memoryBarriers.size());
-        dependencyInfo.pMemoryBarriers = memoryBarriers.data();
-        dependencyInfo.bufferMemoryBarrierCount = static_cast<uint32_t>(bufferBarriers.size());
-        dependencyInfo.pBufferMemoryBarriers = bufferBarriers.data();
-        dependencyInfo.imageMemoryBarrierCount = static_cast<uint32_t>(imageBarriers.size());
-        dependencyInfo.pImageMemoryBarriers = imageBarriers.data();
-        dependencyInfo.pNext = nullptr;
-
-        vkCmdPipelineBarrier2(hardwareExecutor.currentRecordQueue->commandBuffer, &dependencyInfo);
+        hardwareExecutor.hardwareContext->resourceManager.transitionImageLayout(hardwareExecutor.currentRecordQueue->commandBuffer, image, imageLayout, dstStageMask, dstAccessMask);
     }
 
     CommandRecord::RequiredBarriers getRequiredBarriers(HardwareExecutor &hardwareExecutor) override
