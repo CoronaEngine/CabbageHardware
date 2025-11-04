@@ -104,7 +104,7 @@ void RasterizerPipeline::createRenderPass(int multiviewCount)
     depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
     for (size_t i = 0; i < renderTargets.size(); i++)
@@ -116,8 +116,8 @@ void RasterizerPipeline::createRenderPass(int multiviewCount)
         attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+        attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         attachments.push_back(attachment);
     }
@@ -126,7 +126,7 @@ void RasterizerPipeline::createRenderPass(int multiviewCount)
     std::vector<VkAttachmentReference> colorReferences;
     for (uint32_t i = 0; i < renderTargets.size(); i++)
     {
-        colorReferences.push_back({i, VK_IMAGE_LAYOUT_GENERAL});
+        colorReferences.push_back({i, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
     }
 
     VkAttachmentReference depthAttachmentRef{};
@@ -467,7 +467,7 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
         imageBarrier.subresourceRange.layerCount = 1;
         imageBarrier.pNext = nullptr;
 
-        for (size_t i = 0; i < renderTargets.size() - 1; i++)
+        for (size_t i = 0; i < renderTargets.size(); i++)
         {
             imageBarrier.image = imageGlobalPool[*renderTargets[i].imageID].imageHandle;
             imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;

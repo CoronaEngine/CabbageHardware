@@ -542,6 +542,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
              VkResult result;
              auto commitToQueue = [&](DeviceManager::QueueUtils *currentRecordQueue) -> bool {
                  result = vkQueuePresentKHR(currentRecordQueue->vkQueue, &presentInfo);
+                 //swapChainImages[imageIndex].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
                  return true;
                  };
 
