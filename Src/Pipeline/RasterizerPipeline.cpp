@@ -459,8 +459,8 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
         imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
         imageBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
         imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        imageBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-        imageBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+        imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         imageBarrier.subresourceRange.baseMipLevel = 0;
         imageBarrier.subresourceRange.levelCount = 1;
         imageBarrier.subresourceRange.baseArrayLayer = 0;
@@ -496,8 +496,8 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
         bufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
         bufferBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
         bufferBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        bufferBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-        bufferBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+        bufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        bufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         bufferBarrier.pNext = nullptr;
 
         for (size_t i = 0; i < geomMeshes.size(); i++)
@@ -529,43 +529,10 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
     {
         depthImage = HardwareImage(imageSize.x, imageSize.y, ImageFormat::D32_FLOAT, ImageUsage::DepthImage);
 
-        {
-            CommandRecord::RequiredBarriers requiredBarriers;
-
-            VkImageMemoryBarrier2 imageBarrier;
-            imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-            imageBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-            imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-            imageBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-            imageBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-            imageBarrier.image = imageGlobalPool[*depthImage.imageID].imageHandle;
-            imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
-            imageBarrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-            imageBarrier.oldLayout = imageGlobalPool[*depthImage.imageID].imageLayout;
-            imageBarrier.newLayout = (imageGlobalPool[*depthImage.imageID].imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-            imageBarrier.subresourceRange.aspectMask = imageGlobalPool[*depthImage.imageID].aspectMask;
-            imageBarrier.subresourceRange.baseMipLevel = 0;
-            imageBarrier.subresourceRange.levelCount = 1;
-            imageBarrier.subresourceRange.baseArrayLayer = 0;
-            imageBarrier.subresourceRange.layerCount = 1;
-            imageBarrier.pNext = nullptr;
-
-            imageGlobalPool[*depthImage.imageID].imageLayout = imageBarrier.newLayout;
-
-            requiredBarriers.imageBarriers.push_back(imageBarrier);
-
-            VkDependencyInfo dependencyInfo{};
-            dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-            dependencyInfo.memoryBarrierCount = static_cast<uint32_t>(requiredBarriers.memoryBarriers.size());
-            dependencyInfo.pMemoryBarriers = requiredBarriers.memoryBarriers.data();
-            dependencyInfo.bufferMemoryBarrierCount = static_cast<uint32_t>(requiredBarriers.bufferBarriers.size());
-            dependencyInfo.pBufferMemoryBarriers = requiredBarriers.bufferBarriers.data();
-            dependencyInfo.imageMemoryBarrierCount = static_cast<uint32_t>(requiredBarriers.imageBarriers.size());
-            dependencyInfo.pImageMemoryBarriers = requiredBarriers.imageBarriers.data();
-            dependencyInfo.pNext = nullptr;
-
-            vkCmdPipelineBarrier2(hardwareExecutor.currentRecordQueue->commandBuffer, &dependencyInfo);
-        }
+        globalHardwareContext.mainDevice->resourceManager.transitionImageLayout(hardwareExecutor.currentRecordQueue->commandBuffer,
+                                                                                imageGlobalPool[*depthImage.imageID], VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                                                                                VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                                                                                VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 
         createRenderPass(multiviewCount);
 

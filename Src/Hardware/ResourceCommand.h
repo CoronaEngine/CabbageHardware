@@ -31,8 +31,8 @@ struct CopyBufferCommand : public CommandRecord
             srcBufferBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
             srcBufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             srcBufferBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
-            srcBufferBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-            srcBufferBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+            srcBufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            srcBufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             srcBufferBarrier.buffer = srcBuffer.bufferHandle;
             srcBufferBarrier.offset = 0;
             srcBufferBarrier.size = VK_WHOLE_SIZE;
@@ -48,8 +48,8 @@ struct CopyBufferCommand : public CommandRecord
             dstBufferBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
             dstBufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             dstBufferBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-            dstBufferBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-            dstBufferBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+            dstBufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            dstBufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             dstBufferBarrier.buffer = dstBuffer.bufferHandle;
             dstBufferBarrier.offset = 0;
             dstBufferBarrier.size = VK_WHOLE_SIZE;
@@ -95,8 +95,8 @@ struct CopyImageCommand : public CommandRecord
             srcImageBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
             srcImageBarrier.oldLayout = srcImage.imageLayout; // 需根据实际情况设置
             srcImageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-            srcImageBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-            srcImageBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+            srcImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            srcImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             srcImageBarrier.image = srcImage.imageHandle;
             srcImageBarrier.subresourceRange.baseMipLevel = 0;
             srcImageBarrier.subresourceRange.levelCount = 1;
@@ -118,8 +118,8 @@ struct CopyImageCommand : public CommandRecord
             dstImageBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
             dstImageBarrier.oldLayout = dstImage.imageLayout;
             dstImageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            dstImageBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-            dstImageBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+            dstImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            dstImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             dstImageBarrier.image = dstImage.imageHandle;
             dstImageBarrier.subresourceRange.baseMipLevel = 0;
             dstImageBarrier.subresourceRange.levelCount = 1;
@@ -166,8 +166,8 @@ struct CopyBufferToImageCommand : public CommandRecord
             srcBufferBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
             srcBufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             srcBufferBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
-            srcBufferBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-            srcBufferBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+            srcBufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            srcBufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             srcBufferBarrier.buffer = srcBuffer.bufferHandle;
             srcBufferBarrier.offset = 0;
             srcBufferBarrier.size = VK_WHOLE_SIZE;
@@ -184,8 +184,8 @@ struct CopyBufferToImageCommand : public CommandRecord
             dstImageBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
             dstImageBarrier.oldLayout = dstImage.imageLayout;
             dstImageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            dstImageBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-            dstImageBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+            dstImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            dstImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             dstImageBarrier.image = dstImage.imageHandle;
             dstImageBarrier.subresourceRange.aspectMask = dstImage.aspectMask;
             dstImageBarrier.subresourceRange.baseMipLevel = 0;
@@ -235,8 +235,8 @@ struct CopyImageToBufferCommand : public CommandRecord
             srcImageBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
             srcImageBarrier.oldLayout = srcImage.imageLayout;
             srcImageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-            srcImageBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-            srcImageBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+            srcImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            srcImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             srcImageBarrier.image = srcImage.imageHandle;
             srcImageBarrier.subresourceRange.aspectMask = srcImage.aspectMask;
             srcImageBarrier.subresourceRange.baseMipLevel = 0;
@@ -256,8 +256,8 @@ struct CopyImageToBufferCommand : public CommandRecord
             dstBufferBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
             dstBufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             dstBufferBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-            dstBufferBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-            dstBufferBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+            dstBufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            dstBufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             dstBufferBarrier.buffer = dstBuffer.bufferHandle;
             dstBufferBarrier.offset = 0;
             dstBufferBarrier.size = VK_WHOLE_SIZE;
@@ -304,8 +304,8 @@ struct BlitImageCommand : public CommandRecord
             srcImageBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
             srcImageBarrier.oldLayout = srcImage.imageLayout;
             srcImageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-            srcImageBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-            srcImageBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+            srcImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            srcImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             srcImageBarrier.image = srcImage.imageHandle;
             srcImageBarrier.subresourceRange.aspectMask = srcImage.aspectMask;
             srcImageBarrier.subresourceRange.baseMipLevel = 0;
@@ -328,8 +328,8 @@ struct BlitImageCommand : public CommandRecord
             dstImageBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
             dstImageBarrier.oldLayout = dstImage.imageLayout;
             dstImageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            dstImageBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
-            dstImageBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
+            dstImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            dstImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             dstImageBarrier.image = dstImage.imageHandle;
             dstImageBarrier.subresourceRange.aspectMask = dstImage.aspectMask;
             dstImageBarrier.subresourceRange.baseMipLevel = 0;
@@ -342,5 +342,70 @@ struct BlitImageCommand : public CommandRecord
             requiredBarriers.imageBarriers.push_back(dstImageBarrier);
         }
         return requiredBarriers;
+    }
+};
+
+struct TransitionImageLayoutCommand : public CommandRecord
+{
+    ResourceManager::ImageHardwareWrap &image;
+    VkImageLayout imageLayout;
+    VkPipelineStageFlags2 dstStageMask;
+    VkAccessFlags2 dstAccessMask;
+
+    TransitionImageLayoutCommand(ResourceManager::ImageHardwareWrap &image, VkImageLayout imageLayout, VkPipelineStageFlags2 dstStageMask, VkAccessFlags2 dstAccessMask)
+        : image(image), imageLayout(imageLayout), dstStageMask(dstStageMask), dstAccessMask(dstAccessMask)
+    {
+        executorType = ExecutorType::Transfer;
+    }
+
+    ExecutorType getExecutorType() override
+    {
+        return CommandRecord::ExecutorType::Transfer;
+    }
+
+    void commitCommand(HardwareExecutor &hardwareExecutor) override
+    {
+        std::vector<VkMemoryBarrier2> memoryBarriers;
+        std::vector<VkBufferMemoryBarrier2> bufferBarriers;
+        std::vector<VkImageMemoryBarrier2> imageBarriers;
+
+        VkImageMemoryBarrier2 imageBarrier;
+        imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        imageBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+        imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imageBarrier.image = image.imageHandle;
+        imageBarrier.dstStageMask = dstStageMask;
+        imageBarrier.dstAccessMask = dstAccessMask;
+        imageBarrier.oldLayout = image.imageLayout;
+        imageBarrier.newLayout = imageLayout;
+        imageBarrier.subresourceRange.aspectMask = image.aspectMask;
+        imageBarrier.subresourceRange.baseMipLevel = 0;
+        imageBarrier.subresourceRange.levelCount = 1;
+        imageBarrier.subresourceRange.baseArrayLayer = 0;
+        imageBarrier.subresourceRange.layerCount = 1;
+        imageBarrier.pNext = nullptr;
+
+        image.imageLayout = imageBarrier.newLayout;
+
+        imageBarriers.push_back(imageBarrier);
+
+        VkDependencyInfo dependencyInfo{};
+        dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        dependencyInfo.memoryBarrierCount = static_cast<uint32_t>(memoryBarriers.size());
+        dependencyInfo.pMemoryBarriers = memoryBarriers.data();
+        dependencyInfo.bufferMemoryBarrierCount = static_cast<uint32_t>(bufferBarriers.size());
+        dependencyInfo.pBufferMemoryBarriers = bufferBarriers.data();
+        dependencyInfo.imageMemoryBarrierCount = static_cast<uint32_t>(imageBarriers.size());
+        dependencyInfo.pImageMemoryBarriers = imageBarriers.data();
+        dependencyInfo.pNext = nullptr;
+
+        vkCmdPipelineBarrier2(hardwareExecutor.currentRecordQueue->commandBuffer, &dependencyInfo);
+    }
+
+    CommandRecord::RequiredBarriers getRequiredBarriers(HardwareExecutor &hardwareExecutor) override
+    {
+        return CommandRecord::RequiredBarriers{};
     }
 };
