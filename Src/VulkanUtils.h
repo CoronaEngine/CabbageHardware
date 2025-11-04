@@ -1,52 +1,12 @@
 ﻿#pragma once
-
-#include <cstdio>
-#include <cstdint>
+#include <source_location>
 #include "Hardware/GlobalContext.h"
 
-#if __has_include(<source_location>)
-#include <source_location>
-#define CH_USE_SOURCE_LOCATION 1
-#else
-#define CH_USE_SOURCE_LOCATION 0
-#endif
 
-#ifdef CABBAGE_ENGINE_DEBUG
-// Forward declaration to allow use in vkCheck before full definition below.
-static inline const char *vkResultStr(VkResult ret);
-#if CH_USE_SOURCE_LOCATION
-static inline VkResult vkCheck(VkResult result, const std::source_location &loc = std::source_location::current())
+static inline const char *coronaHardwareResultStr(VkResult ret)
 {
-    if (result != VK_SUCCESS)
-    {
-        std::fprintf(stderr, "VkResult: %s, %s:%d, %s\n", vkResultStr(result), loc.file_name(), static_cast<int>(loc.line()), loc.function_name());
-        abort();
-    }
-    return result;
-}
-#else
-// Fallback without std::source_location support. File/line are omitted.
-static inline VkResult vkCheck(VkResult result)
-{
-    if (result != VK_SUCCESS)
-    {
-        std::fprintf(stderr, "VkResult: %s\n", vkResultStr(result));
-        abort();
-    }
-    return result;
-}
-#endif
-#else
-// Release build: keep behavior as a lightweight pass-through.
-static inline VkResult vkCheck(VkResult result)
-{
-    return result;
-}
-#endif
-
-static inline const char *vkResultStr(VkResult ret)
-{
-  switch ((VkResult) ret) {
+  switch ((VkResult) ret)
+  {
     case VK_ERROR_INITIALIZATION_FAILED:
       return "VK_ERROR_INITIALIZATION_FAILED";
     case VK_ERROR_OUT_OF_DEVICE_MEMORY:
@@ -108,4 +68,12 @@ static inline const char *vkResultStr(VkResult ret)
     default:
       return "Unhandled VkResult";
   }
+}
+
+static inline void coronaHardwareCheck(VkResult result)
+{
+    if (result != VK_SUCCESS)
+    {
+        throw std::runtime_error(coronaHardwareResultStr(result));
+    }
 }

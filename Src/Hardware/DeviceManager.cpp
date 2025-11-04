@@ -206,7 +206,7 @@ void DeviceManager::createDevices(const CreateCallback &initInfo, const VkInstan
         createInfo.pEnabledFeatures = nullptr;
         createInfo.pNext = deviceFeaturesUtils.featuresChain.getChainHead();
 
-        vkCheck(vkCreateDevice(physicalDevice, &createInfo, nullptr, &logicalDevice));
+        coronaHardwareCheck(vkCreateDevice(physicalDevice, &createInfo, nullptr, &logicalDevice));
     }
 }
 
@@ -275,11 +275,7 @@ bool DeviceManager::createCommandBuffers()
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandBufferCount = 1;
 
-        vkCheck(vkAllocateCommandBuffers(logicalDevice, &allocInfo, &queues.commandBuffer));
-        if (result != VK_SUCCESS)
-        {
-            throw std::runtime_error("failed to allocate command buffers!");
-        }
+        coronaHardwareCheck(vkAllocateCommandBuffers(logicalDevice, &allocInfo, &queues.commandBuffer));
     };
 
     for (size_t i = 0; i < graphicsQueues.size(); i++)
