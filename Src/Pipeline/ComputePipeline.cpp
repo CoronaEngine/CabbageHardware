@@ -1,5 +1,4 @@
 ﻿#include"ComputePipeline.h"
-
 #include<Hardware/GlobalContext.h>
 
 //using namespace EmbeddedShader;
@@ -103,17 +102,10 @@ void ComputePipeline::commitCommand(HardwareExecutor &hardwareExecutor)
         pipelineLayoutInfo.pushConstantRangeCount = 1;
         pipelineLayoutInfo.pPushConstantRanges = &pushConstant;
 
-        if (vkCreatePipelineLayout(globalHardwareContext.mainDevice->deviceManager.logicalDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
-        {
-            throw std::runtime_error("failed to create pipeline layout!");
-        }
+        coronaHardwareCheck(vkCreatePipelineLayout(globalHardwareContext.mainDevice->deviceManager.logicalDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout));
         computePipelineCreateInfo.layout = pipelineLayout;
 
-        VkResult result = vkCreateComputePipelines(globalHardwareContext.mainDevice->deviceManager.logicalDevice, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &pipeline);
-        if (result != VK_SUCCESS)
-        {
-            throw std::runtime_error("failed to create compute pipeline!");
-        }
+        coronaHardwareCheck(vkCreateComputePipelines(globalHardwareContext.mainDevice->deviceManager.logicalDevice, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &pipeline));
 
         vkDestroyShaderModule(globalHardwareContext.mainDevice->deviceManager.logicalDevice, shaderModule, nullptr);
     }

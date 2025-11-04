@@ -165,16 +165,12 @@ void RasterizerPipeline::createRenderPass(int multiviewCount)
     renderPassInfo.pDependencies = &dependency;
     renderPassInfo.pNext = &renderPassMultiviewCI;
 
-    if (vkCreateRenderPass(globalHardwareContext.mainDevice->deviceManager.logicalDevice, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create render pass!");
-    }
+    coronaHardwareCheck(vkCreateRenderPass(globalHardwareContext.mainDevice->deviceManager.logicalDevice, &renderPassInfo, nullptr, &renderPass));
 }
 
 void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule vertShaderCode, EmbeddedShader::ShaderCodeModule fragShaderCode)
 {
-    auto getVkFormat = [](const std::string &typeName, uint32_t elementCount) -> VkFormat
-        {
+    auto getVkFormat = [](const std::string &typeName, uint32_t elementCount) -> VkFormat {
         VkFormat temp;
         if (typeName == "float")
         {
@@ -238,7 +234,7 @@ void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule
         }
 
         return temp;
-        };
+    };
 
 
     VkShaderModule vertShaderModule = globalHardwareContext.mainDevice->resourceManager.createShaderModule(vertShaderCode);
@@ -367,10 +363,7 @@ void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &push_constant_ranges;
 
-    if (vkCreatePipelineLayout(globalHardwareContext.mainDevice->deviceManager.logicalDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create pipeline layout!");
-    }
+    coronaHardwareCheck(vkCreatePipelineLayout(globalHardwareContext.mainDevice->deviceManager.logicalDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout));
 
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -389,11 +382,7 @@ void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-    VkResult result = vkCreateGraphicsPipelines(globalHardwareContext.mainDevice->deviceManager.logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline);
-    if (result != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create graphics pipeline!");
-    }
+    coronaHardwareCheck(vkCreateGraphicsPipelines(globalHardwareContext.mainDevice->deviceManager.logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline));
 
     vkDestroyShaderModule(globalHardwareContext.mainDevice->deviceManager.logicalDevice, fragShaderModule, nullptr);
     vkDestroyShaderModule(globalHardwareContext.mainDevice->deviceManager.logicalDevice, vertShaderModule, nullptr);
@@ -417,10 +406,7 @@ void RasterizerPipeline::createFramebuffers(ktm::uvec2 imageSize)
     framebufferInfo.height = imageSize.y;
     framebufferInfo.layers = 1;
 
-    if (vkCreateFramebuffer(globalHardwareContext.mainDevice->deviceManager.logicalDevice, &framebufferInfo, nullptr, &frameBuffers) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create framebuffer!");
-    }
+    coronaHardwareCheck(vkCreateFramebuffer(globalHardwareContext.mainDevice->deviceManager.logicalDevice, &framebufferInfo, nullptr, &frameBuffers));
 }
 
 RasterizerPipeline* RasterizerPipeline::operator()(uint16_t imageSizeX, uint16_t imageSizeY)
@@ -428,7 +414,6 @@ RasterizerPipeline* RasterizerPipeline::operator()(uint16_t imageSizeX, uint16_t
     this->imageSize = {imageSizeX, imageSizeY};
     return this;
 }
-
 
 CommandRecord *RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
 {
@@ -440,7 +425,6 @@ CommandRecord *RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
     geomMeshes.push_back(temp);
     return &dumpCommandRecord;
 }
-
 
 CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(HardwareExecutor &hardwareExecutor)
 {

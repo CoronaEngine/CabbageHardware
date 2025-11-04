@@ -137,11 +137,8 @@ bool DisplayManager::initDisplayManager(void* surface)
     if (surface != nullptr)
     {
         createVkSurface(surface);
-
         choosePresentDevice();
-
         createSwapChain();
-
         createSyncObjects();
     }
 
@@ -180,20 +177,14 @@ void DisplayManager::createVkSurface(void *surface)
     createInfo.hwnd = (HWND)(surface);
     createInfo.hinstance = GetModuleHandle(NULL);
 
-    if (vkCreateWin32SurfaceKHR(globalHardwareContext.getVulkanInstance(), &createInfo, nullptr, &vkSurface) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create window surface!");
-    }
+    coronaHardwareCheck((vkCreateWin32SurfaceKHR(globalHardwareContext.getVulkanInstance(), &createInfo, nullptr, &vkSurface)));
 
 #elif __APPLE__
     VkMacOSSurfaceCreateInfoMVK createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
     createInfo.pView = surface;
 
-    if (vkCreateMacOSSurfaceMVK(deviceManager.getVulkanInstance(), &createInfo, nullptr, &vkSurface) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create window surface!");
-    }
+    coronaHardwareCheck(vkCreateMacOSSurfaceMVK(deviceManager.getVulkanInstance(), &createInfo, nullptr, &vkSurface));
 
 #elif __linux__
 
@@ -286,7 +277,6 @@ void DisplayManager::createSwapChain()
     uint32_t imageCount = (capabilities.maxImageCount > 0 && (capabilities.minImageCount + 1) > capabilities.maxImageCount) ?
         capabilities.maxImageCount : (capabilities.minImageCount + 1);
 
-
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     createInfo.surface = vkSurface;
@@ -325,10 +315,7 @@ void DisplayManager::createSwapChain()
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = swapChain;
 
-    if (vkCreateSwapchainKHR(displayDevice->deviceManager.logicalDevice, &createInfo, nullptr, &swapChain) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create swap chain!");
-    }
+    coronaHardwareCheck(vkCreateSwapchainKHR(displayDevice->deviceManager.logicalDevice, &createInfo, nullptr, &swapChain));
 
     std::vector<VkImage> swapChainVkImages;
     vkGetSwapchainImagesKHR(displayDevice->deviceManager.logicalDevice, swapChain, &imageCount, nullptr);
