@@ -2,7 +2,7 @@
 - （紧急）自动判断image的layout
 - （紧急）CabbageHardware使用并发容器
 - （紧急）多显卡同步：VK_KHR_external_semaphore
-- （紧急）图片导入导出：importImageMemory、exportImageMemory（VK_EXT_external_memory）
-- 解决命令行的Warning
-- 多线程资源释放
+- （紧急）解决命令行的Warning
+- （紧急）多线程资源释放
 - BUG：mutiview初始化黑屏
+- 图片导入导出：importImageMemory、exportImageMemory（VK_EXT_external_memory）
