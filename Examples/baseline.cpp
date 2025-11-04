@@ -20,9 +20,61 @@
 #include <set>
 #include <stdexcept>
 #include <vector>
+#include <filesystem>
+#include <fstream>
+#include <regex>
+#include <sstream>
+
+#if defined(_WIN32)
+#define VK_USE_PLATFORM_WIN32_KHR
+#elif defined(__linux__) || defined(__unix__)
+#define VK_USE_PLATFORM_XLIB_KHR
+#elif defined(__APPLE__)
+#define VK_USE_PLATFORM_MACOS_MVK
+#else
+#error "Platform not supported by this example."
+#endif
 
 #define VK_NO_PROTOTYPES
 #include <volk.h>
+
+#include "Compiler/ShaderCodeCompiler.h"
+
+std::string readStringFile(const std::string_view file_path)
+{
+    std::ifstream file(file_path.data());
+    if (!file.is_open())
+    {
+        throw std::runtime_error("Could not open the file.");
+    }
+
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+
+    file.close();
+    return buffer.str();
+}
+
+std::string shaderPath = [] {
+    std::string resultPath = "";
+    std::string runtimePath = std::filesystem::current_path().string();
+    // std::replace(runtimePath.begin(), runtimePath.end(), '\\', '/');
+    std::regex pattern(R"((.*)CabbageHardware\b)");
+    std::smatch matches;
+    if (std::regex_search(runtimePath, matches, pattern))
+    {
+        if (matches.size() > 1)
+        {
+            resultPath = matches[1].str() + "CabbageHardware";
+        }
+        else
+        {
+            throw std::runtime_error("Failed to resolve source path.");
+        }
+    }
+    std::replace(resultPath.begin(), resultPath.end(), '\\', '/');
+    return resultPath + "/Examples";
+}();
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -371,7 +423,7 @@ class HelloTriangleApplication
         appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.pEngineName = "No Engine";
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_0;
+        appInfo.apiVersion = VK_API_VERSION_1_4;
 
         VkInstanceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -694,8 +746,13 @@ class HelloTriangleApplication
 
     void createGraphicsPipeline()
     {
-        auto vertShaderCode = readFile("shaders/vert.spv");
-        auto fragShaderCode = readFile("shaders/frag.spv");
+        //auto vertShaderCode = readFile("shaders/vert.spv");
+        //auto fragShaderCode = readFile("shaders/frag.spv");
+        EmbeddedShader::ShaderCodeCompiler vertexShaderCompiler(EmbeddedShader::ShaderCodeCompiler(readStringFile(shaderPath + "/shader_depth.vert"), EmbeddedShader::ShaderStage::VertexShader, EmbeddedShader::ShaderLanguage::GLSL, EmbeddedShader::CompilerOption()));
+        EmbeddedShader::ShaderCodeCompiler fragmentShaderCompiler(EmbeddedShader::ShaderCodeCompiler(readStringFile(shaderPath + "/shader_depth.frag"), EmbeddedShader::ShaderStage::FragmentShader, EmbeddedShader::ShaderLanguage::GLSL, EmbeddedShader::CompilerOption()));
+
+        std::vector<uint32_t> vertShaderCode = vertexShaderCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV);
+        std::vector<uint32_t> fragShaderCode = fragmentShaderCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV);
 
         VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
         VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
@@ -902,7 +959,7 @@ class HelloTriangleApplication
     void createTextureImage()
     {
         int texWidth, texHeight, texChannels;
-        stbi_uc *pixels = stbi_load("textures/texture.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        stbi_uc *pixels = stbi_load(std::string(shaderPath + "/awesomeface.png").c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
         VkDeviceSize imageSize = texWidth * texHeight * 4;
 
         if (!pixels)
@@ -1426,7 +1483,7 @@ class HelloTriangleApplication
         ubo.model = ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
         ubo.view = ktm::look_at_lh(ktm::fvec3(2.0f, 2.0f, 2.0f), ktm::fvec3(0.0f, 0.0f, 0.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
         ubo.proj = ktm::perspective_lh(ktm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
-        ubo.proj[1][1] *= -1;
+        //ubo.proj[1][1] *= -1;
 
         memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
@@ -1503,12 +1560,12 @@ class HelloTriangleApplication
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
-    VkShaderModule createShaderModule(const std::vector<char> &code)
+    VkShaderModule createShaderModule(const std::vector<unsigned int> &code)
     {
         VkShaderModuleCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        createInfo.codeSize = code.size();
-        createInfo.pCode = reinterpret_cast<const uint32_t *>(code.data());
+        createInfo.codeSize = code.size() * sizeof(unsigned int);
+        createInfo.pCode = code.data();
 
         VkShaderModule shaderModule;
         if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
@@ -1742,19 +1799,19 @@ class HelloTriangleApplication
     }
 };
 
-//int main()
-//{
-//    HelloTriangleApplication app;
-//
-//    try
-//    {
-//        app.run();
-//    }
-//    catch (const std::exception &e)
-//    {
-//        std::cerr << e.what() << std::endl;
-//        return EXIT_FAILURE;
-//    }
-//
-//    return EXIT_SUCCESS;
-//}
+int main()
+{
+    HelloTriangleApplication app;
+
+    try
+    {
+        app.run();
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
