@@ -501,7 +501,7 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
         {
             bufferBarrier.buffer = bufferGlobalPool[*geomMeshes[i].indexBuffer.bufferID].bufferHandle;
             bufferBarrier.offset = bufferGlobalPool[*geomMeshes[i].indexBuffer.bufferID].bufferAllocInfo.offset;
-            bufferBarrier.size = bufferGlobalPool[*geomMeshes[i].indexBuffer.bufferID].bufferAllocInfo.size;
+            bufferBarrier.size = VK_WHOLE_SIZE;
             bufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
             bufferBarrier.dstAccessMask = VK_ACCESS_2_INDEX_READ_BIT;
             requiredBarriers.bufferBarriers.push_back(bufferBarrier);
@@ -509,7 +509,6 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
             {
                 bufferBarrier.buffer = bufferGlobalPool[*geomMeshes[i].vertexBuffers[j].bufferID].bufferHandle;
                 bufferBarrier.offset = bufferGlobalPool[*geomMeshes[i].vertexBuffers[j].bufferID].bufferAllocInfo.offset;
-                bufferBarrier.size = bufferGlobalPool[*geomMeshes[i].vertexBuffers[j].bufferID].bufferAllocInfo.size;
                 bufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
                 bufferBarrier.dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
                 requiredBarriers.bufferBarriers.push_back(bufferBarrier);
