@@ -1,4 +1,5 @@
 ﻿#include "DeviceManager.h"
+#include "../VulkanUtils.h"
 
 DeviceManager::DeviceManager()
 {
@@ -205,11 +206,7 @@ void DeviceManager::createDevices(const CreateCallback &initInfo, const VkInstan
         createInfo.pEnabledFeatures = nullptr;
         createInfo.pNext = deviceFeaturesUtils.featuresChain.getChainHead();
 
-        VkResult result = vkCreateDevice(physicalDevice, &createInfo, nullptr, &logicalDevice);
-        if (result != VK_SUCCESS)
-        {
-            throw std::runtime_error("Failed to create logical device!");
-        }
+        vkCheck(vkCreateDevice(physicalDevice, &createInfo, nullptr, &logicalDevice));
     }
 }
 
@@ -278,7 +275,7 @@ bool DeviceManager::createCommandBuffers()
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandBufferCount = 1;
 
-        result = vkAllocateCommandBuffers(logicalDevice, &allocInfo, &queues.commandBuffer);
+        vkCheck(vkAllocateCommandBuffers(logicalDevice, &allocInfo, &queues.commandBuffer));
         if (result != VK_SUCCESS)
         {
             throw std::runtime_error("failed to allocate command buffers!");
