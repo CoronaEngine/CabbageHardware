@@ -550,6 +550,8 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
             imageBarrier.subresourceRange.layerCount = 1;
             imageBarrier.pNext = nullptr;
 
+            imageGlobalPool[*depthImage.imageID].imageLayout = imageBarrier.newLayout;
+
             requiredBarriers.imageBarriers.push_back(imageBarrier);
 
             VkDependencyInfo dependencyInfo{};

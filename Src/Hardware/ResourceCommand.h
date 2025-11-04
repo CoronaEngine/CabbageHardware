@@ -104,6 +104,8 @@ struct CopyImageCommand : public CommandRecord
             srcImageBarrier.subresourceRange.layerCount = 1;
             srcImageBarrier.pNext = nullptr;
 
+            srcImage.imageLayout = srcImageBarrier.newLayout;
+
             requiredBarriers.imageBarriers.push_back(srcImageBarrier);
         }
         {
@@ -124,6 +126,8 @@ struct CopyImageCommand : public CommandRecord
             dstImageBarrier.subresourceRange.baseArrayLayer = 0;
             dstImageBarrier.subresourceRange.layerCount = 1;
             dstImageBarrier.pNext = nullptr;
+
+            dstImage.imageLayout = dstImageBarrier.newLayout;
 
             requiredBarriers.imageBarriers.push_back(dstImageBarrier);
         }
@@ -190,6 +194,8 @@ struct CopyBufferToImageCommand : public CommandRecord
             dstImageBarrier.subresourceRange.layerCount = 1;
             dstImageBarrier.pNext = nullptr;
 
+            dstImage.imageLayout = dstImageBarrier.newLayout;
+
             requiredBarriers.imageBarriers.push_back(dstImageBarrier);
         }
         return requiredBarriers;
@@ -238,6 +244,8 @@ struct CopyImageToBufferCommand : public CommandRecord
             srcImageBarrier.subresourceRange.baseArrayLayer = 0;
             srcImageBarrier.subresourceRange.layerCount = 1;
             srcImageBarrier.pNext = nullptr;
+
+            srcImage.imageLayout = srcImageBarrier.newLayout;
 
             requiredBarriers.imageBarriers.push_back(srcImageBarrier);
         }
@@ -305,6 +313,8 @@ struct BlitImageCommand : public CommandRecord
             srcImageBarrier.subresourceRange.baseArrayLayer = 0;
             srcImageBarrier.subresourceRange.layerCount = 1;
 
+            srcImage.imageLayout = srcImageBarrier.newLayout;
+
             requiredBarriers.imageBarriers.push_back(srcImageBarrier);
         }
 
@@ -326,6 +336,8 @@ struct BlitImageCommand : public CommandRecord
             dstImageBarrier.subresourceRange.levelCount = 1;
             dstImageBarrier.subresourceRange.baseArrayLayer = 0;
             dstImageBarrier.subresourceRange.layerCount = 1;
+
+            dstImage.imageLayout = dstImageBarrier.newLayout;
 
             requiredBarriers.imageBarriers.push_back(dstImageBarrier);
         }
