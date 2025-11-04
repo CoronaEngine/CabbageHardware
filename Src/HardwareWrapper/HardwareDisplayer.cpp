@@ -2,6 +2,7 @@
 #include<Display/DisplayManager.h>
 
 std::unordered_map<void*, std::shared_ptr<DisplayManager>> displayerGlobalPool;
+std::unordered_map<uint64_t, uint64_t> displayerRefCount;
 std::mutex displayerMutex;
 
 HardwareDisplayer::HardwareDisplayer(void* surface): displaySurface(surface)
