@@ -34,7 +34,7 @@ struct CopyBufferCommand : public CommandRecord
             srcBufferBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
             srcBufferBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
             srcBufferBarrier.buffer = srcBuffer.bufferHandle;
-            srcBufferBarrier.offset = srcBuffer.bufferAllocInfo.offset;
+            srcBufferBarrier.offset = 0;
             srcBufferBarrier.size = VK_WHOLE_SIZE;
             srcBufferBarrier.pNext = nullptr;
 
@@ -51,7 +51,7 @@ struct CopyBufferCommand : public CommandRecord
             dstBufferBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
             dstBufferBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
             dstBufferBarrier.buffer = dstBuffer.bufferHandle;
-            dstBufferBarrier.offset = dstBuffer.bufferAllocInfo.offset;
+            dstBufferBarrier.offset = 0;
             dstBufferBarrier.size = VK_WHOLE_SIZE;
             dstBufferBarrier.pNext = nullptr;
 
@@ -165,7 +165,7 @@ struct CopyBufferToImageCommand : public CommandRecord
             srcBufferBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
             srcBufferBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
             srcBufferBarrier.buffer = srcBuffer.bufferHandle;
-            srcBufferBarrier.offset = srcBuffer.bufferAllocInfo.offset;
+            srcBufferBarrier.offset = 0;
             srcBufferBarrier.size = VK_WHOLE_SIZE;
             srcBufferBarrier.pNext = nullptr;
 
@@ -251,7 +251,7 @@ struct CopyImageToBufferCommand : public CommandRecord
             dstBufferBarrier.srcQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
             dstBufferBarrier.dstQueueFamilyIndex = hardwareExecutor.currentRecordQueue->queueFamilyIndex;
             dstBufferBarrier.buffer = dstBuffer.bufferHandle;
-            dstBufferBarrier.offset = dstBuffer.bufferAllocInfo.offset;
+            dstBufferBarrier.offset = 0;
             dstBufferBarrier.size = VK_WHOLE_SIZE;
             dstBufferBarrier.pNext = nullptr;
 
