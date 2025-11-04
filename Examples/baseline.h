@@ -1,14 +1,10 @@
-#define GLFW_INCLUDE_VULKAN
+#define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
-
-//#define GLM_FORCE_RADIANS
-//#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-//#include <glm/glm.hpp>
-//#include <glm/gtc/matrix_transform.hpp>
+#include <GLFW/glfw3native.h>
 
 #include<ktm/ktm.h>
 
-//#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
 #include <algorithm>
@@ -429,10 +425,34 @@ class HelloTriangleApplication
 
     void createSurface()
     {
-        if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS)
+        //if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS)
+        //{
+        //    throw std::runtime_error("failed to create window surface!");
+        //}
+#if _WIN32 || _WIN64
+        VkWin32SurfaceCreateInfoKHR createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+        createInfo.hwnd = (HWND)(glfwGetWin32Window(window));
+        createInfo.hinstance = GetModuleHandle(NULL);
+
+        if (vkCreateWin32SurfaceKHR(instance, &createInfo, nullptr, &surface) != VK_SUCCESS)
         {
             throw std::runtime_error("failed to create window surface!");
         }
+
+#elif __APPLE__
+        VkMacOSSurfaceCreateInfoMVK createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
+        createInfo.pView = surface;
+
+        if (vkCreateMacOSSurfaceMVK(deviceManager.getVulkanInstance(), &createInfo, nullptr, &surface) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create window surface!");
+        }
+
+#elif __linux__
+
+#endif
     }
 
     void pickPhysicalDevice()
