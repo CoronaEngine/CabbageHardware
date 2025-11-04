@@ -21,6 +21,9 @@
 #include <stdexcept>
 #include <vector>
 
+#define VK_NO_PROTOTYPES
+#include <volk.h>
+
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
