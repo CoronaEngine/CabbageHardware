@@ -147,7 +147,7 @@ struct HardwareDisplayer
 
     HardwareDisplayer &operator=(const HardwareImage &image);
     HardwareDisplayer &operator=(const HardwareDisplayer &other);
-    void setSurface(void *surface);
+    //void setSurface(void *surface);
 
     void *displaySurface = nullptr;
 };

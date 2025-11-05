@@ -32,7 +32,7 @@ int main()
         std::atomic_bool running = true;
 
         auto oneWindowThread = [&](void *surface) {
-            HardwareDisplayer displayManager(surface);
+            HardwareDisplayer displayManager = HardwareDisplayer(surface);
 
             RasterizerUniformBufferObject rasterizerUniformBufferObject;
             ComputeUniformBufferObject computeUniformData;
