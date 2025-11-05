@@ -1,12 +1,27 @@
 ﻿#include"CabbageHardware.h"
 #include<Hardware/GlobalContext.h>
 #include<Hardware/ResourceCommand.h>
+#include "corona/kernel/utils/storage.h"
 
-std::unordered_map<uint64_t, ResourceManager::BufferHardwareWrap> bufferGlobalPool;
-std::unordered_map<uint64_t, uint64_t> bufferRefCount;
-uint64_t currentBufferID = 0;
+//std::unordered_map<uint64_t, ResourceManager::BufferHardwareWrap> bufferGlobalPool;
+//std::unordered_map<uint64_t, uint64_t> bufferRefCount;
+//uint64_t currentBufferID = 0;
+//std::mutex bufferMutex;
 
-std::mutex bufferMutex;
+// 测试：使用 Corona 并发容器
+struct BufferRecord
+{
+    ResourceManager::BufferHardwareWrap wrap{};
+    std::uint64_t refCount{0};
+};
+
+using BufferStorage = Corona::Kernel::Utils::Storage<BufferRecord>;
+static BufferStorage g_bufferStorage;
+
+inline bool isValidId(const std::shared_ptr<uint64_t> &id)
+{
+    return id && *id != std::numeric_limits<uint64_t>::max();
+}
 
 HardwareBuffer &HardwareBuffer::operator=(const HardwareBuffer &other)
 {
@@ -77,10 +92,10 @@ HardwareBuffer::operator bool()
 
 HardwareBuffer::HardwareBuffer(uint64_t bufferSize, BufferUsage usage, const void* data)
 {
-    std::unique_lock<std::mutex> lock(bufferMutex);
+    //std::unique_lock<std::mutex> lock(bufferMutex);
 
-    this->bufferID = std::make_shared<uint64_t>(currentBufferID++);
-	bufferRefCount[*this->bufferID] = 1;
+    //this->bufferID = std::make_shared<uint64_t>(currentBufferID++);
+	//bufferRefCount[*this->bufferID] = 1;
 
 	VkBufferUsageFlags vkUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
@@ -102,12 +117,22 @@ HardwareBuffer::HardwareBuffer(uint64_t bufferSize, BufferUsage usage, const voi
 		break;
 	}
 
-	bufferGlobalPool[*bufferID] = globalHardwareContext.mainDevice->resourceManager.createBuffer(bufferSize, vkUsage);
+	//bufferGlobalPool[*bufferID] = globalHardwareContext.mainDevice->resourceManager.createBuffer(bufferSize, vkUsage);
 
-	if (data != nullptr)
-	{
-        memcpy(bufferGlobalPool[*bufferID].bufferAllocInfo.pMappedData, data, bufferSize);
-	}
+	//if (data != nullptr)
+	//{
+    //    memcpy(bufferGlobalPool[*bufferID].bufferAllocInfo.pMappedData, data, bufferSize);
+	//}
+
+    auto handle = g_bufferStorage.allocate([&](BufferRecord &r) {
+        r.wrap = globalHardwareContext.mainDevice->resourceManager.createBuffer(bufferSize, vkUsage);
+        r.refCount = 1;
+        if (data != nullptr)
+        {
+            std::memcpy(r.wrap.bufferAllocInfo.pMappedData, data, bufferSize);
+        }
+    });
+    this->bufferID = std::make_shared<uint64_t>(static_cast<uint64_t>(handle));
 }
 
 bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareExecutor *executor)
