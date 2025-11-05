@@ -1,6 +1,7 @@
 # TODO（按优先级排序）
-- （紧急）自动判断image的layout
+- （紧急）displayerGlobalPool的displayerRefCount
 - （紧急）CabbageHardware使用并发容器
+- （紧急）自动判断image的layout
 - （紧急）多显卡同步：VK_KHR_external_semaphore
 - （紧急）解决命令行的Warning
 - （紧急）多线程资源释放
