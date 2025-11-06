@@ -78,7 +78,7 @@ struct HardwareBuffer
         return true;
     }
 
-    void *getMappedData();
+    void* getMappedData();
 
     uint64_t getBufferSize();
 
@@ -86,7 +86,7 @@ struct HardwareBuffer
 
     operator bool();
 
-    std::shared_ptr<uint64_t> bufferID;
+    std::shared_ptr<uintptr_t> bufferID;
 };
 
 struct HardwareImage
@@ -106,7 +106,7 @@ struct HardwareImage
 
     HardwareImage &operator=(const HardwareImage &other);
 
-    std::shared_ptr<uint64_t> imageID;
+    std::shared_ptr<uintptr_t> imageID;
 
   private:
     HardwareImage &copyFromBuffer(const HardwareBuffer &buffer);
@@ -136,7 +136,7 @@ struct HardwarePushConstant
 
   private:
     void copyFromRaw(const void *src, uint64_t size);
-    std::shared_ptr<uint64_t> pushConstantID;
+    std::shared_ptr<uintptr_t> pushConstantID;
 };
 
 struct HardwareDisplayer
@@ -149,5 +149,7 @@ struct HardwareDisplayer
     HardwareDisplayer &operator=(const HardwareDisplayer &other);
     //void setSurface(void *surface);
 
-    void *displaySurface = nullptr;
+    std::shared_ptr<uintptr_t> displaySurfaceID;
+
+    //void *displaySurface = nullptr;
 };
