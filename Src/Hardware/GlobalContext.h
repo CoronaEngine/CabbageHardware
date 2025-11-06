@@ -46,20 +46,14 @@ extern Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> global
 
 inline ResourceManager::BufferHardwareWrap getBufferFromHandle(uintptr_t handle)
 {
-    globalBufferStorages.read(handle, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+    globalBufferStorages.read(handle, [](const ResourceManager::BufferHardwareWrap &buffer) {
         return buffer;
     });
 }
 
-inline ResourceManager::ImageHardwareWrap getImageFromHandle(uint64_t handle)
+inline ResourceManager::ImageHardwareWrap getImageFromHandle(uintptr_t handle)
 {
-    ResourceManager::ImageHardwareWrap imageWrap;
-    bool read_success = globalImageStorages.read(static_cast<uintptr_t>(handle), [&](const ResourceManager::ImageHardwareWrap &image) {
-        imageWrap = image;
+    globalImageStorages.read(handle, [](const ResourceManager::ImageHardwareWrap &image) {
+        return image;
     });
-    if (!read_success)
-    {
-        throw std::runtime_error("Failed to read HardwareImage!");
-    }
-    return imageWrap;
 }
