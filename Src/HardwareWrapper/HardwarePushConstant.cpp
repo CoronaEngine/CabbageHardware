@@ -1,7 +1,7 @@
 ﻿#include"CabbageHardware.h"
 #include<Hardware/GlobalContext.h>
 
-struct PushConstantWraper
+struct PushConstantWrap
 {
     uint8_t *data = nullptr;
     uint64_t size = 0;
@@ -9,38 +9,55 @@ struct PushConstantWraper
     uint64_t refCount = 0;
 };
 
-Corona::Kernel::Utils::Storage<PushConstantWraper> globalPushConstantStorages;
+Corona::Kernel::Utils::Storage<PushConstantWrap> globalPushConstantStorages;
 
 HardwarePushConstant::HardwarePushConstant()
 {
-    auto handle = globalPushConstantStorages.allocate([&](ResourceManager::PushConstant &pushConstant) {
-        pushConstant = globalHardwareContext.mainDevice->resourceManager.createPushConstant(0);
-        pushConstant.refCount = 1;
-        pushConstant.data = nullptr;
+    auto handle = globalPushConstantStorages.allocate([&](PushConstantWrap &pushConstant) {
+        PushConstantWrap newPushConstant;
+        newPushConstant.size = 0;
+        newPushConstant.data = nullptr;
+        newPushConstant.refCount = 1;
+        pushConstant = newPushConstant;
     });
 
-    this->pushConstantIdPtr = std::make_shared<uint64_t>(static_cast<uint64_t>(handle));
+    this->pushConstantID = std::make_shared<uintptr_t>(handle);
+}
+
+HardwarePushConstant::HardwarePushConstant(uint64_t size, uint64_t offset, HardwarePushConstant *whole)
+{
+    auto handle = globalPushConstantStorages.allocate([&](PushConstantWrap &pushConstant) {
+        PushConstantWrap newPushConstant;
+        newPushConstant.size = size;
+        newPushConstant.refCount = 1;
+        if (whole != nullptr)
+        {
+            globalPushConstantStorages.read(*(whole->pushConstantID), [&](const PushConstantWrap &wholePushConstant) {
+                newPushConstant.data = wholePushConstant.data + offset;
+            });
+            newPushConstant.isSub = true;
+        }
+        else
+        {
+            newPushConstant.data = (uint8_t *)malloc(size);
+        }
+        pushConstant = newPushConstant;
+    });
+
+    this->pushConstantID = std::make_shared<uintptr_t>(handle);
 }
 
 HardwarePushConstant::HardwarePushConstant(const HardwarePushConstant &other)
 {
-    this->pushConstantIdPtr = other.pushConstantIdPtr;
-
-    auto otherHandle = static_cast<uintptr_t>(*other.pushConstantIdPtr);
-    bool write_success = globalPushConstantStorages.write(otherHandle, [](ResourceManager::PushConstant &pushConstant) {
+    this->pushConstantID = other.pushConstantID;
+    globalPushConstantStorages.write(*other.pushConstantID, [](PushConstantWrap &pushConstant) {
         pushConstant.refCount++;
     });
-
-    if (!write_success)
-    {
-        throw std::runtime_error("Failed to write PushConstant!");
-    }
 }
 
 HardwarePushConstant::~HardwarePushConstant()
 {
-    auto thisHandle = static_cast<uintptr_t>(*this->pushConstantIdPtr);
-    bool write_success = globalPushConstantStorages.write(thisHandle, [&](ResourceManager::PushConstant &pushConstant) {
+    globalPushConstantStorages.write(*pushConstantID, [&](PushConstantWrap &pushConstant) {
         pushConstant.refCount--;
         if (pushConstant.refCount == 0)
         {
@@ -51,106 +68,81 @@ HardwarePushConstant::~HardwarePushConstant()
             }
 
             //globalHardwareContext.mainDevice->resourceManager.destroyBuffer(buffer);
-            globalPushConstantStorages.deallocate(thisHandle);
+            globalPushConstantStorages.deallocate(*pushConstantID);
         }
     });
-
-    if (!write_success)
-    {
-        throw std::runtime_error("Failed to write PushConstant!");
-    }
 }
 
 HardwarePushConstant &HardwarePushConstant::operator=(const HardwarePushConstant &other)
 {
-    auto otherHandle = static_cast<uintptr_t>(*other.pushConstantIdPtr);
-    auto thisHandle = static_cast<uintptr_t>(*this->pushConstantIdPtr);
+    PushConstantWrap otherPushConstant;
+    PushConstantWrap thisPushConstant;
 
-    ResourceManager::PushConstant otherPushConstant;
-    ResourceManager::PushConstant thisPushConstant;
-
-    bool write_success = globalPushConstantStorages.read(otherHandle, [&](const ResourceManager::PushConstant &pushConstant) {
+    globalPushConstantStorages.read(*other.pushConstantID, [&](const PushConstantWrap &pushConstant) {
         otherPushConstant = pushConstant;
     });
 
-    bool write_success = globalPushConstantStorages.read(thisHandle, [&](const ResourceManager::PushConstant &pushConstant) {
+    globalPushConstantStorages.read(*pushConstantID, [&](const PushConstantWrap &pushConstant) {
         thisPushConstant = pushConstant;
     });
 
     if (thisPushConstant.isSub)
     {
         memcpy(thisPushConstant.data, otherPushConstant.data, otherPushConstant.size);
-        bool write_success = globalPushConstantStorages.write(otherHandle, [&](ResourceManager::PushConstant &pushConstant) {
+        globalPushConstantStorages.write(*other.pushConstantID, [&](PushConstantWrap &pushConstant) {
             pushConstant = otherPushConstant;
         });
 
     }
     else
     {
-        otherPushConstant.refCount++;
-        thisPushConstant.refCount--;
-        if (thisPushConstant.refCount == 0)
-        {
-            if (thisPushConstant.data != nullptr && !thisPushConstant.isSub)
+        globalPushConstantStorages.write(*other.pushConstantID, [&](PushConstantWrap &pushConstant) {
+            pushConstant.refCount++;
+        });
+        globalPushConstantStorages.write(*pushConstantID, [&](PushConstantWrap &pushConstant) {
+            pushConstant.refCount--;
+            if (pushConstant.refCount == 0)
             {
-                free(thisPushConstant.data);
-                thisPushConstant.data = nullptr;
+                if (pushConstant.data != nullptr && !pushConstant.isSub)
+                {
+                    free(pushConstant.data);
+                    pushConstant.data = nullptr;
+                }
+                globalPushConstantStorages.deallocate(*pushConstantID);
             }
-            globalPushConstantStorages.deallocate(thisHandle);
-        }
-        *(this->pushConstantIdPtr) = *(other.pushConstantIdPtr);
+
+        });
+        *(this->pushConstantID) = *(other.pushConstantID);
     }
 
     return *this;
 }
 
-HardwarePushConstant::HardwarePushConstant(uint64_t size, uint64_t offset, HardwarePushConstant* whole)
-{
-    auto handle = globalPushConstantStorages.allocate([&](ResourceManager::PushConstant &pushConstant) {
-        pushConstant = globalHardwareContext.mainDevice->resourceManager.createPushConstant(size);
-        pushConstant.refCount = 1;
-        if (whole != nullptr)
-        {
-            auto wholeHandle = static_cast<uintptr_t>(*(whole->pushConstantIdPtr));
-            ResourceManager::PushConstant wholePushConstant;
-            bool read_success = globalPushConstantStorages.read(wholeHandle, [&](const ResourceManager::PushConstant &pushConstant) {
-                wholePushConstant = pushConstant;
-            });
-
-            pushConstant.data = wholePushConstant.data + offset;
-            pushConstant.isSub = true;
-        }
-        else
-        {
-            pushConstant.data = (uint8_t *)malloc(size);
-        }
-    });
-
-    this->pushConstantIdPtr = std::make_shared<uint64_t>(static_cast<uint64_t>(handle));
-}
-
 uint8_t* HardwarePushConstant::getData() const
 {
-    bool read_success = globalPushConstantStorages.read(static_cast<uintptr_t>(*pushConstantIdPtr), [&](const ResourceManager::PushConstant &pushConstant) {
+    globalPushConstantStorages.read(*pushConstantID, [&](const PushConstantWrap &pushConstant) {
         return pushConstant.data;
     });
 }
 
 uint64_t HardwarePushConstant::getSize() const
 {
-    bool read_success = globalPushConstantStorages.read(static_cast<uintptr_t>(*pushConstantIdPtr), [&](const ResourceManager::PushConstant &pushConstant) {
+
+    globalPushConstantStorages.read(*pushConstantID, [&](const PushConstantWrap &pushConstant) {
         return pushConstant.size;
     });
 }
 
 void HardwarePushConstant::copyFromRaw(const void* src, uint64_t size)
 {
-    auto handle = globalPushConstantStorages.allocate([&](ResourceManager::PushConstant &pushConstant) {
-        pushConstant = globalHardwareContext.mainDevice->resourceManager.createPushConstant(size);
-        pushConstant.refCount = 1;
-        pushConstant.data = (uint8_t *)malloc(size);
-        memcpy(pushConstant.data, src, size);
+    auto handle = globalPushConstantStorages.allocate([&](PushConstantWrap &pushConstant) {
+        PushConstantWrap newPushConstant;
+        newPushConstant.size = size;
+        newPushConstant.refCount = 1;
+        newPushConstant.data = (uint8_t *)malloc(size);
+        memcpy(newPushConstant.data, src, size);
+        pushConstant = newPushConstant;
     });
 
-    this->pushConstantIdPtr = std::make_shared<uint64_t>(static_cast<uint64_t>(handle));
+    this->pushConstantID = std::make_shared<uintptr_t>(handle);
 }
