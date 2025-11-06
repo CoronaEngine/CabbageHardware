@@ -1,7 +1,14 @@
 ﻿#include"CabbageHardware.h"
 #include<Display/DisplayManager.h>
 
-Corona::Kernel::Utils::Storage<ResourceManager::DisplayHardwareWrap> globalDisplayStorages;
+struct DisplayHardwareWrap
+{
+    void *displaySurface = nullptr;
+    std::shared_ptr<DisplayManager> displayManager;
+    uint64_t refCount = 0;
+};
+
+Corona::Kernel::Utils::Storage<DisplayHardwareWrap> globalDisplayStorages;
 
 HardwareDisplayer::HardwareDisplayer(void* surface)
 {

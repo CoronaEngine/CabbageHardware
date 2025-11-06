@@ -36,8 +36,9 @@ struct ResourceManager
         // Raw Vulkan allocation when NOT using VMA (e.g., host pointer import)
         VkDeviceMemory bufferMemory = VK_NULL_HANDLE;
 
-        DeviceManager *device;
-        ResourceManager *resourceManager;
+        uint64_t refCount = 0;
+        DeviceManager* device;
+        ResourceManager* resourceManager;
     };
 
     struct ImageHardwareWrap
@@ -63,9 +64,13 @@ struct ResourceManager
         VkImage imageHandle = VK_NULL_HANDLE;
         VkImageView imageView = VK_NULL_HANDLE;
 
-        DeviceManager *device;
-        ResourceManager *resourceManager;
+        uint64_t refCount = 0;
+        DeviceManager* device;
+        ResourceManager* resourceManager;
     };
+
+
+
 
     struct
     {
@@ -86,6 +91,7 @@ struct ResourceManager
 
     BufferHardwareWrap createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, bool hostVisibleMapped = true, bool useDedicated = false);
     void destroyBuffer(BufferHardwareWrap &buffer);
+
 
     uint32_t storeDescriptor(ImageHardwareWrap image);
     uint32_t storeDescriptor(BufferHardwareWrap buffer);
@@ -198,5 +204,5 @@ private:
     uint64_t hostSharedMemorySize = 0;
     uint64_t mutiInstanceMemorySize = 0;
 
-    DeviceManager *device;
+    DeviceManager* device;
 };

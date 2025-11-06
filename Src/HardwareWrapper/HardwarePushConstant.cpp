@@ -1,7 +1,15 @@
 ﻿#include"CabbageHardware.h"
 #include<Hardware/GlobalContext.h>
 
-Corona::Kernel::Utils::Storage<ResourceManager::PushConstant> globalPushConstantStorages;
+struct PushConstantWraper
+{
+    uint8_t *data = nullptr;
+    uint64_t size = 0;
+    bool isSub = false;
+    uint64_t refCount = 0;
+};
+
+Corona::Kernel::Utils::Storage<PushConstantWraper> globalPushConstantStorages;
 
 HardwarePushConstant::HardwarePushConstant()
 {
