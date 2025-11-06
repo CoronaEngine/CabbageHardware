@@ -187,12 +187,3 @@ uint64_t HardwareBuffer::getBufferSize()
 
 	return getBuffer.bufferAllocInfo.size;
 }
-
-VkBuffer HardwareBuffer::getBuffer()
-{
-    ResourceManager::BufferHardwareWrap getBuffer;
-    bool read_success = globalBufferStorages.read(static_cast<uintptr_t>(*bufferIdPtr), [&](const ResourceManager::BufferHardwareWrap &buffer) {
-        getBuffer = buffer;
-    });
-    return getBuffer.bufferHandle;
-}

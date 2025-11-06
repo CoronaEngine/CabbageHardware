@@ -91,20 +91,3 @@ HardwareDisplayer &HardwareDisplayer::operator=(const HardwareImage &image)
 
     return *this;
 }
-
-//void HardwareDisplayer::setSurface(void *surface)
-//{
-//    if (surface != nullptr && displaySurface != surface)
-//    {
-//        std::unique_lock<std::mutex> lock(displayerMutex);
-//        this->displaySurface = surface;
-//        if (displayerGlobalPool.count(surface))
-//        {
-//
-//            displayerGlobalPool[displaySurface] = std::make_shared<DisplayManager>();
-//        }
-//        else
-//        {
-//        }
-//    }
-//}
