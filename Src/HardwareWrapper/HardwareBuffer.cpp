@@ -4,117 +4,32 @@
 
 Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap> globalBufferStorages;
 
-HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer &other)
-{
-    auto otherHandle = static_cast<uintptr_t>(*other.bufferIdPtr);
-    auto thisHandle = static_cast<uintptr_t>(*this->bufferIdPtr);
-
-    bool write_success = globalBufferStorages.write(otherHandle, [](ResourceManager::BufferHardwareWrap &buffer) {
-        buffer.refCount++;
-    });
-
-    if (!write_success)
-    {
-        throw std::runtime_error("Failed to write HardwareBuffer!");
-    }
-
-        bool write_success = globalBufferStorages.write(thisHandle, [&](ResourceManager::BufferHardwareWrap &buffer) {
-            buffer.refCount--;
-            if (buffer.refCount == 0)
-            {
-                globalHardwareContext.mainDevice->resourceManager.destroyBuffer(buffer);
-                globalBufferStorages.deallocate(thisHandle);
-            }
-        });
-
-        if (!write_success)
-        {
-            throw std::runtime_error("Failed to write HardwareBuffer!");
-        }
-
-
-    *(this->bufferIdPtr) = *(other.bufferIdPtr);
-    return *this;
-}
-
 HardwareBuffer::HardwareBuffer()
 {
-    this->bufferIdPtr = std::make_shared<uint64_t>(std::numeric_limits<uint64_t>::max());
+    this->bufferID = std::make_shared<uintptr_t>(std::numeric_limits<uintptr_t>::max());
 }
 
-HardwareBuffer::HardwareBuffer(const HardwareBuffer &other)
+HardwareBuffer::HardwareBuffer(uint64_t bufferSize, BufferUsage usage, const void *data)
 {
-    this->bufferIdPtr = other.bufferIdPtr;
+    VkBufferUsageFlags vkUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-    auto otherHandle = static_cast<uintptr_t>(*other.bufferIdPtr);
-    bool write_success = globalBufferStorages.write(otherHandle, [](ResourceManager::BufferHardwareWrap &buffer) {
-        buffer.refCount++;
-    });
-
-    if (!write_success)
+    switch (usage)
     {
-        throw std::runtime_error("Failed to write HardwareBuffer!");
+    case BufferUsage::VertexBuffer:
+        vkUsage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        break;
+    case BufferUsage::IndexBuffer:
+        vkUsage |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+        break;
+    case BufferUsage::UniformBuffer:
+        vkUsage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        break;
+    case BufferUsage::StorageBuffer:
+        vkUsage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        break;
+    default:
+        break;
     }
-}
-
-HardwareBuffer::~HardwareBuffer()
-{
-    auto thisHandle = static_cast<uintptr_t>(*this->bufferIdPtr);
-    bool write_success = globalBufferStorages.write(thisHandle, [&](ResourceManager::BufferHardwareWrap &buffer) {
-        buffer.refCount--;
-        if (buffer.refCount == 0)
-        {
-            globalHardwareContext.mainDevice->resourceManager.destroyBuffer(buffer);
-            globalBufferStorages.deallocate(thisHandle);
-        }
-    });
-
-    if (!write_success)
-    {
-        throw std::runtime_error("Failed to write HardwareBuffer!");
-    }
-}
-
-HardwareBuffer::operator bool()
-{
-    if (bufferIdPtr != nullptr)
-    {
-        bool read_success = globalBufferStorages.read(static_cast<uintptr_t>(*bufferIdPtr), [](const ResourceManager::BufferHardwareWrap &buffer) {
-            return buffer.bufferHandle != VK_NULL_HANDLE;
-        });
-
-        if (read_success)
-        {
-            throw std::runtime_error("Failed to read HardwareBuffer!");
-        }
-    }
-    else
-    {
-        return false;
-    }
-}
-
-HardwareBuffer::HardwareBuffer(uint64_t bufferSize, BufferUsage usage, const void* data)
-{
-	VkBufferUsageFlags vkUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-
-	switch (usage)
-	{
-	case BufferUsage::VertexBuffer:
-		vkUsage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-		break;
-	case BufferUsage::IndexBuffer:
-		vkUsage |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-		break;
-	case BufferUsage::UniformBuffer:
-		vkUsage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		break;
-	case BufferUsage::StorageBuffer:
-		vkUsage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-		break;
-	default:
-		break;
-	}
 
     auto handle = globalBufferStorages.allocate([&](ResourceManager::BufferHardwareWrap &buffer) {
         buffer = globalHardwareContext.mainDevice->resourceManager.createBuffer(bufferSize, vkUsage);
@@ -125,7 +40,59 @@ HardwareBuffer::HardwareBuffer(uint64_t bufferSize, BufferUsage usage, const voi
         }
     });
 
-    this->bufferIdPtr = std::make_shared<uint64_t>(static_cast<uint64_t>(handle));
+    this->bufferID = std::make_shared<uintptr_t>(handle);
+}
+
+HardwareBuffer::HardwareBuffer(const HardwareBuffer &other)
+{
+    this->bufferID = other.bufferID;
+
+    globalBufferStorages.write(*other.bufferID, [](ResourceManager::BufferHardwareWrap &buffer) {
+        buffer.refCount++;
+    });
+}
+
+HardwareBuffer::~HardwareBuffer()
+{
+    globalBufferStorages.write(*bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
+        buffer.refCount--;
+        if (buffer.refCount == 0)
+        {
+            globalHardwareContext.mainDevice->resourceManager.destroyBuffer(buffer);
+            globalBufferStorages.deallocate(*bufferID);
+        }
+    });
+}
+
+HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer &other)
+{
+    globalBufferStorages.write(*other.bufferID, [](ResourceManager::BufferHardwareWrap &buffer) {
+        buffer.refCount++;
+    });
+
+    globalBufferStorages.write(*this->bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
+        buffer.refCount--;
+        if (buffer.refCount == 0)
+        {
+            globalHardwareContext.mainDevice->resourceManager.destroyBuffer(buffer);
+            globalBufferStorages.deallocate(*this->bufferID);
+        }
+    });
+
+    *(this->bufferID) = *(other.bufferID);
+    return *this;
+}
+
+HardwareBuffer::operator bool()
+{
+    if (bufferID != nullptr)
+    {
+        globalBufferStorages.read(*bufferID, [](const ResourceManager::BufferHardwareWrap &buffer) {
+            return buffer.bufferHandle != VK_NULL_HANDLE;
+        });
+    }
+
+    return false;
 }
 
 bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareExecutor *executor)
@@ -134,10 +101,10 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareE
 
     ResourceManager::BufferHardwareWrap srcBuffer;
     ResourceManager::BufferHardwareWrap dstBuffer;
-    bool read_srcBuffer_success = globalBufferStorages.read(static_cast<uintptr_t>(*inputBuffer.bufferIdPtr), [&](const ResourceManager::BufferHardwareWrap &buffer) {
+    bool read_srcBuffer_success = globalBufferStorages.read(*inputBuffer.bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
         srcBuffer = buffer;
     });
-    bool read_dstBuffer_success = globalBufferStorages.read(static_cast<uintptr_t>(*bufferIdPtr), [&](const ResourceManager::BufferHardwareWrap &buffer) {
+    bool read_dstBuffer_success = globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
         dstBuffer = buffer;
     });
 
@@ -149,41 +116,30 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareE
 
 uint32_t HardwareBuffer::storeDescriptor()
 {
-    ResourceManager::BufferHardwareWrap storeBuffer;
-    bool read_success = globalBufferStorages.read(static_cast<uintptr_t>(*bufferIdPtr), [&](const ResourceManager::BufferHardwareWrap &buffer) {
-        storeBuffer = buffer;
+    globalBufferStorages.read(*bufferID, [](const ResourceManager::BufferHardwareWrap &buffer) {
+        return globalHardwareContext.mainDevice->resourceManager.storeDescriptor(buffer);
     });
-
-    return globalHardwareContext.mainDevice->resourceManager.storeDescriptor(storeBuffer);
 }
 
 bool HardwareBuffer::copyFromData(const void* inputData, uint64_t size)
 {
-    ResourceManager::BufferHardwareWrap copyBuffer;
-    bool read_success = globalBufferStorages.read(static_cast<uintptr_t>(*bufferIdPtr), [&](const ResourceManager::BufferHardwareWrap &buffer) {
-        copyBuffer = buffer;
+    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        memcpy(buffer.bufferAllocInfo.pMappedData, inputData, size);
     });
 
-	memcpy(copyBuffer.bufferAllocInfo.pMappedData, inputData, size);
 	return true;
 }
 
 void* HardwareBuffer::getMappedData()
 {
-    ResourceManager::BufferHardwareWrap getBuffer;
-    bool read_success = globalBufferStorages.read(static_cast<uintptr_t>(*bufferIdPtr), [&](const ResourceManager::BufferHardwareWrap &buffer) {
-        getBuffer = buffer;
+    globalBufferStorages.read(*bufferID, [](const ResourceManager::BufferHardwareWrap &buffer) {
+        return buffer.bufferAllocInfo.pMappedData;
     });
-
-	return getBuffer.bufferAllocInfo.pMappedData;
 }
 
 uint64_t HardwareBuffer::getBufferSize()
 {
-    ResourceManager::BufferHardwareWrap getBuffer;
-    bool read_success = globalBufferStorages.read(static_cast<uintptr_t>(*bufferIdPtr), [&](const ResourceManager::BufferHardwareWrap &buffer) {
-        getBuffer = buffer;
+    globalBufferStorages.read(*bufferID, [](const ResourceManager::BufferHardwareWrap &buffer) {
+        return buffer.bufferAllocInfo.size;
     });
-
-	return getBuffer.bufferAllocInfo.size;
 }
