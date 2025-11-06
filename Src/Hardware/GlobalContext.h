@@ -42,5 +42,5 @@ private:
 
 extern HardwareContext globalHardwareContext;
 
-Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap> globalBufferStorages;
-Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageStorages;
+extern Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap> globalBufferStorages;
+extern Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageStorages;
