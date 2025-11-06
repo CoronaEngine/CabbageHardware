@@ -29,12 +29,15 @@
 class DeviceManager
 {
   public:
-    //enum QueueType
-    //{
-    //    GraphicsQueue = 0,
-    //    ComputeQueue = 1,
-    //    TransferQueue = 2
-    //};
+
+    struct ExternalSemaphoreHandle
+    {
+#if _WIN32 || _WIN64
+        HANDLE handle = nullptr;
+#else
+        int fd = -1;
+#endif
+    };
 
     struct QueueUtils
     {
@@ -76,20 +79,8 @@ class DeviceManager
 
     void cleanUpDeviceManager();
 
-    //DeviceManager &startCommands(QueueType queueType = QueueType::GraphicsQueue);
-    //DeviceManager &endCommands(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
-    //                           std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
-    //                           VkFence fence = VK_NULL_HANDLE);
-
-    //DeviceManager &operator<<(const DeviceManager &)
-    //{
-    //    return *this;
-    //}
-
-    //DeviceManager &operator<<(std::function<void(const VkCommandBuffer &commandBuffer)> commandsFunction);
-    //
-    //QueueUtils *currentRecordQueue = nullptr;
-
+    ExternalSemaphoreHandle exportSemaphore(VkSemaphore &semaphore);
+    VkSemaphore importSemaphore(const ExternalSemaphoreHandle &memHandle, const VkSemaphore &semaphore);
 
     std::vector<QueueUtils> pickAvailableQueues(std::function<bool(const QueueUtils &)> required)
     {

@@ -300,102 +300,49 @@ bool DeviceManager::createCommandBuffers()
     return true;
 }
 
-//DeviceManager &DeviceManager::startCommands(QueueType queueType)
-//{
-//    uint16_t queueIndex = 0;
-//
-//    while (true)
-//    {
-//        switch (queueType)
-//        {
-//        case QueueType::GraphicsQueue:
-//            queueIndex = currentGraphicsQueueIndex.fetch_add(1) % graphicsQueues.size();
-//            currentRecordQueue = &graphicsQueues[queueIndex];
-//            break;
-//        case QueueType::ComputeQueue:
-//            queueIndex = currentComputeQueueIndex.fetch_add(1) % computeQueues.size();
-//            currentRecordQueue = &computeQueues[queueIndex];
-//            break;
-//        case QueueType::TransferQueue:
-//            queueIndex = currentTransferQueueIndex.fetch_add(1) % transferQueues.size();
-//            currentRecordQueue = &transferQueues[queueIndex];
-//            break;
-//        }
-//
-//        if (currentRecordQueue->queueMutex->try_lock())
-//        {
-//            uint64_t timelineCounterValue = 0;
-//            vkGetSemaphoreCounterValue(logicalDevice, currentRecordQueue->timelineSemaphore, &timelineCounterValue);
-//            if (timelineCounterValue >= currentRecordQueue->timelineValue)
-//            {
-//                break;
-//            }
-//            else
-//            {
-//                currentRecordQueue->queueMutex->unlock();
-//            }
-//        }
-//
-//        std::this_thread::yield();
-//    }
-//
-//    vkResetCommandBuffer(currentRecordQueue->commandBuffer, 0);
-//
-//    VkCommandBufferBeginInfo beginInfo{};
-//    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-//    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-//
-//    vkBeginCommandBuffer(currentRecordQueue->commandBuffer, &beginInfo);
-//
-//    return *this;
-//}
-//
-//DeviceManager &DeviceManager::endCommands(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos,
-//                                          std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos,
-//                                          VkFence fence)
-//{
-//    vkEndCommandBuffer(currentRecordQueue->commandBuffer);
-//
-//    VkCommandBufferSubmitInfo commandBufferSubmitInfo{};
-//    commandBufferSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-//    commandBufferSubmitInfo.commandBuffer = currentRecordQueue->commandBuffer;
-//
-//    VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
-//    timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-//    timelineWaitSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
-//    timelineWaitSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue++;
-//    timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-//    waitSemaphoreInfos.push_back(timelineWaitSemaphoreSubmitInfo);
-//
-//    VkSemaphoreSubmitInfo timelineSignalSemaphoreSubmitInfo{};
-//    timelineSignalSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-//    timelineSignalSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
-//    timelineSignalSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue;
-//    timelineSignalSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-//    signalSemaphoreInfos.push_back(timelineSignalSemaphoreSubmitInfo);
-//
-//    VkSubmitInfo2 submitInfo{};
-//    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-//    submitInfo.waitSemaphoreInfoCount = static_cast<uint32_t>(waitSemaphoreInfos.size());
-//    submitInfo.pWaitSemaphoreInfos = waitSemaphoreInfos.data();
-//    submitInfo.signalSemaphoreInfoCount = static_cast<uint32_t>(signalSemaphoreInfos.size());
-//    submitInfo.pSignalSemaphoreInfos = signalSemaphoreInfos.data();
-//    submitInfo.commandBufferInfoCount = 1;
-//    submitInfo.pCommandBufferInfos = &commandBufferSubmitInfo;
-//
-//    VkResult result = vkQueueSubmit2(currentRecordQueue->vkQueue, 1, &submitInfo, fence);
-//    if (result != VK_SUCCESS)
-//    {
-//        throw std::runtime_error("Failed to submit command buffer!");
-//    }
-//
-//    currentRecordQueue->queueMutex->unlock();
-//
-//    return *this;
-//}
-//
-//DeviceManager &DeviceManager::operator<<(std::function<void(const VkCommandBuffer &commandBuffer)> commandsFunction)
-//{
-//    commandsFunction(currentRecordQueue->commandBuffer);
-//    return *this;
-//}
+DeviceManager::ExternalSemaphoreHandle DeviceManager::exportSemaphore(VkSemaphore &semaphore)
+{
+    ExternalSemaphoreHandle handleInfo{};
+
+#if _WIN32 || _WIN64
+    VkSemaphoreGetWin32HandleInfoKHR getHandleInfo{};
+    getHandleInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_WIN32_HANDLE_INFO_KHR;
+    getHandleInfo.pNext = nullptr;
+    getHandleInfo.semaphore = semaphore;
+    getHandleInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+
+    HANDLE handle = nullptr;
+    VkResult result = vkGetSemaphoreWin32HandleKHR(logicalDevice, &getHandleInfo, &handle);
+    if (result != VK_SUCCESS || handle == nullptr)
+    {
+        throw std::runtime_error("Failed to export semaphore handle.");
+    }
+    handleInfo.handle = handle;
+#else
+#endif
+
+    return handleInfo;
+}
+
+VkSemaphore DeviceManager::importSemaphore(const DeviceManager::ExternalSemaphoreHandle &memHandle, const VkSemaphore &semaphore)
+{
+#if _WIN32 || _WIN64
+    VkImportSemaphoreWin32HandleInfoKHR importInfo{};
+    importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR;
+    importInfo.pNext = nullptr;
+    importInfo.semaphore = semaphore;
+    importInfo.flags = 0; // VK_SEMAPHORE_IMPORT_TEMPORARY_BIT 或 0
+    importInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+    importInfo.handle = memHandle.handle;
+    importInfo.name = nullptr;
+
+    VkResult result = vkImportSemaphoreWin32HandleKHR(logicalDevice, &importInfo);
+    if (result != VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to import semaphore handle.");
+    }
+    return semaphore;
+#else
+    return VK_NULL_HANDLE;
+#endif
+}
