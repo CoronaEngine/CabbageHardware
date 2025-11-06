@@ -1,92 +1,80 @@
 ﻿#include"CabbageHardware.h"
 #include<Display/DisplayManager.h>
 
-struct DisplayHardwareWrap
+struct DisplayerHardwareWrap
 {
     void *displaySurface = nullptr;
     std::shared_ptr<DisplayManager> displayManager;
     uint64_t refCount = 0;
 };
 
-Corona::Kernel::Utils::Storage<DisplayHardwareWrap> globalDisplayStorages;
+Corona::Kernel::Utils::Storage<DisplayerHardwareWrap> globalDisplayerStorages;
 
 HardwareDisplayer::HardwareDisplayer(void* surface)
 {
-    auto thisHandle = static_cast<uintptr_t>(*this->displaySurfacePtr);
-    bool write_success = globalDisplayStorages.write(thisHandle, [](ResourceManager::DisplayHardwareWrap &disPlay) {
-        disPlay.refCount++;
+    bool write_success = globalDisplayerStorages.write(*this->displaySurfaceID, [](DisplayerHardwareWrap &disPlayer) {
+        disPlayer.refCount++;
     });
 
     if (!write_success)
     {
-        auto handle = globalDisplayStorages.allocate([&](ResourceManager::DisplayHardwareWrap &disPlay) {
-            disPlay = globalHardwareContext.mainDevice->resourceManager.createDisplay(surface);
-            disPlay.refCount = 1;
-            disPlay.displayManager = std::make_shared<DisplayManager>();
+        auto handle = globalDisplayerStorages.allocate([&](DisplayerHardwareWrap &disPlayer) {
+            DisplayerHardwareWrap newDisplayer;
+            newDisplayer.displaySurface = surface;
+            newDisplayer.refCount = 1;
+            newDisplayer.displayManager = std::make_shared<DisplayManager>();
+            disPlayer = newDisplayer;
         });
 
-        this->displaySurfacePtr = std::make_shared<uint64_t>(static_cast<uint64_t>(handle));
+        this->displaySurfaceID = std::make_shared<uintptr_t>(handle);
     }
 }
 
 HardwareDisplayer::HardwareDisplayer(const HardwareDisplayer &other)
 {
-    this->displaySurfacePtr = other.displaySurfacePtr;
+    this->displaySurfaceID = other.displaySurfaceID;
 
-    auto otherHandle = static_cast<uintptr_t>(*other.displaySurfacePtr);
-    bool write_success = globalDisplayStorages.write(otherHandle, [](ResourceManager::DisplayHardwareWrap &disPlay) {
-        disPlay.refCount++;
+    globalDisplayerStorages.write(*other.displaySurfaceID, [](DisplayerHardwareWrap &disPlayer) {
+        disPlayer.refCount++;
     });
-
-    if (!write_success)
-    {
-        throw std::runtime_error("Failed to write HardwareBuffer!");
-    }
 }
 
 HardwareDisplayer::~HardwareDisplayer()
 {
-    auto thisHandle = static_cast<uintptr_t>(*this->displaySurfacePtr);
-    bool write_success = globalDisplayStorages.write(thisHandle, [&](ResourceManager::DisplayHardwareWrap &disPlay) {
-        disPlay.refCount--;
-        if (disPlay.refCount == 0)
+    globalDisplayerStorages.write(*displaySurfaceID, [&](DisplayerHardwareWrap &disPlayer) {
+        disPlayer.refCount--;
+        if (disPlayer.refCount == 0)
         {
-            disPlay.displayManager.reset();
-            disPlay.displaySurface = nullptr;
-            globalDisplayStorages.deallocate(thisHandle);
+            disPlayer.displayManager.reset();
+            disPlayer.displaySurface = nullptr;
+            globalDisplayerStorages.deallocate(*displaySurfaceID);
         }
     });
 }
 
 HardwareDisplayer &HardwareDisplayer::operator=(const HardwareDisplayer &other)
 {
-    auto otherHandle = static_cast<uintptr_t>(*other.displaySurfacePtr);
-    auto thisHandle = static_cast<uintptr_t>(*this->displaySurfacePtr);
 
-    bool write_success = globalDisplayStorages.write(otherHandle, [](ResourceManager::DisplayHardwareWrap &disPlay) {
-        disPlay.refCount++;
+    globalDisplayerStorages.write(*other.displaySurfaceID, [](DisplayerHardwareWrap &disPlayer) {
+        disPlayer.refCount++;
     });
-
-    bool write_success = globalDisplayStorages.write(thisHandle, [&](ResourceManager::DisplayHardwareWrap &disPlay) {
-        disPlay.refCount--;
-        if (disPlay.refCount == 0)
+    globalDisplayerStorages.write(*displaySurfaceID, [&](DisplayerHardwareWrap &disPlayer) {
+        disPlayer.refCount--;
+        if (disPlayer.refCount == 0)
         {
-            disPlay.displayManager.reset();
-            disPlay.displaySurface = nullptr;
-            globalDisplayStorages.deallocate(thisHandle);
+            disPlayer.displayManager.reset();
+            disPlayer.displaySurface = nullptr;
+            globalDisplayerStorages.deallocate(*displaySurfaceID);
         }
     });
-
-    this->displaySurfacePtr = other.displaySurfacePtr;
+    this->displaySurfaceID = other.displaySurfaceID;
     return *this;
 }
 
 HardwareDisplayer &HardwareDisplayer::operator=(const HardwareImage &image)
 {
-    auto thisHandle = static_cast<uintptr_t>(*this->displaySurfacePtr);
-
-    bool write_success = globalDisplayStorages.write(thisHandle, [&](ResourceManager::DisplayHardwareWrap &disPlay) {
-        disPlay.displayManager->displayFrame(disPlay.displaySurface, image);
+    globalDisplayerStorages.read(*displaySurfaceID, [&](const DisplayerHardwareWrap &disPlayer) {
+        disPlayer.displayManager->displayFrame(disPlayer.displaySurface, image);
     });
 
     return *this;
