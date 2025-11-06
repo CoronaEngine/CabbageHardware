@@ -2,91 +2,128 @@
 #include<Hardware/GlobalContext.h>
 #include<Hardware/ResourceCommand.h>
 
-std::unordered_map<uint64_t, ResourceManager::ImageHardwareWrap> imageGlobalPool;
-std::unordered_map<uint64_t, uint64_t> imageRefCount;
-uint64_t currentImageID = 0;
+Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageStorages;
 
-std::mutex imageMutex;
-
-HardwareImage &HardwareImage::operator=(const HardwareImage &other)
+HardwareImage& HardwareImage::operator=(const HardwareImage& other)
 {
-    std::unique_lock<std::mutex> lock(imageMutex);
+    auto otherHandle = static_cast<uintptr_t>(*other.imageIdPtr);
+    auto thisHandle = static_cast<uintptr_t>(*this->imageIdPtr);
 
-    if (imageGlobalPool.count(*other.imageID))
+    if (otherHandle != thisHandle)
     {
-        imageRefCount[*other.imageID]++;
-    }
-    if (imageGlobalPool.count(*this->imageID))
-    {
-        imageRefCount[*imageID]--;
-        if (imageRefCount[*imageID] == 0)
+        bool write_success = globalImageStorages.write(otherHandle, [](ResourceManager::ImageHardwareWrap &image) {
+            image.refCount++;
+        });
+
+        if (!write_success)
         {
-            globalHardwareContext.mainDevice->resourceManager.destroyImage(imageGlobalPool[*imageID]);
-            imageGlobalPool.erase(*imageID);
-            imageRefCount.erase(*imageID);
+            throw std::runtime_error("Failed to write HardwareBuffer!");
         }
     }
-    *(this->imageID) = *(other.imageID);
+    else
+    {
+        bool write_success = globalImageStorages.write(thisHandle, [&](ResourceManager::ImageHardwareWrap &image) {
+            image.refCount--;
+            if (image.refCount == 0)
+            {
+                globalHardwareContext.mainDevice->resourceManager.destroyImage(image);
+                globalImageStorages.deallocate(thisHandle);
+            }
+        });
+
+        if (!write_success)
+        {
+            throw std::runtime_error("Failed to write HardwareBuffer!");
+        }
+    }
+
+    *(this->imageIdPtr) = *(other.imageIdPtr);
     return *this;
 }
 
 HardwareImage::HardwareImage()
 {
-    std::unique_lock<std::mutex> lock(imageMutex);
-
-    this->imageID = std::make_shared<uint64_t>(std::numeric_limits<uint64_t>::max());
+    this->imageIdPtr = std::make_shared<uint64_t>(std::numeric_limits<uint64_t>::max());
 }
 
 HardwareImage::HardwareImage(const HardwareImage &other)
 {
-    std::unique_lock<std::mutex> lock(imageMutex);
+    this->imageIdPtr = other.imageIdPtr;
 
-    this->imageID = other.imageID;
-    if (imageGlobalPool.count(*other.imageID))
+    auto otherHandle = static_cast<uintptr_t>(*other.imageIdPtr);
+    bool write_success = globalImageStorages.write(otherHandle, [](ResourceManager::ImageHardwareWrap &image) {
+        image.refCount++;
+    });
+
+    if (!write_success)
     {
-        imageRefCount[*other.imageID]++;
+        throw std::runtime_error("Failed to write HardwareBuffer!");
     }
 }
 
 HardwareImage::~HardwareImage()
 {
-    std::unique_lock<std::mutex> lock(imageMutex);
-
-    if (imageGlobalPool.count(*imageID))
-    {
-        imageRefCount[*imageID]--;
-        if (imageRefCount[*imageID] == 0)
+    auto thisHandle = static_cast<uintptr_t>(*this->imageIdPtr);
+    bool write_success = globalImageStorages.write(thisHandle, [&](ResourceManager::ImageHardwareWrap &image) {
+        image.refCount--;
+        if (image.refCount == 0)
         {
-            globalHardwareContext.mainDevice->resourceManager.destroyImage(imageGlobalPool[*imageID]);
-            imageGlobalPool.erase(*imageID);
-            imageRefCount.erase(*imageID);
+            globalHardwareContext.mainDevice->resourceManager.destroyImage(image);
+            globalImageStorages.deallocate(thisHandle);
         }
+    });
+
+    if (!write_success)
+    {
+        throw std::runtime_error("Failed to write HardwareBuffer!");
     }
 }
 
 HardwareImage::operator bool()
 {
-    std::unique_lock<std::mutex> lock(imageMutex);
+    if (imageIdPtr != nullptr)
+    {
+        bool read_success = globalImageStorages.read(static_cast<uintptr_t>(*imageIdPtr), [](const ResourceManager::ImageHardwareWrap &image) {
+            return image.imageHandle != VK_NULL_HANDLE;
+        });
 
-    return imageID != nullptr &&
-           imageGlobalPool.count(*imageID) &&
-           imageGlobalPool[*imageID].imageHandle != VK_NULL_HANDLE;
+        if (read_success)
+        {
+            throw std::runtime_error("Failed to read HardwareBuffer!");
+        }
+    }
+    else
+    {
+        return false;
+    }
 }
 
 uint32_t HardwareImage::storeDescriptor()
 {
-    std::unique_lock<std::mutex> lock(imageMutex);
+    ResourceManager::ImageHardwareWrap storeImage;
+    bool read_success = globalImageStorages.read(static_cast<uintptr_t>(*imageIdPtr), [&](const ResourceManager::ImageHardwareWrap &image) {
+        storeImage = image;
+    });
 
-    return globalHardwareContext.mainDevice->resourceManager.storeDescriptor(imageGlobalPool[*imageID]);
+    return globalHardwareContext.mainDevice->resourceManager.storeDescriptor(storeImage);
 }
-
 
 HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
 {
     HardwareExecutor tempExecutor;
 
+    ResourceManager::BufferHardwareWrap srcBuffer;
+    ResourceManager::ImageHardwareWrap dstImage;
+
+    bool read_srcBuffer_success = globalBufferStorages.read(static_cast<uintptr_t>(*buffer.bufferIdPtr), [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        srcBuffer = buffer;
+    });
+    bool read_dstImage_success = globalImageStorages.read(static_cast<uintptr_t>(*imageIdPtr), [&](const ResourceManager::ImageHardwareWrap &image) {
+        dstImage = image;
+    });
+
     // 使用栅栏确保提交完成后再返回，避免临时 staging buffer 在 GPU 仍然读取时被析构
-    CopyBufferToImageCommand copyCmd(bufferGlobalPool[*buffer.bufferID], imageGlobalPool[*imageID]);
+    CopyBufferToImageCommand copyCmd(srcBuffer, dstImage);
 
     //VkFenceCreateInfo fenceInfo{};
     //fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -113,7 +150,12 @@ HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
 
 HardwareImage &HardwareImage::copyFromData(const void *inputData)
 {
-    HardwareBuffer stagingBuffer = HardwareBuffer(imageGlobalPool[*imageID].imageSize.x * imageGlobalPool[*imageID].imageSize.y * imageGlobalPool[*imageID].pixelSize, BufferUsage::StorageBuffer, inputData);
+    ResourceManager::ImageHardwareWrap copyImage;
+    bool read_success = globalImageStorages.read(static_cast<uintptr_t>(*imageIdPtr), [&](const ResourceManager::ImageHardwareWrap &image) {
+        copyImage = image;
+    });
+
+    HardwareBuffer stagingBuffer = HardwareBuffer(copyImage.imageSize.x * copyImage.imageSize.y * copyImage.pixelSize, BufferUsage::StorageBuffer, inputData);
     copyFromBuffer(stagingBuffer);
     return *this;
 }
@@ -121,12 +163,6 @@ HardwareImage &HardwareImage::copyFromData(const void *inputData)
 
 HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage, int arrayLayers, void *imageData)
 {
-    std::unique_lock<std::mutex> lock(imageMutex);
-
-    this->imageID = std::make_shared<uint64_t>(currentImageID++);
-
-    imageRefCount[*this->imageID] = 1;
-
     VkImageUsageFlags vkImageUsageFlags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
     switch (imageUsage)
@@ -200,10 +236,84 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
         break;
     }
 
-    imageGlobalPool[*imageID] = globalHardwareContext.mainDevice->resourceManager.createImage(ktm::uvec2(width,height), vkImageFormat, pixelSize, vkImageUsageFlags, arrayLayers);
+    auto handle = globalImageStorages.allocate([&](ResourceManager::ImageHardwareWrap &image) {
+        image = globalHardwareContext.mainDevice->resourceManager.createImage(ktm::uvec2(width, height), vkImageFormat, pixelSize, vkImageUsageFlags, arrayLayers);
+        image.refCount = 1;
+        if (imageData != nullptr)
+        {
+            copyFromData(imageData);
+        }
+    });
+}
 
-    if (imageData != nullptr)
-    {
-        copyFromData(imageData);
-    }
+VkFormat HardwareImage::getImageFormat()
+{
+    ResourceManager::ImageHardwareWrap getImage;
+    bool read_success = globalImageStorages.read(static_cast<uintptr_t>(*imageIdPtr), [&](const ResourceManager::ImageHardwareWrap &image) {
+        getImage = image;
+    });
+
+    return getImage.imageFormat;
+}
+
+VkImageView HardwareImage::getImageView()
+{
+    ResourceManager::ImageHardwareWrap getImage;
+    bool read_success = globalImageStorages.read(static_cast<uintptr_t>(*imageIdPtr), [&](const ResourceManager::ImageHardwareWrap &image) {
+        getImage = image;
+    });
+
+    return getImage.imageView;
+}
+
+VkImage HardwareImage::getImage()
+{
+    ResourceManager::ImageHardwareWrap getImage;
+    bool read_success = globalImageStorages.read(static_cast<uintptr_t>(*imageIdPtr), [&](const ResourceManager::ImageHardwareWrap &image) {
+        getImage = image;
+    });
+    return getImage.imageHandle;
+}
+
+VkImageLayout HardwareImage::getImageLayout()
+{
+    ResourceManager::ImageHardwareWrap getImage;
+    bool read_success = globalImageStorages.read(static_cast<uintptr_t>(*imageIdPtr), [&](const ResourceManager::ImageHardwareWrap &image) {
+        getImage = image;
+    });
+    return getImage.imageLayout;
+}
+
+void HardwareImage::setImageLayout(VkImageLayout newLayout)
+{
+    bool write_success = globalImageStorages.write(static_cast<uintptr_t>(*imageIdPtr), [&](ResourceManager::ImageHardwareWrap &image) {
+        image.imageLayout = newLayout;
+    });
+}
+
+VkImageAspectFlags HardwareImage::getImageAspectMask()
+{
+    ResourceManager::ImageHardwareWrap getImage;
+    bool read_success = globalImageStorages.read(static_cast<uintptr_t>(*imageIdPtr), [&](const ResourceManager::ImageHardwareWrap &image) {
+        getImage = image;
+    });
+    return getImage.aspectMask;
+}
+
+ResourceManager::ImageHardwareWrap& HardwareImage::getSelf()
+{
+    ResourceManager::ImageHardwareWrap getImage;
+    bool read_success = globalImageStorages.read(static_cast<uintptr_t>(*imageIdPtr), [&](const ResourceManager::ImageHardwareWrap &image) {
+        getImage = image;
+    });
+    return getImage;
+}
+
+ktm::uvec2 HardwareImage::getImageSize()
+{
+    ResourceManager::ImageHardwareWrap getImage;
+    bool read_success = globalImageStorages.read(static_cast<uintptr_t>(*imageIdPtr), [&](const ResourceManager::ImageHardwareWrap &image) {
+        getImage = image;
+    });
+    return getImage.imageSize;
 }

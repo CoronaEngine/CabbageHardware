@@ -1,102 +1,101 @@
 ﻿#include"CabbageHardware.h"
 #include<Hardware/GlobalContext.h>
 #include<Hardware/ResourceCommand.h>
-#include "corona/kernel/utils/storage.h"
 
-//std::unordered_map<uint64_t, ResourceManager::BufferHardwareWrap> bufferGlobalPool;
-//std::unordered_map<uint64_t, uint64_t> bufferRefCount;
-//uint64_t currentBufferID = 0;
-//std::mutex bufferMutex;
+Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap> globalBufferStorages;
 
-// 测试：使用 Corona 并发容器
-struct BufferRecord
+HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer &other)
 {
-    ResourceManager::BufferHardwareWrap wrap{};
-    std::uint64_t refCount{0};
-};
+    auto otherHandle = static_cast<uintptr_t>(*other.bufferIdPtr);
+    auto thisHandle = static_cast<uintptr_t>(*this->bufferIdPtr);
 
-using BufferStorage = Corona::Kernel::Utils::Storage<BufferRecord>;
-static BufferStorage g_bufferStorage;
+    bool write_success = globalBufferStorages.write(otherHandle, [](ResourceManager::BufferHardwareWrap &buffer) {
+        buffer.refCount++;
+    });
 
-inline bool isValidId(const std::shared_ptr<uint64_t> &id)
-{
-    return id && *id != std::numeric_limits<uint64_t>::max();
-}
-
-HardwareBuffer &HardwareBuffer::operator=(const HardwareBuffer &other)
-{
-    std::unique_lock<std::mutex> lock(bufferMutex);
-
-    if (bufferGlobalPool.count(*other.bufferID))
+    if (!write_success)
     {
-        bufferRefCount[*other.bufferID]++;
+        throw std::runtime_error("Failed to write HardwareBuffer!");
     }
 
-    if (bufferGlobalPool.count(*this->bufferID))
-    {
-        bufferRefCount[*bufferID]--;
-        if (bufferRefCount[*bufferID] == 0)
+        bool write_success = globalBufferStorages.write(thisHandle, [&](ResourceManager::BufferHardwareWrap &buffer) {
+            buffer.refCount--;
+            if (buffer.refCount == 0)
+            {
+                globalHardwareContext.mainDevice->resourceManager.destroyBuffer(buffer);
+                globalBufferStorages.deallocate(thisHandle);
+            }
+        });
+
+        if (!write_success)
         {
-            globalHardwareContext.mainDevice->resourceManager.destroyBuffer(bufferGlobalPool[*bufferID]);
-            bufferGlobalPool.erase(*bufferID);
-            bufferRefCount.erase(*bufferID);
+            throw std::runtime_error("Failed to write HardwareBuffer!");
         }
-    }
 
-    *(this->bufferID) = *(other.bufferID);
+
+    *(this->bufferIdPtr) = *(other.bufferIdPtr);
     return *this;
 }
 
 HardwareBuffer::HardwareBuffer()
 {
-    std::unique_lock<std::mutex> lock(bufferMutex);
-
-    this->bufferID = std::make_shared<uint64_t>(std::numeric_limits<uint64_t>::max());
+    this->bufferIdPtr = std::make_shared<uint64_t>(std::numeric_limits<uint64_t>::max());
 }
 
 HardwareBuffer::HardwareBuffer(const HardwareBuffer &other)
 {
-    std::unique_lock<std::mutex> lock(bufferMutex);
+    this->bufferIdPtr = other.bufferIdPtr;
 
-    this->bufferID = other.bufferID;
-    if (bufferGlobalPool.count(*other.bufferID))
+    auto otherHandle = static_cast<uintptr_t>(*other.bufferIdPtr);
+    bool write_success = globalBufferStorages.write(otherHandle, [](ResourceManager::BufferHardwareWrap &buffer) {
+        buffer.refCount++;
+    });
+
+    if (!write_success)
     {
-        bufferRefCount[*other.bufferID]++;
+        throw std::runtime_error("Failed to write HardwareBuffer!");
     }
 }
 
 HardwareBuffer::~HardwareBuffer()
 {
-    std::unique_lock<std::mutex> lock(bufferMutex);
-
-    if (bufferGlobalPool.count(*bufferID))
-    {
-        bufferRefCount[*bufferID]--;
-        if (bufferRefCount[*bufferID] == 0)
+    auto thisHandle = static_cast<uintptr_t>(*this->bufferIdPtr);
+    bool write_success = globalBufferStorages.write(thisHandle, [&](ResourceManager::BufferHardwareWrap &buffer) {
+        buffer.refCount--;
+        if (buffer.refCount == 0)
         {
-            globalHardwareContext.mainDevice->resourceManager.destroyBuffer(bufferGlobalPool[*bufferID]);
-            bufferGlobalPool.erase(*bufferID);
-            bufferRefCount.erase(*bufferID);
+            globalHardwareContext.mainDevice->resourceManager.destroyBuffer(buffer);
+            globalBufferStorages.deallocate(thisHandle);
         }
+    });
+
+    if (!write_success)
+    {
+        throw std::runtime_error("Failed to write HardwareBuffer!");
     }
 }
 
 HardwareBuffer::operator bool()
 {
-    std::unique_lock<std::mutex> lock(bufferMutex);
+    if (bufferIdPtr != nullptr)
+    {
+        bool read_success = globalBufferStorages.read(static_cast<uintptr_t>(*bufferIdPtr), [](const ResourceManager::BufferHardwareWrap &buffer) {
+            return buffer.bufferHandle != VK_NULL_HANDLE;
+        });
 
-    return bufferID != nullptr &&
-           bufferGlobalPool.count(*bufferID) &&
-           bufferGlobalPool[*bufferID].bufferHandle != VK_NULL_HANDLE;
+        if (read_success)
+        {
+            throw std::runtime_error("Failed to read HardwareBuffer!");
+        }
+    }
+    else
+    {
+        return false;
+    }
 }
 
 HardwareBuffer::HardwareBuffer(uint64_t bufferSize, BufferUsage usage, const void* data)
 {
-    //std::unique_lock<std::mutex> lock(bufferMutex);
-
-    //this->bufferID = std::make_shared<uint64_t>(currentBufferID++);
-	//bufferRefCount[*this->bufferID] = 1;
-
 	VkBufferUsageFlags vkUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 	switch (usage)
@@ -117,30 +116,32 @@ HardwareBuffer::HardwareBuffer(uint64_t bufferSize, BufferUsage usage, const voi
 		break;
 	}
 
-	//bufferGlobalPool[*bufferID] = globalHardwareContext.mainDevice->resourceManager.createBuffer(bufferSize, vkUsage);
-
-	//if (data != nullptr)
-	//{
-    //    memcpy(bufferGlobalPool[*bufferID].bufferAllocInfo.pMappedData, data, bufferSize);
-	//}
-
-    auto handle = g_bufferStorage.allocate([&](BufferRecord &r) {
-        r.wrap = globalHardwareContext.mainDevice->resourceManager.createBuffer(bufferSize, vkUsage);
-        r.refCount = 1;
+    auto handle = globalBufferStorages.allocate([&](ResourceManager::BufferHardwareWrap &buffer) {
+        buffer = globalHardwareContext.mainDevice->resourceManager.createBuffer(bufferSize, vkUsage);
+        buffer.refCount = 1;
         if (data != nullptr)
         {
-            std::memcpy(r.wrap.bufferAllocInfo.pMappedData, data, bufferSize);
+            std::memcpy(buffer.bufferAllocInfo.pMappedData, data, bufferSize);
         }
     });
-    this->bufferID = std::make_shared<uint64_t>(static_cast<uint64_t>(handle));
+
+    this->bufferIdPtr = std::make_shared<uint64_t>(static_cast<uint64_t>(handle));
 }
 
 bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareExecutor *executor)
 {
-    std::unique_lock<std::mutex> lock(bufferMutex);
-
     HardwareExecutor tempExecutor;
-    CopyBufferCommand copyCmd(bufferGlobalPool[*inputBuffer.bufferID], bufferGlobalPool[*bufferID]);
+
+    ResourceManager::BufferHardwareWrap srcBuffer;
+    ResourceManager::BufferHardwareWrap dstBuffer;
+    bool read_srcBuffer_success = globalBufferStorages.read(static_cast<uintptr_t>(*inputBuffer.bufferIdPtr), [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        srcBuffer = buffer;
+    });
+    bool read_dstBuffer_success = globalBufferStorages.read(static_cast<uintptr_t>(*bufferIdPtr), [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        dstBuffer = buffer;
+    });
+
+    CopyBufferCommand copyCmd(srcBuffer, dstBuffer);
     tempExecutor << &copyCmd << tempExecutor.commit();
 
 	return true;
@@ -148,29 +149,50 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareE
 
 uint32_t HardwareBuffer::storeDescriptor()
 {
-    std::unique_lock<std::mutex> lock(bufferMutex);
+    ResourceManager::BufferHardwareWrap storeBuffer;
+    bool read_success = globalBufferStorages.read(static_cast<uintptr_t>(*bufferIdPtr), [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        storeBuffer = buffer;
+    });
 
-    return globalHardwareContext.mainDevice->resourceManager.storeDescriptor(bufferGlobalPool[*bufferID]);
+    return globalHardwareContext.mainDevice->resourceManager.storeDescriptor(storeBuffer);
 }
 
 bool HardwareBuffer::copyFromData(const void* inputData, uint64_t size)
 {
-    std::unique_lock<std::mutex> lock(bufferMutex);
+    ResourceManager::BufferHardwareWrap copyBuffer;
+    bool read_success = globalBufferStorages.read(static_cast<uintptr_t>(*bufferIdPtr), [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        copyBuffer = buffer;
+    });
 
-	memcpy(bufferGlobalPool[*bufferID].bufferAllocInfo.pMappedData, inputData, size);
+	memcpy(copyBuffer.bufferAllocInfo.pMappedData, inputData, size);
 	return true;
 }
 
 void* HardwareBuffer::getMappedData()
 {
-    std::unique_lock<std::mutex> lock(bufferMutex);
+    ResourceManager::BufferHardwareWrap getBuffer;
+    bool read_success = globalBufferStorages.read(static_cast<uintptr_t>(*bufferIdPtr), [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        getBuffer = buffer;
+    });
 
-	return bufferGlobalPool[*bufferID].bufferAllocInfo.pMappedData;
+	return getBuffer.bufferAllocInfo.pMappedData;
 }
 
 uint64_t HardwareBuffer::getBufferSize()
 {
-    std::unique_lock<std::mutex> lock(bufferMutex);
+    ResourceManager::BufferHardwareWrap getBuffer;
+    bool read_success = globalBufferStorages.read(static_cast<uintptr_t>(*bufferIdPtr), [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        getBuffer = buffer;
+    });
 
-	return bufferGlobalPool[*bufferID].bufferAllocInfo.size;
+	return getBuffer.bufferAllocInfo.size;
+}
+
+VkBuffer HardwareBuffer::getBuffer()
+{
+    ResourceManager::BufferHardwareWrap getBuffer;
+    bool read_success = globalBufferStorages.read(static_cast<uintptr_t>(*bufferIdPtr), [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        getBuffer = buffer;
+    });
+    return getBuffer.bufferHandle;
 }
