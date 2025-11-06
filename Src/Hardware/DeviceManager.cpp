@@ -84,10 +84,18 @@ void DeviceManager::cleanUpDeviceManager()
 void DeviceManager::createTimelineSemaphore()
 {
     auto createTimelineSemaphore = [&](QueueUtils &queues) {
+        VkExportSemaphoreCreateInfo exportInfo{};
+        exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
+#if _WIN32 || _WIN64
+        exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+#endif
+        exportInfo.pNext = nullptr;
+
         VkSemaphoreTypeCreateInfo type_create_info{};
         type_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO_KHR;
         type_create_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR;
         type_create_info.initialValue = 0;
+        type_create_info.pNext = &exportInfo;
 
         VkSemaphoreCreateInfo semaphoreInfo{};
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
