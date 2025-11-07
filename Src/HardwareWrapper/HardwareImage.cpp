@@ -150,9 +150,11 @@ HardwareImage::operator bool()
 
 uint32_t HardwareImage::storeDescriptor()
 {
+    uint32_t index = 0;
     globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
-        return globalHardwareContext.mainDevice->resourceManager.storeDescriptor(image);
+        index = globalHardwareContext.mainDevice->resourceManager.storeDescriptor(image);
     });
+    return index;
 }
 
 HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
