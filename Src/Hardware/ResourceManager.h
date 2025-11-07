@@ -69,9 +69,6 @@ struct ResourceManager
         ResourceManager* resourceManager;
     };
 
-
-
-
     struct
     {
         VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
