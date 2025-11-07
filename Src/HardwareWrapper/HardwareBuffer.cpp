@@ -116,9 +116,12 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareE
 
 uint32_t HardwareBuffer::storeDescriptor()
 {
-    globalBufferStorages.read(*bufferID, [](const ResourceManager::BufferHardwareWrap &buffer) {
-        return globalHardwareContext.mainDevice->resourceManager.storeDescriptor(buffer);
+    uint32_t descriptorIndex = 0;
+    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        descriptorIndex = globalHardwareContext.mainDevice->resourceManager.storeDescriptor(buffer);
     });
+
+    return descriptorIndex;
 }
 
 bool HardwareBuffer::copyFromData(const void* inputData, uint64_t size)
@@ -132,14 +135,18 @@ bool HardwareBuffer::copyFromData(const void* inputData, uint64_t size)
 
 void* HardwareBuffer::getMappedData()
 {
-    globalBufferStorages.read(*bufferID, [](const ResourceManager::BufferHardwareWrap &buffer) {
-        return buffer.bufferAllocInfo.pMappedData;
+    ResourceManager::BufferHardwareWrap getBuffer;
+    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        getBuffer = buffer;
     });
+    return getBuffer.bufferAllocInfo.pMappedData;
 }
 
 uint64_t HardwareBuffer::getBufferSize()
 {
-    globalBufferStorages.read(*bufferID, [](const ResourceManager::BufferHardwareWrap &buffer) {
-        return buffer.bufferAllocInfo.size;
+    ResourceManager::BufferHardwareWrap getBuffer;
+    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        getBuffer = buffer;
     });
+    return getBuffer.bufferAllocInfo.size;
 }
