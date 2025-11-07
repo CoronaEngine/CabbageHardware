@@ -46,47 +46,61 @@ HardwareBuffer::HardwareBuffer(uint64_t bufferSize, BufferUsage usage, const voi
 HardwareBuffer::HardwareBuffer(const HardwareBuffer &other)
 {
     this->bufferID = other.bufferID;
-
-    globalBufferStorages.write(*other.bufferID, [](ResourceManager::BufferHardwareWrap &buffer) {
-        buffer.refCount++;
-    });
+    if (*other.bufferID != std::numeric_limits<uintptr_t>::max())
+    {
+        globalBufferStorages.write(*other.bufferID, [](ResourceManager::BufferHardwareWrap &buffer) {
+            buffer.refCount++;
+        });
+    }
 }
 
 HardwareBuffer::~HardwareBuffer()
 {
     bool destroySelf = false;
-    globalBufferStorages.write(*bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
-        buffer.refCount--;
-        if (buffer.refCount == 0)
-        {
-            globalHardwareContext.mainDevice->resourceManager.destroyBuffer(buffer);
-            destroySelf = true;
-        }
-    });
-    if (destroySelf)
+    if (*bufferID != std::numeric_limits<uintptr_t>::max())
     {
-        globalBufferStorages.deallocate(*bufferID);
+        globalBufferStorages.write(*bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
+            buffer.refCount--;
+            if (buffer.refCount == 0)
+            {
+                globalHardwareContext.mainDevice->resourceManager.destroyBuffer(buffer);
+                destroySelf = true;
+            }
+        });
+        if (destroySelf)
+        {
+            globalBufferStorages.deallocate(*bufferID);
+        }
     }
+
+    bufferID.reset();
 }
 
 HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer &other)
 {
-    globalBufferStorages.write(*other.bufferID, [](ResourceManager::BufferHardwareWrap &buffer) {
-        buffer.refCount++;
-    });
+    if (*(other.bufferID) != std::numeric_limits<uintptr_t>::max())
+    {
+        globalBufferStorages.write(*other.bufferID, [](ResourceManager::BufferHardwareWrap &buffer) {
+            buffer.refCount++;
+        });
+    }
 
     bool destroySelf = false;
-    globalBufferStorages.write(*this->bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
-        buffer.refCount--;
-        if (buffer.refCount == 0)
-        {
-            globalHardwareContext.mainDevice->resourceManager.destroyBuffer(buffer);
-            destroySelf = true;
-        }
-    });
-    if (destroySelf)
+    if (*bufferID != std::numeric_limits<uintptr_t>::max())
     {
-        globalBufferStorages.deallocate(*this->bufferID);
+        globalBufferStorages.write(*this->bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
+            buffer.refCount--;
+            if (buffer.refCount == 0)
+            {
+                globalHardwareContext.mainDevice->resourceManager.destroyBuffer(buffer);
+                destroySelf = true;
+            }
+        });
+        if (destroySelf)
+        {
+            globalBufferStorages.deallocate(*this->bufferID);
+        }
+        bufferID.reset();
     }
 
     *(this->bufferID) = *(other.bufferID);
@@ -108,7 +122,6 @@ HardwareBuffer::operator bool()
 bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareExecutor *executor)
 {
     HardwareExecutor tempExecutor;
-
     ResourceManager::BufferHardwareWrap srcBuffer;
     ResourceManager::BufferHardwareWrap dstBuffer;
     bool read_srcBuffer_success = globalBufferStorages.read(*inputBuffer.bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
