@@ -108,14 +108,20 @@ HardwareImage::HardwareImage(const HardwareImage &other)
 
 HardwareImage::~HardwareImage()
 {
+    bool destroySelf = false;
     globalImageStorages.write(*imageID, [&](ResourceManager::ImageHardwareWrap &image) {
         image.refCount--;
         if (image.refCount == 0)
         {
             globalHardwareContext.mainDevice->resourceManager.destroyImage(image);
-            globalImageStorages.deallocate(*imageID);
+            destroySelf = true;
         }
     });
+
+    if (destroySelf)
+    {
+        globalImageStorages.deallocate(*imageID);
+    }
 }
 
 HardwareImage& HardwareImage::operator=(const HardwareImage& other)
