@@ -17,7 +17,7 @@ int main()
     {
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        std::vector<GLFWwindow *> windows(1);
+        std::vector<GLFWwindow *> windows(2);
         for (size_t i = 0; i < windows.size(); i++)
         {
             windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
@@ -130,7 +130,7 @@ int main()
                     frameCount = 0;
                 }
             }
-        }; // 退出线程函数，临时对象会被销毁
+        };
 
         for (size_t i = 0; i < windows.size(); i++)
         {
