@@ -43,15 +43,21 @@ HardwareDisplayer::HardwareDisplayer(const HardwareDisplayer &other)
 
 HardwareDisplayer::~HardwareDisplayer()
 {
+    bool destroySelf = false;
     globalDisplayerStorages.write(*displaySurfaceID, [&](DisplayerHardwareWrap &disPlayer) {
         disPlayer.refCount--;
         if (disPlayer.refCount == 0)
         {
             disPlayer.displayManager.reset();
             disPlayer.displaySurface = nullptr;
+            destroySelf = true;
             globalDisplayerStorages.deallocate(*displaySurfaceID);
         }
     });
+    if (destroySelf)
+    {
+        globalDisplayerStorages.deallocate(*displaySurfaceID);
+    }
 }
 
 HardwareDisplayer &HardwareDisplayer::operator=(const HardwareDisplayer &other)
