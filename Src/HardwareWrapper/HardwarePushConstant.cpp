@@ -120,17 +120,20 @@ HardwarePushConstant &HardwarePushConstant::operator=(const HardwarePushConstant
 
 uint8_t* HardwarePushConstant::getData() const
 {
+    uint8_t* returnData = nullptr;
     globalPushConstantStorages.read(*pushConstantID, [&](const PushConstantWrap &pushConstant) {
-        return pushConstant.data;
+        returnData = pushConstant.data;
     });
+    return returnData;
 }
 
 uint64_t HardwarePushConstant::getSize() const
 {
-
+    uint64_t returnSize = 0;
     globalPushConstantStorages.read(*pushConstantID, [&](const PushConstantWrap &pushConstant) {
-        return pushConstant.size;
+        returnSize = pushConstant.size;
     });
+    return returnSize;
 }
 
 void HardwarePushConstant::copyFromRaw(const void* src, uint64_t size)
