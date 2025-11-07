@@ -12,11 +12,13 @@ Corona::Kernel::Utils::Storage<DisplayerHardwareWrap> globalDisplayerStorages;
 
 HardwareDisplayer::HardwareDisplayer(void* surface)
 {
-    bool write_success = globalDisplayerStorages.write(*this->displaySurfaceID, [](DisplayerHardwareWrap &disPlayer) {
-        disPlayer.refCount++;
-    });
-
-    if (!write_success)
+    if (displaySurfaceID != nullptr)
+    {
+        bool write_success = globalDisplayerStorages.write(*this->displaySurfaceID, [](DisplayerHardwareWrap &disPlayer) {
+            disPlayer.refCount++;
+        });
+    }
+    else
     {
         auto handle = globalDisplayerStorages.allocate([&](DisplayerHardwareWrap &disPlayer) {
             DisplayerHardwareWrap newDisplayer;
