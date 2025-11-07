@@ -110,7 +110,7 @@ void RasterizerPipeline::createRenderPass(int multiviewCount)
     for (size_t i = 0; i < renderTargets.size(); i++)
     {
         VkAttachmentDescription attachment{};
-        attachment.format = imageGlobalPool[*renderTargets[i].imageID].imageFormat;
+        attachment.format = getImageFromHandle(*renderTargets[i].imageID).imageFormat;
         attachment.samples = VK_SAMPLE_COUNT_1_BIT;
         attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -393,9 +393,9 @@ void RasterizerPipeline::createFramebuffers(ktm::uvec2 imageSize)
     std::vector<VkImageView> attachments;
     for (int i = 0; i < renderTargets.size(); i++)
     {
-        attachments.push_back(imageGlobalPool[*renderTargets[i].imageID].imageView);
+        attachments.push_back(getImageFromHandle(*renderTargets[i].imageID).imageView);
     }
-    attachments.push_back(imageGlobalPool[*depthImage.imageID].imageView);
+    attachments.push_back(getImageFromHandle(*depthImage.imageID).imageView);
 
     VkFramebufferCreateInfo framebufferInfo{};
     framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -453,24 +453,33 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
 
         for (size_t i = 0; i < renderTargets.size(); i++)
         {
-            imageBarrier.image = imageGlobalPool[*renderTargets[i].imageID].imageHandle;
+            imageBarrier.image = getImageFromHandle(*renderTargets[i].imageID).imageHandle;
             imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
             imageBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-            imageBarrier.oldLayout = imageGlobalPool[*renderTargets[i].imageID].imageLayout;
-            imageBarrier.newLayout = (imageGlobalPool[*renderTargets[i].imageID].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-            imageBarrier.subresourceRange.aspectMask = imageGlobalPool[*renderTargets[i].imageID].aspectMask;
+            imageBarrier.oldLayout = getImageFromHandle(*renderTargets[i].imageID).imageLayout;
 
+            globalImageStorages.write(*renderTargets[i].imageID, [](ResourceManager::ImageHardwareWrap &image) {
+                image.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            });
+
+            imageBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            imageBarrier.subresourceRange.aspectMask = getImageFromHandle(*renderTargets[i].imageID).aspectMask;
             requiredBarriers.imageBarriers.push_back(imageBarrier);
         }
 
         if (depthImage)
         {
-            imageBarrier.image = imageGlobalPool[*depthImage.imageID].imageHandle;
+            imageBarrier.image = getImageFromHandle(*depthImage.imageID).imageHandle;
             imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
             imageBarrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-            imageBarrier.oldLayout = imageGlobalPool[*depthImage.imageID].imageLayout;
-            imageBarrier.newLayout = (imageGlobalPool[*depthImage.imageID].imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-            imageBarrier.subresourceRange.aspectMask = imageGlobalPool[*depthImage.imageID].aspectMask;
+            imageBarrier.oldLayout = getImageFromHandle(*depthImage.imageID).imageLayout;
+
+            globalImageStorages.write(*depthImage.imageID, [](ResourceManager::ImageHardwareWrap &image) {
+                image.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            });
+
+            imageBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            imageBarrier.subresourceRange.aspectMask = getImageFromHandle(*depthImage.imageID).aspectMask;
             requiredBarriers.imageBarriers.push_back(imageBarrier);
         }
     }
@@ -486,7 +495,7 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
 
         for (size_t i = 0; i < geomMeshes.size(); i++)
         {
-            bufferBarrier.buffer = bufferGlobalPool[*geomMeshes[i].indexBuffer.bufferID].bufferHandle;
+            bufferBarrier.buffer = getBufferFromHandle(*geomMeshes[i].indexBuffer.bufferID).bufferHandle;
             bufferBarrier.offset = 0;
             bufferBarrier.size = VK_WHOLE_SIZE;
             bufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
@@ -494,7 +503,7 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
             requiredBarriers.bufferBarriers.push_back(bufferBarrier);
             for (size_t j = 0; j < geomMeshes[i].vertexBuffers.size(); j++)
             {
-                bufferBarrier.buffer = bufferGlobalPool[*geomMeshes[i].vertexBuffers[j].bufferID].bufferHandle;
+                bufferBarrier.buffer = getBufferFromHandle(*geomMeshes[i].vertexBuffers[j].bufferID).bufferHandle;
                 bufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
                 bufferBarrier.dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
                 requiredBarriers.bufferBarriers.push_back(bufferBarrier);
@@ -513,15 +522,17 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
     {
         depthImage = HardwareImage(imageSize.x, imageSize.y, ImageFormat::D32_FLOAT, ImageUsage::DepthImage);
 
+        auto image = getImageFromHandle(*depthImage.imageID);
+
         globalHardwareContext.mainDevice->resourceManager.transitionImageLayout(hardwareExecutor.currentRecordQueue->commandBuffer,
-                                                                                imageGlobalPool[*depthImage.imageID], VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                                                                                image, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                                                                                 VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
                                                                                 VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 
         createRenderPass(multiviewCount);
 
         createGraphicsPipeline(vertShaderCode, fragShaderCode);
-        createFramebuffers(imageGlobalPool[*depthImage.imageID].imageSize);
+        createFramebuffers(image.imageSize);
     }
 
     // 在图形渲染前插入通用内存屏障，确保此前任何写入对图形流水线阶段可见
@@ -546,15 +557,15 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
     renderPassInfo.renderPass = renderPass;
     renderPassInfo.framebuffer = frameBuffers;
     renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent.width = imageGlobalPool[*depthImage.imageID].imageSize.x;
-    renderPassInfo.renderArea.extent.height = imageGlobalPool[*depthImage.imageID].imageSize.y;
+    renderPassInfo.renderArea.extent.width = getImageFromHandle(*depthImage.imageID).imageSize.x;
+    renderPassInfo.renderArea.extent.height = getImageFromHandle(*depthImage.imageID).imageSize.y;
 
         std::vector<VkClearValue> clearValues;
         for (size_t i = 0; i < renderTargets.size(); i++)
         {
-            clearValues.push_back(imageGlobalPool[*renderTargets[i].imageID].clearValue);
+            clearValues.push_back(getImageFromHandle(*renderTargets[i].imageID).clearValue);
         }
-        clearValues.push_back(imageGlobalPool[*depthImage.imageID].clearValue);
+        clearValues.push_back(getImageFromHandle(*depthImage.imageID).clearValue);
 
         renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
         renderPassInfo.pClearValues = clearValues.data();
@@ -564,16 +575,16 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
         VkViewport viewport{};
         viewport.x = 0.0f;
         viewport.y = 0.0f;
-        viewport.width = (float)imageGlobalPool[*depthImage.imageID].imageSize.x;
-        viewport.height = (float)imageGlobalPool[*depthImage.imageID].imageSize.y;
+        viewport.width = (float)getImageFromHandle(*depthImage.imageID).imageSize.x;
+        viewport.height = (float)getImageFromHandle(*depthImage.imageID).imageSize.y;
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         vkCmdSetViewport(hardwareExecutor.currentRecordQueue->commandBuffer, 0, 1, &viewport);
 
         VkRect2D scissor{};
         scissor.offset = {0, 0};
-        scissor.extent.width = imageGlobalPool[*depthImage.imageID].imageSize.x;
-        scissor.extent.height = imageGlobalPool[*depthImage.imageID].imageSize.y;
+        scissor.extent.width = getImageFromHandle(*depthImage.imageID).imageSize.x;
+        scissor.extent.height = getImageFromHandle(*depthImage.imageID).imageSize.y;
         vkCmdSetScissor(hardwareExecutor.currentRecordQueue->commandBuffer, 0, 1, &scissor);
 
         vkCmdBindPipeline(hardwareExecutor.currentRecordQueue->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
@@ -585,13 +596,13 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
              for (size_t vertexBufferIndex = 0; vertexBufferIndex < geomMeshes[i].vertexBuffers.size(); vertexBufferIndex++)
             {
                  uint64_t bufferID= *geomMeshes[i].vertexBuffers[vertexBufferIndex].bufferID;
-                vertexBuffers.push_back(bufferGlobalPool[bufferID].bufferHandle);
+                 vertexBuffers.push_back(getBufferFromHandle(bufferID).bufferHandle);
                  offsets.push_back(0);
              }
 
              vkCmdBindVertexBuffers(hardwareExecutor.currentRecordQueue->commandBuffer, 0, (uint32_t)geomMeshes[i].vertexBuffers.size(), vertexBuffers.data(), offsets.data());
 
-             vkCmdBindIndexBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, bufferGlobalPool[*geomMeshes[i].indexBuffer.bufferID].bufferHandle, 0 * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
+             vkCmdBindIndexBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, getBufferFromHandle(*geomMeshes[i].indexBuffer.bufferID).bufferHandle, 0 * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
 
              std::vector<VkDescriptorSet> descriptorSets;
              for (size_t i = 0; i < 4; i++)
@@ -604,7 +615,7 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
              void *data = geomMeshes[i].pushConstant.getData();
              vkCmdPushConstants(hardwareExecutor.currentRecordQueue->commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, pushConstantSize, data);
 
-             uint32_t indexCount = bufferGlobalPool[*geomMeshes[i].indexBuffer.bufferID].bufferAllocInfo.size / sizeof(uint32_t);
+             uint32_t indexCount = (uint32_t)(getBufferFromHandle(*geomMeshes[i].indexBuffer.bufferID).bufferAllocInfo.size / sizeof(uint32_t));
              vkCmdDrawIndexed(hardwareExecutor.currentRecordQueue->commandBuffer, indexCount, 1, 0, 0, 0);
 
         }
