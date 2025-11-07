@@ -117,7 +117,6 @@ HardwareImage::~HardwareImage()
             destroySelf = true;
         }
     });
-
     if (destroySelf)
     {
         globalImageStorages.deallocate(*imageID);
@@ -130,14 +129,19 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other)
         image.refCount++;
     });
 
+    bool destroySelf = false;
     globalImageStorages.write(*this->imageID, [&](ResourceManager::ImageHardwareWrap &image) {
         image.refCount--;
         if (image.refCount == 0)
         {
             globalHardwareContext.mainDevice->resourceManager.destroyImage(image);
-            globalImageStorages.deallocate(*imageID);
+            destroySelf = true;
         }
     });
+    if (destroySelf)
+    {
+        globalImageStorages.deallocate(*imageID);
+    }
 
     *(this->imageID) = *(other.imageID);
     return *this;
