@@ -200,11 +200,15 @@ HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
 
 HardwareImage &HardwareImage::copyFromData(const void *inputData)
 {
-
+    uint32_t width, height, pixelSize;
     globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
-        HardwareBuffer stagingBuffer = HardwareBuffer(image.imageSize.x * image.imageSize.y * image.pixelSize, BufferUsage::StorageBuffer, inputData);
-        copyFromBuffer(stagingBuffer);
+        width = image.imageSize.x;
+        height = image.imageSize.y;
+        pixelSize = image.pixelSize;
     });
+
+    HardwareBuffer stagingBuffer = HardwareBuffer(width * height * pixelSize, BufferUsage::StorageBuffer, inputData);
+    copyFromBuffer(stagingBuffer);
 
     return *this;
 }
