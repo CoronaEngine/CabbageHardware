@@ -57,6 +57,7 @@ HardwarePushConstant::HardwarePushConstant(const HardwarePushConstant &other)
 
 HardwarePushConstant::~HardwarePushConstant()
 {
+    bool destroySelf = false;
     globalPushConstantStorages.write(*pushConstantID, [&](PushConstantWrap &pushConstant) {
         pushConstant.refCount--;
         if (pushConstant.refCount == 0)
@@ -67,10 +68,15 @@ HardwarePushConstant::~HardwarePushConstant()
                 pushConstant.data = nullptr;
             }
 
+            destroySelf = true;
             //globalHardwareContext.mainDevice->resourceManager.destroyBuffer(buffer);
-            globalPushConstantStorages.deallocate(*pushConstantID);
         }
     });
+
+    if (destroySelf)
+    {
+        globalPushConstantStorages.deallocate(*pushConstantID);
+    }
 }
 
 HardwarePushConstant &HardwarePushConstant::operator=(const HardwarePushConstant &other)
