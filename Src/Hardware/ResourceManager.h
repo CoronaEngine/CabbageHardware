@@ -172,7 +172,7 @@ private:
     void createTextureSampler();
     void CreateVmaAllocator();
     void createBindlessDescriptorSet();
-    void createExternalBufferMemoryPool(const VkBufferCreateInfo& bufferInfo);
+    void createExternalBufferMemoryPool();
 
     VmaAllocator g_hAllocator = VK_NULL_HANDLE;
     VmaPool g_hBufferPool = VK_NULL_HANDLE;

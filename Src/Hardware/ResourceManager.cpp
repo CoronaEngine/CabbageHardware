@@ -24,6 +24,7 @@ void ResourceManager::initResourceManager(DeviceManager &device)
     CreateVmaAllocator();
     createTextureSampler();
     createBindlessDescriptorSet();
+    createExternalBufferMemoryPool();
 }
 
 void ResourceManager::cleanUpResourceManager()
@@ -391,12 +392,6 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
         }
         else if (!dedicatedOnly)
         {
-            // Non-dedicated exportable buffer creation
-            if (g_hBufferPool == VK_NULL_HANDLE)
-            {
-                createExternalBufferMemoryPool(bufCreateInfo);
-            }
-
             VmaAllocationCreateInfo vbAllocCreateInfo = {};
             vbAllocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
             vbAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
@@ -434,8 +429,44 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
 
 }
 
-void ResourceManager::createExternalBufferMemoryPool(const VkBufferCreateInfo &bufferInfo)
+void ResourceManager::createExternalBufferMemoryPool()
 {
+    VkBufferCreateInfo bufCreateInfo = {};
+    bufCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufCreateInfo.size = 0x10000; // 示例大小
+    bufCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+    // Keep queue family indices alive until after vkCreateBuffer/vmaCreateBuffer
+    // Todo：这里后面可以优化，只传递需要的队列族索引
+    std::vector<uint32_t> queueFamilyIndices;
+    if (device->getQueueFamilyNumber() > 1)
+    {
+        queueFamilyIndices.resize(device->getQueueFamilyNumber());
+        for (size_t i = 0; i < queueFamilyIndices.size(); i++)
+        {
+            queueFamilyIndices[i] = static_cast<uint32_t>(i);
+        }
+        bufCreateInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        bufCreateInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueFamilyIndices.size());
+        bufCreateInfo.pQueueFamilyIndices = queueFamilyIndices.data();
+    }
+    else
+    {
+        bufCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
+
+    // External compatibility query
+    VkExternalMemoryBufferCreateInfoKHR externalMemBufCreateInfo = {};
+    externalMemBufCreateInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO_KHR;
+#if _WIN32 || _WIN64
+    externalMemBufCreateInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+#elif __APPLE__
+    // Not used in this repo
+#elif __linux__
+    externalMemBufCreateInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+#endif
+    bufCreateInfo.pNext = &externalMemBufCreateInfo;
+
 #if _WIN32 || _WIN64
      const VkExternalMemoryHandleTypeFlagsKHR handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #elif __APPLE__
@@ -450,7 +481,7 @@ void ResourceManager::createExternalBufferMemoryPool(const VkBufferCreateInfo &b
 
      // 查找合适的内存类型
      uint32_t memTypeIndex = VK_MAX_MEMORY_TYPES;
-     VkResult res = vmaFindMemoryTypeIndexForBufferInfo(g_hAllocator, &bufferInfo, &allocInfo, &memTypeIndex);
+     VkResult res = vmaFindMemoryTypeIndexForBufferInfo(g_hAllocator, &bufCreateInfo, &allocInfo, &memTypeIndex);
      if (res != VK_SUCCESS)
      {
          throw std::runtime_error("vmaFindMemoryTypeIndexForBufferInfo failed!");
