@@ -100,7 +100,6 @@ HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer &other)
         {
             globalBufferStorages.deallocate(*this->bufferID);
         }
-        bufferID.reset();
     }
 
     *(this->bufferID) = *(other.bufferID);
@@ -109,11 +108,14 @@ HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer &other)
 
 HardwareBuffer::operator bool()
 {
-    if (bufferID != nullptr)
+    if (bufferID != nullptr && *bufferID != std::numeric_limits<uintptr_t>::max())
     {
-        globalBufferStorages.read(*bufferID, [](const ResourceManager::BufferHardwareWrap &buffer) {
-            return buffer.bufferHandle != VK_NULL_HANDLE;
+        bool result = false;
+        globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+            if (buffer.bufferHandle != VK_NULL_HANDLE)
+                result = true;
         });
+        return result;
     }
 
     return false;
