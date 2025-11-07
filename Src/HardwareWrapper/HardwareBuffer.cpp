@@ -54,14 +54,20 @@ HardwareBuffer::HardwareBuffer(const HardwareBuffer &other)
 
 HardwareBuffer::~HardwareBuffer()
 {
+    bool destroySelf = false;
     globalBufferStorages.write(*bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
         buffer.refCount--;
         if (buffer.refCount == 0)
         {
             globalHardwareContext.mainDevice->resourceManager.destroyBuffer(buffer);
-            globalBufferStorages.deallocate(*bufferID);
+            destroySelf = true;
         }
     });
+
+    if (destroySelf)
+    {
+        globalBufferStorages.deallocate(*bufferID);
+    }
 }
 
 HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer &other)
