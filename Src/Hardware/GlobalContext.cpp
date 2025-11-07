@@ -54,8 +54,8 @@ HardwareContext::HardwareContext()
 
 HardwareContext::~HardwareContext()
 {
-    imageGlobalPool.clear();
-    bufferGlobalPool.clear();
+    //imageGlobalPool.clear();
+    //bufferGlobalPool.clear();
 
     for (size_t i = 0; i < hardwareUtils.size(); i++)
     {

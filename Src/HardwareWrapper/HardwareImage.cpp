@@ -2,131 +2,15 @@
 #include<Hardware/GlobalContext.h>
 #include<Hardware/ResourceCommand.h>
 
-std::unordered_map<uint64_t, ResourceManager::ImageHardwareWrap> imageGlobalPool;
-std::unordered_map<uint64_t, uint64_t> imageRefCount;
-uint64_t currentImageID = 0;
-
-std::mutex imageMutex;
-
-HardwareImage &HardwareImage::operator=(const HardwareImage &other)
-{
-    std::unique_lock<std::mutex> lock(imageMutex);
-
-    if (imageGlobalPool.count(*other.imageID))
-    {
-        imageRefCount[*other.imageID]++;
-    }
-    if (imageGlobalPool.count(*this->imageID))
-    {
-        imageRefCount[*imageID]--;
-        if (imageRefCount[*imageID] == 0)
-        {
-            globalHardwareContext.mainDevice->resourceManager.destroyImage(imageGlobalPool[*imageID]);
-            imageGlobalPool.erase(*imageID);
-            imageRefCount.erase(*imageID);
-        }
-    }
-    *(this->imageID) = *(other.imageID);
-    return *this;
-}
+Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageStorages;
 
 HardwareImage::HardwareImage()
 {
-    std::unique_lock<std::mutex> lock(imageMutex);
-
-    this->imageID = std::make_shared<uint64_t>(std::numeric_limits<uint64_t>::max());
+    this->imageID = std::make_shared<uintptr_t>(std::numeric_limits<uintptr_t>::max());
 }
-
-HardwareImage::HardwareImage(const HardwareImage &other)
-{
-    std::unique_lock<std::mutex> lock(imageMutex);
-
-    this->imageID = other.imageID;
-    if (imageGlobalPool.count(*other.imageID))
-    {
-        imageRefCount[*other.imageID]++;
-    }
-}
-
-HardwareImage::~HardwareImage()
-{
-    std::unique_lock<std::mutex> lock(imageMutex);
-
-    if (imageGlobalPool.count(*imageID))
-    {
-        imageRefCount[*imageID]--;
-        if (imageRefCount[*imageID] == 0)
-        {
-            globalHardwareContext.mainDevice->resourceManager.destroyImage(imageGlobalPool[*imageID]);
-            imageGlobalPool.erase(*imageID);
-            imageRefCount.erase(*imageID);
-        }
-    }
-}
-
-HardwareImage::operator bool()
-{
-    std::unique_lock<std::mutex> lock(imageMutex);
-
-    return imageID != nullptr &&
-           imageGlobalPool.count(*imageID) &&
-           imageGlobalPool[*imageID].imageHandle != VK_NULL_HANDLE;
-}
-
-uint32_t HardwareImage::storeDescriptor()
-{
-    std::unique_lock<std::mutex> lock(imageMutex);
-
-    return globalHardwareContext.mainDevice->resourceManager.storeDescriptor(imageGlobalPool[*imageID]);
-}
-
-
-HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
-{
-    HardwareExecutor tempExecutor;
-
-    // 使用栅栏确保提交完成后再返回，避免临时 staging buffer 在 GPU 仍然读取时被析构
-    CopyBufferToImageCommand copyCmd(bufferGlobalPool[*buffer.bufferID], imageGlobalPool[*imageID]);
-
-    //VkFenceCreateInfo fenceInfo{};
-    //fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    //fenceInfo.flags = 0; // 未信号状态
-
-    //VkDevice device = globalHardwareContext.mainDevice->deviceManager.logicalDevice;
-    //VkFence fence = VK_NULL_HANDLE;
-    //if (vkCreateFence(device, &fenceInfo, nullptr, &fence) != VK_SUCCESS)
-    //{
-    //    // 创建失败则退化为同步 DeviceIdle，保证安全性
-    //    tempExecutor << &copyCmd << tempExecutor.commit();
-    //    vkDeviceWaitIdle(device);
-    //    return *this;
-    //}
-
-    tempExecutor << &copyCmd << tempExecutor.commit();
-
-    // 等待 GPU 完成该次提交，确保源 buffer 生命周期安全
-    //vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
-    //vkDestroyFence(device, fence, nullptr);
-
-    return *this;
-}
-
-HardwareImage &HardwareImage::copyFromData(const void *inputData)
-{
-    HardwareBuffer stagingBuffer = HardwareBuffer(imageGlobalPool[*imageID].imageSize.x * imageGlobalPool[*imageID].imageSize.y * imageGlobalPool[*imageID].pixelSize, BufferUsage::StorageBuffer, inputData);
-    copyFromBuffer(stagingBuffer);
-    return *this;
-}
-
 
 HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage, int arrayLayers, void *imageData)
 {
-    std::unique_lock<std::mutex> lock(imageMutex);
-
-    this->imageID = std::make_shared<uint64_t>(currentImageID++);
-
-    imageRefCount[*this->imageID] = 1;
-
     VkImageUsageFlags vkImageUsageFlags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
     switch (imageUsage)
@@ -200,10 +84,157 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
         break;
     }
 
-    imageGlobalPool[*imageID] = globalHardwareContext.mainDevice->resourceManager.createImage(ktm::uvec2(width,height), vkImageFormat, pixelSize, vkImageUsageFlags, arrayLayers);
+    auto handle = globalImageStorages.allocate([&](ResourceManager::ImageHardwareWrap &image) {
+        image = globalHardwareContext.mainDevice->resourceManager.createImage(ktm::uvec2(width, height), vkImageFormat, pixelSize, vkImageUsageFlags, arrayLayers);
+        image.refCount = 1;
+    });
+
+    this->imageID = std::make_shared<uintptr_t>(handle);
 
     if (imageData != nullptr)
     {
         copyFromData(imageData);
     }
+}
+
+HardwareImage::HardwareImage(const HardwareImage &other)
+{
+    this->imageID = other.imageID;
+
+    if (*other.imageID != std::numeric_limits<uintptr_t>::max())
+    {
+        globalImageStorages.write(*other.imageID, [](ResourceManager::ImageHardwareWrap &image) {
+            image.refCount++;
+        });
+    }
+}
+
+HardwareImage::~HardwareImage()
+{
+    bool destroySelf = false;
+    if (*imageID != std::numeric_limits<uintptr_t>::max())
+    {
+        globalImageStorages.write(*imageID, [&](ResourceManager::ImageHardwareWrap &image) {
+            image.refCount--;
+            if (image.refCount == 0)
+            {
+                globalHardwareContext.mainDevice->resourceManager.destroyImage(image);
+                destroySelf = true;
+            }
+        });
+        if (destroySelf)
+        {
+            globalImageStorages.deallocate(*imageID);
+        }
+    }
+
+    imageID.reset();
+}
+
+HardwareImage& HardwareImage::operator=(const HardwareImage& other)
+{
+    if (*(other.imageID) != std::numeric_limits<uintptr_t>::max())
+    {
+        globalImageStorages.write(*other.imageID, [](ResourceManager::ImageHardwareWrap &image) {
+            image.refCount++;
+        });
+    }
+
+    bool destroySelf = false;
+    if (*imageID != std::numeric_limits<uintptr_t>::max())
+    {
+        globalImageStorages.write(*this->imageID, [&](ResourceManager::ImageHardwareWrap &image) {
+            image.refCount--;
+            if (image.refCount == 0)
+            {
+                globalHardwareContext.mainDevice->resourceManager.destroyImage(image);
+                destroySelf = true;
+            }
+        });
+        if (destroySelf)
+        {
+            globalImageStorages.deallocate(*imageID);
+        }
+    }
+
+    *(this->imageID) = *(other.imageID);
+    return *this;
+}
+
+HardwareImage::operator bool()
+{
+    if (imageID != nullptr && *imageID != std::numeric_limits<uintptr_t>::max())
+    {
+        bool result = false;
+        globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
+            if (image.imageHandle != VK_NULL_HANDLE)
+                result = true;
+        });
+        return result;
+    }
+    return false;
+}
+
+uint32_t HardwareImage::storeDescriptor()
+{
+    uint32_t index = 0;
+    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
+        index = globalHardwareContext.mainDevice->resourceManager.storeDescriptor(image);
+    });
+    return index;
+}
+
+HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
+{
+    HardwareExecutor tempExecutor;
+
+    ResourceManager::BufferHardwareWrap srcBuffer;
+    ResourceManager::ImageHardwareWrap dstImage;
+
+    globalBufferStorages.read(*buffer.bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        srcBuffer = buffer;
+    });
+    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
+        dstImage = image;
+    });
+
+    // 使用栅栏确保提交完成后再返回，避免临时 staging buffer 在 GPU 仍然读取时被析构
+    CopyBufferToImageCommand copyCmd(srcBuffer, dstImage);
+
+    //VkFenceCreateInfo fenceInfo{};
+    //fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    //fenceInfo.flags = 0; // 未信号状态
+
+    //VkDevice device = globalHardwareContext.mainDevice->deviceManager.logicalDevice;
+    //VkFence fence = VK_NULL_HANDLE;
+    //if (vkCreateFence(device, &fenceInfo, nullptr, &fence) != VK_SUCCESS)
+    //{
+    //    // 创建失败则退化为同步 DeviceIdle，保证安全性
+    //    tempExecutor << &copyCmd << tempExecutor.commit();
+    //    vkDeviceWaitIdle(device);
+    //    return *this;
+    //}
+
+    tempExecutor << &copyCmd << tempExecutor.commit();
+
+    // 等待 GPU 完成该次提交，确保源 buffer 生命周期安全
+    //vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
+    //vkDestroyFence(device, fence, nullptr);
+
+    return *this;
+}
+
+HardwareImage &HardwareImage::copyFromData(const void *inputData)
+{
+    uint32_t width, height, pixelSize;
+    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
+        width = image.imageSize.x;
+        height = image.imageSize.y;
+        pixelSize = image.pixelSize;
+    });
+
+    HardwareBuffer stagingBuffer = HardwareBuffer(width * height * pixelSize, BufferUsage::StorageBuffer, inputData);
+    copyFromBuffer(stagingBuffer);
+
+    return *this;
 }

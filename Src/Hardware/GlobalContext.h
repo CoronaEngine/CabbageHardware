@@ -3,6 +3,7 @@
 #include "Hardware/DeviceManager.h"
 #include "Hardware/ResourceManager.h"
 #include "../VulkanUtils.h"
+#include "corona/kernel/utils/storage.h"
 
 // 增加宏以启用导出内存功能
 #define USE_EXPORT_MEMORY
@@ -40,7 +41,25 @@ private:
 };
 
 extern HardwareContext globalHardwareContext;
+extern Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap> globalBufferStorages;
+extern Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageStorages;
 
-extern std::unordered_map<uint64_t, ResourceManager::ImageHardwareWrap> imageGlobalPool;
-extern std::unordered_map<uint64_t, ResourceManager::BufferHardwareWrap> bufferGlobalPool;
-//extern std::unordered_map<void *, std::shared_ptr<DisplayManager>> displayerGlobalPool;
+inline ResourceManager::BufferHardwareWrap getBufferFromHandle(uintptr_t handle)
+{
+    ResourceManager::BufferHardwareWrap getBuffer;
+    globalBufferStorages.read(handle, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        getBuffer = buffer;
+    });
+
+    return getBuffer;
+}
+
+inline ResourceManager::ImageHardwareWrap getImageFromHandle(uintptr_t handle)
+{
+    ResourceManager::ImageHardwareWrap getImage;
+    globalImageStorages.read(handle, [&](const ResourceManager::ImageHardwareWrap &image) {
+        getImage = image;
+    });
+
+    return getImage;
+}

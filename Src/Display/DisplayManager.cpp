@@ -349,7 +349,8 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 {
     if (displaySurface != nullptr)
     {
-        ResourceManager::ImageHardwareWrap &sourceImage = imageGlobalPool[*displayImage.imageID];
+        //ResourceManager::ImageHardwareWrap &sourceImage = imageGlobalPool[*displayImage.imageID];
+        ResourceManager::ImageHardwareWrap sourceImage = getImageFromHandle(*displayImage.imageID);
 
         if (this->displaySurface != displaySurface)
         {
@@ -366,8 +367,10 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
             if (globalHardwareContext.mainDevice != displayDevice)
             {
-                this->displayImage = displayDevice->resourceManager.createImage(imageGlobalPool[*displayImage.imageID].imageSize, imageGlobalPool[*displayImage.imageID].imageFormat,
-                                                                                imageGlobalPool[*displayImage.imageID].pixelSize, imageGlobalPool[*displayImage.imageID].imageUsage);
+                /*this->displayImage = displayDevice->resourceManager.createImage(imageGlobalPool[*displayImage.imageID].imageSize, imageGlobalPool[*displayImage.imageID].imageFormat,
+                                                                                imageGlobalPool[*displayImage.imageID].pixelSize, imageGlobalPool[*displayImage.imageID].imageUsage);*/
+
+                this->displayImage = displayDevice->resourceManager.createImage(sourceImage.imageSize, sourceImage.imageFormat, sourceImage.pixelSize, sourceImage.imageUsage);
 
                 VkDeviceSize imageSizeBytes = this->displayImage.imageSize.x * this->displayImage.imageSize.y * this->displayImage.pixelSize;
 

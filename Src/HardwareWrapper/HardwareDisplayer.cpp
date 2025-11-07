@@ -1,106 +1,89 @@
 ﻿#include"CabbageHardware.h"
 #include<Display/DisplayManager.h>
 
-std::unordered_map<void *, std::shared_ptr<DisplayManager>> displayerGlobalPool;
-std::unordered_map<void *, uint64_t> displayerRefCount;
-std::mutex displayerMutex;
-
-HardwareDisplayer::HardwareDisplayer(void* surface): displaySurface(surface)
+struct DisplayerHardwareWrap
 {
-    if (displaySurface != nullptr)
-    {
-        std::unique_lock<std::mutex> lock(displayerMutex);
+    void *displaySurface = nullptr;
+    std::shared_ptr<DisplayManager> displayManager;
+    uint64_t refCount = 0;
+};
 
-        if (!displayerGlobalPool.count(displaySurface))
-        {
-            displayerRefCount[this->displaySurface] = 1;
-            displayerGlobalPool[displaySurface] = std::make_shared<DisplayManager>();
-        }
-        else
-        {
-            displayerRefCount[this->displaySurface]++;
-        }
+Corona::Kernel::Utils::Storage<DisplayerHardwareWrap> globalDisplayerStorages;
+
+HardwareDisplayer::HardwareDisplayer(void* surface)
+{
+    if (displaySurfaceID != nullptr)
+    {
+        globalDisplayerStorages.write(*this->displaySurfaceID, [](DisplayerHardwareWrap &disPlayer) {
+            disPlayer.refCount++;
+        });
+    }
+    else
+    {
+        auto handle = globalDisplayerStorages.allocate([&](DisplayerHardwareWrap &disPlayer) {
+            DisplayerHardwareWrap newDisplayer;
+            newDisplayer.displaySurface = surface;
+            newDisplayer.refCount = 1;
+            newDisplayer.displayManager = std::make_shared<DisplayManager>();
+            disPlayer = newDisplayer;
+        });
+
+        this->displaySurfaceID = std::make_shared<uintptr_t>(handle);
     }
 }
 
 HardwareDisplayer::HardwareDisplayer(const HardwareDisplayer &other)
 {
-    std::unique_lock<std::mutex> lock(displayerMutex);
+    this->displaySurfaceID = other.displaySurfaceID;
 
-    displaySurface = other.displaySurface;
-
-    if (displaySurface != nullptr)
-    {
-        if (displayerGlobalPool.count(displaySurface))
-        {
-            displayerRefCount[displaySurface]++;
-        }
-    }
+    globalDisplayerStorages.write(*other.displaySurfaceID, [](DisplayerHardwareWrap &disPlayer) {
+        disPlayer.refCount++;
+    });
 }
 
 HardwareDisplayer::~HardwareDisplayer()
 {
-    std::unique_lock<std::mutex> lock(displayerMutex);
-
-    if (displaySurface != nullptr)
-    {
-        if (displayerGlobalPool.count(displaySurface))
+    bool destroySelf = false;
+    globalDisplayerStorages.write(*displaySurfaceID, [&](DisplayerHardwareWrap &disPlayer) {
+        disPlayer.refCount--;
+        if (disPlayer.refCount == 0)
         {
-            displayerRefCount[displaySurface]--;
-            if (displayerRefCount[displaySurface] == 0)
-            {
-                displayerGlobalPool.erase(displaySurface);
-                displayerRefCount.erase(displaySurface);
-            }
+            disPlayer.displayManager.reset();
+            disPlayer.displaySurface = nullptr;
+            destroySelf = true;
+            globalDisplayerStorages.deallocate(*displaySurfaceID);
         }
-        displaySurface = nullptr;
+    });
+    if (destroySelf)
+    {
+        globalDisplayerStorages.deallocate(*displaySurfaceID);
     }
 }
 
 HardwareDisplayer &HardwareDisplayer::operator=(const HardwareDisplayer &other)
 {
-    std::unique_lock<std::mutex> lock(displayerMutex);
 
-    if (displayerGlobalPool.count(other.displaySurface))
-    {
-        displayerRefCount[other.displaySurface]++;
-    }
-    if (displayerGlobalPool.count(displaySurface))
-    {
-        displayerRefCount[displaySurface]--;
-        if (displayerRefCount[displaySurface] == 0)
+    globalDisplayerStorages.write(*other.displaySurfaceID, [](DisplayerHardwareWrap &disPlayer) {
+        disPlayer.refCount++;
+    });
+    globalDisplayerStorages.write(*displaySurfaceID, [&](DisplayerHardwareWrap &disPlayer) {
+        disPlayer.refCount--;
+        if (disPlayer.refCount == 0)
         {
-            displayerGlobalPool.erase(displaySurface);
-            displayerRefCount.erase(displaySurface);
+            disPlayer.displayManager.reset();
+            disPlayer.displaySurface = nullptr;
+            globalDisplayerStorages.deallocate(*displaySurfaceID);
         }
-    }
-    displaySurface = other.displaySurface;
+    });
+    this->displaySurfaceID = other.displaySurfaceID;
     return *this;
 }
 
 HardwareDisplayer &HardwareDisplayer::operator=(const HardwareImage &image)
 {
-    std::unique_lock<std::mutex> lock(displayerMutex);
-    if (displayerGlobalPool.count(displaySurface))
-    {
-        displayerGlobalPool[displaySurface]->displayFrame(displaySurface, image);
-    }
+    globalDisplayerStorages.read(*displaySurfaceID, [&](const DisplayerHardwareWrap &disPlayer) {
+        disPlayer.displayManager->displayFrame(disPlayer.displaySurface, image);
+    });
+
     return *this;
 }
-
-//void HardwareDisplayer::setSurface(void *surface)
-//{
-//    if (surface != nullptr && displaySurface != surface)
-//    {
-//        std::unique_lock<std::mutex> lock(displayerMutex);
-//        this->displaySurface = surface;
-//        if (displayerGlobalPool.count(surface))
-//        {
-//
-//            displayerGlobalPool[displaySurface] = std::make_shared<DisplayManager>();
-//        }
-//        else
-//        {
-//        }
-//    }
-//}

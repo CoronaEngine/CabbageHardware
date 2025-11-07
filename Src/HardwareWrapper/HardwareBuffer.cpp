@@ -2,29 +2,103 @@
 #include<Hardware/GlobalContext.h>
 #include<Hardware/ResourceCommand.h>
 
-std::unordered_map<uint64_t, ResourceManager::BufferHardwareWrap> bufferGlobalPool;
-std::unordered_map<uint64_t, uint64_t> bufferRefCount;
-uint64_t currentBufferID = 0;
+Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap> globalBufferStorages;
 
-std::mutex bufferMutex;
-
-HardwareBuffer &HardwareBuffer::operator=(const HardwareBuffer &other)
+HardwareBuffer::HardwareBuffer()
 {
-    std::unique_lock<std::mutex> lock(bufferMutex);
+    this->bufferID = std::make_shared<uintptr_t>(std::numeric_limits<uintptr_t>::max());
+}
 
-    if (bufferGlobalPool.count(*other.bufferID))
+HardwareBuffer::HardwareBuffer(uint64_t bufferSize, BufferUsage usage, const void *data)
+{
+    VkBufferUsageFlags vkUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+    switch (usage)
     {
-        bufferRefCount[*other.bufferID]++;
+    case BufferUsage::VertexBuffer:
+        vkUsage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        break;
+    case BufferUsage::IndexBuffer:
+        vkUsage |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+        break;
+    case BufferUsage::UniformBuffer:
+        vkUsage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        break;
+    case BufferUsage::StorageBuffer:
+        vkUsage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        break;
+    default:
+        break;
     }
 
-    if (bufferGlobalPool.count(*this->bufferID))
-    {
-        bufferRefCount[*bufferID]--;
-        if (bufferRefCount[*bufferID] == 0)
+    auto handle = globalBufferStorages.allocate([&](ResourceManager::BufferHardwareWrap &buffer) {
+        buffer = globalHardwareContext.mainDevice->resourceManager.createBuffer(bufferSize, vkUsage);
+        buffer.refCount = 1;
+        if (data != nullptr)
         {
-            globalHardwareContext.mainDevice->resourceManager.destroyBuffer(bufferGlobalPool[*bufferID]);
-            bufferGlobalPool.erase(*bufferID);
-            bufferRefCount.erase(*bufferID);
+            std::memcpy(buffer.bufferAllocInfo.pMappedData, data, bufferSize);
+        }
+    });
+
+    this->bufferID = std::make_shared<uintptr_t>(handle);
+}
+
+HardwareBuffer::HardwareBuffer(const HardwareBuffer &other)
+{
+    this->bufferID = other.bufferID;
+    if (*other.bufferID != std::numeric_limits<uintptr_t>::max())
+    {
+        globalBufferStorages.write(*other.bufferID, [](ResourceManager::BufferHardwareWrap &buffer) {
+            buffer.refCount++;
+        });
+    }
+}
+
+HardwareBuffer::~HardwareBuffer()
+{
+    bool destroySelf = false;
+    if (*bufferID != std::numeric_limits<uintptr_t>::max())
+    {
+        globalBufferStorages.write(*bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
+            buffer.refCount--;
+            if (buffer.refCount == 0)
+            {
+                globalHardwareContext.mainDevice->resourceManager.destroyBuffer(buffer);
+                destroySelf = true;
+            }
+        });
+        if (destroySelf)
+        {
+            globalBufferStorages.deallocate(*bufferID);
+        }
+    }
+
+    bufferID.reset();
+}
+
+HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer &other)
+{
+    if (*(other.bufferID) != std::numeric_limits<uintptr_t>::max())
+    {
+        globalBufferStorages.write(*other.bufferID, [](ResourceManager::BufferHardwareWrap &buffer) {
+            buffer.refCount++;
+        });
+    }
+
+    bool destroySelf = false;
+    if (*bufferID != std::numeric_limits<uintptr_t>::max())
+    {
+        globalBufferStorages.write(*this->bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
+            buffer.refCount--;
+            if (buffer.refCount == 0)
+            {
+                globalHardwareContext.mainDevice->resourceManager.destroyBuffer(buffer);
+                destroySelf = true;
+            }
+        });
+        if (destroySelf)
+        {
+            globalBufferStorages.deallocate(*this->bufferID);
         }
     }
 
@@ -32,90 +106,34 @@ HardwareBuffer &HardwareBuffer::operator=(const HardwareBuffer &other)
     return *this;
 }
 
-HardwareBuffer::HardwareBuffer()
-{
-    std::unique_lock<std::mutex> lock(bufferMutex);
-
-    this->bufferID = std::make_shared<uint64_t>(std::numeric_limits<uint64_t>::max());
-}
-
-HardwareBuffer::HardwareBuffer(const HardwareBuffer &other)
-{
-    std::unique_lock<std::mutex> lock(bufferMutex);
-
-    this->bufferID = other.bufferID;
-    if (bufferGlobalPool.count(*other.bufferID))
-    {
-        bufferRefCount[*other.bufferID]++;
-    }
-}
-
-HardwareBuffer::~HardwareBuffer()
-{
-    std::unique_lock<std::mutex> lock(bufferMutex);
-
-    if (bufferGlobalPool.count(*bufferID))
-    {
-        bufferRefCount[*bufferID]--;
-        if (bufferRefCount[*bufferID] == 0)
-        {
-            globalHardwareContext.mainDevice->resourceManager.destroyBuffer(bufferGlobalPool[*bufferID]);
-            bufferGlobalPool.erase(*bufferID);
-            bufferRefCount.erase(*bufferID);
-        }
-    }
-}
-
 HardwareBuffer::operator bool()
 {
-    std::unique_lock<std::mutex> lock(bufferMutex);
+    if (bufferID != nullptr && *bufferID != std::numeric_limits<uintptr_t>::max())
+    {
+        bool result = false;
+        globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+            if (buffer.bufferHandle != VK_NULL_HANDLE)
+                result = true;
+        });
+        return result;
+    }
 
-    return bufferID != nullptr &&
-           bufferGlobalPool.count(*bufferID) &&
-           bufferGlobalPool[*bufferID].bufferHandle != VK_NULL_HANDLE;
-}
-
-HardwareBuffer::HardwareBuffer(uint64_t bufferSize, BufferUsage usage, const void* data)
-{
-    std::unique_lock<std::mutex> lock(bufferMutex);
-
-    this->bufferID = std::make_shared<uint64_t>(currentBufferID++);
-	bufferRefCount[*this->bufferID] = 1;
-
-	VkBufferUsageFlags vkUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-
-	switch (usage)
-	{
-	case BufferUsage::VertexBuffer:
-		vkUsage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-		break;
-	case BufferUsage::IndexBuffer:
-		vkUsage |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-		break;
-	case BufferUsage::UniformBuffer:
-		vkUsage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		break;
-	case BufferUsage::StorageBuffer:
-		vkUsage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-		break;
-	default:
-		break;
-	}
-
-	bufferGlobalPool[*bufferID] = globalHardwareContext.mainDevice->resourceManager.createBuffer(bufferSize, vkUsage);
-
-	if (data != nullptr)
-	{
-        memcpy(bufferGlobalPool[*bufferID].bufferAllocInfo.pMappedData, data, bufferSize);
-	}
+    return false;
 }
 
 bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareExecutor *executor)
 {
-    std::unique_lock<std::mutex> lock(bufferMutex);
-
     HardwareExecutor tempExecutor;
-    CopyBufferCommand copyCmd(bufferGlobalPool[*inputBuffer.bufferID], bufferGlobalPool[*bufferID]);
+    ResourceManager::BufferHardwareWrap srcBuffer;
+    ResourceManager::BufferHardwareWrap dstBuffer;
+    bool read_srcBuffer_success = globalBufferStorages.read(*inputBuffer.bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        srcBuffer = buffer;
+    });
+    bool read_dstBuffer_success = globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        dstBuffer = buffer;
+    });
+
+    CopyBufferCommand copyCmd(srcBuffer, dstBuffer);
     tempExecutor << &copyCmd << tempExecutor.commit();
 
 	return true;
@@ -123,29 +141,37 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareE
 
 uint32_t HardwareBuffer::storeDescriptor()
 {
-    std::unique_lock<std::mutex> lock(bufferMutex);
+    uint32_t index = 0;
+    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        index = globalHardwareContext.mainDevice->resourceManager.storeDescriptor(buffer);
+    });
 
-    return globalHardwareContext.mainDevice->resourceManager.storeDescriptor(bufferGlobalPool[*bufferID]);
+    return index;
 }
 
 bool HardwareBuffer::copyFromData(const void* inputData, uint64_t size)
 {
-    std::unique_lock<std::mutex> lock(bufferMutex);
+    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        memcpy(buffer.bufferAllocInfo.pMappedData, inputData, size);
+    });
 
-	memcpy(bufferGlobalPool[*bufferID].bufferAllocInfo.pMappedData, inputData, size);
 	return true;
 }
 
 void* HardwareBuffer::getMappedData()
 {
-    std::unique_lock<std::mutex> lock(bufferMutex);
-
-	return bufferGlobalPool[*bufferID].bufferAllocInfo.pMappedData;
+    ResourceManager::BufferHardwareWrap getBuffer;
+    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        getBuffer = buffer;
+    });
+    return getBuffer.bufferAllocInfo.pMappedData;
 }
 
 uint64_t HardwareBuffer::getBufferSize()
 {
-    std::unique_lock<std::mutex> lock(bufferMutex);
-
-	return bufferGlobalPool[*bufferID].bufferAllocInfo.size;
+    ResourceManager::BufferHardwareWrap getBuffer;
+    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        getBuffer = buffer;
+    });
+    return getBuffer.bufferAllocInfo.size;
 }
