@@ -63,7 +63,6 @@ HardwareBuffer::~HardwareBuffer()
             destroySelf = true;
         }
     });
-
     if (destroySelf)
     {
         globalBufferStorages.deallocate(*bufferID);
@@ -76,14 +75,19 @@ HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer &other)
         buffer.refCount++;
     });
 
+    bool destroySelf = false;
     globalBufferStorages.write(*this->bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
         buffer.refCount--;
         if (buffer.refCount == 0)
         {
             globalHardwareContext.mainDevice->resourceManager.destroyBuffer(buffer);
-            globalBufferStorages.deallocate(*this->bufferID);
+            destroySelf = true;
         }
     });
+    if (destroySelf)
+    {
+        globalBufferStorages.deallocate(*this->bufferID);
+    }
 
     *(this->bufferID) = *(other.bufferID);
     return *this;
