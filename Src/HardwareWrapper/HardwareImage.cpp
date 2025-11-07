@@ -87,13 +87,14 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
     auto handle = globalImageStorages.allocate([&](ResourceManager::ImageHardwareWrap &image) {
         image = globalHardwareContext.mainDevice->resourceManager.createImage(ktm::uvec2(width, height), vkImageFormat, pixelSize, vkImageUsageFlags, arrayLayers);
         image.refCount = 1;
-        if (imageData != nullptr)
-        {
-            copyFromData(imageData);
-        }
     });
 
     this->imageID = std::make_shared<uintptr_t>(handle);
+
+    if (imageData != nullptr)
+    {
+        copyFromData(imageData);
+    }
 }
 
 HardwareImage::HardwareImage(const HardwareImage &other)
@@ -199,6 +200,7 @@ HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
 
 HardwareImage &HardwareImage::copyFromData(const void *inputData)
 {
+
     globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
         HardwareBuffer stagingBuffer = HardwareBuffer(image.imageSize.x * image.imageSize.y * image.pixelSize, BufferUsage::StorageBuffer, inputData);
         copyFromBuffer(stagingBuffer);
