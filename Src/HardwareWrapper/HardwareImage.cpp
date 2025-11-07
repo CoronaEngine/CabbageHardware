@@ -101,46 +101,60 @@ HardwareImage::HardwareImage(const HardwareImage &other)
 {
     this->imageID = other.imageID;
 
-    globalImageStorages.write(*other.imageID, [](ResourceManager::ImageHardwareWrap &image) {
-        image.refCount++;
-    });
+    if (*other.imageID != std::numeric_limits<uintptr_t>::max())
+    {
+        globalImageStorages.write(*other.imageID, [](ResourceManager::ImageHardwareWrap &image) {
+            image.refCount++;
+        });
+    }
 }
 
 HardwareImage::~HardwareImage()
 {
     bool destroySelf = false;
-    globalImageStorages.write(*imageID, [&](ResourceManager::ImageHardwareWrap &image) {
-        image.refCount--;
-        if (image.refCount == 0)
-        {
-            globalHardwareContext.mainDevice->resourceManager.destroyImage(image);
-            destroySelf = true;
-        }
-    });
-    if (destroySelf)
+    if (*imageID != std::numeric_limits<uintptr_t>::max())
     {
-        globalImageStorages.deallocate(*imageID);
+        globalImageStorages.write(*imageID, [&](ResourceManager::ImageHardwareWrap &image) {
+            image.refCount--;
+            if (image.refCount == 0)
+            {
+                globalHardwareContext.mainDevice->resourceManager.destroyImage(image);
+                destroySelf = true;
+            }
+        });
+        if (destroySelf)
+        {
+            globalImageStorages.deallocate(*imageID);
+        }
     }
+
+    imageID.reset();
 }
 
 HardwareImage& HardwareImage::operator=(const HardwareImage& other)
 {
-    globalImageStorages.write(*other.imageID, [](ResourceManager::ImageHardwareWrap &image) {
-        image.refCount++;
-    });
+    if (*(other.imageID) != std::numeric_limits<uintptr_t>::max())
+    {
+        globalImageStorages.write(*other.imageID, [](ResourceManager::ImageHardwareWrap &image) {
+            image.refCount++;
+        });
+    }
 
     bool destroySelf = false;
-    globalImageStorages.write(*this->imageID, [&](ResourceManager::ImageHardwareWrap &image) {
-        image.refCount--;
-        if (image.refCount == 0)
-        {
-            globalHardwareContext.mainDevice->resourceManager.destroyImage(image);
-            destroySelf = true;
-        }
-    });
-    if (destroySelf)
+    if (*imageID != std::numeric_limits<uintptr_t>::max())
     {
-        globalImageStorages.deallocate(*imageID);
+        globalImageStorages.write(*this->imageID, [&](ResourceManager::ImageHardwareWrap &image) {
+            image.refCount--;
+            if (image.refCount == 0)
+            {
+                globalHardwareContext.mainDevice->resourceManager.destroyImage(image);
+                destroySelf = true;
+            }
+        });
+        if (destroySelf)
+        {
+            globalImageStorages.deallocate(*imageID);
+        }
     }
 
     *(this->imageID) = *(other.imageID);
@@ -149,13 +163,15 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other)
 
 HardwareImage::operator bool()
 {
-    if (imageID != nullptr)
+    if (imageID != nullptr && *imageID != std::numeric_limits<uintptr_t>::max())
     {
-        globalImageStorages.read(*imageID, [](const ResourceManager::ImageHardwareWrap &image) {
-            return image.imageHandle != VK_NULL_HANDLE;
+        bool result = false;
+        globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
+            if (image.imageHandle != VK_NULL_HANDLE)
+                result = true;
         });
+        return result;
     }
-
     return false;
 }
 
