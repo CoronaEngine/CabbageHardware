@@ -14,7 +14,7 @@ HardwareDisplayer::HardwareDisplayer(void* surface)
 {
     if (displaySurfaceID != nullptr)
     {
-        bool write_success = globalDisplayerStorages.write(*this->displaySurfaceID, [](DisplayerHardwareWrap &disPlayer) {
+        globalDisplayerStorages.write(*this->displaySurfaceID, [](DisplayerHardwareWrap &disPlayer) {
             disPlayer.refCount++;
         });
     }
