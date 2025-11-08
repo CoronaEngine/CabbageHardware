@@ -6,7 +6,7 @@ Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageSt
 
 HardwareImage::HardwareImage()
 {
-    this->imageID = std::make_shared<uintptr_t>(std::numeric_limits<uintptr_t>::max());
+    this->imageID = std::make_shared<uintptr_t>(0);
 }
 
 HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage, int arrayLayers, void *imageData)
@@ -101,7 +101,7 @@ HardwareImage::HardwareImage(const HardwareImage &other)
 {
     this->imageID = other.imageID;
 
-    if (*other.imageID != std::numeric_limits<uintptr_t>::max())
+    if (*other.imageID != 0)
     {
         globalImageStorages.write(*other.imageID, [](ResourceManager::ImageHardwareWrap &image) {
             image.refCount++;
@@ -112,7 +112,7 @@ HardwareImage::HardwareImage(const HardwareImage &other)
 HardwareImage::~HardwareImage()
 {
     bool destroySelf = false;
-    if (*imageID != std::numeric_limits<uintptr_t>::max())
+    if (*imageID != 0)
     {
         globalImageStorages.write(*imageID, [&](ResourceManager::ImageHardwareWrap &image) {
             image.refCount--;
@@ -127,13 +127,11 @@ HardwareImage::~HardwareImage()
             globalImageStorages.deallocate(*imageID);
         }
     }
-
-    imageID.reset();
 }
 
 HardwareImage& HardwareImage::operator=(const HardwareImage& other)
 {
-    if (*(other.imageID) != std::numeric_limits<uintptr_t>::max())
+    if (*(other.imageID) != 0)
     {
         globalImageStorages.write(*other.imageID, [](ResourceManager::ImageHardwareWrap &image) {
             image.refCount++;
@@ -141,7 +139,7 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other)
     }
 
     bool destroySelf = false;
-    if (*imageID != std::numeric_limits<uintptr_t>::max())
+    if (*imageID != 0)
     {
         globalImageStorages.write(*this->imageID, [&](ResourceManager::ImageHardwareWrap &image) {
             image.refCount--;
@@ -163,7 +161,7 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other)
 
 HardwareImage::operator bool()
 {
-    if (imageID != nullptr && *imageID != std::numeric_limits<uintptr_t>::max())
+    if (imageID != nullptr && *imageID != 0)
     {
         bool result = false;
         globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
