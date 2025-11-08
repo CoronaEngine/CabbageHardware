@@ -236,7 +236,6 @@ void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule
         return temp;
     };
 
-
     VkShaderModule vertShaderModule = globalHardwareContext.mainDevice->resourceManager.createShaderModule(vertShaderCode);
     VkShaderModule fragShaderModule = globalHardwareContext.mainDevice->resourceManager.createShaderModule(fragShaderCode);
 
@@ -264,7 +263,7 @@ void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule
 
     std::vector<VkVertexInputBindingDescription> bindingDescriptions(vertexStageInputs.size());
     std::vector<VkVertexInputAttributeDescription> attributeDescriptions(vertexStageInputs.size());
-    //for (uint32_t index = 0; index < vertShaderCode.shaderResources.stageInputs.size(); index++)
+    // for (uint32_t index = 0; index < vertShaderCode.shaderResources.stageInputs.size(); index++)
     for (auto item : vertexStageInputs)
     {
         bindingDescriptions[item.location].binding = item.location;
@@ -273,7 +272,7 @@ void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule
 
         attributeDescriptions[item.location].binding = item.location;
         attributeDescriptions[item.location].location = item.location;
-        attributeDescriptions[item.location].format = getVkFormat(item.typeName,item.elementCount);
+        attributeDescriptions[item.location].format = getVkFormat(item.typeName, item.elementCount);
         attributeDescriptions[item.location].offset = 0;
     }
 
@@ -409,7 +408,7 @@ void RasterizerPipeline::createFramebuffers(ktm::uvec2 imageSize)
     coronaHardwareCheck(vkCreateFramebuffer(globalHardwareContext.mainDevice->deviceManager.logicalDevice, &framebufferInfo, nullptr, &frameBuffers));
 }
 
-RasterizerPipeline* RasterizerPipeline::operator()(uint16_t imageSizeX, uint16_t imageSizeY)
+RasterizerPipeline *RasterizerPipeline::operator()(uint16_t imageSizeX, uint16_t imageSizeY)
 {
     this->imageSize = {imageSizeX, imageSizeY};
     return this;
@@ -422,7 +421,7 @@ CommandRecord *RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
     temp.vertexBuffers = tempVertexBuffers;
     temp.pushConstant = tempPushConstant;
     tempPushConstant = HardwarePushConstant(temp.pushConstant.getSize(), 0);
-    geomMeshes.push_back(temp);
+    geomMeshesRecord.push_back(temp);
     return &dumpCommandRecord;
 }
 
@@ -493,17 +492,17 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
         bufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         bufferBarrier.pNext = nullptr;
 
-        for (size_t i = 0; i < geomMeshes.size(); i++)
+        for (size_t i = 0; i < geomMeshesRecord.size(); i++)
         {
-            bufferBarrier.buffer = getBufferFromHandle(*geomMeshes[i].indexBuffer.bufferID).bufferHandle;
+            bufferBarrier.buffer = getBufferFromHandle(*geomMeshesRecord[i].indexBuffer.bufferID).bufferHandle;
             bufferBarrier.offset = 0;
             bufferBarrier.size = VK_WHOLE_SIZE;
             bufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
             bufferBarrier.dstAccessMask = VK_ACCESS_2_INDEX_READ_BIT;
             requiredBarriers.bufferBarriers.push_back(bufferBarrier);
-            for (size_t j = 0; j < geomMeshes[i].vertexBuffers.size(); j++)
+            for (size_t j = 0; j < geomMeshesRecord[i].vertexBuffers.size(); j++)
             {
-                bufferBarrier.buffer = getBufferFromHandle(*geomMeshes[i].vertexBuffers[j].bufferID).bufferHandle;
+                bufferBarrier.buffer = getBufferFromHandle(*geomMeshesRecord[i].vertexBuffers[j].bufferID).bufferHandle;
                 bufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
                 bufferBarrier.dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
                 requiredBarriers.bufferBarriers.push_back(bufferBarrier);
@@ -513,7 +512,6 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
 
     return requiredBarriers;
 }
-
 
 void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
 {
@@ -536,23 +534,6 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
         createFramebuffers(imageSize);
     }
 
-    // 在图形渲染前插入通用内存屏障，确保此前任何写入对图形流水线阶段可见
-    //{
-    //    VkMemoryBarrier barrier{};
-    //    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-    //    barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
-    //    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-    //                            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    //    vkCmdPipelineBarrier(
-    //        hardwareExecutor.currentRecordQueue->commandBuffer,
-    //        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-    //        VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-    //        0,
-    //        1, &barrier,
-    //        0, nullptr,
-    //        0, nullptr);
-    //}
-
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = renderPass;
@@ -561,67 +542,66 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
     renderPassInfo.renderArea.extent.width = getImageFromHandle(*depthImage.imageID).imageSize.x;
     renderPassInfo.renderArea.extent.height = getImageFromHandle(*depthImage.imageID).imageSize.y;
 
-        std::vector<VkClearValue> clearValues;
-        for (size_t i = 0; i < renderTargets.size(); i++)
+    std::vector<VkClearValue> clearValues;
+    for (size_t i = 0; i < renderTargets.size(); i++)
+    {
+        clearValues.push_back(getImageFromHandle(*renderTargets[i].imageID).clearValue);
+    }
+    clearValues.push_back(getImageFromHandle(*depthImage.imageID).clearValue);
+
+    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+    renderPassInfo.pClearValues = clearValues.data();
+
+    vkCmdBeginRenderPass(hardwareExecutor.currentRecordQueue->commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = (float)getImageFromHandle(*depthImage.imageID).imageSize.x;
+    viewport.height = (float)getImageFromHandle(*depthImage.imageID).imageSize.y;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(hardwareExecutor.currentRecordQueue->commandBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent.width = getImageFromHandle(*depthImage.imageID).imageSize.x;
+    scissor.extent.height = getImageFromHandle(*depthImage.imageID).imageSize.y;
+    vkCmdSetScissor(hardwareExecutor.currentRecordQueue->commandBuffer, 0, 1, &scissor);
+
+    vkCmdBindPipeline(hardwareExecutor.currentRecordQueue->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+    for (size_t i = 0; i < geomMeshesRecord.size(); i++)
+    {
+        std::vector<VkBuffer> vertexBuffers;
+        std::vector<VkDeviceSize> offsets;
+        for (size_t vertexBufferIndex = 0; vertexBufferIndex < geomMeshesRecord[i].vertexBuffers.size(); vertexBufferIndex++)
         {
-            clearValues.push_back(getImageFromHandle(*renderTargets[i].imageID).clearValue);
-        }
-        clearValues.push_back(getImageFromHandle(*depthImage.imageID).clearValue);
-
-        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-        renderPassInfo.pClearValues = clearValues.data();
-
-        vkCmdBeginRenderPass(hardwareExecutor.currentRecordQueue->commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-        VkViewport viewport{};
-        viewport.x = 0.0f;
-        viewport.y = 0.0f;
-        viewport.width = (float)getImageFromHandle(*depthImage.imageID).imageSize.x;
-        viewport.height = (float)getImageFromHandle(*depthImage.imageID).imageSize.y;
-        viewport.minDepth = 0.0f;
-        viewport.maxDepth = 1.0f;
-        vkCmdSetViewport(hardwareExecutor.currentRecordQueue->commandBuffer, 0, 1, &viewport);
-
-        VkRect2D scissor{};
-        scissor.offset = {0, 0};
-        scissor.extent.width = getImageFromHandle(*depthImage.imageID).imageSize.x;
-        scissor.extent.height = getImageFromHandle(*depthImage.imageID).imageSize.y;
-        vkCmdSetScissor(hardwareExecutor.currentRecordQueue->commandBuffer, 0, 1, &scissor);
-
-        vkCmdBindPipeline(hardwareExecutor.currentRecordQueue->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
-        for (size_t i = 0; i < geomMeshes.size(); i++)
-        {
-             std::vector<VkBuffer> vertexBuffers;
-             std::vector<VkDeviceSize> offsets;
-             for (size_t vertexBufferIndex = 0; vertexBufferIndex < geomMeshes[i].vertexBuffers.size(); vertexBufferIndex++)
-            {
-                 uint64_t bufferID= *geomMeshes[i].vertexBuffers[vertexBufferIndex].bufferID;
-                 vertexBuffers.push_back(getBufferFromHandle(bufferID).bufferHandle);
-                 offsets.push_back(0);
-             }
-
-             vkCmdBindVertexBuffers(hardwareExecutor.currentRecordQueue->commandBuffer, 0, (uint32_t)geomMeshes[i].vertexBuffers.size(), vertexBuffers.data(), offsets.data());
-
-             vkCmdBindIndexBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, getBufferFromHandle(*geomMeshes[i].indexBuffer.bufferID).bufferHandle, 0 * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
-
-             std::vector<VkDescriptorSet> descriptorSets;
-             for (size_t i = 0; i < 4; i++)
-            {
-                 descriptorSets.push_back(globalHardwareContext.mainDevice->resourceManager.bindlessDescriptors[i].descriptorSet);
-             }
-
-             vkCmdBindDescriptorSets(hardwareExecutor.currentRecordQueue->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
-
-             void *data = geomMeshes[i].pushConstant.getData();
-             vkCmdPushConstants(hardwareExecutor.currentRecordQueue->commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, pushConstantSize, data);
-
-             uint32_t indexCount = (uint32_t)(getBufferFromHandle(*geomMeshes[i].indexBuffer.bufferID).bufferAllocInfo.size / sizeof(uint32_t));
-             vkCmdDrawIndexed(hardwareExecutor.currentRecordQueue->commandBuffer, indexCount, 1, 0, 0, 0);
-
+            uint64_t bufferID = *geomMeshesRecord[i].vertexBuffers[vertexBufferIndex].bufferID;
+            vertexBuffers.push_back(getBufferFromHandle(bufferID).bufferHandle);
+            offsets.push_back(0);
         }
 
-        vkCmdEndRenderPass(hardwareExecutor.currentRecordQueue->commandBuffer);
+        vkCmdBindVertexBuffers(hardwareExecutor.currentRecordQueue->commandBuffer, 0, (uint32_t)geomMeshesRecord[i].vertexBuffers.size(), vertexBuffers.data(), offsets.data());
 
-        geomMeshes.clear();
+        vkCmdBindIndexBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, getBufferFromHandle(*geomMeshesRecord[i].indexBuffer.bufferID).bufferHandle, 0 * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
+
+        std::vector<VkDescriptorSet> descriptorSets;
+        for (size_t i = 0; i < 4; i++)
+        {
+            descriptorSets.push_back(globalHardwareContext.mainDevice->resourceManager.bindlessDescriptors[i].descriptorSet);
+        }
+
+        vkCmdBindDescriptorSets(hardwareExecutor.currentRecordQueue->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+
+        void *data = geomMeshesRecord[i].pushConstant.getData();
+        vkCmdPushConstants(hardwareExecutor.currentRecordQueue->commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, pushConstantSize, data);
+
+        uint32_t indexCount = (uint32_t)(getBufferFromHandle(*geomMeshesRecord[i].indexBuffer.bufferID).bufferAllocInfo.size / sizeof(uint32_t));
+        vkCmdDrawIndexed(hardwareExecutor.currentRecordQueue->commandBuffer, indexCount, 1, 0, 0, 0);
+    }
+
+    vkCmdEndRenderPass(hardwareExecutor.currentRecordQueue->commandBuffer);
+
+    geomMeshesRecord.clear();
 }

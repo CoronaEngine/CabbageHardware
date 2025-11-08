@@ -119,7 +119,7 @@ struct RasterizerPipeline : public CommandRecord
 
         HardwarePushConstant pushConstant;
     };
-    std::vector<TriangleGeomMesh> geomMeshes;
+    std::vector<TriangleGeomMesh> geomMeshesRecord;
 
     CommandRecord dumpCommandRecord;
 
