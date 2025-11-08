@@ -190,7 +190,7 @@ private:
     std::unordered_map<VkBuffer, int> StorageBufferBindingList;
     std::unordered_map<VkImageView, int> StorageImageBindingList;
 
-    std::mutex bindlessDescriptorMutex;
+    //std::mutex bindlessDescriptorMutex;
 
     uint32_t UniformBindingIndex = 0;
     uint32_t TextureBindingIndex = 0;

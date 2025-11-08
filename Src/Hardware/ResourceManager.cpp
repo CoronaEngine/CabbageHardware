@@ -54,7 +54,7 @@ void ResourceManager::cleanUpResourceManager()
     }
 
     {
-        std::scoped_lock lock(bindlessDescriptorMutex);
+        //std::scoped_lock lock(bindlessDescriptorMutex);
         UniformBindingList.clear();
         TextureBindingList.clear();
         StorageBufferBindingList.clear();
@@ -1684,7 +1684,7 @@ void ResourceManager::createBindlessDescriptorSet()
 
 uint32_t ResourceManager::storeDescriptor(ImageHardwareWrap image)
 {
-    std::unique_lock<std::mutex> lock(bindlessDescriptorMutex);
+    //std::unique_lock<std::mutex> lock(bindlessDescriptorMutex);
 
     uint32_t textureIndex = -1;
 
@@ -1756,7 +1756,7 @@ uint32_t ResourceManager::storeDescriptor(ImageHardwareWrap image)
 
 uint32_t ResourceManager::storeDescriptor(BufferHardwareWrap buffer)
 {
-    std::unique_lock<std::mutex> lock(bindlessDescriptorMutex);
+    //std::unique_lock<std::mutex> lock(bindlessDescriptorMutex);
 
     uint32_t bufferIndex = -1;
 
