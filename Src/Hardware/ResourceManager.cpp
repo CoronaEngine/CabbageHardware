@@ -1694,32 +1694,37 @@ uint32_t ResourceManager::storeDescriptor(ImageHardwareWrap image)
 
     if (descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
     {
-        auto it = StorageImageBindingList.find(image.imageView);
-        if (it != StorageImageBindingList.end())
-        {
-            textureIndex = it->second;
-        }
-        else
-        {
-            updateDescriptorSets = true;
+        // 查找是否已存在
+        StorageImageBindingList.for_each_read([&](const BindingEntry<VkImageView> &entry) {
+            if (entry.handle == image.imageView)
+                textureIndex = entry.bindingIndex;
+        });
 
+        if (textureIndex == -1)
+        {
             textureIndex = StorageImageBindingIndex++;
-            StorageImageBindingList.insert(std::pair<VkImageView, int>(image.imageView, textureIndex));
+            updateDescriptorSets = true;
+            StorageImageBindingList.allocate([&](BindingEntry<VkImageView> &entry) {
+                entry.handle = image.imageView;
+                entry.bindingIndex = textureIndex;
+            });
         }
     }
     else
     {
-        auto it = TextureBindingList.find(image.imageView);
-        if (it != TextureBindingList.end())
-        {
-            textureIndex = it->second;
-        }
-        else
-        {
-            updateDescriptorSets = true;
+        TextureBindingList.for_each_read([&](const BindingEntry<VkImageView> &entry) {
+            if (entry.handle == image.imageView)
+                textureIndex = entry.bindingIndex;
+        });
 
+        if (textureIndex == -1)
+        {
             textureIndex = TextureBindingIndex++;
-            TextureBindingList.insert(std::pair<VkImageView, int>(image.imageView, textureIndex));
+            updateDescriptorSets = true;
+            TextureBindingList.allocate([&](BindingEntry<VkImageView> &entry) {
+                entry.handle = image.imageView;
+                entry.bindingIndex = textureIndex;
+            });
         }
     }
 
@@ -1766,32 +1771,36 @@ uint32_t ResourceManager::storeDescriptor(BufferHardwareWrap buffer)
 
     if (descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
     {
-        auto it = StorageBufferBindingList.find(buffer.bufferHandle);
-        if (it != StorageBufferBindingList.end())
-        {
-            bufferIndex = it->second;
-        }
-        else
-        {
-            updateDescriptorSets = true;
+        StorageBufferBindingList.for_each_read([&](const BindingEntry<VkBuffer> &entry) {
+            if (entry.handle == buffer.bufferHandle)
+                bufferIndex = entry.bindingIndex;
+        });
 
+        if (bufferIndex == -1)
+        {
             bufferIndex = StorageBufferBindingIndex++;
-            StorageBufferBindingList.insert(std::pair<VkBuffer, int>(buffer.bufferHandle, bufferIndex));
+            updateDescriptorSets = true;
+            StorageBufferBindingList.allocate([&](BindingEntry<VkBuffer> &entry) {
+                entry.handle = buffer.bufferHandle;
+                entry.bindingIndex = bufferIndex;
+            });
         }
     }
     else
     {
-        auto it = UniformBindingList.find(buffer.bufferHandle);
-        if (it != UniformBindingList.end())
-        {
-            bufferIndex = it->second;
-        }
-        else
-        {
-            updateDescriptorSets = true;
+        UniformBindingList.for_each_read([&](const BindingEntry<VkBuffer> &entry) {
+            if (entry.handle == buffer.bufferHandle)
+                bufferIndex = entry.bindingIndex;
+        });
 
+        if (bufferIndex == -1)
+        {
             bufferIndex = UniformBindingIndex++;
-            UniformBindingList.insert(std::pair<VkBuffer, int>(buffer.bufferHandle, bufferIndex));
+            updateDescriptorSets = true;
+            UniformBindingList.allocate([&](BindingEntry<VkBuffer> &entry) {
+                entry.handle = buffer.bufferHandle;
+                entry.bindingIndex = bufferIndex;
+            });
         }
     }
 

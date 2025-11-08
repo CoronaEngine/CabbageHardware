@@ -1,12 +1,11 @@
 ﻿#pragma once
 
 #include <unordered_map>
-#include <vector>
-#include <corona/kernel/utils/storage.h>
 #include"DeviceManager.h"
 #include<vk_mem_alloc.h>
 #include <ktm/ktm.h>
 #include "../VulkanUtils.h"
+#include <corona/kernel/utils/storage.h>
 
 //#include"HardwareExecutor.h"
 
@@ -196,7 +195,7 @@ private:
     struct BindingEntry
     {
         THandle handle = (THandle)VK_NULL_HANDLE;
-        int index = -1;
+        int bindingIndex = -1;
     };
 
     Corona::Kernel::Utils::Storage<BindingEntry<VkBuffer>> UniformBindingList;
