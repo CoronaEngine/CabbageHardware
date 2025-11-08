@@ -6,7 +6,7 @@ Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageSt
 
 HardwareImage::HardwareImage()
 {
-    this->imageID = std::make_shared<uintptr_t>(nullptr);
+    this->imageID = std::make_shared<uintptr_t>(0);
 }
 
 HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage, int arrayLayers, void *imageData)
@@ -101,7 +101,7 @@ HardwareImage::HardwareImage(const HardwareImage &other)
 {
     this->imageID = other.imageID;
 
-    if (other.imageID != nullptr)
+    if (*other.imageID != 0)
     {
         globalImageStorages.write(*other.imageID, [](ResourceManager::ImageHardwareWrap &image) {
             image.refCount++;
@@ -112,7 +112,7 @@ HardwareImage::HardwareImage(const HardwareImage &other)
 HardwareImage::~HardwareImage()
 {
     bool destroySelf = false;
-    if (imageID != nullptr)
+    if (*imageID != 0)
     {
         globalImageStorages.write(*imageID, [&](ResourceManager::ImageHardwareWrap &image) {
             image.refCount--;
@@ -131,7 +131,7 @@ HardwareImage::~HardwareImage()
 
 HardwareImage& HardwareImage::operator=(const HardwareImage& other)
 {
-    if (other.imageID != nullptr)
+    if (*(other.imageID) != 0)
     {
         globalImageStorages.write(*other.imageID, [](ResourceManager::ImageHardwareWrap &image) {
             image.refCount++;
@@ -139,7 +139,7 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other)
     }
 
     bool destroySelf = false;
-    if (imageID != nullptr)
+    if (*imageID != 0)
     {
         globalImageStorages.write(*this->imageID, [&](ResourceManager::ImageHardwareWrap &image) {
             image.refCount--;
@@ -155,13 +155,13 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other)
         }
     }
 
-    this->imageID = other.imageID;
+    *(this->imageID) = *(other.imageID);
     return *this;
 }
 
 HardwareImage::operator bool()
 {
-    if (imageID != nullptr)
+    if (imageID != nullptr && *imageID != 0)
     {
         bool result = false;
         globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {

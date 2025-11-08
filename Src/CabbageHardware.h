@@ -150,7 +150,7 @@ struct HardwareDisplayer
     HardwareDisplayer &operator=(const HardwareDisplayer &other);
     //void setSurface(void *surface);
 
-    std::shared_ptr<uintptr_t> displaySurfaceID = nullptr;
+    std::shared_ptr<uintptr_t> displaySurfaceID;
 
     //void *displaySurface = nullptr;
 };
