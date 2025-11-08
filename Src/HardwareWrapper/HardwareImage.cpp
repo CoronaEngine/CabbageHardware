@@ -6,8 +6,7 @@ Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageSt
 
 HardwareImage::HardwareImage()
 {
-    //this->imageID = std::make_shared<uintptr_t>(std::numeric_limits<uintptr_t>::max());
-    this->imageID = nullptr;
+    this->imageID = std::make_shared<uintptr_t>(nullptr);
 }
 
 HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage, int arrayLayers, void *imageData)

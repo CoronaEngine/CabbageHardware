@@ -6,8 +6,7 @@ Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap> globalBuffer
 
 HardwareBuffer::HardwareBuffer()
 {
-    //this->bufferID = std::make_shared<uintptr_t>(std::numeric_limits<uintptr_t>::max());
-    this->bufferID = nullptr;
+    this->bufferID = std::make_shared<uintptr_t>(nullptr);
 }
 
 HardwareBuffer::HardwareBuffer(uint64_t bufferSize, BufferUsage usage, const void *data)
