@@ -517,13 +517,14 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
 
 void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
 {
-
-    if (!depthImage)
+    if (pipelineLayout == VK_NULL_HANDLE && graphicsPipeline == VK_NULL_HANDLE)
     {
-        depthImage = HardwareImage(imageSize.x, imageSize.y, ImageFormat::D32_FLOAT, ImageUsage::DepthImage);
+        if (!depthImage)
+        {
+            depthImage = HardwareImage(imageSize.x, imageSize.y, ImageFormat::D32_FLOAT, ImageUsage::DepthImage);
+        }
 
         auto image = getImageFromHandle(*depthImage.imageID);
-
         globalHardwareContext.mainDevice->resourceManager.transitionImageLayout(hardwareExecutor.currentRecordQueue->commandBuffer,
                                                                                 image, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                                                                                 VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
@@ -532,7 +533,7 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
         createRenderPass(multiviewCount);
 
         createGraphicsPipeline(vertShaderCode, fragShaderCode);
-        createFramebuffers(image.imageSize);
+        createFramebuffers(imageSize);
     }
 
     // 在图形渲染前插入通用内存屏障，确保此前任何写入对图形流水线阶段可见

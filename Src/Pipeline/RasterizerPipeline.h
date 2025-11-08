@@ -32,6 +32,11 @@ struct RasterizerPipeline : public CommandRecord
                        EmbeddedShader::ShaderLanguage vertexShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL, EmbeddedShader::ShaderLanguage fragmentShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
                        const std::source_location &sourceLocation = std::source_location::current());
 
+    void setDepthImage(HardwareImage& depthImage)
+    {
+        this->depthImage = depthImage;
+    }
+
     HardwareImage &getDepthImage()
     {
         return depthImage;
