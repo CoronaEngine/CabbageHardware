@@ -86,7 +86,7 @@ struct HardwareBuffer
 
     operator bool();
 
-    std::shared_ptr<uintptr_t> bufferID;
+    std::shared_ptr<uintptr_t> bufferID = nullptr;
 };
 
 struct HardwareImage
@@ -106,7 +106,7 @@ struct HardwareImage
 
     HardwareImage &operator=(const HardwareImage &other);
 
-    std::shared_ptr<uintptr_t> imageID;
+    std::shared_ptr<uintptr_t> imageID = nullptr;
 
   private:
     HardwareImage &copyFromBuffer(const HardwareBuffer &buffer);
@@ -137,7 +137,7 @@ struct HardwarePushConstant
   private:
     void copyFromRaw(const void *src, uint64_t size);
 
-    std::shared_ptr<uintptr_t> pushConstantID;
+    std::shared_ptr<uintptr_t> pushConstantID = nullptr;
 };
 
 struct HardwareDisplayer
@@ -150,7 +150,7 @@ struct HardwareDisplayer
     HardwareDisplayer &operator=(const HardwareDisplayer &other);
     //void setSurface(void *surface);
 
-    std::shared_ptr<uintptr_t> displaySurfaceID;
+    std::shared_ptr<uintptr_t> displaySurfaceID = nullptr;
 
     //void *displaySurface = nullptr;
 };

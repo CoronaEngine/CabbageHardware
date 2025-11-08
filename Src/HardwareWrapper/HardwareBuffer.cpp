@@ -6,7 +6,8 @@ Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap> globalBuffer
 
 HardwareBuffer::HardwareBuffer()
 {
-    this->bufferID = std::make_shared<uintptr_t>(std::numeric_limits<uintptr_t>::max());
+    //this->bufferID = std::make_shared<uintptr_t>(std::numeric_limits<uintptr_t>::max());
+    this->bufferID = nullptr;
 }
 
 HardwareBuffer::HardwareBuffer(uint64_t bufferSize, BufferUsage usage, const void *data)
@@ -46,7 +47,7 @@ HardwareBuffer::HardwareBuffer(uint64_t bufferSize, BufferUsage usage, const voi
 HardwareBuffer::HardwareBuffer(const HardwareBuffer &other)
 {
     this->bufferID = other.bufferID;
-    if (*other.bufferID != std::numeric_limits<uintptr_t>::max())
+    if (other.bufferID != nullptr)
     {
         globalBufferStorages.write(*other.bufferID, [](ResourceManager::BufferHardwareWrap &buffer) {
             buffer.refCount++;
@@ -57,7 +58,7 @@ HardwareBuffer::HardwareBuffer(const HardwareBuffer &other)
 HardwareBuffer::~HardwareBuffer()
 {
     bool destroySelf = false;
-    if (*bufferID != std::numeric_limits<uintptr_t>::max())
+    if (bufferID != nullptr)
     {
         globalBufferStorages.write(*bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
             buffer.refCount--;
@@ -72,13 +73,11 @@ HardwareBuffer::~HardwareBuffer()
             globalBufferStorages.deallocate(*bufferID);
         }
     }
-
-    bufferID.reset();
 }
 
 HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer &other)
 {
-    if (*(other.bufferID) != std::numeric_limits<uintptr_t>::max())
+    if (other.bufferID != nullptr)
     {
         globalBufferStorages.write(*other.bufferID, [](ResourceManager::BufferHardwareWrap &buffer) {
             buffer.refCount++;
@@ -86,7 +85,7 @@ HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer &other)
     }
 
     bool destroySelf = false;
-    if (*bufferID != std::numeric_limits<uintptr_t>::max())
+    if (bufferID != nullptr)
     {
         globalBufferStorages.write(*this->bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
             buffer.refCount--;
@@ -102,13 +101,13 @@ HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer &other)
         }
     }
 
-    *(this->bufferID) = *(other.bufferID);
+    this->bufferID = other.bufferID;
     return *this;
 }
 
 HardwareBuffer::operator bool()
 {
-    if (bufferID != nullptr && *bufferID != std::numeric_limits<uintptr_t>::max())
+    if (bufferID != nullptr)
     {
         bool result = false;
         globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
