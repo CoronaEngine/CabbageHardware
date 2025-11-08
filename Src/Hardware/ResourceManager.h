@@ -5,6 +5,7 @@
 #include<vk_mem_alloc.h>
 #include <ktm/ktm.h>
 #include "../VulkanUtils.h"
+#include <corona/kernel/utils/storage.h>
 
 //#include"HardwareExecutor.h"
 
@@ -185,12 +186,24 @@ private:
     const uint32_t StorageBufferBinding = 2;
     const uint32_t StorageImageBinding = 3;
 
-    std::unordered_map<VkBuffer, int> UniformBindingList;
-    std::unordered_map<VkImageView, int> TextureBindingList;
-    std::unordered_map<VkBuffer, int> StorageBufferBindingList;
-    std::unordered_map<VkImageView, int> StorageImageBindingList;
+    //std::unordered_map<VkBuffer, int> UniformBindingList;
+    //std::unordered_map<VkImageView, int> TextureBindingList;
+    //std::unordered_map<VkBuffer, int> StorageBufferBindingList;
+    //std::unordered_map<VkImageView, int> StorageImageBindingList;
 
-    std::mutex bindlessDescriptorMutex;
+    template<typename THandle>
+    struct BindingEntry
+    {
+        THandle handle = (THandle)VK_NULL_HANDLE;
+        int bindingIndex = -1;
+    };
+
+    Corona::Kernel::Utils::Storage<BindingEntry<VkBuffer>> UniformBindingList;
+    Corona::Kernel::Utils::Storage<BindingEntry<VkImageView>> TextureBindingList;
+    Corona::Kernel::Utils::Storage<BindingEntry<VkBuffer>> StorageBufferBindingList;
+    Corona::Kernel::Utils::Storage<BindingEntry<VkImageView>> StorageImageBindingList;
+
+    //std::mutex bindlessDescriptorMutex;
 
     uint32_t UniformBindingIndex = 0;
     uint32_t TextureBindingIndex = 0;
