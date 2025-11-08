@@ -55,10 +55,10 @@ void ResourceManager::cleanUpResourceManager()
 
     {
         //std::scoped_lock lock(bindlessDescriptorMutex);
-        UniformBindingList.clear();
-        TextureBindingList.clear();
-        StorageBufferBindingList.clear();
-        StorageImageBindingList.clear();
+        //UniformBindingList.clear();
+        //TextureBindingList.clear();
+        //StorageBufferBindingList.clear();
+        //StorageImageBindingList.clear();
 
         UniformBindingIndex = 0;
         TextureBindingIndex = 0;
