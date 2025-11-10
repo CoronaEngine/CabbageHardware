@@ -58,7 +58,7 @@ void DeviceManager::cleanUpDeviceManager()
             }
 
             q.vkQueue = VK_NULL_HANDLE;
-            q.timelineValue = 0;
+            //q.timelineValue.store(0);
             q.queueFamilyIndex = static_cast<uint32_t>(-1);
             q.queueMutex.reset();
             q.deviceManager = nullptr;
@@ -221,10 +221,12 @@ void DeviceManager::choosePresentQueueFamily()
         QueueUtils tempQueueUtils;
         tempQueueUtils.queueFamilyIndex = i;
         tempQueueUtils.deviceManager = this;
+        //tempQueueUtils.timelineValue.store(0);
 
         for (uint32_t queueIndex = 0; queueIndex < queueFamilies[i].queueCount; queueIndex++)
         {
             tempQueueUtils.queueMutex = std::make_shared<std::mutex>();
+            tempQueueUtils.timelineValue = std::make_shared<std::atomic_uint64_t>(0);
 
             vkGetDeviceQueue(logicalDevice, i, queueIndex, &tempQueueUtils.vkQueue);
 

@@ -10,6 +10,7 @@
 #include <set>
 #include <stdexcept>
 #include <vector>
+#include <atomic>
 
 #if defined(_WIN32)
 #define VK_USE_PLATFORM_WIN32_KHR
@@ -42,7 +43,7 @@ class DeviceManager
     struct QueueUtils
     {
         std::shared_ptr<std::mutex> queueMutex;
-        uint64_t timelineValue = 0;
+        std::shared_ptr<std::atomic_uint64_t> timelineValue;
         VkSemaphore timelineSemaphore;
         uint32_t queueFamilyIndex = -1;
         VkQueue vkQueue = VK_NULL_HANDLE;
