@@ -63,4 +63,6 @@ private:
 
     std::shared_ptr<HardwareExecutor> mainDeviceExecutor;
     std::shared_ptr<HardwareExecutor> displayDeviceExecutor;
+
+    std::shared_ptr<HardwareExecutor> waitedExecutor;
 };

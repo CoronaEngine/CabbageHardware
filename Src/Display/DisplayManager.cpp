@@ -347,9 +347,7 @@ void DisplayManager::recreateSwapChain()
 
 bool DisplayManager::waitExecutor(HardwareExecutor &executor)
 {
-    //mainDeviceExecutor->wait(executor);
-    //displayDeviceExecutor->wait(executor);
-
+    waitedExecutor = std::make_shared<HardwareExecutor>(executor);
     return true;
 }
 
@@ -425,6 +423,9 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 this->displayImage = sourceImage;
             }
         }
+
+        //mainDeviceExecutor->wait(*waitedExecutor);
+        //displayDeviceExecutor->wait(*waitedExecutor);
 
         VkSurfaceCapabilitiesKHR capabilities;
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(displayDevice->deviceManager.physicalDevice, vkSurface, &capabilities);
