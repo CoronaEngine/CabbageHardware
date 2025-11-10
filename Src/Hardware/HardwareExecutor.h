@@ -89,7 +89,7 @@ struct HardwareExecutor
         VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
         timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
         timelineWaitSemaphoreSubmitInfo.semaphore = other.currentRecordQueue->timelineSemaphore;
-        timelineWaitSemaphoreSubmitInfo.value = other.currentRecordQueue->timelineValue->load(std::memory_order_seq_cst);
+        timelineWaitSemaphoreSubmitInfo.value = other.currentRecordQueue->timelineValue->fetch_add(0);
         timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);
         return *this;

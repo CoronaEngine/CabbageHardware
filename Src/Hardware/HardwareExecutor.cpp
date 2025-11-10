@@ -20,7 +20,7 @@ DeviceManager::QueueUtils *HardwareExecutor::pickQueueAndCommit(
         {
             uint64_t timelineCounterValue = 0;
             vkGetSemaphoreCounterValue(queue->deviceManager->logicalDevice, queue->timelineSemaphore, &timelineCounterValue);
-            if (timelineCounterValue >= queue->timelineValue->load(std::memory_order_seq_cst))
+            if (timelineCounterValue >= queue->timelineValue->fetch_add(0))
             {
                 break;
             }
@@ -30,7 +30,7 @@ DeviceManager::QueueUtils *HardwareExecutor::pickQueueAndCommit(
             }
         }
 
-        std::this_thread::yield();
+        //std::this_thread::yield();
     }
 
 
@@ -100,7 +100,7 @@ HardwareExecutor &HardwareExecutor::commit()
             VkSemaphoreSubmitInfo timelineSignalSemaphoreSubmitInfo{};
             timelineSignalSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             timelineSignalSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
-            timelineSignalSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->load(std::memory_order_seq_cst);
+            timelineSignalSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->fetch_add(0);
             timelineSignalSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
             signalSemaphores.push_back(timelineSignalSemaphoreSubmitInfo);
 
@@ -161,7 +161,7 @@ HardwareExecutor &HardwareExecutor::commit()
         VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
         timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
         timelineWaitSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
-        timelineWaitSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->load(std::memory_order_seq_cst);
+        timelineWaitSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->fetch_add(0);
         timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);
     }

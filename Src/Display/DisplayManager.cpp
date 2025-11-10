@@ -424,8 +424,8 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
             }
         }
 
-        //mainDeviceExecutor->wait(*waitedExecutor);
-        //displayDeviceExecutor->wait(*waitedExecutor);
+        mainDeviceExecutor->wait(*waitedExecutor);
+        displayDeviceExecutor->wait(*waitedExecutor);
 
         VkSurfaceCapabilitiesKHR capabilities;
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(displayDevice->deviceManager.physicalDevice, vkSurface, &capabilities);
