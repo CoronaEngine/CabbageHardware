@@ -489,7 +489,8 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
             TransitionImageLayoutCommand transitionCmd(swapChainImages[imageIndex], VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                                                        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_NONE);
             *displayDeviceExecutor << &blitCmd << &transitionCmd
-                                   << displayDeviceExecutor->commit(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame]);
+                                   << displayDeviceExecutor->wait(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame])
+                                   << displayDeviceExecutor->commit(/*waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame]*/);
 
              // 准备呈现信息，等待 timeline semaphore
              VkPresentInfoKHR presentInfo{};

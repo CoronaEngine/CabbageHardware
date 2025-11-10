@@ -44,7 +44,7 @@ DeviceManager::QueueUtils *HardwareExecutor::pickQueueAndCommit(
 
 
 
-HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos, std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos, VkFence fence)
+HardwareExecutor &HardwareExecutor::commit()
 {
     if (commandList.size() > 0)
     {
@@ -95,29 +95,33 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
             timelineWaitSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
             timelineWaitSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue++;
             timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-            waitSemaphoreInfos.push_back(timelineWaitSemaphoreSubmitInfo);
+            waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);
 
             VkSemaphoreSubmitInfo timelineSignalSemaphoreSubmitInfo{};
             timelineSignalSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             timelineSignalSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
             timelineSignalSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue;
             timelineSignalSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-            signalSemaphoreInfos.push_back(timelineSignalSemaphoreSubmitInfo);
+            signalSemaphores.push_back(timelineSignalSemaphoreSubmitInfo);
 
             VkSubmitInfo2 submitInfo{};
             submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-            submitInfo.waitSemaphoreInfoCount = static_cast<uint32_t>(waitSemaphoreInfos.size());
-            submitInfo.pWaitSemaphoreInfos = waitSemaphoreInfos.data();
-            submitInfo.signalSemaphoreInfoCount = static_cast<uint32_t>(signalSemaphoreInfos.size());
-            submitInfo.pSignalSemaphoreInfos = signalSemaphoreInfos.data();
+            submitInfo.waitSemaphoreInfoCount = static_cast<uint32_t>(waitSemaphores.size());
+            submitInfo.pWaitSemaphoreInfos = waitSemaphores.data();
+            submitInfo.signalSemaphoreInfoCount = static_cast<uint32_t>(signalSemaphores.size());
+            submitInfo.pSignalSemaphoreInfos = signalSemaphores.data();
             submitInfo.commandBufferInfoCount = 1;
             submitInfo.pCommandBufferInfos = &commandBufferSubmitInfo;
 
-            VkResult result = vkQueueSubmit2(currentRecordQueue->vkQueue, 1, &submitInfo, fence);
+            VkResult result = vkQueueSubmit2(currentRecordQueue->vkQueue, 1, &submitInfo, waitFence);
             if (result != VK_SUCCESS)
             {
                 throw std::runtime_error("Failed to submit command buffer!");
             }
+
+            waitSemaphores.clear();
+            signalSemaphores.clear();
+            waitFence = VK_NULL_HANDLE;
 
             return true;
         };

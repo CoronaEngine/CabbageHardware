@@ -68,9 +68,22 @@ struct HardwareExecutor
         return other;
     }
 
-    HardwareExecutor &commit(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
-                             std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
-                             VkFence fence = VK_NULL_HANDLE);
+    HardwareExecutor &wait(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
+                           std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
+                           VkFence fence = VK_NULL_HANDLE)
+    {
+        waitSemaphores = waitSemaphoreInfos;
+        signalSemaphores = signalSemaphoreInfos;
+        waitFence = fence;
+        return *this;
+    }
+
+    HardwareExecutor &wait(HardwareExecutor &other)
+    {
+        return *this;
+    }
+
+    HardwareExecutor &commit();
 
     static DeviceManager::QueueUtils *pickQueueAndCommit(std::atomic_uint16_t &queueIndex, std::vector<DeviceManager::QueueUtils> &queues, std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand);
 
@@ -81,4 +94,8 @@ struct HardwareExecutor
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
 
     std::vector<CommandRecord *> commandList;
+
+    std::vector<VkSemaphoreSubmitInfo> waitSemaphores = std::vector<VkSemaphoreSubmitInfo>();
+    std::vector<VkSemaphoreSubmitInfo> signalSemaphores = std::vector<VkSemaphoreSubmitInfo>();
+    VkFence waitFence = VK_NULL_HANDLE;
 };
