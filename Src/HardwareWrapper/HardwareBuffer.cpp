@@ -36,7 +36,7 @@ HardwareBuffer::HardwareBuffer(uint32_t bufferSize, uint32_t elementSize, Buffer
         buffer.refCount = 1;
         if (data != nullptr)
         {
-            std::memcpy(buffer.bufferAllocInfo.pMappedData, data, bufferSize);
+            std::memcpy(buffer.bufferAllocInfo.pMappedData, data, bufferSize * elementSize);
         }
     });
 
@@ -149,7 +149,7 @@ uint32_t HardwareBuffer::storeDescriptor()
 
 bool HardwareBuffer::copyFromData(const void* inputData, uint64_t size)
 {
-    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+    globalBufferStorages.write(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
         memcpy(buffer.bufferAllocInfo.pMappedData, inputData, size);
     });
 
@@ -171,5 +171,5 @@ uint64_t HardwareBuffer::getBufferSize()
     globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
         getBuffer = buffer;
     });
-    return getBuffer.bufferAllocInfo.size;
+    return getBuffer.bufferSize * getBuffer.elementSize;
 }
