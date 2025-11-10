@@ -72,14 +72,26 @@ struct HardwareExecutor
                            std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
                            VkFence fence = VK_NULL_HANDLE)
     {
-        waitSemaphores = waitSemaphoreInfos;
-        signalSemaphores = signalSemaphoreInfos;
         waitFence = fence;
+        for (size_t i = 0; i < waitSemaphoreInfos.size(); i++)
+        {
+            waitSemaphores.push_back(waitSemaphoreInfos[i]);
+        }
+        for (size_t i = 0; i < signalSemaphoreInfos.size(); i++)
+        {
+            signalSemaphores.push_back(signalSemaphoreInfos[i]);
+        }
         return *this;
     }
 
     HardwareExecutor &wait(HardwareExecutor &other)
     {
+        VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
+        timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        timelineWaitSemaphoreSubmitInfo.semaphore = other.currentRecordQueue->timelineSemaphore;
+        timelineWaitSemaphoreSubmitInfo.value = other.currentRecordQueue->timelineValue;
+        timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);
         return *this;
     }
 
