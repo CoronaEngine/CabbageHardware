@@ -26,6 +26,8 @@ struct ResourceManager
     {
         //VkPipelineStageFlags2 srcStageMask;
         //VkAccessFlags2 srcAccessMask;
+        uint32_t bufferSize = 0;
+        uint32_t elementSize = 0;
 
         VkBuffer bufferHandle = VK_NULL_HANDLE;
 
@@ -50,6 +52,7 @@ struct ResourceManager
 
         uint32_t pixelSize = 0;
         ktm::uvec2 imageSize = ktm::uvec2(0, 0);
+
         VkFormat imageFormat = VK_FORMAT_MAX_ENUM;
         VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_FLAG_BITS_MAX_ENUM;
         VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_NONE;
@@ -87,7 +90,7 @@ struct ResourceManager
     VkImageView createImageView(ImageHardwareWrap &image);
     void destroyImage(ImageHardwareWrap &image);
 
-    BufferHardwareWrap createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, bool hostVisibleMapped = true, bool useDedicated = false);
+    BufferHardwareWrap createBuffer(uint32_t bufferSize, uint32_t elementSize, VkBufferUsageFlags usage, bool hostVisibleMapped = true, bool useDedicated = false);
     void destroyBuffer(BufferHardwareWrap &buffer);
 
 

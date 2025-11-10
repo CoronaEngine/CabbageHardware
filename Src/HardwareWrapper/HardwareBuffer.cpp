@@ -9,7 +9,7 @@ HardwareBuffer::HardwareBuffer()
     this->bufferID = std::make_shared<uintptr_t>(0);
 }
 
-HardwareBuffer::HardwareBuffer(uint64_t bufferSize, BufferUsage usage, const void *data)
+HardwareBuffer::HardwareBuffer(uint32_t bufferSize, uint32_t elementSize, BufferUsage usage, const void *data)
 {
     VkBufferUsageFlags vkUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
@@ -32,7 +32,7 @@ HardwareBuffer::HardwareBuffer(uint64_t bufferSize, BufferUsage usage, const voi
     }
 
     auto handle = globalBufferStorages.allocate([&](ResourceManager::BufferHardwareWrap &buffer) {
-        buffer = globalHardwareContext.mainDevice->resourceManager.createBuffer(bufferSize, vkUsage);
+        buffer = globalHardwareContext.mainDevice->resourceManager.createBuffer(bufferSize, elementSize, vkUsage);
         buffer.refCount = 1;
         if (data != nullptr)
         {

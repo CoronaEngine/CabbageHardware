@@ -55,12 +55,17 @@ struct HardwareBuffer
 {
     HardwareBuffer();
     HardwareBuffer(const HardwareBuffer &other);
-    HardwareBuffer(uint64_t size, BufferUsage usage, const void *data = nullptr);
+    HardwareBuffer(uint32_t bufferSize, uint32_t elementSize, BufferUsage usage, const void *data = nullptr);
+    HardwareBuffer(uint32_t size, BufferUsage usage, const void *data = nullptr)
+        : HardwareBuffer(1, size, usage, data)
+    {
+
+    }
 
     template <typename Type>
     HardwareBuffer(const Type &input, BufferUsage usage)
         requires is_container<Type>
-        : HardwareBuffer(input.size() * sizeof(input[0]), usage, input.data())
+        : HardwareBuffer(input.size(), sizeof(input[0]), usage, input.data())
     {
     }
 

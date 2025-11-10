@@ -253,13 +253,15 @@ void ResourceManager::destroyBuffer(BufferHardwareWrap &buffer)
 
 
 // Todo: 方法写的很丑，有待重构
-ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, bool hostVisibleMapped, bool useDedicated)
+ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(uint32_t bufferSize, uint32_t elementSize, VkBufferUsageFlags usage, bool hostVisibleMapped, bool useDedicated)
 {
     BufferHardwareWrap resultBuffer;
     resultBuffer.device = this->device;
     resultBuffer.resourceManager = this;
+    resultBuffer.bufferSize = bufferSize;
+    resultBuffer.elementSize = elementSize;
 
-    if (size == 0)
+    if (bufferSize * elementSize == 0)
     {
         return resultBuffer;
     }
@@ -270,7 +272,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
 
         VkBufferCreateInfo bufCreateInfo = {};
         bufCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufCreateInfo.size = size;
+        bufCreateInfo.size = bufferSize * elementSize;
         bufCreateInfo.usage = usage;
 
         // Keep queue family indices alive until after vkCreateBuffer/vmaCreateBuffer
@@ -331,7 +333,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(VkDeviceSize s
 
         VkBufferCreateInfo bufCreateInfo = {};
         bufCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufCreateInfo.size = size;
+        bufCreateInfo.size = bufferSize * elementSize;
         bufCreateInfo.usage = usage;
 
         // Keep queue family indices alive until after vkCreateBuffer/vmaCreateBuffer

@@ -601,8 +601,8 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
         void *data = geomMeshesRecord[i].pushConstant.getData();
         vkCmdPushConstants(hardwareExecutor.currentRecordQueue->commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, pushConstantSize, data);
 
-        uint32_t indexCount = (uint32_t)(geomMeshesRecord[i].indexBuffer.bufferAllocInfo.size / sizeof(uint32_t));
-        vkCmdDrawIndexed(hardwareExecutor.currentRecordQueue->commandBuffer, indexCount, 1, 0, 0, 0);
+        //uint32_t indexCount = (uint32_t)(geomMeshesRecord[i].indexBuffer.bufferAllocInfo.size / sizeof(uint32_t));
+        vkCmdDrawIndexed(hardwareExecutor.currentRecordQueue->commandBuffer, geomMeshesRecord[i].indexBuffer.bufferSize, 1, 0, 0, 0);
     }
 
     vkCmdEndRenderPass(hardwareExecutor.currentRecordQueue->commandBuffer);
