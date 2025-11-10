@@ -418,7 +418,11 @@ CommandRecord *RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
 {
     TriangleGeomMesh temp;
     temp.indexBuffer = indexBuffer;
-    temp.vertexBuffers = tempVertexBuffers;
+    temp.vertexBuffers.resize(tempVertexBuffers.size());
+    for (size_t i = 0; i < tempVertexBuffers.size(); i++)
+    {
+        temp.vertexBuffers[i] = tempVertexBuffers[i];
+    }
     temp.pushConstant = tempPushConstant;
     tempPushConstant = HardwarePushConstant(temp.pushConstant.getSize(), 0);
     geomMeshesRecord.push_back(temp);
