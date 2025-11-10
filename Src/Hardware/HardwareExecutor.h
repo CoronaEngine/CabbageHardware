@@ -63,19 +63,20 @@ struct HardwareExecutor
         return *this;
     }
 
-    HardwareExecutor &operator<<(HardwareExecutor &other)
-    {
-        return other;
-    }
+    //HardwareExecutor &operator<<(HardwareExecutor &other)
+    //{
+    //    return other;
+    //}
 
-    HardwareExecutor &commit(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
+    CommandRecord *commit(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
                              std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
                              VkFence fence = VK_NULL_HANDLE);
 
     static DeviceManager::QueueUtils *pickQueueAndCommit(std::atomic_uint16_t &queueIndex, std::vector<DeviceManager::QueueUtils> &queues, std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand);
 
     // private:
-    //     friend struct CommandRecord;
+    CommandRecord dumpCommandRecord;
+
     DeviceManager::QueueUtils *currentRecordQueue = nullptr;
 
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;

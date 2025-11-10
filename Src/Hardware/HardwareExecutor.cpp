@@ -44,7 +44,7 @@ DeviceManager::QueueUtils *HardwareExecutor::pickQueueAndCommit(
 
 
 
-HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos, std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos, VkFence fence)
+CommandRecord *HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos, std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos, VkFence fence)
 {
     if (commandList.size() > 0)
     {
@@ -153,5 +153,5 @@ HardwareExecutor &HardwareExecutor::commit(std::vector<VkSemaphoreSubmitInfo> wa
         commandList.clear();
     }
 
-    return *this;
+    return &dumpCommandRecord;
 }
