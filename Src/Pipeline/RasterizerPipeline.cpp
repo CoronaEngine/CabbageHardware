@@ -417,11 +417,11 @@ RasterizerPipeline *RasterizerPipeline::operator()(uint16_t imageSizeX, uint16_t
 CommandRecord *RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
 {
     TriangleGeomMesh temp;
-    temp.indexBuffer = indexBuffer;
+    temp.indexBuffer = getBufferFromHandle(*(indexBuffer.bufferID));
     temp.vertexBuffers.resize(tempVertexBuffers.size());
     for (size_t i = 0; i < tempVertexBuffers.size(); i++)
     {
-        temp.vertexBuffers[i] = tempVertexBuffers[i];
+        temp.vertexBuffers[i] = getBufferFromHandle(*(tempVertexBuffers[i].bufferID));
     }
     temp.pushConstant = tempPushConstant;
     tempPushConstant = HardwarePushConstant(temp.pushConstant.getSize(), 0);
@@ -498,7 +498,7 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
 
         for (size_t i = 0; i < geomMeshesRecord.size(); i++)
         {
-            bufferBarrier.buffer = getBufferFromHandle(*geomMeshesRecord[i].indexBuffer.bufferID).bufferHandle;
+            bufferBarrier.buffer = geomMeshesRecord[i].indexBuffer.bufferHandle;
             bufferBarrier.offset = 0;
             bufferBarrier.size = VK_WHOLE_SIZE;
             bufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
@@ -506,7 +506,7 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
             requiredBarriers.bufferBarriers.push_back(bufferBarrier);
             for (size_t j = 0; j < geomMeshesRecord[i].vertexBuffers.size(); j++)
             {
-                bufferBarrier.buffer = getBufferFromHandle(*geomMeshesRecord[i].vertexBuffers[j].bufferID).bufferHandle;
+                bufferBarrier.buffer = geomMeshesRecord[i].vertexBuffers[j].bufferHandle;
                 bufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
                 bufferBarrier.dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
                 requiredBarriers.bufferBarriers.push_back(bufferBarrier);
@@ -581,14 +581,14 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
         std::vector<VkDeviceSize> offsets;
         for (size_t vertexBufferIndex = 0; vertexBufferIndex < geomMeshesRecord[i].vertexBuffers.size(); vertexBufferIndex++)
         {
-            uint64_t bufferID = *geomMeshesRecord[i].vertexBuffers[vertexBufferIndex].bufferID;
-            vertexBuffers.push_back(getBufferFromHandle(bufferID).bufferHandle);
+            //uint64_t bufferID = *geomMeshesRecord[i].vertexBuffers[vertexBufferIndex].bufferID;
+            vertexBuffers.push_back(geomMeshesRecord[i].vertexBuffers[vertexBufferIndex].bufferHandle);
             offsets.push_back(0);
         }
 
         vkCmdBindVertexBuffers(hardwareExecutor.currentRecordQueue->commandBuffer, 0, (uint32_t)geomMeshesRecord[i].vertexBuffers.size(), vertexBuffers.data(), offsets.data());
 
-        vkCmdBindIndexBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, getBufferFromHandle(*geomMeshesRecord[i].indexBuffer.bufferID).bufferHandle, 0 * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
+        vkCmdBindIndexBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, geomMeshesRecord[i].indexBuffer.bufferHandle, 0 * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
 
         std::vector<VkDescriptorSet> descriptorSets;
         for (size_t i = 0; i < 4; i++)
@@ -601,7 +601,7 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
         void *data = geomMeshesRecord[i].pushConstant.getData();
         vkCmdPushConstants(hardwareExecutor.currentRecordQueue->commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, pushConstantSize, data);
 
-        uint32_t indexCount = (uint32_t)(getBufferFromHandle(*geomMeshesRecord[i].indexBuffer.bufferID).bufferAllocInfo.size / sizeof(uint32_t));
+        uint32_t indexCount = (uint32_t)(geomMeshesRecord[i].indexBuffer.bufferAllocInfo.size / sizeof(uint32_t));
         vkCmdDrawIndexed(hardwareExecutor.currentRecordQueue->commandBuffer, indexCount, 1, 0, 0, 0);
     }
 

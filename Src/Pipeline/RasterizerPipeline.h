@@ -114,8 +114,8 @@ struct RasterizerPipeline : public CommandRecord
 
     struct TriangleGeomMesh
     {
-        HardwareBuffer indexBuffer;
-        std::vector<HardwareBuffer> vertexBuffers;
+        ResourceManager::BufferHardwareWrap indexBuffer;
+        std::vector<ResourceManager::BufferHardwareWrap> vertexBuffers;
 
         HardwarePushConstant pushConstant;
     };
