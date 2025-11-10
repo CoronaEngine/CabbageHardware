@@ -82,12 +82,15 @@ HardwareDisplayer &HardwareDisplayer::operator=(const HardwareDisplayer &other)
 
 HardwareDisplayer &HardwareDisplayer::wait(HardwareExecutor &executor)
 {
+    globalDisplayerStorages.write(*displaySurfaceID, [&](const DisplayerHardwareWrap &disPlayer) {
+        disPlayer.displayManager->waitExecutor(executor);
+    });
     return *this;
 }
 
 HardwareDisplayer &HardwareDisplayer::operator<<(HardwareImage &image)
 {
-    globalDisplayerStorages.read(*displaySurfaceID, [&](const DisplayerHardwareWrap &disPlayer) {
+    globalDisplayerStorages.write(*displaySurfaceID, [&](const DisplayerHardwareWrap &disPlayer) {
         disPlayer.displayManager->displayFrame(disPlayer.displaySurface, image);
     });
 

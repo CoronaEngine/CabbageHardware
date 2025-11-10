@@ -345,6 +345,14 @@ void DisplayManager::recreateSwapChain()
 {
 }
 
+bool DisplayManager::waitExecutor(HardwareExecutor &executor)
+{
+    //mainDeviceExecutor->wait(executor);
+    //displayDeviceExecutor->wait(executor);
+
+    return true;
+}
+
 bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayImage)
 {
     if (displaySurface != nullptr)

@@ -15,6 +15,8 @@ public:
 
     bool initDisplayManager(void* surface);
 
+    bool waitExecutor(HardwareExecutor &executor);
+
     bool displayFrame(void *surface, HardwareImage displayImage);
 
 private:
