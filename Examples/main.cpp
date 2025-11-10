@@ -116,10 +116,11 @@ int main()
                 // 比如添加更多的图像用法标志，或者支持多层图像等
                 // 总之，HardwareExecutor和CommandRecord的设计目标是简化多管线协作的复杂性
                 // 让用户专注于管线本身的逻辑，而不必过多关心底层的同步和资源管理细节
-                executor
-                    << rasterizer(1920, 1080)
-                    << computer(1920 / 8, 1080 / 8, 1)
-                    << executor.commit();
+                executor << rasterizer(1920, 1080)
+                         << executor.commit();
+
+                executor << computer(1920 / 8, 1080 / 8, 1)
+                         << executor.commit();
 
                 displayManager = finalOutputImage;
 
