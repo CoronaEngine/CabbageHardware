@@ -122,7 +122,7 @@ int main()
                 executor << computer(1920 / 8, 1080 / 8, 1)
                          << executor.commit();
 
-                displayManager = finalOutputImage;
+                displayManager.wait(executor) << finalOutputImage;
 
                 auto timeD = std::chrono::duration<float, std::chrono::milliseconds::period>(std::chrono::high_resolution_clock::now() - start);
                 totalTimeMs += timeD.count();

@@ -79,7 +79,13 @@ HardwareDisplayer &HardwareDisplayer::operator=(const HardwareDisplayer &other)
     return *this;
 }
 
-HardwareDisplayer &HardwareDisplayer::operator=(const HardwareImage &image)
+
+HardwareDisplayer &HardwareDisplayer::wait(HardwareExecutor &executor)
+{
+    return *this;
+}
+
+HardwareDisplayer &HardwareDisplayer::operator<<(HardwareImage &image)
 {
     globalDisplayerStorages.read(*displaySurfaceID, [&](const DisplayerHardwareWrap &disPlayer) {
         disPlayer.displayManager->displayFrame(disPlayer.displaySurface, image);

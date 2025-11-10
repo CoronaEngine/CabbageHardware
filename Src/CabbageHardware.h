@@ -151,11 +151,11 @@ struct HardwareDisplayer
     HardwareDisplayer(const HardwareDisplayer &other);
     ~HardwareDisplayer();
 
-    HardwareDisplayer &operator=(const HardwareImage &image);
     HardwareDisplayer &operator=(const HardwareDisplayer &other);
-    //void setSurface(void *surface);
+
+    HardwareDisplayer &operator<<(HardwareImage &image);
+
+    HardwareDisplayer &wait(HardwareExecutor &executor);
 
     std::shared_ptr<uintptr_t> displaySurfaceID;
-
-    //void *displaySurface = nullptr;
 };
