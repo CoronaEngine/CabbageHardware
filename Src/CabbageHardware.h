@@ -44,6 +44,15 @@ enum class BufferUsage : int32_t
     StorageBuffer = 8,
 };
 
+struct ExternalHandle
+{
+#if _WIN32 || _WIN64
+    HANDLE handle = nullptr;
+#else
+    int fd = -1;
+#endif
+};
+
 template <typename T>
 concept is_container = requires(T a) {
     a.size();
@@ -61,6 +70,9 @@ struct HardwareBuffer
     {
 
     }
+
+    ExternalHandle exportBufferMemory();
+    HardwareBuffer importBufferMemory(const ExternalHandle &memHandle);
 
     template <typename Type>
     HardwareBuffer(const Type &input, BufferUsage usage)

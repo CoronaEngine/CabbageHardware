@@ -173,3 +173,33 @@ uint64_t HardwareBuffer::getBufferSize()
     });
     return getBuffer.bufferSize * getBuffer.elementSize;
 }
+
+
+ExternalHandle HardwareBuffer::exportBufferMemory()
+{
+    ExternalHandle handle{};
+    globalBufferStorages.write(*bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
+        ResourceManager::ExternalMemoryHandle mempryHandle = globalHardwareContext.mainDevice->resourceManager.exportBufferMemory(buffer);
+#if _WIN32 || _WIN64
+        handle.handle = mempryHandle.handle;
+#else
+        handle.fd = mempryHandle.fd;
+#endif
+    });
+    return handle;
+}
+
+HardwareBuffer HardwareBuffer::importBufferMemory(const ExternalHandle& memHandle)
+{
+//    ResourceManager::ExternalMemoryHandle mempryHandle;
+//#if _WIN32 || _WIN64
+//    mempryHandle.handle = memHandle.handle;
+//#else
+//    mempryHandle.fd = memHandle.fd;
+//#endif
+//    globalBufferStorages.write(*bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
+//        ResourceManager::BufferHardwareWrap buffer = globalHardwareContext.mainDevice->resourceManager.importBufferMemory(mempryHandle, buffer);
+//    });
+
+    return HardwareBuffer();
+}
