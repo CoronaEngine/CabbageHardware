@@ -191,15 +191,16 @@ ExternalHandle HardwareBuffer::exportBufferMemory()
 
 HardwareBuffer HardwareBuffer::importBufferMemory(const ExternalHandle& memHandle)
 {
-//    ResourceManager::ExternalMemoryHandle mempryHandle;
-//#if _WIN32 || _WIN64
-//    mempryHandle.handle = memHandle.handle;
-//#else
-//    mempryHandle.fd = memHandle.fd;
-//#endif
-//    globalBufferStorages.write(*bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
-//        ResourceManager::BufferHardwareWrap buffer = globalHardwareContext.mainDevice->resourceManager.importBufferMemory(mempryHandle, buffer);
-//    });
+    ResourceManager::ExternalMemoryHandle mempryHandle;
+#if _WIN32 || _WIN64
+    mempryHandle.handle = memHandle.handle;
+#else
+    mempryHandle.fd = memHandle.fd;
+#endif
+    
+    auto handle = globalBufferStorages.allocate([&](ResourceManager::BufferHardwareWrap &buffer) {
+        buffer = globalHardwareContext.mainDevice->resourceManager.importBufferMemory(mempryHandle, buffer);
+    });
 
-    return HardwareBuffer();
+    return *this;
 }
