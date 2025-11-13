@@ -205,7 +205,7 @@ ExternalHandle HardwareBuffer::exportBufferMemory()
 {
     ExternalHandle handle{};
     globalBufferStorages.write(*bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
-        ResourceManager::ExternalMemoryHandle mempryHandle = globalHardwareContext.mainDevice->resourceManager.exportBufferMemory(buffer);
+        ResourceManager::ExternalMemoryHandle mempryHandle = globalHardwareContext.getMainDevice()->resourceManager.exportBufferMemory(buffer);
 #if _WIN32 || _WIN64
         handle.handle = mempryHandle.handle;
 #else
@@ -225,7 +225,7 @@ HardwareBuffer HardwareBuffer::importBufferMemory(const ExternalHandle& memHandl
 #endif
 
     auto handle = globalBufferStorages.allocate([&](ResourceManager::BufferHardwareWrap &buffer) {
-        buffer = globalHardwareContext.mainDevice->resourceManager.importBufferMemory(mempryHandle, buffer);
+        buffer = globalHardwareContext.getMainDevice()->resourceManager.importBufferMemory(mempryHandle, buffer);
     });
 
     return *this;
