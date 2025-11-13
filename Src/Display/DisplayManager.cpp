@@ -39,7 +39,7 @@ void DisplayManager::cleanUpDisplayManager()
     }
 
     // 即便 displayDevice 为空，也尽可能释放 surface 等与实例相关的资源
-    VkDevice device = (displayDevice ? displayDevice->deviceManager.logicalDevice : VK_NULL_HANDLE);
+    VkDevice device = (displayDevice ? displayDevice->deviceManager.getLogicalDevice() : VK_NULL_HANDLE);
 
     if (device != VK_NULL_HANDLE)
     {
@@ -160,9 +160,9 @@ void DisplayManager::createSyncObjects()
 
     for (size_t i = 0; i < swapChainImages.size(); i++)
     {
-        if (vkCreateSemaphore(displayDevice->deviceManager.logicalDevice, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
-            vkCreateSemaphore(displayDevice->deviceManager.logicalDevice, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
-            vkCreateFence(displayDevice->deviceManager.logicalDevice, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS)
+        if (vkCreateSemaphore(displayDevice->deviceManager.getLogicalDevice(), &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
+            vkCreateSemaphore(displayDevice->deviceManager.getLogicalDevice(), &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
+            vkCreateFence(displayDevice->deviceManager.getLogicalDevice(), &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS)
         {
             throw std::runtime_error("failed to create synchronization objects for a frame!");
         }
@@ -204,35 +204,35 @@ void DisplayManager::choosePresentDevice()
     presentQueues = globalHardwareContext.mainDevice->deviceManager.pickAvailableQueues(pickQueuesRoles);
 
 #else
-    for (int i = 0; i < globalHardwareContext.hardwareUtils.size(); i++)
+    for (int i = 0; i < globalHardwareContext.getAllDevices().size(); i++)
     {
         auto pickQueuesRoles = [&](const DeviceManager::QueueUtils &queues) -> bool {
             VkBool32 presentSupport = false;
-            vkGetPhysicalDeviceSurfaceSupportKHR(globalHardwareContext.hardwareUtils[i]->deviceManager.physicalDevice, queues.queueFamilyIndex, vkSurface, &presentSupport);
+            vkGetPhysicalDeviceSurfaceSupportKHR(globalHardwareContext.getAllDevices()[i]->deviceManager.getPhysicalDevice(), queues.queueFamilyIndex, vkSurface, &presentSupport);
             return presentSupport;
         };
 
-        presentQueues = globalHardwareContext.hardwareUtils[i]->deviceManager.pickAvailableQueues(pickQueuesRoles);
+        presentQueues = globalHardwareContext.getAllDevices()[i]->deviceManager.pickAvailableQueues(pickQueuesRoles);
         if (presentQueues.size()>0)
         {
-            displayDevice = globalHardwareContext.hardwareUtils[i];
+            displayDevice = globalHardwareContext.getAllDevices()[i];
         }
 
-        if (globalHardwareContext.mainDevice != displayDevice)
+        if (globalHardwareContext.getMainDevice() != displayDevice)
         {
             break;
         }
     }
 #endif
 
-    mainDeviceExecutor = std::make_shared<HardwareExecutor>(globalHardwareContext.mainDevice);
+    mainDeviceExecutor = std::make_shared<HardwareExecutor>(globalHardwareContext.getMainDevice());
     displayDeviceExecutor = std::make_shared<HardwareExecutor>(displayDevice);
 }
 
 void DisplayManager::createSwapChain()
 {
     VkSurfaceCapabilitiesKHR capabilities;
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(displayDevice->deviceManager.physicalDevice, vkSurface, &capabilities);
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(displayDevice->deviceManager.getPhysicalDevice(), vkSurface, &capabilities);
 
     this->displaySize = ktm::uvec2{
         std::clamp(capabilities.currentExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
@@ -240,11 +240,11 @@ void DisplayManager::createSwapChain()
     };
 
     uint32_t formatCount;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(displayDevice->deviceManager.physicalDevice, vkSurface, &formatCount, nullptr);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(displayDevice->deviceManager.getPhysicalDevice(), vkSurface, &formatCount, nullptr);
     std::vector<VkSurfaceFormatKHR> formats(formatCount);
     if (formatCount != 0)
     {
-        vkGetPhysicalDeviceSurfaceFormatsKHR(displayDevice->deviceManager.physicalDevice, vkSurface, &formatCount, formats.data());
+        vkGetPhysicalDeviceSurfaceFormatsKHR(displayDevice->deviceManager.getPhysicalDevice(), vkSurface, &formatCount, formats.data());
 
         surfaceFormat = formats[0];
         for (const auto& availableFormat : formats)
@@ -259,11 +259,11 @@ void DisplayManager::createSwapChain()
 
     VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
     uint32_t presentModeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(displayDevice->deviceManager.physicalDevice, vkSurface, &presentModeCount, nullptr);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(displayDevice->deviceManager.getPhysicalDevice(), vkSurface, &presentModeCount, nullptr);
     std::vector<VkPresentModeKHR> presentModes(presentModeCount);
     if (presentModeCount != 0)
     {
-        vkGetPhysicalDeviceSurfacePresentModesKHR(displayDevice->deviceManager.physicalDevice, vkSurface, &presentModeCount, presentModes.data());
+        vkGetPhysicalDeviceSurfacePresentModesKHR(displayDevice->deviceManager.getPhysicalDevice(), vkSurface, &presentModeCount, presentModes.data());
         for (const auto& availablePresentMode : presentModes)
         {
             if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR)
@@ -315,13 +315,13 @@ void DisplayManager::createSwapChain()
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = swapChain;
 
-    coronaHardwareCheck(vkCreateSwapchainKHR(displayDevice->deviceManager.logicalDevice, &createInfo, nullptr, &swapChain));
+    coronaHardwareCheck(vkCreateSwapchainKHR(displayDevice->deviceManager.getLogicalDevice(), &createInfo, nullptr, &swapChain));
 
     std::vector<VkImage> swapChainVkImages;
-    vkGetSwapchainImagesKHR(displayDevice->deviceManager.logicalDevice, swapChain, &imageCount, nullptr);
+    vkGetSwapchainImagesKHR(displayDevice->deviceManager.getLogicalDevice(), swapChain, &imageCount, nullptr);
     swapChainVkImages.resize(imageCount);
     swapChainImages.resize(imageCount);
-    vkGetSwapchainImagesKHR(displayDevice->deviceManager.logicalDevice, swapChain, &imageCount, swapChainVkImages.data());
+    vkGetSwapchainImagesKHR(displayDevice->deviceManager.getLogicalDevice(), swapChain, &imageCount, swapChainVkImages.data());
 
     for (uint32_t i = 0; i < swapChainImages.size(); i++)
     {
@@ -356,7 +356,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
     if (displaySurface != nullptr)
     {
         //ResourceManager::ImageHardwareWrap &sourceImage = imageGlobalPool[*displayImage.imageID];
-        ResourceManager::ImageHardwareWrap sourceImage = getImageFromHandle(*displayImage.imageID);
+        ResourceManager::ImageHardwareWrap sourceImage = getImageFromHandle(*displayImage.getImageID());
 
         if (this->displaySurface != displaySurface)
         {
@@ -371,7 +371,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
 
             initDisplayManager(displaySurface);
 
-            if (globalHardwareContext.mainDevice != displayDevice)
+            if (globalHardwareContext.getMainDevice() != displayDevice)
             {
                 /*this->displayImage = displayDevice->resourceManager.createImage(imageGlobalPool[*displayImage.imageID].imageSize, imageGlobalPool[*displayImage.imageID].imageFormat,
                                                                                 imageGlobalPool[*displayImage.imageID].pixelSize, imageGlobalPool[*displayImage.imageID].imageUsage);*/
@@ -389,11 +389,11 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                     VkPhysicalDeviceProperties2 props2{};
                     props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
                     props2.pNext = &hostProps;
-                    vkGetPhysicalDeviceProperties2(globalHardwareContext.mainDevice->deviceManager.physicalDevice, &props2);
+                    vkGetPhysicalDeviceProperties2(globalHardwareContext.getMainDevice()->deviceManager.getPhysicalDevice(), &props2);
 
                     requiredAlign = hostProps.minImportedHostPointerAlignment;
 
-                    vkGetPhysicalDeviceProperties2(displayDevice->deviceManager.physicalDevice, &props2);
+                    vkGetPhysicalDeviceProperties2(displayDevice->deviceManager.getPhysicalDevice(), &props2);
 
                     requiredAlign = std::max(requiredAlign, hostProps.minImportedHostPointerAlignment);
                 }
@@ -401,7 +401,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
                 hostBufferPtr = Corona::Kernal::Memory::aligned_malloc(imageSizeBytes, requiredAlign);
 
                 //srcStaging = globalHardwareContext.mainDevice->resourceManager.createBuffer(imageSizeBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, true, true);
-                srcStaging = globalHardwareContext.mainDevice->resourceManager.importHostBuffer(hostBufferPtr, imageSizeBytes);
+                srcStaging = globalHardwareContext.getMainDevice()->resourceManager.importHostBuffer(hostBufferPtr, imageSizeBytes);
 
                 {
                     // 导出缓冲区内存
@@ -428,7 +428,7 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
         displayDeviceExecutor->wait(*waitedExecutor);
 
         VkSurfaceCapabilitiesKHR capabilities;
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(displayDevice->deviceManager.physicalDevice, vkSurface, &capabilities);
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(displayDevice->deviceManager.getPhysicalDevice(), vkSurface, &capabilities);
 
         ktm::uvec2 displaySize = ktm::uvec2{
             std::clamp(capabilities.currentExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
@@ -446,16 +446,16 @@ bool DisplayManager::displayFrame(void *displaySurface, HardwareImage displayIma
             createSwapChain();
         }
 
-        vkWaitForFences(displayDevice->deviceManager.logicalDevice, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+        vkWaitForFences(displayDevice->deviceManager.getLogicalDevice(), 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
         uint32_t imageIndex;
-        VkResult result = vkAcquireNextImageKHR(displayDevice->deviceManager.logicalDevice, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+        VkResult result = vkAcquireNextImageKHR(displayDevice->deviceManager.getLogicalDevice(), swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
-        vkResetFences(displayDevice->deviceManager.logicalDevice, 1, &inFlightFences[currentFrame]);
+        vkResetFences(displayDevice->deviceManager.getLogicalDevice(), 1, &inFlightFences[currentFrame]);
 
         if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
         {
-            if (globalHardwareContext.mainDevice != displayDevice)
+            if (globalHardwareContext.getMainDevice() != displayDevice)
             {
                 // 在主设备上：源图像 -> srcStaging
                 CopyImageToBufferCommand copyCmd(sourceImage, srcStaging);
