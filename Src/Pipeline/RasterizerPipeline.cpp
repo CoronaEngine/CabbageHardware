@@ -1,66 +1,147 @@
 ﻿#include "RasterizerPipeline.h"
 #include <Hardware/GlobalContext.h>
 
-RasterizerPipeline::RasterizerPipeline(std::string vertexShaderCode, std::string fragmentShaderCode, uint32_t multiviewCount,
-                                       EmbeddedShader::ShaderLanguage vertexShaderLanguage, EmbeddedShader::ShaderLanguage fragmentShaderLanguage, const std::source_location &sourceLocation)
+void extractStageBindings(const EmbeddedShader::ShaderCodeModule::ShaderResources &resources,
+                          std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> &inputs,
+                          std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> &outputs)
 {
-    EmbeddedShader::ShaderCodeCompiler vertexShaderCompiler(EmbeddedShader::ShaderCodeCompiler(vertexShaderCode, EmbeddedShader::ShaderStage::VertexShader, vertexShaderLanguage, EmbeddedShader::CompilerOption(), sourceLocation));
-    EmbeddedShader::ShaderCodeCompiler fragmentShaderCompiler(EmbeddedShader::ShaderCodeCompiler(fragmentShaderCode, EmbeddedShader::ShaderStage::FragmentShader, fragmentShaderLanguage, EmbeddedShader::CompilerOption(), sourceLocation));
+    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
 
-    vertShaderCode = vertexShaderCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV);
-    fragShaderCode = fragmentShaderCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV);
-
-    vertexResource = vertexShaderCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV).shaderResources;
-    fragmentResource = fragmentShaderCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV).shaderResources;
-
-    tempPushConstant = HardwarePushConstant(vertexShaderCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV).shaderResources.pushConstantSize, 0);
-
-    auto vertexResources = vertexShaderCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV).shaderResources;
-    auto fragmentResources = fragmentShaderCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV).shaderResources;
-
-    for (auto &[name, bindInfo] : vertexResources.bindInfoPool)
+    for (const auto &[name, bindInfo] : resources.bindInfoPool)
     {
-        if (bindInfo.bindType == EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::stageInputs)
+        if (bindInfo.bindType == BindType::stageInputs)
         {
-            vertexStageInputs.push_back(bindInfo);
+            inputs.push_back(bindInfo);
         }
-        if (bindInfo.bindType == EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::stageOutputs)
+        else if (bindInfo.bindType == BindType::stageOutputs)
         {
-            vertexStageOutputs.push_back(bindInfo);
+            outputs.push_back(bindInfo);
         }
     }
-    for (auto &[name, bindInfo] : fragmentResources.bindInfoPool)
+}
+
+VkFormat getVkFormatFromType(const std::string &typeName, uint32_t elementCount)
+{
+    if (typeName == "float")
     {
-        if (bindInfo.bindType == EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::stageInputs)
+        switch (elementCount)
         {
-            fragmentStageInputs.push_back(bindInfo);
+        case 1:
+            return VK_FORMAT_R32_SFLOAT;
+        case 2:
+            return VK_FORMAT_R32G32_SFLOAT;
+        case 3:
+            return VK_FORMAT_R32G32B32_SFLOAT;
+        case 4:
+            return VK_FORMAT_R32G32B32A32_SFLOAT;
+        default:
+            break;
         }
-        if (bindInfo.bindType == EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::stageOutputs)
+    }
+    else if (typeName == "int")
+    {
+        switch (elementCount)
         {
-            fragmentStageOutputs.push_back(bindInfo);
+        case 1:
+            return VK_FORMAT_R32_SINT;
+        case 2:
+            return VK_FORMAT_R32G32_SINT;
+        case 3:
+            return VK_FORMAT_R32G32B32_SINT;
+        case 4:
+            return VK_FORMAT_R32G32B32A32_SINT;
+        default:
+            break;
+        }
+    }
+    else if (typeName == "uint")
+    {
+        switch (elementCount)
+        {
+        case 1:
+            return VK_FORMAT_R32_UINT;
+        case 2:
+            return VK_FORMAT_R32G32_UINT;
+        case 3:
+            return VK_FORMAT_R32G32B32_UINT;
+        case 4:
+            return VK_FORMAT_R32G32B32A32_UINT;
+        default:
+            break;
         }
     }
 
+    throw std::runtime_error("Unsupported vertex attribute type: " + typeName);
+}
+
+RasterizerPipeline::RasterizerPipeline()
+{
+    executorType = CommandRecord::ExecutorType::Graphics;
+}
+
+RasterizerPipeline::RasterizerPipeline(std::string vertexShaderCode,
+                                       std::string fragmentShaderCode,
+                                       uint32_t multiviewCount,
+                                       EmbeddedShader::ShaderLanguage vertexShaderLanguage,
+                                       EmbeddedShader::ShaderLanguage fragmentShaderLanguage,
+                                       const std::source_location &sourceLocation)
+    : RasterizerPipeline()
+{
+    // 编译着色器
+    EmbeddedShader::ShaderCodeCompiler vertexCompiler(vertexShaderCode,
+                                                      EmbeddedShader::ShaderStage::VertexShader,
+                                                      vertexShaderLanguage,
+                                                      EmbeddedShader::CompilerOption(),
+                                                      sourceLocation);
+
+    EmbeddedShader::ShaderCodeCompiler fragmentCompiler(fragmentShaderCode,
+                                                        EmbeddedShader::ShaderStage::FragmentShader,
+                                                        fragmentShaderLanguage,
+                                                        EmbeddedShader::CompilerOption(),
+                                                        sourceLocation);
+
+    // 获取 SPIR-V 代码
+    vertShaderCode = vertexCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV);
+    fragShaderCode = fragmentCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV);
+
+    // 获取着色器资源
+    vertexResource = vertShaderCode.shaderResources;
+    fragmentResource = fragShaderCode.shaderResources;
+
+    // 提取阶段绑定信息
+    extractStageBindings(vertexResource, vertexStageInputs, vertexStageOutputs);
+    extractStageBindings(fragmentResource, fragmentStageInputs, fragmentStageOutputs);
+
+    // 初始化缓冲区和渲染目标
     tempVertexBuffers.resize(vertexStageInputs.size());
     renderTargets.resize(fragmentStageOutputs.size());
 
+    // 设置多视图计数
     this->multiviewCount = multiviewCount;
 
-    this->pushConstantSize = (std::max)(vertShaderCode.shaderResources.pushConstantSize, fragShaderCode.shaderResources.pushConstantSize);
+    // 验证并计算推送常量大小
+    const uint32_t vertPushConstSize = vertShaderCode.shaderResources.pushConstantSize;
+    const uint32_t fragPushConstSize = fragShaderCode.shaderResources.pushConstantSize;
 
-    if (vertShaderCode.shaderResources.pushConstantSize != fragShaderCode.shaderResources.pushConstantSize && (vertShaderCode.shaderResources.pushConstantSize != 0 && (fragShaderCode.shaderResources.pushConstantSize != 0)))
+    if (vertPushConstSize != 0 && fragPushConstSize != 0 && vertPushConstSize != fragPushConstSize)
     {
-        throw "shader error";
+        throw std::runtime_error("Vertex and fragment shader push constant sizes mismatch");
+    }
+
+    pushConstantSize = std::max(vertPushConstSize, fragPushConstSize);
+
+    if (pushConstantSize > 0)
+    {
+        tempPushConstant = HardwarePushConstant(pushConstantSize, 0);
     }
 }
 
 RasterizerPipeline::~RasterizerPipeline()
 {
-    // 依赖设备销毁 Vulkan 资源，按从下至上的顺序：先 framebuffer，再 pipeline/layout，最后 render pass
     VkDevice device = VK_NULL_HANDLE;
-    if (globalHardwareContext.mainDevice)
+    if (const auto mainDevice = globalHardwareContext.getMainDevice())
     {
-        device = globalHardwareContext.mainDevice->deviceManager.logicalDevice;
+        device = mainDevice->deviceManager.getLogicalDevice();
     }
 
     if (device != VK_NULL_HANDLE)
@@ -95,8 +176,32 @@ RasterizerPipeline::~RasterizerPipeline()
 
 void RasterizerPipeline::createRenderPass(int multiviewCount)
 {
-    std::vector<VkAttachmentDescription> attachments;
+    const auto mainDevice = globalHardwareContext.getMainDevice();
+    if (!mainDevice)
+    {
+        throw std::runtime_error("No main device available");
+    }
 
+    // 配置附件描述
+    std::vector<VkAttachmentDescription> attachments;
+    attachments.reserve(renderTargets.size() + 1);
+
+    // 颜色附件
+    for (const auto &renderTarget : renderTargets)
+    {
+        VkAttachmentDescription attachment{};
+        attachment.format = getImageFromHandle(*renderTarget.getImageID()).imageFormat;
+        attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        attachments.push_back(attachment);
+    }
+
+    // 深度附件
     VkAttachmentDescription depthAttachment{};
     depthAttachment.format = VK_FORMAT_D32_SFLOAT;
     depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -106,139 +211,79 @@ void RasterizerPipeline::createRenderPass(int multiviewCount)
     depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    for (size_t i = 0; i < renderTargets.size(); i++)
-    {
-        VkAttachmentDescription attachment{};
-        attachment.format = getImageFromHandle(*renderTargets[i].imageID).imageFormat;
-        attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-        attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-        attachments.push_back(attachment);
-    }
     attachments.push_back(depthAttachment);
 
+    // 配置颜色附件引用
     std::vector<VkAttachmentReference> colorReferences;
-    for (uint32_t i = 0; i < renderTargets.size(); i++)
+    colorReferences.reserve(renderTargets.size());
+    for (uint32_t i = 0; i < renderTargets.size(); ++i)
     {
         colorReferences.push_back({i, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
     }
 
+    // 配置深度附件引用
     VkAttachmentReference depthAttachmentRef{};
-    depthAttachmentRef.attachment = (uint32_t)colorReferences.size();
+    depthAttachmentRef.attachment = static_cast<uint32_t>(colorReferences.size());
     depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+    // 配置子通道
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = (uint32_t)colorReferences.size();
+    subpass.colorAttachmentCount = static_cast<uint32_t>(colorReferences.size());
     subpass.pColorAttachments = colorReferences.data();
     subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
-    VkSubpassDependency dependency;
+    // 配置子通道依赖
+    VkSubpassDependency dependency{};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                              VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                              VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                               VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     dependency.dependencyFlags = 0;
 
-    const uint32_t viewMask = (0b1 << multiviewCount) - 1;
-    VkRenderPassMultiviewCreateInfo renderPassMultiviewCI{};
-    renderPassMultiviewCI.sType = VK_STRUCTURE_TYPE_RENDER_PASS_MULTIVIEW_CREATE_INFO;
-    renderPassMultiviewCI.subpassCount = 1;
-    renderPassMultiviewCI.pViewMasks = &viewMask;
-    renderPassMultiviewCI.correlationMaskCount = 0;
+    // 配置多视图
+    const uint32_t viewMask = (1u << multiviewCount) - 1;
+    VkRenderPassMultiviewCreateInfo multiviewCreateInfo{};
+    multiviewCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_MULTIVIEW_CREATE_INFO;
+    multiviewCreateInfo.subpassCount = 1;
+    multiviewCreateInfo.pViewMasks = &viewMask;
+    multiviewCreateInfo.correlationMaskCount = 0;
 
+    // 创建渲染通道
     VkRenderPassCreateInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = (uint32_t)attachments.size();
+    renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
     renderPassInfo.pAttachments = attachments.data();
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
     renderPassInfo.dependencyCount = 1;
     renderPassInfo.pDependencies = &dependency;
-    renderPassInfo.pNext = &renderPassMultiviewCI;
+    renderPassInfo.pNext = &multiviewCreateInfo;
 
-    coronaHardwareCheck(vkCreateRenderPass(globalHardwareContext.mainDevice->deviceManager.logicalDevice, &renderPassInfo, nullptr, &renderPass));
+    coronaHardwareCheck(vkCreateRenderPass(mainDevice->deviceManager.getLogicalDevice(), &renderPassInfo, nullptr, &renderPass));
 }
 
-void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule vertShaderCode, EmbeddedShader::ShaderCodeModule fragShaderCode)
+void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule &vertShaderCode,
+                                                EmbeddedShader::ShaderCodeModule &fragShaderCode)
 {
-    auto getVkFormat = [](const std::string &typeName, uint32_t elementCount) -> VkFormat {
-        VkFormat temp;
-        if (typeName == "float")
-        {
-            switch (elementCount)
-            {
-            case 1:
-                temp = VK_FORMAT_R32_SFLOAT;
-                break;
-            case 2:
-                temp = VK_FORMAT_R32G32_SFLOAT;
-                break;
-            case 3:
-                temp = VK_FORMAT_R32G32B32_SFLOAT;
-                break;
-            case 4:
-                temp = VK_FORMAT_R32G32B32A32_SFLOAT;
-                break;
-            default:
-                break;
-            }
-        }
-        if (typeName == "int")
-        {
-            switch (elementCount)
-            {
-            case 1:
-                temp = VK_FORMAT_R32_SINT;
-                break;
-            case 2:
-                temp = VK_FORMAT_R32G32_SINT;
-                break;
-            case 3:
-                temp = VK_FORMAT_R32G32B32_SINT;
-                break;
-            case 4:
-                temp = VK_FORMAT_R32G32B32A32_SINT;
-                break;
-            default:
-                break;
-            }
-        }
-        if (typeName == "uint")
-        {
-            switch (elementCount)
-            {
-            case 1:
-                temp = VK_FORMAT_R32_UINT;
-                break;
-            case 2:
-                temp = VK_FORMAT_R32G32_UINT;
-                break;
-            case 3:
-                temp = VK_FORMAT_R32G32B32_UINT;
-                break;
-            case 4:
-                temp = VK_FORMAT_R32G32B32A32_UINT;
-                break;
-            default:
-                break;
-            }
-        }
+    const auto mainDevice = globalHardwareContext.getMainDevice();
+    if (!mainDevice)
+    {
+        throw std::runtime_error("No main device available");
+    }
 
-        return temp;
-    };
+    const VkDevice device = mainDevice->deviceManager.getLogicalDevice();
 
-    VkShaderModule vertShaderModule = globalHardwareContext.mainDevice->resourceManager.createShaderModule(vertShaderCode);
-    VkShaderModule fragShaderModule = globalHardwareContext.mainDevice->resourceManager.createShaderModule(fragShaderCode);
+    // 创建着色器模块
+    VkShaderModule vertShaderModule = mainDevice->resourceManager.createShaderModule(vertShaderCode);
+    VkShaderModule fragShaderModule = mainDevice->resourceManager.createShaderModule(fragShaderCode);
 
+    // 配置着色器阶段
     VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -253,44 +298,48 @@ void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule
 
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    // 配置顶点输入
+    std::vector<VkVertexInputBindingDescription> bindingDescriptions;
+    std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
+    bindingDescriptions.reserve(vertexStageInputs.size());
+    attributeDescriptions.reserve(vertexStageInputs.size());
 
-    // VkVertexInputBindingDescription bindingDescriptions[1] = {};
-    // bindingDescriptions[0].binding = 0;
-    // bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    // bindingDescriptions[0].stride = 0;
-
-    std::vector<VkVertexInputBindingDescription> bindingDescriptions(vertexStageInputs.size());
-    std::vector<VkVertexInputAttributeDescription> attributeDescriptions(vertexStageInputs.size());
-    // for (uint32_t index = 0; index < vertShaderCode.shaderResources.stageInputs.size(); index++)
-    for (auto item : vertexStageInputs)
+    for (const auto &input : vertexStageInputs)
     {
-        bindingDescriptions[item.location].binding = item.location;
-        bindingDescriptions[item.location].stride = item.typeSize;
-        bindingDescriptions[item.location].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        VkVertexInputBindingDescription bindingDesc{};
+        bindingDesc.binding = input.location;
+        bindingDesc.stride = input.typeSize;
+        bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        bindingDescriptions.push_back(bindingDesc);
 
-        attributeDescriptions[item.location].binding = item.location;
-        attributeDescriptions[item.location].location = item.location;
-        attributeDescriptions[item.location].format = getVkFormat(item.typeName, item.elementCount);
-        attributeDescriptions[item.location].offset = 0;
+        VkVertexInputAttributeDescription attributeDesc{};
+        attributeDesc.binding = input.location;
+        attributeDesc.location = input.location;
+        attributeDesc.format = getVkFormatFromType(input.typeName, input.elementCount);
+        attributeDesc.offset = 0;
+        attributeDescriptions.push_back(attributeDesc);
     }
 
-    vertexInputInfo.vertexBindingDescriptionCount = (uint32_t)bindingDescriptions.size();
-    vertexInputInfo.vertexAttributeDescriptionCount = (uint32_t)attributeDescriptions.size();
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());
     vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.data();
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
     vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
+    // 配置输入装配
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
+    // 配置视口状态
     VkPipelineViewportStateCreateInfo viewportState{};
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewportState.viewportCount = 1;
     viewportState.scissorCount = 1;
 
+    // 配置光栅化
     VkPipelineRasterizationStateCreateInfo rasterizer{};
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizer.depthClampEnable = VK_FALSE;
@@ -301,11 +350,13 @@ void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
 
+    // 配置多重采样
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
+    // 配置深度模板
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
     depthStencil.depthTestEnable = VK_TRUE;
@@ -314,56 +365,57 @@ void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
 
-    std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments;
+    // 配置颜色混合
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                          VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachment.blendEnable = VK_FALSE;
 
-    for (uint32_t i = 0; i < renderTargets.size(); i++)
-    {
-        colorBlendAttachments.push_back(colorBlendAttachment);
-    }
+    std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments(
+        renderTargets.size(), colorBlendAttachment);
 
     VkPipelineColorBlendStateCreateInfo colorBlending{};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE;
     colorBlending.logicOp = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = (uint32_t)colorBlendAttachments.size();
+    colorBlending.attachmentCount = static_cast<uint32_t>(colorBlendAttachments.size());
     colorBlending.pAttachments = colorBlendAttachments.data();
-    colorBlending.blendConstants[0] = 0.0f;
-    colorBlending.blendConstants[1] = 0.0f;
-    colorBlending.blendConstants[2] = 0.0f;
-    colorBlending.blendConstants[3] = 0.0f;
 
+    // 配置动态状态
     std::vector<VkDynamicState> dynamicStates = {
         VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR};
+
     VkPipelineDynamicStateCreateInfo dynamicState{};
     dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
     dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
     dynamicState.pDynamicStates = dynamicStates.data();
 
-    VkPushConstantRange push_constant_ranges = {};
-    push_constant_ranges.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-    push_constant_ranges.offset = 0;
-    push_constant_ranges.size = pushConstantSize;
+    // 配置推送常量
+    VkPushConstantRange pushConstantRange{};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = pushConstantSize;
 
+    // 获取描述符集布局
     std::vector<VkDescriptorSetLayout> setLayouts;
-    for (size_t i = 0; i < 4; i++)
+    setLayouts.reserve(4);
+    for (size_t i = 0; i < 4; ++i)
     {
-        setLayouts.push_back(globalHardwareContext.mainDevice->resourceManager.bindlessDescriptors[i].descriptorSetLayout);
+        setLayouts.push_back(mainDevice->resourceManager.bindlessDescriptors[i].descriptorSetLayout);
     }
 
+    // 创建管线布局
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = setLayouts.size();
+    pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
     pipelineLayoutInfo.pSetLayouts = setLayouts.data();
+    pipelineLayoutInfo.pushConstantRangeCount = pushConstantSize > 0 ? 1 : 0;
+    pipelineLayoutInfo.pPushConstantRanges = pushConstantSize > 0 ? &pushConstantRange : nullptr;
 
-    pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &push_constant_ranges;
+    coronaHardwareCheck(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout));
 
-    coronaHardwareCheck(vkCreatePipelineLayout(globalHardwareContext.mainDevice->deviceManager.logicalDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout));
-
+    // 创建图形管线
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipelineInfo.stageCount = 2;
@@ -381,21 +433,33 @@ void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-    coronaHardwareCheck(vkCreateGraphicsPipelines(globalHardwareContext.mainDevice->deviceManager.logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline));
+    coronaHardwareCheck(vkCreateGraphicsPipelines(
+        device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline));
 
-    vkDestroyShaderModule(globalHardwareContext.mainDevice->deviceManager.logicalDevice, fragShaderModule, nullptr);
-    vkDestroyShaderModule(globalHardwareContext.mainDevice->deviceManager.logicalDevice, vertShaderModule, nullptr);
+    // 清理着色器模块
+    vkDestroyShaderModule(device, fragShaderModule, nullptr);
+    vkDestroyShaderModule(device, vertShaderModule, nullptr);
 }
 
 void RasterizerPipeline::createFramebuffers(ktm::uvec2 imageSize)
 {
-    std::vector<VkImageView> attachments;
-    for (int i = 0; i < renderTargets.size(); i++)
+    const auto mainDevice = globalHardwareContext.getMainDevice();
+    if (!mainDevice)
     {
-        attachments.push_back(getImageFromHandle(*renderTargets[i].imageID).imageView);
+        throw std::runtime_error("No main device available");
     }
-    attachments.push_back(getImageFromHandle(*depthImage.imageID).imageView);
 
+    // 收集所有附件的图像视图
+    std::vector<VkImageView> attachments;
+    attachments.reserve(renderTargets.size() + 1);
+
+    for (const auto &renderTarget : renderTargets)
+    {
+        attachments.push_back(getImageFromHandle(*renderTarget.getImageID()).imageView);
+    }
+    attachments.push_back(getImageFromHandle(*depthImage.getImageID()).imageView);
+
+    // 创建帧缓冲
     VkFramebufferCreateInfo framebufferInfo{};
     framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     framebufferInfo.renderPass = renderPass;
@@ -405,112 +469,183 @@ void RasterizerPipeline::createFramebuffers(ktm::uvec2 imageSize)
     framebufferInfo.height = imageSize.y;
     framebufferInfo.layers = 1;
 
-    coronaHardwareCheck(vkCreateFramebuffer(globalHardwareContext.mainDevice->deviceManager.logicalDevice, &framebufferInfo, nullptr, &frameBuffers));
+    coronaHardwareCheck(vkCreateFramebuffer(
+        mainDevice->deviceManager.getLogicalDevice(),
+        &framebufferInfo,
+        nullptr,
+        &frameBuffers));
 }
 
-RasterizerPipeline *RasterizerPipeline::operator()(uint16_t imageSizeX, uint16_t imageSizeY)
+std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> RasterizerPipeline::operator[](const std::string &resourceName)
 {
-    this->imageSize = {imageSizeX, imageSizeY};
+    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
+
+    // 在顶点着色器资源中查找
+    if (auto *vertexRes = vertexResource.findShaderBindInfo(resourceName))
+    {
+        switch (vertexRes->bindType)
+        {
+        case BindType::pushConstantMembers:
+            return HardwarePushConstant(vertexRes->typeSize, vertexRes->byteOffset, &tempPushConstant);
+
+        case BindType::stageInputs:
+            return tempVertexBuffers[vertexRes->location];
+
+        default:
+            break;
+        }
+    }
+
+    // 在片段着色器资源中查找
+    if (auto *fragmentRes = fragmentResource.findShaderBindInfo(resourceName))
+    {
+        switch (fragmentRes->bindType)
+        {
+        case BindType::pushConstantMembers:
+            return HardwarePushConstant(fragmentRes->typeSize, fragmentRes->byteOffset, &tempPushConstant);
+
+        case BindType::stageOutputs:
+            return renderTargets[fragmentRes->location];
+
+        default:
+            break;
+        }
+    }
+
+    throw std::runtime_error("Failed to find resource with name: " + resourceName);
+}
+
+RasterizerPipeline *RasterizerPipeline::operator()(uint16_t width, uint16_t height)
+{
+    imageSize = {width, height};
     return this;
 }
 
 CommandRecord *RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
 {
-    TriangleGeomMesh temp;
-    temp.indexBuffer = getBufferFromHandle(*(indexBuffer.bufferID));
-    temp.vertexBuffers.resize(tempVertexBuffers.size());
-    for (size_t i = 0; i < tempVertexBuffers.size(); i++)
+    TriangleGeomMesh mesh;
+    mesh.indexBuffer = getBufferFromHandle(*indexBuffer.getBufferID());
+
+    mesh.vertexBuffers.reserve(tempVertexBuffers.size());
+    for (const auto &vertexBuffer : tempVertexBuffers)
     {
-        temp.vertexBuffers[i] = getBufferFromHandle(*(tempVertexBuffers[i].bufferID));
+        mesh.vertexBuffers.push_back(getBufferFromHandle(*vertexBuffer.getBufferID()));
     }
-    temp.pushConstant = tempPushConstant;
-    tempPushConstant = HardwarePushConstant(temp.pushConstant.getSize(), 0);
-    geomMeshesRecord.push_back(temp);
+
+    mesh.pushConstant = tempPushConstant;
+
+    // 重置临时推送常量
+    if (pushConstantSize > 0)
+    {
+        tempPushConstant = HardwarePushConstant(pushConstantSize, 0);
+    }
+
+    geomMeshesRecord.push_back(std::move(mesh));
+
     return &dumpCommandRecord;
 }
 
 CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(HardwareExecutor &hardwareExecutor)
 {
-    CommandRecord::RequiredBarriers requiredBarriers;
+    RequiredBarriers requiredBarriers;
+
+    // 内存屏障
     requiredBarriers.memoryBarriers.resize(1);
+    auto &memoryBarrier = requiredBarriers.memoryBarriers[0];
+    memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+    memoryBarrier.pNext = nullptr;
+    memoryBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+    memoryBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    memoryBarrier.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT;
+    memoryBarrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT |
+                                 VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
 
-    requiredBarriers.memoryBarriers[0].sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
-    requiredBarriers.memoryBarriers[0].srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-    requiredBarriers.memoryBarriers[0].srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-    requiredBarriers.memoryBarriers[0].dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT;
-    requiredBarriers.memoryBarriers[0].dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-    requiredBarriers.memoryBarriers[0].pNext = nullptr;
+    // 图像屏障
+    VkImageMemoryBarrier2 imageBarrierTemplate{};
+    imageBarrierTemplate.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+    imageBarrierTemplate.pNext = nullptr;
+    imageBarrierTemplate.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+    imageBarrierTemplate.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    imageBarrierTemplate.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageBarrierTemplate.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageBarrierTemplate.subresourceRange.baseMipLevel = 0;
+    imageBarrierTemplate.subresourceRange.levelCount = 1;
+    imageBarrierTemplate.subresourceRange.baseArrayLayer = 0;
+    imageBarrierTemplate.subresourceRange.layerCount = 1;
 
+    // 颜色附件屏障
+    for (auto &renderTarget : renderTargets)
     {
-        VkImageMemoryBarrier2 imageBarrier;
-        imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        imageBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-        imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        imageBarrier.subresourceRange.baseMipLevel = 0;
-        imageBarrier.subresourceRange.levelCount = 1;
-        imageBarrier.subresourceRange.baseArrayLayer = 0;
-        imageBarrier.subresourceRange.layerCount = 1;
-        imageBarrier.pNext = nullptr;
+        const auto imageWrap = getImageFromHandle(*renderTarget.getImageID());
 
-        for (size_t i = 0; i < renderTargets.size(); i++)
-        {
-            imageBarrier.image = getImageFromHandle(*renderTargets[i].imageID).imageHandle;
-            imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-            imageBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-            imageBarrier.oldLayout = getImageFromHandle(*renderTargets[i].imageID).imageLayout;
+        VkImageMemoryBarrier2 imageBarrier = imageBarrierTemplate;
+        imageBarrier.image = imageWrap.imageHandle;
+        imageBarrier.oldLayout = imageWrap.imageLayout;
+        imageBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        imageBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
+                                     VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        imageBarrier.subresourceRange.aspectMask = imageWrap.aspectMask;
 
-            globalImageStorages.write(*renderTargets[i].imageID, [](ResourceManager::ImageHardwareWrap &image) {
-                image.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            });
+        requiredBarriers.imageBarriers.push_back(imageBarrier);
 
-            imageBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            imageBarrier.subresourceRange.aspectMask = getImageFromHandle(*renderTargets[i].imageID).aspectMask;
-            requiredBarriers.imageBarriers.push_back(imageBarrier);
-        }
-
-        if (depthImage)
-        {
-            imageBarrier.image = getImageFromHandle(*depthImage.imageID).imageHandle;
-            imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
-            imageBarrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-            imageBarrier.oldLayout = getImageFromHandle(*depthImage.imageID).imageLayout;
-
-            globalImageStorages.write(*depthImage.imageID, [](ResourceManager::ImageHardwareWrap &image) {
-                image.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-            });
-
-            imageBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-            imageBarrier.subresourceRange.aspectMask = getImageFromHandle(*depthImage.imageID).aspectMask;
-            requiredBarriers.imageBarriers.push_back(imageBarrier);
-        }
+        // 更新图像布局
+        globalImageStorages.write(*renderTarget.getImageID(), [](ResourceManager::ImageHardwareWrap &image) {
+            image.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        });
     }
 
+    // 深度附件屏障
+    if (depthImage)
     {
-        VkBufferMemoryBarrier2 bufferBarrier;
-        bufferBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-        bufferBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-        bufferBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        bufferBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        bufferBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        bufferBarrier.pNext = nullptr;
+        const auto depthImageWrap = getImageFromHandle(*depthImage.getImageID());
 
-        for (size_t i = 0; i < geomMeshesRecord.size(); i++)
+        VkImageMemoryBarrier2 imageBarrier = imageBarrierTemplate;
+        imageBarrier.image = depthImageWrap.imageHandle;
+        imageBarrier.oldLayout = depthImageWrap.imageLayout;
+        imageBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+                                    VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+        imageBarrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                                     VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        imageBarrier.subresourceRange.aspectMask = depthImageWrap.aspectMask;
+
+        requiredBarriers.imageBarriers.push_back(imageBarrier);
+
+        // 更新图像布局
+        globalImageStorages.write(*depthImage.getImageID(), [](ResourceManager::ImageHardwareWrap &image) {
+            image.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        });
+    }
+
+    // 缓冲区屏障
+    VkBufferMemoryBarrier2 bufferBarrierTemplate{};
+    bufferBarrierTemplate.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+    bufferBarrierTemplate.pNext = nullptr;
+    bufferBarrierTemplate.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+    bufferBarrierTemplate.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    bufferBarrierTemplate.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    bufferBarrierTemplate.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    bufferBarrierTemplate.offset = 0;
+    bufferBarrierTemplate.size = VK_WHOLE_SIZE;
+
+    for (const auto &mesh : geomMeshesRecord)
+    {
+        // 索引缓冲区屏障
+        VkBufferMemoryBarrier2 indexBarrier = bufferBarrierTemplate;
+        indexBarrier.buffer = mesh.indexBuffer.bufferHandle;
+        indexBarrier.dstStageMask = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
+        indexBarrier.dstAccessMask = VK_ACCESS_2_INDEX_READ_BIT;
+        requiredBarriers.bufferBarriers.push_back(indexBarrier);
+
+        // 顶点缓冲区屏障
+        for (const auto &vertexBuffer : mesh.vertexBuffers)
         {
-            bufferBarrier.buffer = geomMeshesRecord[i].indexBuffer.bufferHandle;
-            bufferBarrier.offset = 0;
-            bufferBarrier.size = VK_WHOLE_SIZE;
-            bufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
-            bufferBarrier.dstAccessMask = VK_ACCESS_2_INDEX_READ_BIT;
-            requiredBarriers.bufferBarriers.push_back(bufferBarrier);
-            for (size_t j = 0; j < geomMeshesRecord[i].vertexBuffers.size(); j++)
-            {
-                bufferBarrier.buffer = geomMeshesRecord[i].vertexBuffers[j].bufferHandle;
-                bufferBarrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
-                bufferBarrier.dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
-                requiredBarriers.bufferBarriers.push_back(bufferBarrier);
-            }
+            VkBufferMemoryBarrier2 vertexBarrier = bufferBarrierTemplate;
+            vertexBarrier.buffer = vertexBuffer.bufferHandle;
+            vertexBarrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
+            vertexBarrier.dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
+            requiredBarriers.bufferBarriers.push_back(vertexBarrier);
         }
     }
 
@@ -519,93 +654,155 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
 
 void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
 {
-    if (pipelineLayout == VK_NULL_HANDLE && graphicsPipeline == VK_NULL_HANDLE)
+    const auto mainDevice = globalHardwareContext.getMainDevice();
+    if (!mainDevice)
     {
+        throw std::runtime_error("No main device available");
+    }
+
+    // 延迟创建管线
+    if (pipelineLayout == VK_NULL_HANDLE || graphicsPipeline == VK_NULL_HANDLE)
+    {
+        // 创建默认深度图像
         if (!depthImage)
         {
-            depthImage = HardwareImage(imageSize.x, imageSize.y, ImageFormat::D32_FLOAT, ImageUsage::DepthImage);
+            depthImage = HardwareImage(
+                imageSize.x, imageSize.y,
+                ImageFormat::D32_FLOAT,
+                ImageUsage::DepthImage);
         }
 
-        auto image = getImageFromHandle(*depthImage.imageID);
-        globalHardwareContext.mainDevice->resourceManager.transitionImageLayout(hardwareExecutor.currentRecordQueue->commandBuffer,
-                                                                                image, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                                                                                VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-                                                                                VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+        // 转换深度图像布局
+        auto depthImageWrap = getImageFromHandle(*depthImage.getImageID());
+        mainDevice->resourceManager.transitionImageLayout(
+            hardwareExecutor.currentRecordQueue->commandBuffer,
+            depthImageWrap,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 
         createRenderPass(multiviewCount);
-
         createGraphicsPipeline(vertShaderCode, fragShaderCode);
         createFramebuffers(imageSize);
     }
+
+    const VkCommandBuffer commandBuffer = hardwareExecutor.currentRecordQueue->commandBuffer;
+
+    // 配置渲染通道
+    std::vector<VkClearValue> clearValues;
+    clearValues.reserve(renderTargets.size() + 1);
+
+    for (const auto &renderTarget : renderTargets)
+    {
+        clearValues.push_back(getImageFromHandle(*renderTarget.getImageID()).clearValue);
+    }
+    clearValues.push_back(getImageFromHandle(*depthImage.getImageID()).clearValue);
+
+    const auto depthImageWrap = getImageFromHandle(*depthImage.getImageID());
 
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = renderPass;
     renderPassInfo.framebuffer = frameBuffers;
     renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent.width = getImageFromHandle(*depthImage.imageID).imageSize.x;
-    renderPassInfo.renderArea.extent.height = getImageFromHandle(*depthImage.imageID).imageSize.y;
-
-    std::vector<VkClearValue> clearValues;
-    for (size_t i = 0; i < renderTargets.size(); i++)
-    {
-        clearValues.push_back(getImageFromHandle(*renderTargets[i].imageID).clearValue);
-    }
-    clearValues.push_back(getImageFromHandle(*depthImage.imageID).clearValue);
-
+    renderPassInfo.renderArea.extent.width = depthImageWrap.imageSize.x;
+    renderPassInfo.renderArea.extent.height = depthImageWrap.imageSize.y;
     renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
     renderPassInfo.pClearValues = clearValues.data();
 
-    vkCmdBeginRenderPass(hardwareExecutor.currentRecordQueue->commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+    // 设置动态视口和裁剪区
     VkViewport viewport{};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
-    viewport.width = (float)getImageFromHandle(*depthImage.imageID).imageSize.x;
-    viewport.height = (float)getImageFromHandle(*depthImage.imageID).imageSize.y;
+    viewport.width = static_cast<float>(depthImageWrap.imageSize.x);
+    viewport.height = static_cast<float>(depthImageWrap.imageSize.y);
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(hardwareExecutor.currentRecordQueue->commandBuffer, 0, 1, &viewport);
+    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
     VkRect2D scissor{};
     scissor.offset = {0, 0};
-    scissor.extent.width = getImageFromHandle(*depthImage.imageID).imageSize.x;
-    scissor.extent.height = getImageFromHandle(*depthImage.imageID).imageSize.y;
-    vkCmdSetScissor(hardwareExecutor.currentRecordQueue->commandBuffer, 0, 1, &scissor);
+    scissor.extent.width = depthImageWrap.imageSize.x;
+    scissor.extent.height = depthImageWrap.imageSize.y;
+    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    vkCmdBindPipeline(hardwareExecutor.currentRecordQueue->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+    // 绑定管线
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-    for (size_t i = 0; i < geomMeshesRecord.size(); i++)
+    // 绑定描述符集
+    std::vector<VkDescriptorSet> descriptorSets;
+    descriptorSets.reserve(4);
+    for (size_t i = 0; i < 4; ++i)
     {
+        descriptorSets.push_back(mainDevice->resourceManager.bindlessDescriptors[i].descriptorSet);
+    }
+
+    vkCmdBindDescriptorSets(
+        commandBuffer,
+        VK_PIPELINE_BIND_POINT_GRAPHICS,
+        pipelineLayout,
+        0,
+        static_cast<uint32_t>(descriptorSets.size()),
+        descriptorSets.data(),
+        0,
+        nullptr);
+
+    // 绘制所有几何网格
+    for (const auto &mesh : geomMeshesRecord)
+    {
+        // 收集顶点缓冲区
         std::vector<VkBuffer> vertexBuffers;
         std::vector<VkDeviceSize> offsets;
-        for (size_t vertexBufferIndex = 0; vertexBufferIndex < geomMeshesRecord[i].vertexBuffers.size(); vertexBufferIndex++)
+        vertexBuffers.reserve(mesh.vertexBuffers.size());
+        offsets.reserve(mesh.vertexBuffers.size());
+
+        for (const auto &vertexBuffer : mesh.vertexBuffers)
         {
-            //uint64_t bufferID = *geomMeshesRecord[i].vertexBuffers[vertexBufferIndex].bufferID;
-            vertexBuffers.push_back(geomMeshesRecord[i].vertexBuffers[vertexBufferIndex].bufferHandle);
+            vertexBuffers.push_back(vertexBuffer.bufferHandle);
             offsets.push_back(0);
         }
 
-        vkCmdBindVertexBuffers(hardwareExecutor.currentRecordQueue->commandBuffer, 0, (uint32_t)geomMeshesRecord[i].vertexBuffers.size(), vertexBuffers.data(), offsets.data());
+        // 绑定顶点缓冲区
+        vkCmdBindVertexBuffers(
+            commandBuffer,
+            0,
+            static_cast<uint32_t>(vertexBuffers.size()),
+            vertexBuffers.data(),
+            offsets.data());
 
-        vkCmdBindIndexBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, geomMeshesRecord[i].indexBuffer.bufferHandle, 0 * sizeof(uint32_t), VK_INDEX_TYPE_UINT32);
+        // 绑定索引缓冲区
+        vkCmdBindIndexBuffer(
+            commandBuffer,
+            mesh.indexBuffer.bufferHandle,
+            0,
+            VK_INDEX_TYPE_UINT32);
 
-        std::vector<VkDescriptorSet> descriptorSets;
-        for (size_t i = 0; i < 4; i++)
+        // 推送常量
+        if (const void *pushConstData = mesh.pushConstant.getData();
+            pushConstData != nullptr && pushConstantSize > 0)
         {
-            descriptorSets.push_back(globalHardwareContext.mainDevice->resourceManager.bindlessDescriptors[i].descriptorSet);
+            vkCmdPushConstants(
+                commandBuffer,
+                pipelineLayout,
+                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                0,
+                pushConstantSize,
+                pushConstData);
         }
 
-        vkCmdBindDescriptorSets(hardwareExecutor.currentRecordQueue->commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
-
-        void *data = geomMeshesRecord[i].pushConstant.getData();
-        vkCmdPushConstants(hardwareExecutor.currentRecordQueue->commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, pushConstantSize, data);
-
-        //uint32_t indexCount = (uint32_t)(geomMeshesRecord[i].indexBuffer.bufferAllocInfo.size / sizeof(uint32_t));
-        vkCmdDrawIndexed(hardwareExecutor.currentRecordQueue->commandBuffer, geomMeshesRecord[i].indexBuffer.bufferSize, 1, 0, 0, 0);
+        // 绘制
+        vkCmdDrawIndexed(commandBuffer, mesh.indexBuffer.bufferSize, 1, 0, 0, 0);
     }
 
-    vkCmdEndRenderPass(hardwareExecutor.currentRecordQueue->commandBuffer);
+    vkCmdEndRenderPass(commandBuffer);
 
+    // 清空记录
     geomMeshesRecord.clear();
+}
+
+VkFormat RasterizerPipeline::getVkFormatFromType(const std::string &typeName, uint32_t elementCount) const
+{
+    return ::getVkFormatFromType(typeName, elementCount);
 }
