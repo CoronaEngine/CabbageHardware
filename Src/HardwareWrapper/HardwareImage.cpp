@@ -69,7 +69,8 @@ void incrementImageRefCount(uintptr_t imageID)
 {
     if (imageID != 0)
     {
-        globalImageStorages.write(imageID, [](ResourceManager::ImageHardwareWrap &image) {
+        globalImageStorages.write(imageID, [](ResourceManager::ImageHardwareWrap &image) 
+        {
             ++image.refCount;
         });
     }
@@ -83,7 +84,8 @@ void decrementImageRefCount(uintptr_t imageID)
     }
 
     bool shouldDestroy = false;
-    globalImageStorages.write(imageID, [&](ResourceManager::ImageHardwareWrap &image) {
+    globalImageStorages.write(imageID, [&](ResourceManager::ImageHardwareWrap &image) 
+    {
         if (--image.refCount == 0)
         {
             globalHardwareContext.getMainDevice()->resourceManager.destroyImage(image);
@@ -107,7 +109,8 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
     const auto [vkFormat, pixelSize] = convertImageFormat(imageFormat);
     const VkImageUsageFlags vkUsage = convertImageUsage(imageUsage);
 
-    const auto handle = globalImageStorages.allocate([&](ResourceManager::ImageHardwareWrap &image) {
+    const auto handle = globalImageStorages.allocate([&](ResourceManager::ImageHardwareWrap &image)
+    {
         image = globalHardwareContext.getMainDevice()->resourceManager.createImage(ktm::uvec2(width, height), vkFormat, pixelSize, vkUsage, arrayLayers);
         image.refCount = 1;
     });
@@ -153,7 +156,8 @@ HardwareImage::operator bool() const
     }
 
     bool isValid = false;
-    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
+    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) 
+    {
         isValid = (image.imageHandle != VK_NULL_HANDLE);
     });
 
@@ -163,7 +167,8 @@ HardwareImage::operator bool() const
 uint32_t HardwareImage::storeDescriptor()
 {
     uint32_t index = 0;
-    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
+    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) 
+    {
         index = globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(image);
     });
 
@@ -175,11 +180,13 @@ HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
     ResourceManager::BufferHardwareWrap srcBuffer;
     ResourceManager::ImageHardwareWrap dstImage;
 
-    globalBufferStorages.read(*buffer.bufferID, [&](const ResourceManager::BufferHardwareWrap &buf) {
+    globalBufferStorages.read(*buffer.bufferID, [&](const ResourceManager::BufferHardwareWrap &buf) 
+    {
         srcBuffer = buf;
     });
 
-    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &img) {
+    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &img)
+    {
         dstImage = img;
     });
 
@@ -201,7 +208,8 @@ HardwareImage &HardwareImage::copyFromData(const void *inputData)
     uint32_t height = 0;
     uint32_t pixelSize = 0;
 
-    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
+    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) 
+    {
         width = image.imageSize.x;
         height = image.imageSize.y;
         pixelSize = image.pixelSize;
