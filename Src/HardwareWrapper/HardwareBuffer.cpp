@@ -200,7 +200,6 @@ uint64_t HardwareBuffer::getBufferSize() const
     return totalSize;
 }
 
-
 ExternalHandle HardwareBuffer::exportBufferMemory()
 {
     ExternalHandle handle{};
