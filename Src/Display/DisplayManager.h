@@ -9,60 +9,67 @@
 class DisplayManager
 {
 public:
-
     DisplayManager();
     ~DisplayManager();
 
-    bool initDisplayManager(void* surface);
+    // 禁止拷贝和移动
+    DisplayManager(const DisplayManager &) = delete;
+    DisplayManager &operator=(const DisplayManager &) = delete;
+    DisplayManager(DisplayManager &&) = delete;
+    DisplayManager &operator=(DisplayManager &&) = delete;
 
+    bool initDisplayManager(void *surface);
     bool waitExecutor(HardwareExecutor &executor);
-
     bool displayFrame(void *surface, HardwareImage displayImage);
 
 private:
-
+    // Vulkan 核心资源
     VkSurfaceKHR vkSurface = VK_NULL_HANDLE;
     VkSwapchainKHR swapChain = VK_NULL_HANDLE;
+    VkSurfaceFormatKHR surfaceFormat{};
 
-    ktm::uvec2 displaySize = ktm::uvec2(0, 0);
+    // 显示参数
+    ktm::uvec2 displaySize{0, 0};
     void *displaySurface = nullptr;
+    uint32_t currentFrame = 0;
 
+    // 交换链资源
     std::vector<ResourceManager::ImageHardwareWrap> swapChainImages;
-    VkSurfaceFormatKHR surfaceFormat;
+    ResourceManager::ImageHardwareWrap displayImage{};
 
-    ResourceManager::ImageHardwareWrap displayImage;
-
+    // 同步对象
     std::vector<VkSemaphore> imageAvailableSemaphores;
     std::vector<VkSemaphore> renderFinishedSemaphores;
     std::vector<VkFence> inFlightFences;
 
-    //VkSemaphore timelineSemaphore = VK_NULL_HANDLE;
-    //uint64_t timelineCounter = 0;
-    //std::vector<uint64_t> frameTimelineValues;
-
-    std::atomic_uint16_t currentQueueIndex = 0;
+    // 队列和设备
+    std::atomic_uint16_t currentQueueIndex{0};
     std::vector<DeviceManager::QueueUtils> presentQueues;
-
     std::shared_ptr<HardwareContext::HardwareUtils> displayDevice;
 
+    // 跨设备传输资源
+    void *hostBufferPtr = nullptr;
+    ResourceManager::BufferHardwareWrap srcStaging{};
+    ResourceManager::BufferHardwareWrap dstStaging{};
+
+    // 执行器
+    std::shared_ptr<HardwareExecutor> mainDeviceExecutor;
+    std::shared_ptr<HardwareExecutor> displayDeviceExecutor;
+    std::shared_ptr<HardwareExecutor> waitedExecutor;
+
+    // 内部方法
     void cleanUpDisplayManager();
-    void createVkSurface(void* surface);
+    void createVkSurface(void *surface);
     void choosePresentDevice();
     void createSyncObjects();
     void createSwapChain();
     void recreateSwapChain();
 
-    uint32_t currentFrame = 0;
+    void cleanupSyncObjects();
+    void cleanupSwapChainImages();
+    void cleanupStagingBuffers();
+    void cleanupDisplayImage();
 
-    void *hostBufferPtr = nullptr;
-
-    ResourceManager::BufferHardwareWrap srcStaging;
-    //std::vector<char> srcCpuData;
-    ResourceManager::BufferHardwareWrap dstStaging;
-    //std::vector<char> dstCpuData;
-
-    std::shared_ptr<HardwareExecutor> mainDeviceExecutor;
-    std::shared_ptr<HardwareExecutor> displayDeviceExecutor;
-
-    std::shared_ptr<HardwareExecutor> waitedExecutor;
+    bool needsSwapChainRecreation(const ktm::uvec2 &newSize) const;
+    void setupCrossDeviceTransfer(const ResourceManager::ImageHardwareWrap &sourceImage);
 };
