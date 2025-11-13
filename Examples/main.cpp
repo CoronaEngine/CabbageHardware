@@ -99,23 +99,6 @@ int main()
                 computeUniformBuffer.copyFromData(&computeUniformData, sizeof(computeUniformData));
                 computer["pushConsts.uniformBufferIndex"] = computeUniformBuffer.storeDescriptor();
 
-                // 开始执行
-                // 注意这里的执行顺序是从上到下，也就是先光栅化后计算
-                // 每一个管线前面的<<操作符都会把管线内记录的命令添加到executor中
-                // 最后通过commit提交执行
-                // executor会自动处理管线间的资源同步问题
-                // 比如这里的finalOutputImage在光栅化管线中作为输出，在计算管线中作为输入
-                // executor会自动在两条管线间插入合适的内存屏障，确保数据正确性
-                // 当然你也可以手动添加内存屏障，覆盖executor的自动处理
-                // 具体用法请参考HardwareExecutor和CommandRecord的实现
-                // 注意这里的图像格式和用法必须匹配，否则会导致未定义行为
-                // 比如finalOutputImage作为光栅化的输出，必须包含VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
-                // 作为计算的输入，必须包含VK_IMAGE_USAGE_STORAGE_BIT
-                // 这些都会在创建HardwareImage时自动处理
-                // 如果你需要更复杂的用法，可以参考HardwareImage的实现自行扩展
-                // 比如添加更多的图像用法标志，或者支持多层图像等
-                // 总之，HardwareExecutor和CommandRecord的设计目标是简化多管线协作的复杂性
-                // 让用户专注于管线本身的逻辑，而不必过多关心底层的同步和资源管理细节
                 executor << rasterizer(1920, 1080)
                          << executor.commit();
 
