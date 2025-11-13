@@ -1,4 +1,5 @@
 ﻿#include <Hardware/GlobalContext.h>
+#include <algorithm>
 
 #define VOLK_IMPLEMENTATION
 #include <volk.h>
