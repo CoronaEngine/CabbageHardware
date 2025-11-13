@@ -129,7 +129,8 @@ void ResourceManager::createVmaAllocator()
     }
 
 #ifdef CABBAGE_ENGINE_DEBUG
-    const auto toGB = [](uint64_t bytes) -> double {
+    const auto toGB = [](uint64_t bytes) -> double
+    {
         return bytes / 1073741824.0; // 1024^3
     };
 
@@ -875,7 +876,8 @@ uint32_t ResourceManager::storeDescriptor(ImageHardwareWrap image)
     if (descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
     {
         // 查找是否已存在
-        storageImageBindingList.for_each_read([&](const BindingEntry<VkImageView> &entry) {
+        storageImageBindingList.for_each_read([&](const BindingEntry<VkImageView> &entry)
+        {
             if (entry.handle == image.imageView)
                 textureIndex = entry.bindingIndex;
         });
@@ -884,7 +886,8 @@ uint32_t ResourceManager::storeDescriptor(ImageHardwareWrap image)
         {
             textureIndex = storageImageBindingIndex++;
             updateDescriptorSets = true;
-            storageImageBindingList.allocate([&](BindingEntry<VkImageView> &entry) {
+            storageImageBindingList.allocate([&](BindingEntry<VkImageView> &entry)
+            {
                 entry.handle = image.imageView;
                 entry.bindingIndex = textureIndex;
             });
@@ -892,7 +895,8 @@ uint32_t ResourceManager::storeDescriptor(ImageHardwareWrap image)
     }
     else
     {
-        textureBindingList.for_each_read([&](const BindingEntry<VkImageView> &entry) {
+        textureBindingList.for_each_read([&](const BindingEntry<VkImageView> &entry)
+        {
             if (entry.handle == image.imageView)
                 textureIndex = entry.bindingIndex;
         });
@@ -901,7 +905,8 @@ uint32_t ResourceManager::storeDescriptor(ImageHardwareWrap image)
         {
             textureIndex = textureBindingIndex++;
             updateDescriptorSets = true;
-            textureBindingList.allocate([&](BindingEntry<VkImageView> &entry) {
+            textureBindingList.allocate([&](BindingEntry<VkImageView> &entry)
+            {
                 entry.handle = image.imageView;
                 entry.bindingIndex = textureIndex;
             });
@@ -947,7 +952,8 @@ uint32_t ResourceManager::storeDescriptor(BufferHardwareWrap buffer)
 
     if (descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
     {
-        storageBufferBindingList.for_each_read([&](const BindingEntry<VkBuffer> &entry) {
+        storageBufferBindingList.for_each_read([&](const BindingEntry<VkBuffer> &entry)
+        {
             if (entry.handle == buffer.bufferHandle)
                 bufferIndex = entry.bindingIndex;
         });
@@ -956,7 +962,8 @@ uint32_t ResourceManager::storeDescriptor(BufferHardwareWrap buffer)
         {
             bufferIndex = storageBufferBindingIndex++;
             updateDescriptorSets = true;
-            storageBufferBindingList.allocate([&](BindingEntry<VkBuffer> &entry) {
+            storageBufferBindingList.allocate([&](BindingEntry<VkBuffer> &entry)
+            {
                 entry.handle = buffer.bufferHandle;
                 entry.bindingIndex = bufferIndex;
             });
@@ -964,7 +971,8 @@ uint32_t ResourceManager::storeDescriptor(BufferHardwareWrap buffer)
     }
     else
     {
-        uniformBindingList.for_each_read([&](const BindingEntry<VkBuffer> &entry) {
+        uniformBindingList.for_each_read([&](const BindingEntry<VkBuffer> &entry)
+        {
             if (entry.handle == buffer.bufferHandle)
                 bufferIndex = entry.bindingIndex;
         });
@@ -973,7 +981,8 @@ uint32_t ResourceManager::storeDescriptor(BufferHardwareWrap buffer)
         {
             bufferIndex = uniformBindingIndex++;
             updateDescriptorSets = true;
-            uniformBindingList.allocate([&](BindingEntry<VkBuffer> &entry) {
+            uniformBindingList.allocate([&](BindingEntry<VkBuffer> &entry)
+            {
                 entry.handle = buffer.bufferHandle;
                 entry.bindingIndex = bufferIndex;
             });
