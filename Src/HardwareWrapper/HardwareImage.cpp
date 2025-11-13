@@ -1,95 +1,118 @@
-﻿#include"CabbageHardware.h"
-#include<Hardware/GlobalContext.h>
-#include<Hardware/ResourceCommand.h>
+﻿#include "CabbageHardware.h"
+#include <Hardware/GlobalContext.h>
+#include <Hardware/ResourceCommand.h>
 
 Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageStorages;
 
-HardwareImage::HardwareImage()
+struct ImageFormatInfo
 {
-    this->imageID = std::make_shared<uintptr_t>(0);
+    VkFormat vkFormat;
+    uint32_t pixelSize;
+};
+
+ImageFormatInfo convertImageFormat(ImageFormat format)
+{
+    switch (format)
+    {
+    case ImageFormat::RGBA8_UINT:
+        return {VK_FORMAT_R8G8B8A8_UINT, 4};
+    case ImageFormat::RGBA8_SINT:
+        return {VK_FORMAT_R8G8B8A8_SINT, 4};
+    case ImageFormat::RGBA8_SRGB:
+        return {VK_FORMAT_R8G8B8A8_SRGB, 4};
+    case ImageFormat::RGBA16_UINT:
+        return {VK_FORMAT_R16G16B16A16_UINT, 8};
+    case ImageFormat::RGBA16_SINT:
+        return {VK_FORMAT_R16G16B16A16_SINT, 8};
+    case ImageFormat::RGBA16_FLOAT:
+        return {VK_FORMAT_R16G16B16A16_SFLOAT, 8};
+    case ImageFormat::RGBA32_UINT:
+        return {VK_FORMAT_R32G32B32A32_UINT, 16};
+    case ImageFormat::RGBA32_SINT:
+        return {VK_FORMAT_R32G32B32A32_SINT, 16};
+    case ImageFormat::RGBA32_FLOAT:
+        return {VK_FORMAT_R32G32B32A32_SFLOAT, 16};
+    case ImageFormat::RG32_FLOAT:
+        return {VK_FORMAT_R32G32_SFLOAT, 8};
+    case ImageFormat::D16_UNORM:
+        return {VK_FORMAT_D16_UNORM, 2};
+    case ImageFormat::D32_FLOAT:
+        return {VK_FORMAT_D32_SFLOAT, 4};
+    default:
+        return {VK_FORMAT_R8G8B8A8_UNORM, 4};
+    }
+}
+
+VkImageUsageFlags convertImageUsage(ImageUsage usage)
+{
+    VkImageUsageFlags vkUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+    switch (usage)
+    {
+    case ImageUsage::SampledImage:
+        vkUsage |= VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        break;
+    case ImageUsage::StorageImage:
+        vkUsage |= VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        break;
+    case ImageUsage::DepthImage:
+        vkUsage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        break;
+    default:
+        break;
+    }
+
+    return vkUsage;
+}
+
+void incrementImageRefCount(uintptr_t imageID)
+{
+    if (imageID != 0)
+    {
+        globalImageStorages.write(imageID, [](ResourceManager::ImageHardwareWrap &image) {
+            ++image.refCount;
+        });
+    }
+}
+
+void decrementImageRefCount(uintptr_t imageID)
+{
+    if (imageID == 0)
+    {
+        return;
+    }
+
+    bool shouldDestroy = false;
+    globalImageStorages.write(imageID, [&](ResourceManager::ImageHardwareWrap &image) {
+        if (--image.refCount == 0)
+        {
+            globalHardwareContext.getMainDevice()->resourceManager.destroyImage(image);
+            shouldDestroy = true;
+        }
+    });
+
+    if (shouldDestroy)
+    {
+        globalImageStorages.deallocate(imageID);
+    }
+}
+
+HardwareImage::HardwareImage()
+    : imageID(std::make_shared<uintptr_t>(0))
+{
 }
 
 HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage, int arrayLayers, void *imageData)
 {
-    VkImageUsageFlags vkImageUsageFlags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    const auto [vkFormat, pixelSize] = convertImageFormat(imageFormat);
+    const VkImageUsageFlags vkUsage = convertImageUsage(imageUsage);
 
-    switch (imageUsage)
-    {
-    case ImageUsage::SampledImage:
-        vkImageUsageFlags = vkImageUsageFlags | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-        break;
-    case ImageUsage::StorageImage:
-        vkImageUsageFlags = vkImageUsageFlags | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-        break;
-    case ImageUsage::DepthImage:
-        vkImageUsageFlags = vkImageUsageFlags | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-        break;
-    default:
-        break;
-    }
-
-    uint32_t pixelSize;
-    VkFormat vkImageFormat;
-    switch (imageFormat)
-    {
-    case ImageFormat::RGBA8_UINT:
-        vkImageFormat = VK_FORMAT_R8G8B8A8_UINT;
-        pixelSize = 8 * 4 / 8;
-        break;
-    case ImageFormat::RGBA8_SINT:
-        vkImageFormat = VK_FORMAT_R8G8B8A8_SINT;
-        pixelSize = 8 * 4 / 8;
-        break;
-    case ImageFormat::RGBA8_SRGB:
-        vkImageFormat = VK_FORMAT_R8G8B8A8_SRGB;
-        pixelSize = 8 * 4 / 8;
-        break;
-    case ImageFormat::RGBA16_UINT:
-        vkImageFormat = VK_FORMAT_R16G16B16A16_UINT;
-        pixelSize = 16 * 4 / 8;
-        break;
-    case ImageFormat::RGBA16_SINT:
-        vkImageFormat = VK_FORMAT_R16G16B16A16_SINT;
-        pixelSize = 16 * 4 / 8;
-        break;
-    case ImageFormat::RGBA16_FLOAT:
-        vkImageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
-        pixelSize = 16 * 4 / 8;
-        break;
-    case ImageFormat::RGBA32_UINT:
-        vkImageFormat = VK_FORMAT_R32G32B32A32_UINT;
-        pixelSize = 32 * 4 / 8;
-        break;
-    case ImageFormat::RGBA32_SINT:
-        vkImageFormat = VK_FORMAT_R32G32B32A32_SINT;
-        pixelSize = 32 * 4 / 8;
-        break;
-    case ImageFormat::RGBA32_FLOAT:
-        vkImageFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
-        pixelSize = 32 * 4 / 8;
-        break;
-    case ImageFormat::RG32_FLOAT:
-        vkImageFormat = VK_FORMAT_R32G32_SFLOAT;
-        pixelSize = 32 * 2 / 8;
-        break;
-    case ImageFormat::D16_UNORM:
-        vkImageFormat = VK_FORMAT_D16_UNORM;
-        pixelSize = 16 / 8;
-        break;
-    case ImageFormat::D32_FLOAT:
-        vkImageFormat = VK_FORMAT_D32_SFLOAT;
-        pixelSize = 32 / 8;
-        break;
-    default:
-        break;
-    }
-
-    auto handle = globalImageStorages.allocate([&](ResourceManager::ImageHardwareWrap &image) {
-        image = globalHardwareContext.mainDevice->resourceManager.createImage(ktm::uvec2(width, height), vkImageFormat, pixelSize, vkImageUsageFlags, arrayLayers);
+    const auto handle = globalImageStorages.allocate([&](ResourceManager::ImageHardwareWrap &image) {
+        image = globalHardwareContext.getMainDevice()->resourceManager.createImage(ktm::uvec2(width, height), vkFormat, pixelSize, vkUsage, arrayLayers);
         image.refCount = 1;
     });
 
-    this->imageID = std::make_shared<uintptr_t>(handle);
+    imageID = std::make_shared<uintptr_t>(handle);
 
     if (imageData != nullptr)
     {
@@ -98,141 +121,94 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
 }
 
 HardwareImage::HardwareImage(const HardwareImage &other)
+    : imageID(other.imageID)
 {
-    this->imageID = other.imageID;
-
-    if (*other.imageID != 0)
-    {
-        globalImageStorages.write(*other.imageID, [](ResourceManager::ImageHardwareWrap &image) {
-            image.refCount++;
-        });
-    }
+    incrementImageRefCount(*imageID);
 }
 
 HardwareImage::~HardwareImage()
 {
-    bool destroySelf = false;
-    if (*imageID != 0)
+    if (imageID)
     {
-        globalImageStorages.write(*imageID, [&](ResourceManager::ImageHardwareWrap &image) {
-            image.refCount--;
-            if (image.refCount == 0)
-            {
-                globalHardwareContext.mainDevice->resourceManager.destroyImage(image);
-                destroySelf = true;
-            }
-        });
-        if (destroySelf)
-        {
-            globalImageStorages.deallocate(*imageID);
-        }
+        decrementImageRefCount(*imageID);
     }
 }
 
-HardwareImage& HardwareImage::operator=(const HardwareImage& other)
+HardwareImage &HardwareImage::operator=(const HardwareImage &other)
 {
-    if (*(other.imageID) != 0)
+    if (this != &other)
     {
-        globalImageStorages.write(*other.imageID, [](ResourceManager::ImageHardwareWrap &image) {
-            image.refCount++;
-        });
+        incrementImageRefCount(*other.imageID);
+        decrementImageRefCount(*imageID);
+        *(this->imageID) = *(other.imageID);
     }
-
-    bool destroySelf = false;
-    if (*imageID != 0)
-    {
-        globalImageStorages.write(*this->imageID, [&](ResourceManager::ImageHardwareWrap &image) {
-            image.refCount--;
-            if (image.refCount == 0)
-            {
-                globalHardwareContext.mainDevice->resourceManager.destroyImage(image);
-                destroySelf = true;
-            }
-        });
-        if (destroySelf)
-        {
-            globalImageStorages.deallocate(*imageID);
-        }
-    }
-
-    *(this->imageID) = *(other.imageID);
     return *this;
 }
 
-HardwareImage::operator bool()
+HardwareImage::operator bool() const
 {
-    if (imageID != nullptr && *imageID != 0)
+    if (!imageID || *imageID == 0)
     {
-        bool result = false;
-        globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
-            if (image.imageHandle != VK_NULL_HANDLE)
-                result = true;
-        });
-        return result;
+        return false;
     }
-    return false;
+
+    bool isValid = false;
+    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
+        isValid = (image.imageHandle != VK_NULL_HANDLE);
+    });
+
+    return isValid;
 }
 
 uint32_t HardwareImage::storeDescriptor()
 {
     uint32_t index = 0;
     globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
-        index = globalHardwareContext.mainDevice->resourceManager.storeDescriptor(image);
+        index = globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(image);
     });
+
     return index;
 }
 
 HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
 {
-    HardwareExecutor tempExecutor;
-
     ResourceManager::BufferHardwareWrap srcBuffer;
     ResourceManager::ImageHardwareWrap dstImage;
 
-    globalBufferStorages.read(*buffer.bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
-        srcBuffer = buffer;
-    });
-    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
-        dstImage = image;
+    globalBufferStorages.read(*buffer.bufferID, [&](const ResourceManager::BufferHardwareWrap &buf) {
+        srcBuffer = buf;
     });
 
-    // 使用栅栏确保提交完成后再返回，避免临时 staging buffer 在 GPU 仍然读取时被析构
+    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &img) {
+        dstImage = img;
+    });
+
+    HardwareExecutor tempExecutor;
     CopyBufferToImageCommand copyCmd(srcBuffer, dstImage);
-
-    //VkFenceCreateInfo fenceInfo{};
-    //fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    //fenceInfo.flags = 0; // 未信号状态
-
-    //VkDevice device = globalHardwareContext.mainDevice->deviceManager.logicalDevice;
-    //VkFence fence = VK_NULL_HANDLE;
-    //if (vkCreateFence(device, &fenceInfo, nullptr, &fence) != VK_SUCCESS)
-    //{
-    //    // 创建失败则退化为同步 DeviceIdle，保证安全性
-    //    tempExecutor << &copyCmd << tempExecutor.commit();
-    //    vkDeviceWaitIdle(device);
-    //    return *this;
-    //}
-
     tempExecutor << &copyCmd << tempExecutor.commit();
-
-    // 等待 GPU 完成该次提交，确保源 buffer 生命周期安全
-    //vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
-    //vkDestroyFence(device, fence, nullptr);
 
     return *this;
 }
 
 HardwareImage &HardwareImage::copyFromData(const void *inputData)
 {
-    uint32_t width, height, pixelSize;
+    if (inputData == nullptr)
+    {
+        return *this;
+    }
+
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t pixelSize = 0;
+
     globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
         width = image.imageSize.x;
         height = image.imageSize.y;
         pixelSize = image.pixelSize;
     });
 
-    HardwareBuffer stagingBuffer = HardwareBuffer(width * height * pixelSize, BufferUsage::StorageBuffer, inputData);
-    copyFromBuffer(stagingBuffer);
+    const uint64_t bufferSize = static_cast<uint64_t>(width) * height * pixelSize;
+    HardwareBuffer stagingBuffer(bufferSize, BufferUsage::StorageBuffer, inputData);
 
-    return *this;
+    return copyFromBuffer(stagingBuffer);
 }
