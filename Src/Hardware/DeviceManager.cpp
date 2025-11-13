@@ -136,20 +136,23 @@ void DeviceManager::createDevices(const CreateCallback &initInfo, const VkInstan
     vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, availableExtensions.data());
 
     requiredExtensions.erase(std::remove_if(requiredExtensions.begin(), requiredExtensions.end(),
-                                            [&availableExtensions](const char *required) {
-                                                bool supported = std::any_of(availableExtensions.begin(), availableExtensions.end(),
-                                                                             [required](const VkExtensionProperties &available) {
-                                                                                 return strcmp(required, available.extensionName) == 0;
-                                                                             });
+        [&availableExtensions](const char *required)
+        {
+            bool supported = std::any_of(availableExtensions.begin(), availableExtensions.end(),
+                [required](const VkExtensionProperties &available)
+                {
+                    return strcmp(required, available.extensionName) == 0;
+                }
+            );
 
-                                                if (!supported)
-                                                {
-                                                    printExtensionWarning(required);
-                                                }
-
-                                                return !supported;
-                                            }),
-                             requiredExtensions.end());
+            if (!supported)
+            {
+                printExtensionWarning(required);
+            }
+            return !supported;
+        }),
+        requiredExtensions.end()
+    );
 
     vkGetPhysicalDeviceFeatures2(physicalDevice, deviceFeaturesUtils.featuresChain.getChainHead());
     deviceFeaturesUtils.featuresChain = deviceFeaturesUtils.featuresChain & initInfo.requiredDeviceFeatures(vkInstance, physicalDevice);
@@ -241,7 +244,8 @@ void DeviceManager::choosePresentQueueFamily()
 
 bool DeviceManager::createCommandBuffers()
 {
-    auto createCommandBuffer = [this](QueueUtils &queue) {
+    auto createCommandBuffer = [this](QueueUtils &queue)
+    {
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -258,12 +262,9 @@ bool DeviceManager::createCommandBuffers()
         coronaHardwareCheck(vkAllocateCommandBuffers(logicalDevice, &allocInfo, &queue.commandBuffer));
     };
 
-    for (auto &queue : graphicsQueues)
-        createCommandBuffer(queue);
-    for (auto &queue : computeQueues)
-        createCommandBuffer(queue);
-    for (auto &queue : transferQueues)
-        createCommandBuffer(queue);
+    for (auto &queue : graphicsQueues) createCommandBuffer(queue);
+    for (auto &queue : computeQueues) createCommandBuffer(queue);
+    for (auto &queue : transferQueues) createCommandBuffer(queue);
 
     return true;
 }
@@ -272,7 +273,8 @@ std::vector<DeviceManager::QueueUtils> DeviceManager::pickAvailableQueues(std::f
 {
     std::vector<QueueUtils> result;
 
-    auto addMatchingQueues = [&](const std::vector<QueueUtils> &queues) {
+    auto addMatchingQueues = [&](const std::vector<QueueUtils> &queues)
+    {
         for (const auto &queue : queues)
         {
             if (predicate(queue))
