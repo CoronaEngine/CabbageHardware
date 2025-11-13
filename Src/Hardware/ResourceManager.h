@@ -7,8 +7,6 @@
 #include "../VulkanUtils.h"
 #include <corona/kernel/utils/storage.h>
 
-//#include"HardwareExecutor.h"
-
 class HardwareExecutor;
 
 struct ResourceManager
@@ -24,34 +22,26 @@ struct ResourceManager
 
     struct BufferHardwareWrap
     {
-        //VkPipelineStageFlags2 srcStageMask;
-        //VkAccessFlags2 srcAccessMask;
         uint32_t bufferSize = 0;
         uint32_t elementSize = 0;
+        uint64_t refCount = 0;
 
         VkBuffer bufferHandle = VK_NULL_HANDLE;
-
-        // VMA allocation when managed by VMA
-        VmaAllocation bufferAlloc = VK_NULL_HANDLE;
-        VmaAllocationInfo bufferAllocInfo = {};
         VkBufferUsageFlags bufferUsage = VK_BUFFER_USAGE_FLAG_BITS_MAX_ENUM;
 
-        // Raw Vulkan allocation when NOT using VMA (e.g., host pointer import)
-        VkDeviceMemory bufferMemory = VK_NULL_HANDLE;
+        VmaAllocation bufferAlloc = VK_NULL_HANDLE;
+        VmaAllocationInfo bufferAllocInfo = {};
 
-        uint64_t refCount = 0;
-        DeviceManager* device;
-        ResourceManager* resourceManager;
+        DeviceManager *device = nullptr;
+        ResourceManager *resourceManager = nullptr;
     };
 
     struct ImageHardwareWrap
     {
-        //VkPipelineStageFlags2 srcStageMask;
-        //VkAccessFlags2 srcAccessMask;
         VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
         uint32_t pixelSize = 0;
-        ktm::uvec2 imageSize = ktm::uvec2(0, 0);
+        ktm::uvec2 imageSize = {0, 0};
+        uint64_t refCount = 0;
 
         VkFormat imageFormat = VK_FORMAT_MAX_ENUM;
         VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_FLAG_BITS_MAX_ENUM;
@@ -62,23 +52,22 @@ struct ResourceManager
 
         VkClearValue clearValue = {};
 
-        VmaAllocation imageAlloc = VK_NULL_HANDLE;
-        VmaAllocationInfo imageAllocInfo = {};
-
         VkImage imageHandle = VK_NULL_HANDLE;
         VkImageView imageView = VK_NULL_HANDLE;
 
-        uint64_t refCount = 0;
-        DeviceManager* device;
-        ResourceManager* resourceManager;
+        VmaAllocation imageAlloc = VK_NULL_HANDLE;
+        VmaAllocationInfo imageAllocInfo = {};
+
+        DeviceManager *device = nullptr;
+        ResourceManager *resourceManager = nullptr;
     };
 
-    struct
+    struct BindlessDescriptorSet
     {
         VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
         VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
         VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
-    } bindlessDescriptors[4];
+    };
 
     ResourceManager();
     ~ResourceManager();
@@ -86,136 +75,123 @@ struct ResourceManager
     void initResourceManager(DeviceManager &device);
     void cleanUpResourceManager();
 
-    ImageHardwareWrap createImage(ktm::uvec2 imageSize, VkFormat imageFormat, uint32_t pixelSize, VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, int arrayLayers = 1, int mipLevels = 1, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
-    VkImageView createImageView(ImageHardwareWrap &image);
+    // Image operations
+    [[nodiscard]] ImageHardwareWrap createImage(ktm::uvec2 imageSize,
+                                                VkFormat imageFormat,
+                                                uint32_t pixelSize,
+                                                VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                                                int arrayLayers = 1,
+                                                int mipLevels = 1,
+                                                VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
+
+    [[nodiscard]] VkImageView createImageView(ImageHardwareWrap &image);
     void destroyImage(ImageHardwareWrap &image);
 
-    BufferHardwareWrap createBuffer(uint32_t bufferSize, uint32_t elementSize, VkBufferUsageFlags usage, bool hostVisibleMapped = true, bool useDedicated = false);
+    // Buffer operations
+    [[nodiscard]] BufferHardwareWrap createBuffer(uint32_t bufferSize,
+                                                  uint32_t elementSize,
+                                                  VkBufferUsageFlags usage,
+                                                  bool hostVisibleMapped = true,
+                                                  bool useDedicated = false);
+
     void destroyBuffer(BufferHardwareWrap &buffer);
 
+    // External memory operations
+    [[nodiscard]] ExternalMemoryHandle exportBufferMemory(BufferHardwareWrap &sourceBuffer);
+    [[nodiscard]] BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle &memHandle, const BufferHardwareWrap &sourceBuffer);
+    [[nodiscard]] BufferHardwareWrap importHostBuffer(void *hostPtr, uint64_t size);
 
-    uint32_t storeDescriptor(ImageHardwareWrap image);
-    uint32_t storeDescriptor(BufferHardwareWrap buffer);
-    //uint32_t storeDescriptor(VkAccelerationStructureKHR m_tlas);
+    // Descriptor operations
+    [[nodiscard]] uint32_t storeDescriptor(ImageHardwareWrap image);
+    [[nodiscard]] uint32_t storeDescriptor(BufferHardwareWrap buffer);
 
+    // Copy operations
     ResourceManager &copyBuffer(VkCommandBuffer &commandBuffer, BufferHardwareWrap &srcBuffer, BufferHardwareWrap &dstBuffer);
     ResourceManager &copyImage(VkCommandBuffer &commandBuffer, ImageHardwareWrap &source, ImageHardwareWrap &destination);
-
+    ResourceManager &copyBufferToImage(VkCommandBuffer &commandBuffer, BufferHardwareWrap &buffer, ImageHardwareWrap &image);
+    ResourceManager &copyImageToBuffer(VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, BufferHardwareWrap &buffer);
     ResourceManager &blitImage(VkCommandBuffer &commandBuffer, ImageHardwareWrap &srcImage, ImageHardwareWrap &dstImage);
-
-    ResourceManager &copyBufferToImage(VkCommandBuffer &commandBuffer, BufferHardwareWrap& buffer, ImageHardwareWrap& image);
-    ResourceManager &copyImageToBuffer(VkCommandBuffer &commandBuffer, ImageHardwareWrap& image, BufferHardwareWrap& buffer);
 
     void copyBufferToHost(BufferHardwareWrap &buffer, void *cpuData);
 
-    ExternalMemoryHandle exportBufferMemory(BufferHardwareWrap &sourceBuffer);
-    BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle &memHandle, const BufferHardwareWrap &sourceBuffer);
+    // Layout transition
+    void transitionImageLayout(VkCommandBuffer &commandBuffer,
+                               ImageHardwareWrap &image,
+                               VkImageLayout imageLayout,
+                               VkPipelineStageFlags2 dstStageMask,
+                               VkAccessFlags2 dstAccessMask);
 
-    BufferHardwareWrap importHostBuffer(void *hostPtr, uint64_t size);
+    // Shader module
+    [[nodiscard]] VkShaderModule createShaderModule(const std::vector<unsigned int> &code);
 
-    //void TestWin32HandlesImport(BufferHardwareWrap &srcStaging, BufferHardwareWrap &dstStaging, VkDeviceSize imageSizeBytes, ResourceManager &srcResourceManager, ResourceManager &dstResourceManager);
-    //uint32_t findExternalMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-    //void transitionImageLayoutUnblocked(const VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
-
-    //ResourceManager &transitionImageLayout(VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, VkImageLayout newLayout, VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
-
-    VkShaderModule createShaderModule(const std::vector<unsigned int> &code);
-
-    uint64_t getHostSharedMemorySize()
+    // Memory statistics
+    [[nodiscard]] uint64_t getHostSharedMemorySize() const
     {
         return hostSharedMemorySize;
     }
-
-    uint64_t getDeviceMemorySize()
+    [[nodiscard]] uint64_t getDeviceMemorySize() const
     {
         return deviceMemorySize;
     }
 
-    void transitionImageLayout(VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, VkImageLayout imageLayout, VkPipelineStageFlags2 dstStageMask, VkAccessFlags2 dstAccessMask)
+    [[nodiscard]] VmaAllocator getVmaAllocator() const
     {
-        std::vector<VkMemoryBarrier2> memoryBarriers;
-        std::vector<VkBufferMemoryBarrier2> bufferBarriers;
-        std::vector<VkImageMemoryBarrier2> imageBarriers;
-
-        VkImageMemoryBarrier2 imageBarrier;
-        imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        imageBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-        imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        imageBarrier.image = image.imageHandle;
-        imageBarrier.dstStageMask = dstStageMask;
-        imageBarrier.dstAccessMask = dstAccessMask;
-        imageBarrier.oldLayout = image.imageLayout;
-        imageBarrier.newLayout = imageLayout;
-        imageBarrier.subresourceRange.aspectMask = image.aspectMask;
-        imageBarrier.subresourceRange.baseMipLevel = 0;
-        imageBarrier.subresourceRange.levelCount = 1;
-        imageBarrier.subresourceRange.baseArrayLayer = 0;
-        imageBarrier.subresourceRange.layerCount = 1;
-        imageBarrier.pNext = nullptr;
-
-        image.imageLayout = imageBarrier.newLayout;
-
-        imageBarriers.push_back(imageBarrier);
-
-        VkDependencyInfo dependencyInfo{};
-        dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-        dependencyInfo.memoryBarrierCount = static_cast<uint32_t>(memoryBarriers.size());
-        dependencyInfo.pMemoryBarriers = memoryBarriers.data();
-        dependencyInfo.bufferMemoryBarrierCount = static_cast<uint32_t>(bufferBarriers.size());
-        dependencyInfo.pBufferMemoryBarriers = bufferBarriers.data();
-        dependencyInfo.imageMemoryBarrierCount = static_cast<uint32_t>(imageBarriers.size());
-        dependencyInfo.pImageMemoryBarriers = imageBarriers.data();
-        dependencyInfo.pNext = nullptr;
-
-        vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
+        return vmaAllocator;
+    }
+    [[nodiscard]] VmaPool getVmaPool() const
+    {
+        return exportBufferPool;
     }
 
-private:
-    void createTextureSampler();
-    void CreateVmaAllocator();
-    void createBindlessDescriptorSet();
-    void createExternalBufferMemoryPool();
+    BindlessDescriptorSet bindlessDescriptors[4];
 
-    VmaAllocator g_hAllocator = VK_NULL_HANDLE;
-    VmaPool g_hBufferPool = VK_NULL_HANDLE;
-    uint32_t g_exportBufferPoolMemTypeIndex = UINT32_MAX;
+  private:
+    enum class DescriptorBindingType : uint8_t
+    {
+        Uniform = 0,
+        Texture = 1,
+        StorageBuffer = 2,
+        StorageImage = 3
+    };
 
-    VkSampler textureSampler;
-
-    const uint32_t UniformBinding = 0;
-    const uint32_t TextureBinding = 1;
-    const uint32_t StorageBufferBinding = 2;
-    const uint32_t StorageImageBinding = 3;
-
-    //std::unordered_map<VkBuffer, int> UniformBindingList;
-    //std::unordered_map<VkImageView, int> TextureBindingList;
-    //std::unordered_map<VkBuffer, int> StorageBufferBindingList;
-    //std::unordered_map<VkImageView, int> StorageImageBindingList;
-
-    template<typename THandle>
+    template <typename THandle>
     struct BindingEntry
     {
         THandle handle = (THandle)VK_NULL_HANDLE;
         int bindingIndex = -1;
     };
 
-    Corona::Kernel::Utils::Storage<BindingEntry<VkBuffer>> UniformBindingList;
-    Corona::Kernel::Utils::Storage<BindingEntry<VkImageView>> TextureBindingList;
-    Corona::Kernel::Utils::Storage<BindingEntry<VkBuffer>> StorageBufferBindingList;
-    Corona::Kernel::Utils::Storage<BindingEntry<VkImageView>> StorageImageBindingList;
+    void createVmaAllocator();
+    void createTextureSampler();
+    void createBindlessDescriptorSet();
+    void createExternalBufferMemoryPool();
 
-    //std::mutex bindlessDescriptorMutex;
+    void createDedicatedBuffer(const VkBufferCreateInfo &bufferInfo, const VmaAllocationCreateInfo &allocInfo, BufferHardwareWrap &resultBuffer);
+    void createPooledBuffer(const VkBufferCreateInfo &bufferInfo, const VmaAllocationCreateInfo &allocInfo, BufferHardwareWrap &resultBuffer);
+    void createNonExportableBuffer(const VkBufferCreateInfo &bufferInfo, const VmaAllocationCreateInfo &allocInfo, BufferHardwareWrap &resultBuffer);
 
-    uint32_t UniformBindingIndex = 0;
-    uint32_t TextureBindingIndex = 0;
-    uint32_t StorageBufferBindingIndex = 0;
-    uint32_t StorageImageBindingIndex = 0;
+    VmaAllocator vmaAllocator = VK_NULL_HANDLE;
+    VmaPool exportBufferPool = VK_NULL_HANDLE;
+    VkSampler textureSampler = VK_NULL_HANDLE;
+
+    Corona::Kernel::Utils::Storage<BindingEntry<VkBuffer>> uniformBindingList;
+    Corona::Kernel::Utils::Storage<BindingEntry<VkImageView>> textureBindingList;
+    Corona::Kernel::Utils::Storage<BindingEntry<VkBuffer>> storageBufferBindingList;
+    Corona::Kernel::Utils::Storage<BindingEntry<VkImageView>> storageImageBindingList;
+
+    const uint32_t UniformBinding = 0;
+    const uint32_t TextureBinding = 1;
+    const uint32_t StorageBufferBinding = 2;
+    const uint32_t StorageImageBinding = 3;
+
+    uint32_t uniformBindingIndex = 0;
+    uint32_t textureBindingIndex = 0;
+    uint32_t storageBufferBindingIndex = 0;
+    uint32_t storageImageBindingIndex = 0;
 
     uint64_t deviceMemorySize = 0;
     uint64_t hostSharedMemorySize = 0;
-    uint64_t mutiInstanceMemorySize = 0;
+    uint64_t multiInstanceMemorySize = 0;
 
-    DeviceManager* device;
+    DeviceManager *device = nullptr;
 };
