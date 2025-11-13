@@ -125,23 +125,11 @@ struct ResourceManager
     [[nodiscard]] VkShaderModule createShaderModule(const std::vector<unsigned int> &code);
 
     // Memory statistics
-    [[nodiscard]] uint64_t getHostSharedMemorySize() const
-    {
-        return hostSharedMemorySize;
-    }
-    [[nodiscard]] uint64_t getDeviceMemorySize() const
-    {
-        return deviceMemorySize;
-    }
+    [[nodiscard]] uint64_t getHostSharedMemorySize() const { return hostSharedMemorySize; }
+    [[nodiscard]] uint64_t getDeviceMemorySize() const { return deviceMemorySize; }
 
-    [[nodiscard]] VmaAllocator getVmaAllocator() const
-    {
-        return vmaAllocator;
-    }
-    [[nodiscard]] VmaPool getVmaPool() const
-    {
-        return exportBufferPool;
-    }
+    [[nodiscard]] VmaAllocator getVmaAllocator() const { return vmaAllocator; }
+    [[nodiscard]] VmaPool getVmaPool() const { return exportBufferPool; }
 
     BindlessDescriptorSet bindlessDescriptors[4];
 
