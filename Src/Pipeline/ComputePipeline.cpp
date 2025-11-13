@@ -1,24 +1,38 @@
-﻿#include"ComputePipeline.h"
-#include<Hardware/GlobalContext.h>
+﻿#include "ComputePipeline.h"
+#include <Hardware/GlobalContext.h>
 
-//using namespace EmbeddedShader;
-
-ComputePipeline::ComputePipeline(std::string shaderCode, EmbeddedShader::ShaderLanguage language, const std::source_location &sourceLocation)
+ComputePipeline::ComputePipeline()
 {
-    EmbeddedShader::ShaderCodeCompiler shaderCodeCompiler(EmbeddedShader::ShaderCodeCompiler(shaderCode, EmbeddedShader::ShaderStage::ComputeShader, language, EmbeddedShader::CompilerOption(), sourceLocation));
+    executorType = CommandRecord::ExecutorType::Compute;
+}
 
-    this->shaderCode = shaderCodeCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV);
-    this->pushConstant = HardwarePushConstant(shaderCodeCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV).shaderResources.pushConstantSize, 0);
+ComputePipeline::ComputePipeline(std::string shaderCode,
+                                 EmbeddedShader::ShaderLanguage language,
+                                 const std::source_location &sourceLocation)
+    : ComputePipeline()
+{
+    EmbeddedShader::ShaderCodeCompiler compiler(shaderCode,
+                                                EmbeddedShader::ShaderStage::ComputeShader,
+                                                language,
+                                                EmbeddedShader::CompilerOption(),
+                                                sourceLocation);
 
-	shaderResource = shaderCodeCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV).shaderResources;
+    this->shaderCode = compiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV);
+    this->shaderResource = this->shaderCode.shaderResources;
+
+    const uint32_t pushConstantSize = this->shaderCode.shaderResources.pushConstantSize;
+    if (pushConstantSize > 0)
+    {
+        this->pushConstant = HardwarePushConstant(pushConstantSize, 0);
+    }
 }
 
 ComputePipeline::~ComputePipeline()
 {
     VkDevice device = VK_NULL_HANDLE;
-    if (globalHardwareContext.mainDevice)
+    if (const auto mainDevice = globalHardwareContext.getMainDevice())
     {
-        device = globalHardwareContext.mainDevice->deviceManager.logicalDevice;
+        device = mainDevice->deviceManager.getLogicalDevice();
     }
 
     if (device != VK_NULL_HANDLE)
@@ -30,6 +44,7 @@ ComputePipeline::~ComputePipeline()
             vkDestroyPipeline(device, pipeline, nullptr);
             pipeline = VK_NULL_HANDLE;
         }
+
         if (pipelineLayout != VK_NULL_HANDLE)
         {
             vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
@@ -38,117 +53,146 @@ ComputePipeline::~ComputePipeline()
     }
 }
 
-ComputePipeline* ComputePipeline::operator()(uint16_t groupCountX, uint16_t groupCountY, uint16_t groupCountZ)
+std::variant<HardwarePushConstant> ComputePipeline::operator[](const std::string &resourceName)
 {
-    groupCount = {groupCountX, groupCountY, groupCountZ};
-	return this;
+    auto *resource = shaderResource.findShaderBindInfo(resourceName);
+
+    if (resource == nullptr)
+    {
+        throw std::runtime_error("Failed to find resource with name: " + resourceName);
+    }
+
+    if (resource->bindType != EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::pushConstantMembers)
+    {
+        throw std::runtime_error("Resource '" + resourceName + "' is not a push constant member");
+    }
+
+    return HardwarePushConstant(resource->typeSize, resource->byteOffset, &pushConstant);
 }
 
+ComputePipeline *ComputePipeline::operator()(uint16_t x, uint16_t y, uint16_t z)
+{
+    groupCount = {x, y, z};
+    return this;
+}
 
 CommandRecord::RequiredBarriers ComputePipeline::getRequiredBarriers(HardwareExecutor &hardwareExecutor)
 {
-    CommandRecord::RequiredBarriers requiredBarriers;
+    RequiredBarriers requiredBarriers;
     requiredBarriers.memoryBarriers.resize(1);
 
-    requiredBarriers.memoryBarriers[0].sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
-    requiredBarriers.memoryBarriers[0].srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-    requiredBarriers.memoryBarriers[0].srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-    requiredBarriers.memoryBarriers[0].dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
-    requiredBarriers.memoryBarriers[0].dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
-    requiredBarriers.memoryBarriers[0].pNext = nullptr;
+    auto &barrier = requiredBarriers.memoryBarriers[0];
+    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+    barrier.pNext = nullptr;
+    barrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
 
     return requiredBarriers;
 }
 
+void ComputePipeline::createComputePipeline()
+{
+    const auto mainDevice = globalHardwareContext.getMainDevice();
+    if (!mainDevice)
+    {
+        throw std::runtime_error("No main device available");
+    }
+
+    const VkDevice device = mainDevice->deviceManager.getLogicalDevice();
+
+    // 创建着色器模块
+    VkShaderModule shaderModule = mainDevice->resourceManager.createShaderModule(shaderCode);
+
+    // 配置计算着色器阶段
+    VkPipelineShaderStageCreateInfo shaderStageInfo{};
+    shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    shaderStageInfo.module = shaderModule;
+    shaderStageInfo.pName = "main";
+
+    // 配置推送常量
+    VkPushConstantRange pushConstantRange{};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = shaderCode.shaderResources.pushConstantSize;
+
+    // 获取描述符集布局
+    std::vector<VkDescriptorSetLayout> setLayouts;
+    setLayouts.reserve(4);
+    for (size_t i = 0; i < 4; ++i)
+    {
+        setLayouts.push_back(mainDevice->resourceManager.bindlessDescriptors[i].descriptorSetLayout);
+    }
+
+    // 创建管线布局
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
+    pipelineLayoutInfo.pSetLayouts = setLayouts.data();
+    pipelineLayoutInfo.pushConstantRangeCount = pushConstantRange.size > 0 ? 1 : 0;
+    pipelineLayoutInfo.pPushConstantRanges = pushConstantRange.size > 0 ? &pushConstantRange : nullptr;
+
+    coronaHardwareCheck(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout));
+
+    // 创建计算管线
+    VkComputePipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    pipelineInfo.stage = shaderStageInfo;
+    pipelineInfo.layout = pipelineLayout;
+
+    coronaHardwareCheck(vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline));
+
+    // 清理着色器模块
+    vkDestroyShaderModule(device, shaderModule, nullptr);
+}
 
 void ComputePipeline::commitCommand(HardwareExecutor &hardwareExecutor)
 {
-    if (pipelineLayout == VK_NULL_HANDLE && pipeline == VK_NULL_HANDLE)
+    // 延迟创建管线
+    if (pipelineLayout == VK_NULL_HANDLE || pipeline == VK_NULL_HANDLE)
     {
-        // EmbededShaderCodeGenerator::addPreprocess("layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;");
+        createComputePipeline();
+    }
 
-        // std::string shaderFile = EmbededShader::runDslParse(shaderFunc);
-        // std::vector<unsigned int> mSPIRVCode = PipelineBasics::RealtimeShaderCompiler(shaderFile);
-        // std::vector<unsigned int> mSPIRVCode = EmbededShaderCodeGenerator::runPipelineParse(shaderFunc, fileName, lineIndex);
+    const VkCommandBuffer commandBuffer = hardwareExecutor.currentRecordQueue->commandBuffer;
 
-        VkComputePipelineCreateInfo computePipelineCreateInfo{};
-        computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    // 绑定管线
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 
-        VkShaderModule shaderModule = globalHardwareContext.mainDevice->resourceManager.createShaderModule(shaderCode);
+    // 绑定描述符集
+    std::vector<VkDescriptorSet> descriptorSets;
+    descriptorSets.reserve(4);
+    for (size_t i = 0; i < 4; ++i)
+    {
+        descriptorSets.push_back(globalHardwareContext.getMainDevice()->resourceManager.bindlessDescriptors[i].descriptorSet);
+    }
 
-        computePipelineCreateInfo.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        // computePipelineCreateInfo.stage.flags = VK_SHADER_STAGE_COMPUTE_BIT;
-        computePipelineCreateInfo.stage.module = shaderModule;
-        computePipelineCreateInfo.stage.pName = "main";
-        computePipelineCreateInfo.stage.flags = 0;
-        computePipelineCreateInfo.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    vkCmdBindDescriptorSets(commandBuffer,
+                            VK_PIPELINE_BIND_POINT_COMPUTE,
+                            pipelineLayout,
+                            0,
+                            static_cast<uint32_t>(descriptorSets.size()),
+                            descriptorSets.data(),
+                            0,
+                            nullptr);
 
-        VkPushConstantRange pushConstant{};
-        pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-        pushConstant.offset = 0;
-        // pushConstant.size = EmbededShader::testAst.getFinalPushConstSize();
-        pushConstant.size = shaderCode.shaderResources.pushConstantSize;
-
-        std::vector<VkDescriptorSetLayout> setLayouts;
-        for (size_t i = 0; i < 4; i++)
+    // 推送常量
+    if (const void *data = pushConstant.getData(); data != nullptr)
+    {
+        const uint32_t pushConstantSize = shaderCode.shaderResources.pushConstantSize;
+        if (pushConstantSize > 0)
         {
-            setLayouts.push_back(globalHardwareContext.mainDevice->resourceManager.bindlessDescriptors[i].descriptorSetLayout);
+            vkCmdPushConstants(commandBuffer,
+                               pipelineLayout,
+                               VK_SHADER_STAGE_COMPUTE_BIT,
+                               0,
+                               pushConstantSize,
+                               data);
         }
-
-        VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutInfo.setLayoutCount = setLayouts.size();
-        pipelineLayoutInfo.pSetLayouts = setLayouts.data();
-        pipelineLayoutInfo.pushConstantRangeCount = 1;
-        pipelineLayoutInfo.pPushConstantRanges = &pushConstant;
-
-        coronaHardwareCheck(vkCreatePipelineLayout(globalHardwareContext.mainDevice->deviceManager.logicalDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout));
-        computePipelineCreateInfo.layout = pipelineLayout;
-
-        coronaHardwareCheck(vkCreateComputePipelines(globalHardwareContext.mainDevice->deviceManager.logicalDevice, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &pipeline));
-
-        vkDestroyShaderModule(globalHardwareContext.mainDevice->deviceManager.logicalDevice, shaderModule, nullptr);
     }
 
-    if (pipelineLayout != VK_NULL_HANDLE && pipeline != VK_NULL_HANDLE)
-    {
-        // 在绑定/调度前加入一次通用内存屏障，确保此前写入对计算着色器可见
-        //{
-        //    VkMemoryBarrier barrier{};
-        //    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-        //    barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
-        //    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-        //    vkCmdPipelineBarrier(
-        //        hardwareExecutor.currentRecordQueue->commandBuffer,
-        //        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-        //        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        //        0,
-        //        1, &barrier,
-        //        0, nullptr,
-        //        0, nullptr);
-        //}
-
-        //auto runCommand = [&](const VkCommandBuffer &commandBuffer) {
-        vkCmdBindPipeline(hardwareExecutor.currentRecordQueue->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-
-            std::vector<VkDescriptorSet> descriptorSets;
-            for (size_t i = 0; i < 4; i++)
-            {
-                descriptorSets.push_back(globalHardwareContext.mainDevice->resourceManager.bindlessDescriptors[i].descriptorSet);
-            }
-
-            vkCmdBindDescriptorSets(hardwareExecutor.currentRecordQueue->commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, (uint32_t)descriptorSets.size(), descriptorSets.data(), 0, nullptr);
-
-            // void* pushContastValue = EmbededShader::testAst.getFinalPushConstBytes();
-            void *data = pushConstant.getData();
-            if (data != nullptr)
-            {
-                vkCmdPushConstants(hardwareExecutor.currentRecordQueue->commandBuffer, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, shaderCode.shaderResources.pushConstantSize, data);
-            }
-
-            vkCmdDispatch(hardwareExecutor.currentRecordQueue->commandBuffer, groupCount.x, groupCount.y, groupCount.z);
-        ////};
-
-        //executor << runCommand;
-    }
+    // 调度计算任务
+    vkCmdDispatch(commandBuffer, groupCount.x, groupCount.y, groupCount.z);
 }
