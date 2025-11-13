@@ -33,7 +33,8 @@ void incrementBufferRefCount(uintptr_t bufferID)
 {
     if (bufferID != 0)
     {
-        globalBufferStorages.write(bufferID, [](ResourceManager::BufferHardwareWrap &buffer) {
+        globalBufferStorages.write(bufferID, [](ResourceManager::BufferHardwareWrap &buffer)
+        {
             ++buffer.refCount;
         });
     }
@@ -47,7 +48,8 @@ void decrementBufferRefCount(uintptr_t bufferID)
     }
 
     bool shouldDestroy = false;
-    globalBufferStorages.write(bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
+    globalBufferStorages.write(bufferID, [&](ResourceManager::BufferHardwareWrap &buffer)
+    {
         if (--buffer.refCount == 0)
         {
             globalHardwareContext.getMainDevice()->resourceManager.destroyBuffer(buffer);
@@ -70,7 +72,8 @@ HardwareBuffer::HardwareBuffer(uint32_t bufferSize, uint32_t elementSize, Buffer
 {
     const VkBufferUsageFlags vkUsage = convertBufferUsage(usage);
 
-    const auto handle = globalBufferStorages.allocate([&](ResourceManager::BufferHardwareWrap &buffer) {
+    const auto handle = globalBufferStorages.allocate([&](ResourceManager::BufferHardwareWrap &buffer)
+    {
         buffer = globalHardwareContext.getMainDevice()->resourceManager.createBuffer(bufferSize, elementSize, vkUsage);
         buffer.refCount = 1;
 
@@ -117,7 +120,8 @@ HardwareBuffer::operator bool() const
     }
 
     bool isValid = false;
-    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer)
+    {
         isValid = (buffer.bufferHandle != VK_NULL_HANDLE);
     });
 
@@ -130,14 +134,16 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareE
     ResourceManager::BufferHardwareWrap dstBuffer;
 
     const bool srcValid = globalBufferStorages.read(*inputBuffer.bufferID,
-                                                    [&](const ResourceManager::BufferHardwareWrap &buffer) {
-                                                        srcBuffer = buffer;
-                                                    });
+        [&](const ResourceManager::BufferHardwareWrap &buffer)
+        {
+            srcBuffer = buffer;
+        });
 
     const bool dstValid = globalBufferStorages.read(*bufferID,
-                                                    [&](const ResourceManager::BufferHardwareWrap &buffer) {
-                                                        dstBuffer = buffer;
-                                                    });
+        [&](const ResourceManager::BufferHardwareWrap &buffer)
+        {
+            dstBuffer = buffer;
+        });
 
     if (!srcValid || !dstValid)
     {
@@ -154,7 +160,8 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareE
 uint32_t HardwareBuffer::storeDescriptor()
 {
     uint32_t index = 0;
-    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer)
+    {
         index = globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(buffer);
     });
 
@@ -169,7 +176,8 @@ bool HardwareBuffer::copyFromData(const void *inputData, uint64_t size)
     }
 
     bool success = false;
-    globalBufferStorages.write(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+    globalBufferStorages.write(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer)
+    {
         if (buffer.bufferAllocInfo.pMappedData != nullptr)
         {
             std::memcpy(buffer.bufferAllocInfo.pMappedData, inputData, size);
@@ -183,7 +191,8 @@ bool HardwareBuffer::copyFromData(const void *inputData, uint64_t size)
 void *HardwareBuffer::getMappedData()
 {
     void *mappedData = nullptr;
-    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer)
+    {
         mappedData = buffer.bufferAllocInfo.pMappedData;
     });
 
@@ -193,7 +202,8 @@ void *HardwareBuffer::getMappedData()
 uint64_t HardwareBuffer::getBufferSize() const
 {
     uint64_t totalSize = 0;
-    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer)
+    {
         totalSize = static_cast<uint64_t>(buffer.bufferSize) * buffer.elementSize;
     });
 
@@ -203,7 +213,8 @@ uint64_t HardwareBuffer::getBufferSize() const
 ExternalHandle HardwareBuffer::exportBufferMemory()
 {
     ExternalHandle handle{};
-    globalBufferStorages.write(*bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
+    globalBufferStorages.write(*bufferID, [&](ResourceManager::BufferHardwareWrap &buffer)
+    {
         ResourceManager::ExternalMemoryHandle mempryHandle = globalHardwareContext.getMainDevice()->resourceManager.exportBufferMemory(buffer);
 #if _WIN32 || _WIN64
         handle.handle = mempryHandle.handle;
@@ -223,9 +234,9 @@ HardwareBuffer HardwareBuffer::importBufferMemory(const ExternalHandle& memHandl
     mempryHandle.fd = memHandle.fd;
 #endif
 
-    auto handle = globalBufferStorages.allocate([&](ResourceManager::BufferHardwareWrap &buffer) {
+    auto handle = globalBufferStorages.allocate([&](ResourceManager::BufferHardwareWrap &buffer)
+    {
         buffer = globalHardwareContext.getMainDevice()->resourceManager.importBufferMemory(mempryHandle, buffer);
     });
-
     return *this;
 }
