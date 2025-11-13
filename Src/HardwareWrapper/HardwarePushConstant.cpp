@@ -15,7 +15,8 @@ void incrementPushConstantRefCount(uintptr_t id)
 {
     if (id != 0)
     {
-        globalPushConstantStorages.write(id, [](PushConstantWrap &pc) {
+        globalPushConstantStorages.write(id, [](PushConstantWrap &pc)
+        {
             ++pc.refCount;
         });
     }
@@ -29,7 +30,8 @@ void decrementPushConstantRefCount(uintptr_t id)
     }
 
     bool shouldDestroy = false;
-    globalPushConstantStorages.write(id, [&](PushConstantWrap &pc) {
+    globalPushConstantStorages.write(id, [&](PushConstantWrap &pc)
+    {
         if (--pc.refCount == 0)
         {
             if (pc.data != nullptr && !pc.isSub)
@@ -49,7 +51,8 @@ void decrementPushConstantRefCount(uintptr_t id)
 
 HardwarePushConstant::HardwarePushConstant()
 {
-    const auto handle = globalPushConstantStorages.allocate([](PushConstantWrap &pc) {
+    const auto handle = globalPushConstantStorages.allocate([](PushConstantWrap &pc)
+    {
         pc.size = 0;
         pc.data = nullptr;
         pc.refCount = 1;
@@ -65,12 +68,14 @@ HardwarePushConstant::HardwarePushConstant(uint64_t size, uint64_t offset, Hardw
     if (whole != nullptr)
     {
         globalPushConstantStorages.read(*whole->pushConstantID,
-                                        [&](const PushConstantWrap &pc) {
-                                            wholeData = pc.data;
-                                        });
+            [&](const PushConstantWrap &pc)
+            {
+                wholeData = pc.data;
+            });
     }
 
-    const auto handle = globalPushConstantStorages.allocate([&](PushConstantWrap &pc) {
+    const auto handle = globalPushConstantStorages.allocate([&](PushConstantWrap &pc)
+    {
         pc.size = size;
         pc.refCount = 1;
 
@@ -113,11 +118,13 @@ HardwarePushConstant &HardwarePushConstant::operator=(const HardwarePushConstant
     PushConstantWrap thisPc;
     PushConstantWrap otherPc;
 
-    globalPushConstantStorages.read(*pushConstantID, [&](const PushConstantWrap &pc) {
+    globalPushConstantStorages.read(*pushConstantID, [&](const PushConstantWrap &pc)
+    {
         thisPc = pc;
     });
 
-    globalPushConstantStorages.read(*other.pushConstantID, [&](const PushConstantWrap &pc) {
+    globalPushConstantStorages.read(*other.pushConstantID, [&](const PushConstantWrap &pc)
+    {
         otherPc = pc;
     });
 
@@ -127,7 +134,8 @@ HardwarePushConstant &HardwarePushConstant::operator=(const HardwarePushConstant
         {
             const size_t copySize = std::min(thisPc.size, otherPc.size);
             std::memcpy(thisPc.data, otherPc.data, copySize);
-            globalPushConstantStorages.write(*pushConstantID, [&](PushConstantWrap &pc) {
+            globalPushConstantStorages.write(*pushConstantID, [&](PushConstantWrap &pc)
+            {
                 pc = thisPc;
             });
         }
@@ -145,7 +153,8 @@ HardwarePushConstant &HardwarePushConstant::operator=(const HardwarePushConstant
 uint8_t *HardwarePushConstant::getData() const
 {
     uint8_t *data = nullptr;
-    globalPushConstantStorages.read(*pushConstantID, [&](const PushConstantWrap &pc) {
+    globalPushConstantStorages.read(*pushConstantID, [&](const PushConstantWrap &pc)
+    {
         data = pc.data;
     });
 
@@ -155,7 +164,8 @@ uint8_t *HardwarePushConstant::getData() const
 uint64_t HardwarePushConstant::getSize() const
 {
     uint64_t size = 0;
-    globalPushConstantStorages.read(*pushConstantID, [&](const PushConstantWrap &pc) {
+    globalPushConstantStorages.read(*pushConstantID, [&](const PushConstantWrap &pc)
+    {
         size = pc.size;
     });
 
@@ -169,7 +179,8 @@ void HardwarePushConstant::copyFromRaw(const void *src, uint64_t size)
         return;
     }
 
-    const auto handle = globalPushConstantStorages.allocate([&](PushConstantWrap &pc) {
+    const auto handle = globalPushConstantStorages.allocate([&](PushConstantWrap &pc)
+    {
         pc.size = size;
         pc.refCount = 1;
         pc.isSub = false;
