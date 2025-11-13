@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include<set>
 #include<stdexcept>
@@ -9,35 +9,35 @@
 
 struct DeviceFeaturesChain
 {
-  public:
-
+public:
     DeviceFeaturesChain();
 
-    VkPhysicalDeviceFeatures2 *getChainHead();
+    VkPhysicalDeviceFeatures2* getChainHead();
 
-    DeviceFeaturesChain operator&(DeviceFeaturesChain features);
-    DeviceFeaturesChain operator&(VkPhysicalDeviceFeatures features);
-    DeviceFeaturesChain operator&(VkPhysicalDeviceFeatures2 features);
-    DeviceFeaturesChain operator&(VkPhysicalDeviceVulkan11Features features);
-    DeviceFeaturesChain operator&(VkPhysicalDeviceVulkan12Features features);
-    DeviceFeaturesChain operator&(VkPhysicalDeviceVulkan13Features features);
-    DeviceFeaturesChain operator&(VkPhysicalDeviceVulkan14Features features);
-    DeviceFeaturesChain operator&(VkPhysicalDeviceAccelerationStructureFeaturesKHR features);
-    DeviceFeaturesChain operator&(VkPhysicalDeviceRayTracingPipelineFeaturesKHR features);
-    DeviceFeaturesChain operator&(VkPhysicalDeviceRayQueryFeaturesKHR features);
+    DeviceFeaturesChain operator&(const DeviceFeaturesChain &features) const;
+    DeviceFeaturesChain operator&(const VkPhysicalDeviceFeatures &features) const;
+    DeviceFeaturesChain operator&(const VkPhysicalDeviceFeatures2 &features) const;
+    DeviceFeaturesChain operator&(const VkPhysicalDeviceVulkan11Features &features) const;
+    DeviceFeaturesChain operator&(const VkPhysicalDeviceVulkan12Features &features) const;
+    DeviceFeaturesChain operator&(const VkPhysicalDeviceVulkan13Features &features) const;
+    DeviceFeaturesChain operator&(const VkPhysicalDeviceVulkan14Features &features) const;
+    DeviceFeaturesChain operator&(const VkPhysicalDeviceAccelerationStructureFeaturesKHR &features) const;
+    DeviceFeaturesChain operator&(const VkPhysicalDeviceRayTracingPipelineFeaturesKHR &features) const;
+    DeviceFeaturesChain operator&(const VkPhysicalDeviceRayQueryFeaturesKHR &features) const;
 
-    DeviceFeaturesChain operator|(DeviceFeaturesChain features);
-    DeviceFeaturesChain operator|(VkPhysicalDeviceFeatures features);
-    DeviceFeaturesChain operator|(VkPhysicalDeviceFeatures2 features);
-    DeviceFeaturesChain operator|(VkPhysicalDeviceVulkan11Features features);
-    DeviceFeaturesChain operator|(VkPhysicalDeviceVulkan12Features features);
-    DeviceFeaturesChain operator|(VkPhysicalDeviceVulkan13Features features);
-    DeviceFeaturesChain operator|(VkPhysicalDeviceVulkan14Features features);
-    DeviceFeaturesChain operator|(VkPhysicalDeviceAccelerationStructureFeaturesKHR features);
-    DeviceFeaturesChain operator|(VkPhysicalDeviceRayTracingPipelineFeaturesKHR features);
-    DeviceFeaturesChain operator|(VkPhysicalDeviceRayQueryFeaturesKHR features);
+    DeviceFeaturesChain operator|(const DeviceFeaturesChain &features) const;
+    DeviceFeaturesChain operator|(const VkPhysicalDeviceFeatures &features) const;
+    DeviceFeaturesChain operator|(const VkPhysicalDeviceFeatures2 &features) const;
+    DeviceFeaturesChain operator|(const VkPhysicalDeviceVulkan11Features &features) const;
+    DeviceFeaturesChain operator|(const VkPhysicalDeviceVulkan12Features &features) const;
+    DeviceFeaturesChain operator|(const VkPhysicalDeviceVulkan13Features &features) const;
+    DeviceFeaturesChain operator|(const VkPhysicalDeviceVulkan14Features &features) const;
+    DeviceFeaturesChain operator|(const VkPhysicalDeviceAccelerationStructureFeaturesKHR &features) const;
+    DeviceFeaturesChain operator|(const VkPhysicalDeviceRayTracingPipelineFeaturesKHR &features) const;
+    DeviceFeaturesChain operator|(const VkPhysicalDeviceRayQueryFeaturesKHR &features) const;
 
-  private:
+private:
+    void initializeChain();
 
     VkPhysicalDeviceFeatures2 deviceFeatures2{};
     VkPhysicalDeviceVulkan11Features deviceFeatures11{};
@@ -54,12 +54,11 @@ struct DeviceFeaturesChain
 
 struct CreateCallback
 {
-    std::function<std::set<const char *>(const VkInstance &instance, const VkPhysicalDevice &device)> requiredInstanceExtensions =
-        [](const VkInstance &instance, const VkPhysicalDevice &device) { return std::set<const char *>(); };
+    using InstanceExtensionsFunc = std::function<std::set<const char *>(const VkInstance &, const VkPhysicalDevice &)>;
+    using DeviceExtensionsFunc = std::function<std::set<const char *>(const VkInstance &, const VkPhysicalDevice &)>;
+    using DeviceFeaturesFunc = std::function<DeviceFeaturesChain(const VkInstance &, const VkPhysicalDevice &)>;
 
-    std::function<std::set<const char *>(const VkInstance &instance, const VkPhysicalDevice &device)> requiredDeviceExtensions =
-        [](const VkInstance &instance, const VkPhysicalDevice &device) { return std::set<const char *>(); };
-
-    std::function<DeviceFeaturesChain(const VkInstance &instance, const VkPhysicalDevice &device)> requiredDeviceFeatures =
-        [](const VkInstance &instance, const VkPhysicalDevice &device) { return DeviceFeaturesChain(); };
+    InstanceExtensionsFunc requiredInstanceExtensions = [](const VkInstance &, const VkPhysicalDevice &) { return std::set<const char *>(); };
+    DeviceExtensionsFunc requiredDeviceExtensions = [](const VkInstance &, const VkPhysicalDevice &) { return std::set<const char *>(); };
+    DeviceFeaturesFunc requiredDeviceFeatures = [](const VkInstance &, const VkPhysicalDevice &) { return DeviceFeaturesChain(); };
 };
