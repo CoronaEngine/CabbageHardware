@@ -71,11 +71,14 @@ HardwareContext::~HardwareContext()
 void HardwareContext::prepareFeaturesChain()
 {
     // 配置所需实例扩展
-    hardwareCreateInfos.requiredInstanceExtensions = [](const VkInstance &, const VkPhysicalDevice &) {
-        std::set<const char *> extensions{
+    hardwareCreateInfos.requiredInstanceExtensions = [](const VkInstance &, const VkPhysicalDevice &) 
+    {
+        std::set<const char *> extensions
+        {
             "VK_KHR_surface",
             VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
-            VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME};
+            VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME
+        };
 
 #if _WIN32 || _WIN64
         extensions.insert(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
@@ -89,8 +92,10 @@ void HardwareContext::prepareFeaturesChain()
     };
 
     // 配置所需设备扩展
-    hardwareCreateInfos.requiredDeviceExtensions = [](const VkInstance &, const VkPhysicalDevice &) {
-        return std::set<const char *>{
+    hardwareCreateInfos.requiredDeviceExtensions = [](const VkInstance &, const VkPhysicalDevice &)
+    {
+        return std::set<const char *>
+        {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME,
             VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
             VK_KHR_16BIT_STORAGE_EXTENSION_NAME,
@@ -110,7 +115,8 @@ void HardwareContext::prepareFeaturesChain()
         };
     };
 
-    hardwareCreateInfos.requiredDeviceFeatures = [](const VkInstance &, const VkPhysicalDevice &) {
+    hardwareCreateInfos.requiredDeviceFeatures = [](const VkInstance &, const VkPhysicalDevice &)
+    {
         VkPhysicalDeviceFeatures features{};
         features.samplerAnisotropy = VK_TRUE;
         features.shaderInt16 = VK_TRUE;
@@ -157,10 +163,11 @@ void HardwareContext::createVkInstance(const CreateCallback &initInfo)
     std::vector<VkLayerProperties> availableLayers(layerCount);
     vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
 
-    const auto validationLayerAvailable = std::any_of(availableLayers.begin(), availableLayers.end(),
-                                                      [](const VkLayerProperties &props) {
-                                                          return strcmp("VK_LAYER_KHRONOS_validation", props.layerName) == 0;
-                                                      });
+    const auto validationLayerAvailable = std::any_of(availableLayers.begin(), availableLayers.end(),                             
+        [](const VkLayerProperties &props) 
+        {                                      
+            return strcmp("VK_LAYER_KHRONOS_validation", props.layerName) == 0;                                       
+        });
 
     if (validationLayerAvailable)
     {
@@ -175,20 +182,25 @@ void HardwareContext::createVkInstance(const CreateCallback &initInfo)
     std::vector<VkExtensionProperties> availableExtensions(extensionCount);
     vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, availableExtensions.data());
 
-    requiredExtensions.erase(std::remove_if(requiredExtensions.begin(), requiredExtensions.end(),
-                                            [&availableExtensions](const char *ext) {
-                                                const bool supported = std::any_of(availableExtensions.begin(), availableExtensions.end(),
-                                                                                   [ext](const VkExtensionProperties &props) {
-                                                                                       return strcmp(ext, props.extensionName) == 0;
-                                                                                   });
+    requiredExtensions.erase(std::remove_if(requiredExtensions.begin(), requiredExtensions.end(),                             
+        [&availableExtensions](const char *ext) 
+        {                                 
+            const bool supported = std::any_of(availableExtensions.begin(), availableExtensions.end(),                                                                  
+                [ext](const VkExtensionProperties &props) 
+                {                                                           
+                    return strcmp(ext, props.extensionName) == 0;                                                
+                });
 
-                                                if (!supported)
-                                                {
-                                                    std::cerr << "Warning: Instance extension not supported: " << ext << "\n";
-                                                }
-                                                return !supported;
-                                            }),
-                             requiredExtensions.end());
+                                                
+            if (!supported)                              
+            {                                  
+                std::cerr << "Warning: Instance extension not supported: " << ext << "\n";                        
+            }              
+            return !supported;                              
+        }),
+                             
+        requiredExtensions.end()
+    );
 
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -265,12 +277,13 @@ void HardwareContext::chooseMainDevice()
         throw std::runtime_error("No hardware devices available!");
     }
 
-    mainDevice = *std::min_element(hardwareUtils.begin(), hardwareUtils.end(),
-                                   [](const std::shared_ptr<HardwareUtils> &a, const std::shared_ptr<HardwareUtils> &b) {
-                                       const auto typeA = a->deviceManager.getFeaturesUtils().supportedProperties.properties.deviceType;
-                                       const auto typeB = b->deviceManager.getFeaturesUtils().supportedProperties.properties.deviceType;
-                                       return getDeviceTypePriority(typeA) < getDeviceTypePriority(typeB);
-                                   });
+    mainDevice = *std::min_element(hardwareUtils.begin(), hardwareUtils.end(),                  
+        [](const std::shared_ptr<HardwareUtils> &a, const std::shared_ptr<HardwareUtils> &b) 
+        {                       
+            const auto typeA = a->deviceManager.getFeaturesUtils().supportedProperties.properties.deviceType;                          
+            const auto typeB = b->deviceManager.getFeaturesUtils().supportedProperties.properties.deviceType;                       
+            return getDeviceTypePriority(typeA) < getDeviceTypePriority(typeB);                    
+        });
 
 #ifdef CABBAGE_ENGINE_DEBUG
     const auto &props = mainDevice->deviceManager.getFeaturesUtils().supportedProperties.properties;
