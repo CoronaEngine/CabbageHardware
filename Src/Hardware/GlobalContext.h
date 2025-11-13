@@ -61,7 +61,8 @@ extern Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> global
 [[nodiscard]] inline ResourceManager::BufferHardwareWrap getBufferFromHandle(uintptr_t handle)
 {
     ResourceManager::BufferHardwareWrap buffer;
-    globalBufferStorages.read(handle, [&buffer](const ResourceManager::BufferHardwareWrap &storedBuffer) {
+    globalBufferStorages.read(handle, [&buffer](const ResourceManager::BufferHardwareWrap &storedBuffer)
+    {
         buffer = storedBuffer;
     });
     return buffer;
@@ -70,7 +71,8 @@ extern Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> global
 [[nodiscard]] inline ResourceManager::ImageHardwareWrap getImageFromHandle(uintptr_t handle)
 {
     ResourceManager::ImageHardwareWrap image;
-    globalImageStorages.read(handle, [&image](const ResourceManager::ImageHardwareWrap &storedImage) {
+    globalImageStorages.read(handle, [&image](const ResourceManager::ImageHardwareWrap &storedImage)
+    {
         image = storedImage;
     });
     return image;
