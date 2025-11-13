@@ -371,8 +371,7 @@ void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule
                                           VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachment.blendEnable = VK_FALSE;
 
-    std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments(
-        renderTargets.size(), colorBlendAttachment);
+    std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments(renderTargets.size(), colorBlendAttachment);
 
     VkPipelineColorBlendStateCreateInfo colorBlending{};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -382,9 +381,11 @@ void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule
     colorBlending.pAttachments = colorBlendAttachments.data();
 
     // 配置动态状态
-    std::vector<VkDynamicState> dynamicStates = {
+    std::vector<VkDynamicState> dynamicStates =
+    {
         VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR};
+        VK_DYNAMIC_STATE_SCISSOR
+    };
 
     VkPipelineDynamicStateCreateInfo dynamicState{};
     dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -433,8 +434,12 @@ void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-    coronaHardwareCheck(vkCreateGraphicsPipelines(
-        device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline));
+    coronaHardwareCheck(vkCreateGraphicsPipelines(device,
+                                                  VK_NULL_HANDLE,
+                                                  1,
+                                                  &pipelineInfo,
+                                                  nullptr,
+                                                  &graphicsPipeline));
 
     // 清理着色器模块
     vkDestroyShaderModule(device, fragShaderModule, nullptr);
@@ -469,11 +474,10 @@ void RasterizerPipeline::createFramebuffers(ktm::uvec2 imageSize)
     framebufferInfo.height = imageSize.y;
     framebufferInfo.layers = 1;
 
-    coronaHardwareCheck(vkCreateFramebuffer(
-        mainDevice->deviceManager.getLogicalDevice(),
-        &framebufferInfo,
-        nullptr,
-        &frameBuffers));
+    coronaHardwareCheck(vkCreateFramebuffer(mainDevice->deviceManager.getLogicalDevice(),
+                                            &framebufferInfo,
+                                            nullptr,
+                                            &frameBuffers));
 }
 
 std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> RasterizerPipeline::operator[](const std::string &resourceName)
@@ -590,7 +594,8 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
         requiredBarriers.imageBarriers.push_back(imageBarrier);
 
         // 更新图像布局
-        globalImageStorages.write(*renderTarget.getImageID(), [](ResourceManager::ImageHardwareWrap &image) {
+        globalImageStorages.write(*renderTarget.getImageID(), [](ResourceManager::ImageHardwareWrap &image)
+        {
             image.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         });
     }
@@ -613,7 +618,8 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
         requiredBarriers.imageBarriers.push_back(imageBarrier);
 
         // 更新图像布局
-        globalImageStorages.write(*depthImage.getImageID(), [](ResourceManager::ImageHardwareWrap &image) {
+        globalImageStorages.write(*depthImage.getImageID(), [](ResourceManager::ImageHardwareWrap &image)
+        {
             image.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         });
     }
@@ -666,20 +672,19 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
         // 创建默认深度图像
         if (!depthImage)
         {
-            depthImage = HardwareImage(
-                imageSize.x, imageSize.y,
-                ImageFormat::D32_FLOAT,
-                ImageUsage::DepthImage);
+            depthImage = HardwareImage(imageSize.x,
+                                       imageSize.y,
+                                       ImageFormat::D32_FLOAT,
+                                       ImageUsage::DepthImage);
         }
 
         // 转换深度图像布局
         auto depthImageWrap = getImageFromHandle(*depthImage.getImageID());
-        mainDevice->resourceManager.transitionImageLayout(
-            hardwareExecutor.currentRecordQueue->commandBuffer,
-            depthImageWrap,
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-            VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+        mainDevice->resourceManager.transitionImageLayout(hardwareExecutor.currentRecordQueue->commandBuffer,
+                                                          depthImageWrap,
+                                                          VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                                                          VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                                                          VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 
         createRenderPass(multiviewCount);
         createGraphicsPipeline(vertShaderCode, fragShaderCode);
@@ -739,15 +744,14 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
         descriptorSets.push_back(mainDevice->resourceManager.bindlessDescriptors[i].descriptorSet);
     }
 
-    vkCmdBindDescriptorSets(
-        commandBuffer,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        pipelineLayout,
-        0,
-        static_cast<uint32_t>(descriptorSets.size()),
-        descriptorSets.data(),
-        0,
-        nullptr);
+    vkCmdBindDescriptorSets(commandBuffer,
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pipelineLayout,
+                            0,
+                            static_cast<uint32_t>(descriptorSets.size()),
+                            descriptorSets.data(),
+                            0,
+                            nullptr);
 
     // 绘制所有几何网格
     for (const auto &mesh : geomMeshesRecord)
@@ -765,31 +769,27 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
         }
 
         // 绑定顶点缓冲区
-        vkCmdBindVertexBuffers(
-            commandBuffer,
-            0,
-            static_cast<uint32_t>(vertexBuffers.size()),
-            vertexBuffers.data(),
-            offsets.data());
+        vkCmdBindVertexBuffers(commandBuffer,
+                               0,
+                               static_cast<uint32_t>(vertexBuffers.size()),
+                               vertexBuffers.data(),
+                               offsets.data());
 
         // 绑定索引缓冲区
-        vkCmdBindIndexBuffer(
-            commandBuffer,
-            mesh.indexBuffer.bufferHandle,
-            0,
-            VK_INDEX_TYPE_UINT32);
+        vkCmdBindIndexBuffer(commandBuffer,
+                             mesh.indexBuffer.bufferHandle,
+                             0,
+                             VK_INDEX_TYPE_UINT32);
 
         // 推送常量
-        if (const void *pushConstData = mesh.pushConstant.getData();
-            pushConstData != nullptr && pushConstantSize > 0)
+        if (const void *pushConstData = mesh.pushConstant.getData(); pushConstData != nullptr && pushConstantSize > 0)
         {
-            vkCmdPushConstants(
-                commandBuffer,
-                pipelineLayout,
-                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                0,
-                pushConstantSize,
-                pushConstData);
+            vkCmdPushConstants(commandBuffer,
+                               pipelineLayout,
+                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                               0,
+                               pushConstantSize,
+                               pushConstData);
         }
 
         // 绘制
