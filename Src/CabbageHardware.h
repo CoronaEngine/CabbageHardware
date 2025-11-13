@@ -62,7 +62,7 @@ struct ExternalHandle
 
 struct HardwareBuffer
 {
-  public:
+public:
     HardwareBuffer();
     HardwareBuffer(const HardwareBuffer &other);
     HardwareBuffer(uint32_t bufferSize, uint32_t elementSize, BufferUsage usage, const void *data = nullptr);
@@ -107,7 +107,7 @@ struct HardwareBuffer
         return bufferID;
     }
 
-  private:
+private:
     std::shared_ptr<uintptr_t> bufferID;
 
     friend class HardwareImage;
@@ -115,7 +115,7 @@ struct HardwareBuffer
 
 struct HardwareImage
 {
-  public:
+public:
     HardwareImage();
     HardwareImage(const HardwareImage &other);
     HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage = ImageUsage::SampledImage, int arrayLayers = 1, void *imageData = nullptr);
@@ -132,7 +132,7 @@ struct HardwareImage
         return imageID;
     }
 
-  private:
+private:
     HardwareImage &copyFromBuffer(const HardwareBuffer &buffer);
 
     HardwareImage &copyFromData(const void *inputData);
@@ -144,7 +144,7 @@ struct HardwareImage
 
 struct HardwarePushConstant
 {
-  public:
+public:
     HardwarePushConstant();
     HardwarePushConstant(const HardwarePushConstant &other);
 
@@ -170,7 +170,7 @@ struct HardwarePushConstant
         return pushConstantID;
     }
 
-  private:
+private:
     void copyFromRaw(const void *src, uint64_t size);
 
     std::shared_ptr<uintptr_t> pushConstantID;
@@ -178,7 +178,7 @@ struct HardwarePushConstant
 
 struct HardwareDisplayer
 {
-  public:
+public:
     explicit HardwareDisplayer(void *surface = nullptr);
     HardwareDisplayer(const HardwareDisplayer &other);
     ~HardwareDisplayer();
@@ -193,6 +193,6 @@ struct HardwareDisplayer
         return displaySurfaceID;
     }
 
-  private:
+private:
     std::shared_ptr<uintptr_t> displaySurfaceID;
 };
