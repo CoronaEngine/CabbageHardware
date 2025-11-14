@@ -78,13 +78,15 @@ public:
     {
     }
 
+    HardwareBuffer(const ExternalHandle &memHandle, uint32_t bufferSize, uint32_t elementSize, uint32_t allocSize, BufferUsage usage);
+
     ~HardwareBuffer();
 
     HardwareBuffer &operator=(const HardwareBuffer &other);
     explicit operator bool() const;
 
     ExternalHandle exportBufferMemory();
-    HardwareBuffer importBufferMemory(const ExternalHandle &memHandle);
+    //HardwareBuffer importBufferMemory(const ExternalHandle &memHandle);
 
     [[nodiscard]] uint32_t storeDescriptor();
 
