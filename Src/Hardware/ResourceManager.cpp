@@ -1,13 +1,12 @@
 ﻿#include "ResourceManager.h"
+#include "HardwareExecutor.h"
+#include <Hardware/GlobalContext.h>
+#include <numeric>
 
 // #define VMA_STATS_STRING_ENABLED 0
 #define VK_NO_PROTOTYPES
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
-
-#include "HardwareExecutor.h"
-#include <Hardware/GlobalContext.h>
-#include <numeric>
 
 ResourceManager::ResourceManager() = default;
 
@@ -64,7 +63,7 @@ void ResourceManager::cleanUpResourceManager()
     // 清理 VMA 分配器
     if (vmaAllocator != VK_NULL_HANDLE)
     {
-        vmaDestroyAllocator(vmaAllocator);
+        //vmaDestroyAllocator(vmaAllocator);
         vmaAllocator = VK_NULL_HANDLE;
     }
 
@@ -358,7 +357,7 @@ void ResourceManager::createExternalBufferMemoryPool()
 
     coronaHardwareCheck(vmaCreatePool(vmaAllocator, &poolInfo, &exportBufferPool));
 
-#ifndef CABBAGE_ENGINE_DEBUG
+#ifdef CABBAGE_ENGINE_DEBUG
     std::cout << "[ResourceManager] External memory pool created:\n"
               << "  Memory Type Index: " << memoryTypeIndex << "\n"
               << "  Handle Type: 0x" << std::hex << EXTERNAL_MEMORY_HANDLE_TYPE << std::dec << "\n"
@@ -458,7 +457,7 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
                                      mipLevels;
     deviceMemorySize += imageMemorySize;
 
-#ifndef CABBAGE_ENGINE_DEBUG
+#ifdef CABBAGE_ENGINE_DEBUG
     std::cout << "[ResourceManager] Image created: "
               << imageSize.x << "x" << imageSize.y
               << " Format: 0x" << std::hex << imageFormat << std::dec

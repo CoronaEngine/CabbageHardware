@@ -9,7 +9,7 @@
 #include<corona/kernel/memory/cache_aligned_allocator.h>
 #include <numeric>
 
-//#define USE_SAME_DEVICE
+#define USE_SAME_DEVICE
 
 DisplayManager::DisplayManager() = default;
 
@@ -142,7 +142,7 @@ void DisplayManager::cleanupDisplayImage()
         displayImage.imageAlloc != VK_NULL_HANDLE &&
         displayDevice)
     {
-        displayDevice->resourceManager.destroyImage(displayImage);
+        //displayDevice->resourceManager.destroyImage(displayImage);
         displayImage = {};
     }
 }
