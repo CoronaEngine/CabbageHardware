@@ -236,8 +236,10 @@ HardwareBuffer::HardwareBuffer(const ExternalHandle &memHandle, uint32_t bufferS
 
     const VkBufferUsageFlags vkUsage = convertBufferUsage(usage);
 
-    auto handle = globalBufferStorages.allocate([&](ResourceManager::BufferHardwareWrap &buffer)
-    {
+    const auto handle = globalBufferStorages.allocate([&](ResourceManager::BufferHardwareWrap &buffer) {
         buffer = globalHardwareContext.getMainDevice()->resourceManager.importBufferMemory(mempryHandle, bufferSize, elementSize, allocSize, vkUsage);
+        buffer.refCount = 1;
     });
+
+    bufferID = std::make_shared<uintptr_t>(handle);
 }

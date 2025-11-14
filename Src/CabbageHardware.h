@@ -134,11 +134,10 @@ public:
         return imageID;
     }
 
-private:
     HardwareImage &copyFromBuffer(const HardwareBuffer &buffer);
-
     HardwareImage &copyFromData(const void *inputData);
 
+  private:
     std::shared_ptr<uintptr_t> imageID;
 
     friend class HardwareDisplayer;
