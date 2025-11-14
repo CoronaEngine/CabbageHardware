@@ -10,89 +10,102 @@ struct DisplayerHardwareWrap
 
 Corona::Kernel::Utils::Storage<DisplayerHardwareWrap> globalDisplayerStorages;
 
-HardwareDisplayer::HardwareDisplayer(void* surface)
+void incrementDisplayerRefCount(uintptr_t id)
 {
-    if (displaySurfaceID != nullptr)
+    if (id != 0)
     {
-        globalDisplayerStorages.write(*this->displaySurfaceID, [](DisplayerHardwareWrap &disPlayer) {
-            disPlayer.refCount++;
+        globalDisplayerStorages.write(id, [](DisplayerHardwareWrap &displayer)
+        {
+            ++displayer.refCount;
         });
-    }
-    else
-    {
-        auto handle = globalDisplayerStorages.allocate([&](DisplayerHardwareWrap &disPlayer) {
-            DisplayerHardwareWrap newDisplayer;
-            newDisplayer.displaySurface = surface;
-            newDisplayer.refCount = 1;
-            newDisplayer.displayManager = std::make_shared<DisplayManager>();
-            disPlayer = newDisplayer;
-        });
-
-        this->displaySurfaceID = std::make_shared<uintptr_t>(handle);
     }
 }
 
-HardwareDisplayer::HardwareDisplayer(const HardwareDisplayer &other)
+void decrementDisplayerRefCount(uintptr_t id)
 {
-    this->displaySurfaceID = other.displaySurfaceID;
+    if (id == 0)
+    {
+        return;
+    }
 
-    globalDisplayerStorages.write(*other.displaySurfaceID, [](DisplayerHardwareWrap &disPlayer) {
-        disPlayer.refCount++;
+    bool shouldDestroy = false;
+    globalDisplayerStorages.write(id, [&](DisplayerHardwareWrap &displayer)
+    {
+        if (--displayer.refCount == 0)
+        {
+            displayer.displayManager.reset();
+            displayer.displaySurface = nullptr;
+            shouldDestroy = true;
+        }
     });
+
+    if (shouldDestroy)
+    {
+        globalDisplayerStorages.deallocate(id);
+    }
+}
+
+HardwareDisplayer::HardwareDisplayer(void *surface)
+{
+    const auto handle = globalDisplayerStorages.allocate([surface](DisplayerHardwareWrap &displayer)
+    {
+        displayer.displaySurface = surface;
+        displayer.displayManager = std::make_shared<DisplayManager>();
+        displayer.refCount = 1;
+    });
+
+    displaySurfaceID = std::make_shared<uintptr_t>(handle);
+}
+
+HardwareDisplayer::HardwareDisplayer(const HardwareDisplayer &other)
+    : displaySurfaceID(other.displaySurfaceID)
+{
+    incrementDisplayerRefCount(*displaySurfaceID);
 }
 
 HardwareDisplayer::~HardwareDisplayer()
 {
-    bool destroySelf = false;
-    globalDisplayerStorages.write(*displaySurfaceID, [&](DisplayerHardwareWrap &disPlayer) {
-        disPlayer.refCount--;
-        if (disPlayer.refCount == 0)
-        {
-            disPlayer.displayManager.reset();
-            disPlayer.displaySurface = nullptr;
-            destroySelf = true;
-            globalDisplayerStorages.deallocate(*displaySurfaceID);
-        }
-    });
-    if (destroySelf)
+    if (displaySurfaceID)
     {
-        globalDisplayerStorages.deallocate(*displaySurfaceID);
+        decrementDisplayerRefCount(*displaySurfaceID);
     }
 }
 
 HardwareDisplayer &HardwareDisplayer::operator=(const HardwareDisplayer &other)
 {
-
-    globalDisplayerStorages.write(*other.displaySurfaceID, [](DisplayerHardwareWrap &disPlayer) {
-        disPlayer.refCount++;
-    });
-    globalDisplayerStorages.write(*displaySurfaceID, [&](DisplayerHardwareWrap &disPlayer) {
-        disPlayer.refCount--;
-        if (disPlayer.refCount == 0)
-        {
-            disPlayer.displayManager.reset();
-            disPlayer.displaySurface = nullptr;
-            globalDisplayerStorages.deallocate(*displaySurfaceID);
-        }
-    });
-    this->displaySurfaceID = other.displaySurfaceID;
+    if (this != &other)
+    {
+        incrementDisplayerRefCount(*other.displaySurfaceID);
+        decrementDisplayerRefCount(*displaySurfaceID);
+        displaySurfaceID = other.displaySurfaceID;
+    }
     return *this;
 }
 
-
 HardwareDisplayer &HardwareDisplayer::wait(HardwareExecutor &executor)
 {
-    globalDisplayerStorages.write(*displaySurfaceID, [&](const DisplayerHardwareWrap &disPlayer) {
-        disPlayer.displayManager->waitExecutor(executor);
-    });
+    globalDisplayerStorages.read(*displaySurfaceID,
+        [&executor](const DisplayerHardwareWrap &displayer)
+        {
+            if (displayer.displayManager)
+            {
+                displayer.displayManager->waitExecutor(executor);
+            }
+        });
+
     return *this;
 }
 
 HardwareDisplayer &HardwareDisplayer::operator<<(HardwareImage &image)
 {
-    globalDisplayerStorages.write(*displaySurfaceID, [&](const DisplayerHardwareWrap &disPlayer) {
-        disPlayer.displayManager->displayFrame(disPlayer.displaySurface, image);
-    });
+    globalDisplayerStorages.read(*displaySurfaceID,
+        [&image](const DisplayerHardwareWrap &displayer)
+        {
+            if (displayer.displayManager && displayer.displaySurface)
+            {
+                displayer.displayManager->displayFrame(displayer.displaySurface, image);
+            }
+        });
 
     return *this;
 }

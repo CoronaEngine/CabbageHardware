@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <Hardware/DeviceManager.h>
 #include <Hardware/GlobalContext.h>
@@ -47,7 +47,7 @@ struct CommandRecord
 
 struct HardwareExecutor
 {
-    HardwareExecutor(std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext = globalHardwareContext.mainDevice)
+    HardwareExecutor(std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext = globalHardwareContext.getMainDevice())
         : hardwareContext(hardwareContext)
     {
     }

@@ -1,12 +1,9 @@
-#include "HardwareExecutor.h"
-
+﻿#include "HardwareExecutor.h"
 #include <Hardware/GlobalContext.h>
 
-
-DeviceManager::QueueUtils *HardwareExecutor::pickQueueAndCommit(
-    std::atomic_uint16_t &currentQueueIndex,
-    std::vector<DeviceManager::QueueUtils> &currentQueues,
-    std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand)
+DeviceManager::QueueUtils *HardwareExecutor::pickQueueAndCommit(std::atomic_uint16_t &currentQueueIndex,
+                                                                std::vector<DeviceManager::QueueUtils> &currentQueues,
+                                                                std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand)
 {
     DeviceManager::QueueUtils *queue;
     uint16_t queueIndex = 0;
@@ -35,7 +32,7 @@ DeviceManager::QueueUtils *HardwareExecutor::pickQueueAndCommit(
 
 
     commitCommand(queue);
-    
+
 
     queue->queueMutex->unlock();
 

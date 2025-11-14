@@ -5,61 +5,75 @@
 #include "../VulkanUtils.h"
 #include "corona/kernel/utils/storage.h"
 
-// 增加宏以启用导出内存功能
-#define USE_EXPORT_MEMORY
-
 class DisplayManager;
 
 struct HardwareContext
 {
-    HardwareContext();
-
-    ~HardwareContext();
-
+  public:
     struct HardwareUtils
     {
         DeviceManager deviceManager;
         ResourceManager resourceManager;
     };
 
-    std::vector<std::shared_ptr<HardwareUtils>> hardwareUtils;
+    HardwareContext();
+    ~HardwareContext();
 
-    std::shared_ptr<HardwareUtils> mainDevice;
+    HardwareContext(const HardwareContext &) = delete;
+    HardwareContext &operator=(const HardwareContext &) = delete;
+    HardwareContext(HardwareContext &&) = delete;
+    HardwareContext &operator=(HardwareContext &&) = delete;
 
-    [[nodiscard]] VkInstance getVulkanInstance() const { return vkInstance; }
+    [[nodiscard]] VkInstance getVulkanInstance() const
+    {
+        return vkInstance;
+    }
 
-private:
+    [[nodiscard]] const std::vector<std::shared_ptr<HardwareUtils>> &getAllDevices() const
+    {
+        return hardwareUtils;
+    }
+
+    [[nodiscard]] std::shared_ptr<HardwareUtils> getMainDevice() const
+    {
+        return mainDevice;
+    }
+
+  private:
     void prepareFeaturesChain();
-    CreateCallback hardwareCreateInfos{};
-
     void createVkInstance(const CreateCallback &createInfo);
+    void chooseMainDevice();
+    void setupDebugMessenger();
+    void cleanupDebugMessenger();
 
     VkInstance vkInstance = VK_NULL_HANDLE;
     VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
 
-    void chooseMainDevice();
+    CreateCallback hardwareCreateInfos{};
+    std::vector<std::shared_ptr<HardwareUtils>> hardwareUtils;
+    std::shared_ptr<HardwareUtils> mainDevice;
 };
 
 extern HardwareContext globalHardwareContext;
 extern Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap> globalBufferStorages;
 extern Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageStorages;
 
-inline ResourceManager::BufferHardwareWrap getBufferFromHandle(uintptr_t handle)
+[[nodiscard]] inline ResourceManager::BufferHardwareWrap getBufferFromHandle(uintptr_t handle)
 {
-    ResourceManager::BufferHardwareWrap getBuffer;
-    globalBufferStorages.read(handle, [&](const ResourceManager::BufferHardwareWrap &buffer) {
-        getBuffer = buffer;
+    ResourceManager::BufferHardwareWrap buffer;
+    globalBufferStorages.read(handle, [&buffer](const ResourceManager::BufferHardwareWrap &storedBuffer)
+    {
+        buffer = storedBuffer;
     });
-
-    return getBuffer;
+    return buffer;
 }
 
-inline ResourceManager::ImageHardwareWrap getImageFromHandle(uintptr_t handle)
+[[nodiscard]] inline ResourceManager::ImageHardwareWrap getImageFromHandle(uintptr_t handle)
 {
-    ResourceManager::ImageHardwareWrap getImage;
-    globalImageStorages.read(handle, [&](const ResourceManager::ImageHardwareWrap &image) {
-        getImage = image;
+    ResourceManager::ImageHardwareWrap image;
+    globalImageStorages.read(handle, [&image](const ResourceManager::ImageHardwareWrap &storedImage)
+    {
+        image = storedImage;
     });
-
-    return getImage;
+    return image;
 }

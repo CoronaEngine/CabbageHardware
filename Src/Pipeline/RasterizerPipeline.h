@@ -1,75 +1,37 @@
 ﻿#pragma once
-#include <vector>
 
+#include <vector>
 #include "../Hardware/DeviceManager.h"
 #include "../Hardware/ResourceManager.h"
-
 #include "Compiler/ShaderCodeCompiler.h"
-
 #include "../CabbageHardware.h"
-
 
 struct RasterizerPipeline : public CommandRecord
 {
-    //struct GeomMeshDrawIndexed
-    //{
-    //    uint32_t indexOffset;
-    //    uint32_t indexCount;
-    //    ResourceManager::BufferHardwareWrap indexBuffer;
-    //    std::vector<ResourceManager::BufferHardwareWrap> vertexBuffers;
+  public:
+    RasterizerPipeline();
+    ~RasterizerPipeline() override;
 
-    //    HardwarePushConstant pushConstant;
-    //};
-
-    RasterizerPipeline()
-    {
-        executorType = CommandRecord::ExecutorType::Graphics;
-    }
-
-    ~RasterizerPipeline();
-
-    RasterizerPipeline(std::string vertexShaderCode, std::string fragmentShaderCode, uint32_t multiviewCount = 1,
-                       EmbeddedShader::ShaderLanguage vertexShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL, EmbeddedShader::ShaderLanguage fragmentShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
+    RasterizerPipeline(std::string vertexShaderCode,
+                       std::string fragmentShaderCode,
+                       uint32_t multiviewCount = 1,
+                       EmbeddedShader::ShaderLanguage vertexShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
+                       EmbeddedShader::ShaderLanguage fragmentShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
                        const std::source_location &sourceLocation = std::source_location::current());
 
-    void setDepthImage(HardwareImage& depthImage)
+    void setDepthImage(HardwareImage &depthImage)
     {
         this->depthImage = depthImage;
     }
 
-    HardwareImage &getDepthImage()
+    [[nodiscard]] HardwareImage &getDepthImage()
     {
         return depthImage;
     }
 
-    std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> operator[](const std::string &resourceName)
-    {
-        EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo *vertexResource = this->vertexResource.findShaderBindInfo(resourceName);
-        if (vertexResource != nullptr)
-        {
-            switch (vertexResource->bindType)
-            {
-            case EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::pushConstantMembers:
-                return std::move(HardwarePushConstant(vertexResource->typeSize, vertexResource->byteOffset, &tempPushConstant));
-            case EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::stageInputs:
-                return tempVertexBuffers[vertexResource->location];
-            }
-        }
-        else
-        {
-            EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo *fragmentResource = this->fragmentResource.findShaderBindInfo(resourceName);
-            switch (fragmentResource->bindType)
-            {
-            case EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::pushConstantMembers:
-                return std::move(HardwarePushConstant(fragmentResource->typeSize, fragmentResource->byteOffset, &tempPushConstant));
-            case EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::stageOutputs:
-                return renderTargets[fragmentResource->location];
-            }
-        }
-        return std::move(HardwarePushConstant());
-    }
+    std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> operator[](const std::string &resourceName);
 
-    RasterizerPipeline* operator()(uint16_t x, uint16_t y);
+    RasterizerPipeline *operator()(uint16_t width, uint16_t height);
 
     CommandRecord *record(const HardwareBuffer &indexBuffer);
 
@@ -79,52 +41,42 @@ struct RasterizerPipeline : public CommandRecord
     }
 
     void commitCommand(HardwareExecutor &hardwareExecutor) override;
-
     RequiredBarriers getRequiredBarriers(HardwareExecutor &hardwareExecutor) override;
 
   private:
-
-    ktm::uvec2 imageSize = {0, 0};
+    struct TriangleGeomMesh
+    {
+        ResourceManager::BufferHardwareWrap indexBuffer;
+        std::vector<ResourceManager::BufferHardwareWrap> vertexBuffers;
+        HardwarePushConstant pushConstant;
+    };
 
     void createRenderPass(int multiviewCount = 1);
-    void createGraphicsPipeline(EmbeddedShader::ShaderCodeModule vertShaderCode, EmbeddedShader::ShaderCodeModule fragShaderCode);
+    void createGraphicsPipeline(EmbeddedShader::ShaderCodeModule &vertShaderCode,
+                                EmbeddedShader::ShaderCodeModule &fragShaderCode);
     void createFramebuffers(ktm::uvec2 imageSize);
 
-    uint32_t pushConstantSize;
+    [[nodiscard]] VkFormat getVkFormatFromType(const std::string &typeName, uint32_t elementCount) const;
 
+    ktm::uvec2 imageSize = {0, 0};
+    uint32_t pushConstantSize = 0;
     int multiviewCount = 1;
 
     VkRenderPass renderPass = VK_NULL_HANDLE;
     VkPipeline graphicsPipeline = VK_NULL_HANDLE;
     VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-
     VkFramebuffer frameBuffers = VK_NULL_HANDLE;
 
-    // std::vector<ResourceManager::ImageHardwareWrap> renderTarget;
     HardwareImage depthImage;
+    std::vector<HardwareImage> renderTargets;
 
     EmbeddedShader::ShaderCodeModule vertShaderCode;
     EmbeddedShader::ShaderCodeModule fragShaderCode;
 
-    // HardwareImage depthImage;
-    std::vector<HardwareImage> renderTargets;
-
-    // EmbeddedShader::ShaderCodeCompiler vertexShaderCompiler;
-    // EmbeddedShader::ShaderCodeCompiler fragmentShaderCompiler;
-
-    struct TriangleGeomMesh
-    {
-        ResourceManager::BufferHardwareWrap indexBuffer;
-        std::vector<ResourceManager::BufferHardwareWrap> vertexBuffers;
-
-        HardwarePushConstant pushConstant;
-    };
     std::vector<TriangleGeomMesh> geomMeshesRecord;
 
     CommandRecord dumpCommandRecord;
-
     HardwarePushConstant tempPushConstant;
-
     std::vector<HardwareBuffer> tempVertexBuffers;
 
     std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> vertexStageInputs;
