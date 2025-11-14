@@ -6,7 +6,24 @@
 #include <fstream>
 #include <sstream>
 #include <regex>
+#include <iostream>
 #include <ktm/ktm.h>
+
+constexpr bool ENABLE_RESOURCE_TRACKING = true;
+constexpr bool ENABLE_VERBOSE_LOGGING = true;
+
+// 调试日志宏
+#define LOG_INFO(msg)                               \
+    if (ENABLE_VERBOSE_LOGGING)                     \
+    {                                               \
+        std::cout << "[INFO] " << msg << std::endl; \
+    }
+#define LOG_ERROR(msg) std::cerr << "[ERROR] " << msg << std::endl;
+#define LOG_RESOURCE(action, type)                                        \
+    if (ENABLE_RESOURCE_TRACKING)                                         \
+    {                                                                     \
+        std::cout << "[RESOURCE] " << action << " " << type << std::endl; \
+    }
 
 // 着色器路径解析
 inline std::string resolveShaderPath()
@@ -62,7 +79,7 @@ namespace RenderConfig
 {
     constexpr int WINDOW_WIDTH = 1920;
     constexpr int WINDOW_HEIGHT = 1080;
-    constexpr int WINDOW_COUNT = 1;
+    constexpr int WINDOW_COUNT = 2;
     constexpr int CUBE_COUNT = 20;
     constexpr int COMPUTE_GROUP_SIZE = 8;
     constexpr int FRAME_AVERAGE_COUNT = 100;
