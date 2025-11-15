@@ -1136,11 +1136,11 @@ ResourceManager &ResourceManager::blitImage(VkCommandBuffer &commandBuffer,
     return *this;
 }
 
-void ResourceManager::copyBufferToHost(BufferHardwareWrap &buffer, void *cpuData)
+void ResourceManager::copyBufferToHost(BufferHardwareWrap &buffer, void *cpuData, uint64_t size)
 {
     if (buffer.bufferAllocInfo.pMappedData != nullptr)
     {
-        std::memcpy(cpuData, buffer.bufferAllocInfo.pMappedData, buffer.elementCount);
+        std::memcpy(cpuData, buffer.bufferAllocInfo.pMappedData, size);
     }
 }
 

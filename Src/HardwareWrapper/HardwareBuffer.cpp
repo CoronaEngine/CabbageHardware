@@ -188,6 +188,27 @@ bool HardwareBuffer::copyFromData(const void *inputData, uint64_t size)
     return success;
 }
 
+
+bool HardwareBuffer::copyToData(void *outputData, uint64_t size)
+{
+    if (outputData == nullptr || size == 0)
+    {
+        return false;
+    }
+
+    bool success = false;
+    globalBufferStorages.write(*bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
+        if (buffer.bufferAllocInfo.pMappedData != nullptr)
+        {
+            globalHardwareContext.getMainDevice()->resourceManager.copyBufferToHost(buffer, outputData, size);
+            success = true;
+        }
+    });
+
+    return success;
+}
+
+
 void *HardwareBuffer::getMappedData()
 {
     void *mappedData = nullptr;

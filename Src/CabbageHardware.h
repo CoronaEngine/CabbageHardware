@@ -94,6 +94,8 @@ public:
 
     bool copyFromData(const void *inputData, uint64_t size);
 
+    bool copyToData(void *outputData, uint64_t size);
+
     template <typename T>
     bool copyFromVector(const std::vector<T> &input)
     {

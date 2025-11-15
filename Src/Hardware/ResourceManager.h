@@ -112,7 +112,7 @@ struct ResourceManager
     ResourceManager &copyImageToBuffer(VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, BufferHardwareWrap &buffer);
     ResourceManager &blitImage(VkCommandBuffer &commandBuffer, ImageHardwareWrap &srcImage, ImageHardwareWrap &dstImage);
 
-    void copyBufferToHost(BufferHardwareWrap &buffer, void *cpuData);
+    void copyBufferToHost(BufferHardwareWrap &buffer, void *cpuData, uint64_t size);
 
     // Layout transition
     void transitionImageLayout(VkCommandBuffer &commandBuffer,
