@@ -102,7 +102,8 @@ public:
 
     [[nodiscard]] void *getMappedData();
 
-    [[nodiscard]] uint64_t getBufferSize() const;
+    [[nodiscard]] uint64_t getElementSize() const;
+    [[nodiscard]] uint64_t getElementCount() const;
 
     [[nodiscard]] std::shared_ptr<uintptr_t> getBufferID() const
     {

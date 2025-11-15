@@ -513,7 +513,7 @@ void ResourceManager::destroyImage(ImageHardwareWrap &image)
     }
 }
 
-ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(uint32_t bufferSize,
+ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(uint32_t elementCount,
                                                                   uint32_t elementSize,
                                                                   VkBufferUsageFlags usage,
                                                                   bool hostVisibleMapped,
@@ -523,11 +523,11 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(uint32_t buffe
     BufferHardwareWrap resultBuffer{};
     resultBuffer.device = device;
     resultBuffer.resourceManager = this;
-    resultBuffer.bufferSize = bufferSize;
+    resultBuffer.elementCount = elementCount;
     resultBuffer.elementSize = elementSize;
     resultBuffer.bufferUsage = usage;
 
-    const uint64_t totalSize = static_cast<uint64_t>(bufferSize) * elementSize;
+    const uint64_t totalSize = static_cast<uint64_t>(elementCount) * elementSize;
     if (totalSize == 0)
     {
         return resultBuffer;
@@ -669,7 +669,7 @@ void ResourceManager::destroyBuffer(BufferHardwareWrap &buffer)
 
         buffer.bufferHandle = VK_NULL_HANDLE;
         buffer.bufferAlloc = VK_NULL_HANDLE;
-        buffer.bufferSize = 0;
+        buffer.elementCount = 0;
     }
 }
 
@@ -703,7 +703,7 @@ ResourceManager::ExternalMemoryHandle ResourceManager::exportBufferMemory(Buffer
     return memHandle;
 }
 
-ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const ExternalMemoryHandle &memHandle, uint32_t bufferSize, uint32_t elementSize, uint32_t allocSize, VkBufferUsageFlags bufferUsage)
+ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const ExternalMemoryHandle &memHandle, uint32_t elementCount, uint32_t elementSize, uint32_t allocSize, VkBufferUsageFlags bufferUsage)
 {
 #if _WIN32 || _WIN64
     if (memHandle.handle == nullptr || memHandle.handle == INVALID_HANDLE_VALUE)
@@ -724,7 +724,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     importedBuffer.device = device;
     importedBuffer.resourceManager = this;
     importedBuffer.bufferUsage = bufferUsage;
-    importedBuffer.bufferSize = bufferSize;
+    importedBuffer.elementCount = elementCount;
     importedBuffer.elementSize = elementSize;
 
     VkBufferCreateInfo bufferInfo{};
@@ -1140,7 +1140,7 @@ void ResourceManager::copyBufferToHost(BufferHardwareWrap &buffer, void *cpuData
 {
     if (buffer.bufferAllocInfo.pMappedData != nullptr)
     {
-        std::memcpy(cpuData, buffer.bufferAllocInfo.pMappedData, buffer.bufferSize);
+        std::memcpy(cpuData, buffer.bufferAllocInfo.pMappedData, buffer.elementCount);
     }
 }
 

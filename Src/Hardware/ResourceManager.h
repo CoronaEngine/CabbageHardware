@@ -22,7 +22,7 @@ struct ResourceManager
 
     struct BufferHardwareWrap
     {
-        uint32_t bufferSize = 0;
+        uint32_t elementCount = 0;
         uint32_t elementSize = 0;
         uint64_t refCount = 0;
 
@@ -88,7 +88,7 @@ struct ResourceManager
     void destroyImage(ImageHardwareWrap &image);
 
     // Buffer operations
-    [[nodiscard]] BufferHardwareWrap createBuffer(uint32_t bufferSize,
+    [[nodiscard]] BufferHardwareWrap createBuffer(uint32_t elementCount,
                                                   uint32_t elementSize,
                                                   VkBufferUsageFlags usage,
                                                   bool hostVisibleMapped = true,
@@ -98,7 +98,7 @@ struct ResourceManager
 
     // External memory operations
     [[nodiscard]] ExternalMemoryHandle exportBufferMemory(BufferHardwareWrap &sourceBuffer);
-    [[nodiscard]] BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle &memHandle, uint32_t bufferSize, uint32_t elementSize, uint32_t allocSize, VkBufferUsageFlags usage);
+    [[nodiscard]] BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle &memHandle, uint32_t elementCount, uint32_t elementSize, uint32_t allocSize, VkBufferUsageFlags usage);
     [[nodiscard]] BufferHardwareWrap importHostBuffer(void *hostPtr, uint64_t size);
 
     // Descriptor operations

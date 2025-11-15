@@ -199,12 +199,22 @@ void *HardwareBuffer::getMappedData()
     return mappedData;
 }
 
-uint64_t HardwareBuffer::getBufferSize() const
+uint64_t HardwareBuffer::getElementCount() const
 {
     uint64_t totalSize = 0;
     globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer)
     {
-        totalSize = static_cast<uint64_t>(buffer.bufferSize) * buffer.elementSize;
+        totalSize = buffer.elementCount;
+    });
+
+    return totalSize;
+}
+
+uint64_t HardwareBuffer::getElementSize() const
+{
+    uint64_t totalSize = 0;
+    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
+        totalSize = buffer.elementSize;
     });
 
     return totalSize;

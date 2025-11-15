@@ -793,7 +793,7 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
         }
 
         // 绘制
-        vkCmdDrawIndexed(commandBuffer, mesh.indexBuffer.bufferSize, 1, 0, 0, 0);
+        vkCmdDrawIndexed(commandBuffer, mesh.indexBuffer.elementCount, 1, 0, 0, 0);
     }
 
     vkCmdEndRenderPass(commandBuffer);
