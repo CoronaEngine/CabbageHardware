@@ -519,7 +519,6 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(uint32_t eleme
                                                                   bool hostVisibleMapped,
                                                                   bool useDedicated)
 {
-
     BufferHardwareWrap resultBuffer{};
     resultBuffer.device = device;
     resultBuffer.resourceManager = this;
@@ -641,7 +640,13 @@ void ResourceManager::createDedicatedBuffer(const VkBufferCreateInfo &bufferInfo
     VmaAllocationCreateInfo dedicatedAllocInfo = allocInfo;
     dedicatedAllocInfo.flags |= VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
 
-    coronaHardwareCheck(vmaCreateBuffer(vmaAllocator, &bufferInfo, &dedicatedAllocInfo, &resultBuffer.bufferHandle, &resultBuffer.bufferAlloc, &resultBuffer.bufferAllocInfo));
+    coronaHardwareCheck(vmaCreateDedicatedBuffer(vmaAllocator,
+                                                 &bufferInfo,
+                                                 &dedicatedAllocInfo,
+                                                 &exportInfo,
+                                                 &resultBuffer.bufferHandle,
+                                                 &resultBuffer.bufferAlloc,
+                                                 &resultBuffer.bufferAllocInfo));
 }
 
 void ResourceManager::createPooledBuffer(const VkBufferCreateInfo &bufferInfo,
@@ -703,7 +708,7 @@ ResourceManager::ExternalMemoryHandle ResourceManager::exportBufferMemory(Buffer
     return memHandle;
 }
 
-ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const ExternalMemoryHandle &memHandle, uint32_t elementCount, uint32_t elementSize, uint32_t allocSize, VkBufferUsageFlags bufferUsage)
+ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const ExternalMemoryHandle &memHandle, const BufferHardwareWrap &sourceBuffer)
 {
 #if _WIN32 || _WIN64
     if (memHandle.handle == nullptr || memHandle.handle == INVALID_HANDLE_VALUE)
@@ -723,14 +728,12 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     BufferHardwareWrap importedBuffer{};
     importedBuffer.device = device;
     importedBuffer.resourceManager = this;
-    importedBuffer.bufferUsage = bufferUsage;
-    importedBuffer.elementCount = elementCount;
-    importedBuffer.elementSize = elementSize;
+    importedBuffer.bufferUsage = sourceBuffer.bufferUsage;
 
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = allocSize;
-    bufferInfo.usage = bufferUsage;
+    bufferInfo.size = sourceBuffer.bufferAllocInfo.size;
+    bufferInfo.usage = importedBuffer.bufferUsage;
 
     // 配置队列族共享模式
     std::vector<uint32_t> queueFamilyIndices;

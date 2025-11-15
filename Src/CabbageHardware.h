@@ -78,7 +78,7 @@ public:
     {
     }
 
-    HardwareBuffer(const ExternalHandle &memHandle, uint32_t bufferSize, uint32_t elementSize, uint32_t allocSize, BufferUsage usage);
+    HardwareBuffer(const ExternalHandle &memHandle, const ResourceManager::BufferHardwareWrap &sourceBuffer);
 
     ~HardwareBuffer();
 
