@@ -791,10 +791,11 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT |
                       VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
-    coronaHardwareCheck(vmaCreateBuffer(vmaAllocator,
+    coronaHardwareCheck(vmaCreateDedicatedBuffer(vmaAllocator,
                                         &bufferInfo,
                                         &allocInfo,
-                                        &importedBuffer.bufferHandle,
+                                                 &importInfo,
+&importedBuffer.bufferHandle,
                                         &importedBuffer.bufferAlloc,
                                         &importedBuffer.bufferAllocInfo));
 
