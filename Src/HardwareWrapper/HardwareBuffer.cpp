@@ -256,7 +256,7 @@ ExternalHandle HardwareBuffer::exportBufferMemory()
     return handle;
 }
 
-HardwareBuffer::HardwareBuffer(const ExternalHandle &memHandle, const ResourceManager::BufferHardwareWrap &sourceBuffer)
+HardwareBuffer::HardwareBuffer(const ExternalHandle &memHandle, uint32_t bufferSize, uint32_t elementSize, uint32_t allocSize, BufferUsage usage)
 {
     ResourceManager::ExternalMemoryHandle mempryHandle;
 #if _WIN32 || _WIN64
@@ -265,9 +265,10 @@ HardwareBuffer::HardwareBuffer(const ExternalHandle &memHandle, const ResourceMa
     mempryHandle.fd = memHandle.fd;
 #endif
 
-    const auto handle = globalBufferStorages.allocate([&](ResourceManager::BufferHardwareWrap &buffer)
-    {
-        buffer = globalHardwareContext.getMainDevice()->resourceManager.importBufferMemory(mempryHandle, sourceBuffer);
+    const VkBufferUsageFlags vkUsage = convertBufferUsage(usage);
+
+    const auto handle = globalBufferStorages.allocate([&](ResourceManager::BufferHardwareWrap &buffer) {
+        buffer = globalHardwareContext.getMainDevice()->resourceManager.importBufferMemory(mempryHandle, bufferSize, elementSize, allocSize, vkUsage);
         buffer.refCount = 1;
     });
 

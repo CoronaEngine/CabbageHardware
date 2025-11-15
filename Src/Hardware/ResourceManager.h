@@ -100,7 +100,7 @@ struct ResourceManager
 
     // External memory operations
     [[nodiscard]] ExternalMemoryHandle exportBufferMemory(BufferHardwareWrap &sourceBuffer);
-    [[nodiscard]] BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle &memHandle, const BufferHardwareWrap &sourceBuffer);
+    [[nodiscard]] BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle &memHandle, uint32_t elementCount, uint32_t elementSize, uint32_t allocSize, VkBufferUsageFlags usage);
     [[nodiscard]] BufferHardwareWrap importHostBuffer(void *hostPtr, uint64_t size);
 
     // Descriptor operations
