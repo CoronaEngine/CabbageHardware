@@ -792,12 +792,12 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
                       VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
     coronaHardwareCheck(vmaCreateDedicatedBuffer(vmaAllocator,
-                                        &bufferInfo,
-                                        &allocInfo,
+                                                 &bufferInfo,
+                                                 &allocInfo,
                                                  &importInfo,
-&importedBuffer.bufferHandle,
-                                        &importedBuffer.bufferAlloc,
-                                        &importedBuffer.bufferAllocInfo));
+                                                 &importedBuffer.bufferHandle,
+                                                 &importedBuffer.bufferAlloc,
+                                                 &importedBuffer.bufferAllocInfo));
 
     return importedBuffer;
 }
@@ -856,12 +856,13 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *host
     allocInfo.preferredFlags = 0;
     allocInfo.memoryTypeBits = hostPointerProps.memoryTypeBits;
 
-    coronaHardwareCheck(vmaCreateBuffer(vmaAllocator,
-                                        &bufferInfo,
-                                        &allocInfo,
-                                        &bufferWrap.bufferHandle,
-                                        &bufferWrap.bufferAlloc,
-                                        &bufferWrap.bufferAllocInfo));
+    coronaHardwareCheck(vmaCreateDedicatedBuffer(vmaAllocator,
+                                                 &bufferInfo,
+                                                 &allocInfo,
+                                                 &importInfo,
+                                                 &bufferWrap.bufferHandle,
+                                                 &bufferWrap.bufferAlloc,
+                                                 &bufferWrap.bufferAllocInfo));
 
     bufferWrap.bufferAllocInfo.size = size;
     return bufferWrap;
