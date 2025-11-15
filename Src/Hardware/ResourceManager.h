@@ -94,11 +94,13 @@ struct ResourceManager
                                                   bool hostVisibleMapped = true,
                                                   bool useDedicated = false);
 
+    [[nodiscard]] BufferHardwareWrap createExportBuffer(VkDeviceSize size);
+
     void destroyBuffer(BufferHardwareWrap &buffer);
 
     // External memory operations
     [[nodiscard]] ExternalMemoryHandle exportBufferMemory(BufferHardwareWrap &sourceBuffer);
-    [[nodiscard]] BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle &memHandle, uint32_t elementCount, uint32_t elementSize, uint32_t allocSize, VkBufferUsageFlags usage);
+    [[nodiscard]] BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle &memHandle, const BufferHardwareWrap &sourceBuffer);
     [[nodiscard]] BufferHardwareWrap importHostBuffer(void *hostPtr, uint64_t size);
 
     // Descriptor operations

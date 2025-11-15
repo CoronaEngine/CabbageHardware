@@ -484,10 +484,13 @@ void DisplayManager::setupCrossDeviceTransfer(const ResourceManager::ImageHardwa
     // 创建源和目标暂存缓冲区
     cleanupStagingBuffers();
 
-    srcStaging = globalHardwareContext.getMainDevice()->resourceManager.importHostBuffer(
-        hostBufferPtr, imageSizeBytes);
-    dstStaging = displayDevice->resourceManager.importHostBuffer(
-        hostBufferPtr, imageSizeBytes);
+    srcStaging = globalHardwareContext.getMainDevice()->resourceManager.importHostBuffer(hostBufferPtr, imageSizeBytes);
+    //srcStaging = globalHardwareContext.getMainDevice()->resourceManager.createBuffer(imageSizeBytes, 1, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, true, true);
+    //srcStaging = globalHardwareContext.getMainDevice()->resourceManager.createExportBuffer(imageSizeBytes);
+
+    //ResourceManager::ExternalMemoryHandle memHandle = globalHardwareContext.getMainDevice()->resourceManager.exportBufferMemory(srcStaging);
+    //dstStaging = displayDevice->resourceManager.importBufferMemory(memHandle, srcStaging);
+    dstStaging = displayDevice->resourceManager.importHostBuffer(hostBufferPtr, imageSizeBytes);
 }
 
 bool DisplayManager::waitExecutor(HardwareExecutor &executor)
@@ -524,10 +527,9 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
 
             // 设置跨设备传输
             if (globalHardwareContext.getMainDevice() != displayDevice)
+            //if (true)
             {
-                this->displayImage = displayDevice->resourceManager.createImage(
-                    sourceImage.imageSize, sourceImage.imageFormat,
-                    sourceImage.pixelSize, sourceImage.imageUsage);
+                this->displayImage = displayDevice->resourceManager.createImage(sourceImage.imageSize, sourceImage.imageFormat,sourceImage.pixelSize, sourceImage.imageUsage);
 
                 setupCrossDeviceTransfer(sourceImage);
             }
@@ -546,8 +548,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
 
         // 检查交换链是否需要重建
         VkSurfaceCapabilitiesKHR capabilities;
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-            displayDevice->deviceManager.getPhysicalDevice(), vkSurface, &capabilities);
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(displayDevice->deviceManager.getPhysicalDevice(), vkSurface, &capabilities);
 
         ktm::uvec2 newSize{
             std::clamp(capabilities.currentExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
@@ -582,6 +583,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
 
         // 跨设备传输（如果需要）
         if (globalHardwareContext.getMainDevice() != displayDevice)
+        //if (true)
         {
             CopyImageToBufferCommand copyCmd(sourceImage, srcStaging);
             (*mainDeviceExecutor) << &copyCmd << mainDeviceExecutor->commit();
