@@ -1,10 +1,10 @@
 ﻿#pragma once
 
 #include <chrono>
-#include<Hardware/GlobalContext.h>
-#include<Hardware/HardwareExecutor.h>
-#include<CabbageHardware.h>
-#include "../VulkanUtils.h"
+#include <numeric>
+
+#include "CabbageHardware.h"
+#include "Hardware/HardwareUtil.h"
 
 class DisplayManager
 {

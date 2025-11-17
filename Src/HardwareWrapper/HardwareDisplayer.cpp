@@ -1,5 +1,5 @@
-﻿#include"CabbageHardware.h"
-#include<Display/DisplayManager.h>
+﻿#include "CabbageHardware.h"
+#include "Display/DisplayManager.h"
 
 struct DisplayerHardwareWrap
 {

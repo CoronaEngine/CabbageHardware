@@ -1,13 +1,6 @@
-﻿#include"DisplayManager.h"
-#include <algorithm>
-#include<vector>
-#include<volk.h>
-#include <cstdlib>
-#include <memory>
-#include<Hardware/GlobalContext.h>
-#include<Hardware/ResourceCommand.h>
-#include<corona/kernel/memory/cache_aligned_allocator.h>
-#include <numeric>
+﻿#include "DisplayManager.h"
+#include "Hardware/ResourceCommand.h"
+#include "corona/kernel/memory/cache_aligned_allocator.h"
 
 #define USE_SAME_DEVICE
 
@@ -485,12 +478,11 @@ void DisplayManager::setupCrossDeviceTransfer(const ResourceManager::ImageHardwa
     cleanupStagingBuffers();
 
     srcStaging = globalHardwareContext.getMainDevice()->resourceManager.importHostBuffer(hostBufferPtr, imageSizeBytes);
-    //srcStaging = globalHardwareContext.getMainDevice()->resourceManager.createBuffer(imageSizeBytes, 1, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, true, true);
-    //srcStaging = globalHardwareContext.getMainDevice()->resourceManager.createExportBuffer(imageSizeBytes);
-
-    //ResourceManager::ExternalMemoryHandle memHandle = globalHardwareContext.getMainDevice()->resourceManager.exportBufferMemory(srcStaging);
-    //dstStaging = displayDevice->resourceManager.importBufferMemory(memHandle, srcStaging);
     dstStaging = displayDevice->resourceManager.importHostBuffer(hostBufferPtr, imageSizeBytes);
+
+    /*srcStaging = globalHardwareContext.getMainDevice()->resourceManager.createBuffer(imageSizeBytes, 1, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, true, true);
+    ResourceManager::ExternalMemoryHandle memHandle = globalHardwareContext.getMainDevice()->resourceManager.exportBufferMemory(srcStaging);
+    dstStaging = displayDevice->resourceManager.importBufferMemory(memHandle, srcStaging.elementCount, srcStaging.elementSize,srcStaging.bufferAllocInfo.size,srcStaging.bufferUsage);*/
 }
 
 bool DisplayManager::waitExecutor(HardwareExecutor &executor)
@@ -526,8 +518,8 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
             }
 
             // 设置跨设备传输
-            if (globalHardwareContext.getMainDevice() != displayDevice)
-            //if (true)
+            //if (globalHardwareContext.getMainDevice() != displayDevice)
+            if (true)
             {
                 this->displayImage = displayDevice->resourceManager.createImage(sourceImage.imageSize, sourceImage.imageFormat,sourceImage.pixelSize, sourceImage.imageUsage);
 
@@ -582,14 +574,20 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         vkResetFences(displayDevice->deviceManager.getLogicalDevice(), 1, &inFlightFences[currentFrame]);
 
         // 跨设备传输（如果需要）
-        if (globalHardwareContext.getMainDevice() != displayDevice)
-        //if (true)
+        //if (globalHardwareContext.getMainDevice() != displayDevice)
+        if (true)
         {
             CopyImageToBufferCommand copyCmd(sourceImage, srcStaging);
             (*mainDeviceExecutor) << &copyCmd << mainDeviceExecutor->commit();
 
+
+            std::vector<uint8_t> zeroData(dstStaging.bufferAllocInfo.size, 0);
+            displayDevice->resourceManager.copyBufferToHost(dstStaging, zeroData.data(), dstStaging.bufferAllocInfo.size);
+            vkDeviceWaitIdle(displayDevice->deviceManager.getLogicalDevice());
+
             CopyBufferToImageCommand copyCmd2(dstStaging, this->displayImage);
             (*displayDeviceExecutor) << &copyCmd2;
+
         }
 
         // 设置同步信息

@@ -1,5 +1,5 @@
 ﻿#include "ComputePipeline.h"
-#include <Hardware/GlobalContext.h>
+#include "Hardware/HardwareUtil.h"
 
 ComputePipeline::ComputePipeline()
 {

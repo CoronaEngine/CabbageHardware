@@ -1,7 +1,6 @@
 ﻿#pragma once
 
-#include <Hardware/DeviceManager.h>
-#include <Hardware/GlobalContext.h>
+#include "Hardware/GlobalContext.h"
 
 class RasterizerPipeline;
 class ComputePipeline;

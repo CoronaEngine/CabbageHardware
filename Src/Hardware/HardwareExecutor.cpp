@@ -1,5 +1,4 @@
 ﻿#include "HardwareExecutor.h"
-#include <Hardware/GlobalContext.h>
 
 DeviceManager::QueueUtils *HardwareExecutor::pickQueueAndCommit(std::atomic_uint16_t &currentQueueIndex,
                                                                 std::vector<DeviceManager::QueueUtils> &currentQueues,

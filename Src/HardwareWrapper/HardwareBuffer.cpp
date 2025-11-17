@@ -1,6 +1,6 @@
-﻿#include"CabbageHardware.h"
-#include<Hardware/GlobalContext.h>
-#include<Hardware/ResourceCommand.h>
+﻿#include "CabbageHardware.h"
+#include "Hardware/GlobalContext.h"
+#include "Hardware/ResourceCommand.h"
 
 Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap> globalBufferStorages;
 

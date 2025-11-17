@@ -1,16 +1,9 @@
 ﻿#pragma once
 
-#include <array>
-#include <atomic>
 #include <chrono>
-#include <functional>
 #include <iostream>
-#include <memory>
 #include <mutex>
-#include <optional>
-#include <set>
-#include <stdexcept>
-#include <vector>
+#include <algorithm>
 
 #if defined(_WIN32)
     #define VK_USE_PLATFORM_WIN32_KHR
