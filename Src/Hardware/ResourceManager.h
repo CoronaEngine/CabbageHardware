@@ -83,7 +83,6 @@ struct ResourceManager
                                                 int arrayLayers = 1,
                                                 int mipLevels = 1,
                                                 VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
-
     [[nodiscard]] VkImageView createImageView(ImageHardwareWrap &image);
     void destroyImage(ImageHardwareWrap &image);
 
@@ -93,9 +92,6 @@ struct ResourceManager
                                                   VkBufferUsageFlags usage,
                                                   bool hostVisibleMapped = true,
                                                   bool useDedicated = false);
-
-    [[nodiscard]] BufferHardwareWrap createExportBuffer(VkDeviceSize size);
-
     void destroyBuffer(BufferHardwareWrap &buffer);
 
     // External memory operations
@@ -169,10 +165,10 @@ struct ResourceManager
     Corona::Kernel::Utils::Storage<BindingEntry<VkBuffer>> storageBufferBindingList;
     Corona::Kernel::Utils::Storage<BindingEntry<VkImageView>> storageImageBindingList;
 
-    const uint32_t UniformBinding = 0;
-    const uint32_t TextureBinding = 1;
-    const uint32_t StorageBufferBinding = 2;
-    const uint32_t StorageImageBinding = 3;
+    const uint32_t uniformBinding = 0;
+    const uint32_t textureBinding = 1;
+    const uint32_t storageBufferBinding = 2;
+    const uint32_t storageImageBinding = 3;
 
     uint32_t uniformBindingIndex = 0;
     uint32_t textureBindingIndex = 0;
