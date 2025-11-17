@@ -553,6 +553,11 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
 {
     RequiredBarriers requiredBarriers;
 
+    if (geomMeshesRecord.size() < 0)
+    {
+        return requiredBarriers;
+    }
+
     // 内存屏障
     requiredBarriers.memoryBarriers.resize(1);
     auto &memoryBarrier = requiredBarriers.memoryBarriers[0];
@@ -660,11 +665,12 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
 
 void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
 {
-    const auto mainDevice = globalHardwareContext.getMainDevice();
-    if (!mainDevice)
+    if (geomMeshesRecord.size() < 0)
     {
-        throw std::runtime_error("No main device available");
+        return;
     }
+
+    const auto mainDevice = globalHardwareContext.getMainDevice();
 
     // 延迟创建管线
     if (pipelineLayout == VK_NULL_HANDLE || graphicsPipeline == VK_NULL_HANDLE)
@@ -795,6 +801,7 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
         // 绘制
         vkCmdDrawIndexed(commandBuffer, mesh.indexBuffer.elementCount, 1, 0, 0, 0);
     }
+
 
     vkCmdEndRenderPass(commandBuffer);
 
