@@ -1,10 +1,10 @@
 ﻿#pragma once
 
 #include <vector>
-#include "../Hardware/DeviceManager.h"
-#include "../Hardware/ResourceManager.h"
+#include "Hardware/DeviceManager.h"
+#include "Hardware/ResourceManager.h"
 #include "Compiler/ShaderCodeCompiler.h"
-#include "../CabbageHardware.h"
+#include "CabbageHardware.h"
 
 struct RasterizerPipeline : public CommandRecord
 {

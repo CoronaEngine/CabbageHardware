@@ -4,9 +4,6 @@
 #include <memory>
 #include <mutex>
 #include <type_traits>
-
-//#include <ktm/ktm.h>
-
 #include "Hardware/HardwareExecutor.h"
 
 enum class ImageFormat : uint32_t

@@ -1,5 +1,5 @@
 ﻿#include "DeviceManager.h"
-#include "../VulkanUtils.h"
+#include "HardwareUtil.h"
 
 DeviceManager::DeviceManager() = default;
 

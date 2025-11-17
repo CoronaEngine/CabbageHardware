@@ -1,9 +1,7 @@
 ﻿#include "ResourceManager.h"
-#include "HardwareExecutor.h"
-#include <Hardware/GlobalContext.h>
-#include <numeric>
+#include "HardwareUtil.h"
+#include "GlobalContext.h"
 
-// #define VMA_STATS_STRING_ENABLED 0
 #define VK_NO_PROTOTYPES
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>

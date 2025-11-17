@@ -1,13 +1,6 @@
-﻿#include"DisplayManager.h"
-#include <algorithm>
-#include<vector>
-#include<volk.h>
-#include <cstdlib>
-#include <memory>
-#include<Hardware/GlobalContext.h>
-#include<Hardware/ResourceCommand.h>
-#include<corona/kernel/memory/cache_aligned_allocator.h>
-#include <numeric>
+﻿#include "DisplayManager.h"
+#include "Hardware/ResourceCommand.h"
+#include "corona/kernel/memory/cache_aligned_allocator.h"
 
 #define USE_SAME_DEVICE
 

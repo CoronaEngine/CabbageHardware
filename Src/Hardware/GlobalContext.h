@@ -1,8 +1,7 @@
 ﻿#pragma once
 
-#include "Hardware/DeviceManager.h"
-#include "Hardware/ResourceManager.h"
-#include "../VulkanUtils.h"
+#include "DeviceManager.h"
+#include "ResourceManager.h"
 #include "corona/kernel/utils/storage.h"
 
 class DisplayManager;

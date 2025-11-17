@@ -1,10 +1,10 @@
 ﻿#pragma once
 
 #include <ktm/ktm.h>
-#include "../Hardware/DeviceManager.h"
-#include "../Hardware/ResourceManager.h"
+#include "Hardware/DeviceManager.h"
+#include "Hardware/ResourceManager.h"
 #include "Compiler/ShaderCodeCompiler.h"
-#include "../CabbageHardware.h"
+#include "CabbageHardware.h"
 
 struct ComputePipeline : public CommandRecord
 {
