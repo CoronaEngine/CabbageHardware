@@ -23,3 +23,4 @@ target_link_libraries(CabbageHardwareExamples PRIVATE
     CabbageHardware)
 
 helicon_install_runtime_deps(CabbageHardwareExamples)
+corona_copy_tbb_runtime_artifacts(CabbageHardwareExamples)
