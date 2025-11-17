@@ -9,21 +9,63 @@
 #include <iostream>
 #include <ktm/ktm.h>
 
+// Windows 控制台颜色支持
+#ifdef _WIN32
+#include <windows.h>
+
+inline void setConsoleColor(WORD color)
+{
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleTextAttribute(hConsole, color);
+}
+
+inline void setConsoleErrorColor(WORD color)
+{
+    HANDLE hConsole = GetStdHandle(STD_ERROR_HANDLE);
+    SetConsoleTextAttribute(hConsole, color);
+}
+
+#define CONSOLE_RED (FOREGROUND_RED | FOREGROUND_INTENSITY)
+#define CONSOLE_GREEN (FOREGROUND_GREEN | FOREGROUND_INTENSITY)
+#define CONSOLE_YELLOW (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY)
+#define CONSOLE_CYAN (FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY)
+#define CONSOLE_DEFAULT (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE)
+
+#endif
+
 constexpr bool ENABLE_RESOURCE_TRACKING = true;
 constexpr bool ENABLE_VERBOSE_LOGGING = true;
 
 // 调试日志宏
-#define LOG_INFO(msg)                               \
-    if (ENABLE_VERBOSE_LOGGING)                     \
-    {                                               \
-        std::cout << "[INFO] " << msg << std::endl; \
-    }
-#define LOG_ERROR(msg) std::cerr << "[ERROR] " << msg << std::endl;
-#define LOG_RESOURCE(action, type)                                        \
-    if (ENABLE_RESOURCE_TRACKING)                                         \
-    {                                                                     \
-        std::cout << "[RESOURCE] " << action << " " << type << std::endl; \
-    }
+#define LOG_INFO(msg)                                       \
+    do                                                      \
+    {                                                       \
+        if (ENABLE_VERBOSE_LOGGING)                         \
+        {                                                   \
+            std::cout << "[INFO] " << msg << std::endl;     \
+        }                                                   \
+    } while(0)
+
+#define LOG_ERROR(msg)                                      \
+    do                                                      \
+    {                                                       \
+        setConsoleErrorColor(CONSOLE_RED);                  \
+        std::cerr << "[ERROR] " << msg << std::endl;        \
+        setConsoleErrorColor(CONSOLE_DEFAULT);              \
+    } while(0)
+
+#define LOG_RESOURCE(action, type)                          \
+    do                                                      \
+    {                                                       \
+        if (ENABLE_RESOURCE_TRACKING)                       \
+        {                                                   \
+            setConsoleColor(CONSOLE_CYAN);                  \
+            std::cout << "[RESOURCE] " << action << " "     \
+                      << type;                              \
+            setConsoleColor(CONSOLE_DEFAULT);               \
+            std::cout << std::endl;                         \
+        }                                                   \
+    } while(0)
 
 // 着色器路径解析
 inline std::string resolveShaderPath()
@@ -80,7 +122,7 @@ namespace RenderConfig
     constexpr int WINDOW_WIDTH = 1920;
     constexpr int WINDOW_HEIGHT = 1080;
     constexpr int WINDOW_COUNT = 1;
-    constexpr int CUBE_COUNT = 20;
+    constexpr int CUBE_COUNT = 0;
     constexpr int COMPUTE_GROUP_SIZE = 8;
     constexpr int FRAME_AVERAGE_COUNT = 100;
 }

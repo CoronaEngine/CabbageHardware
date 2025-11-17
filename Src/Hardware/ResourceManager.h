@@ -130,7 +130,7 @@ struct ResourceManager
 
     BindlessDescriptorSet bindlessDescriptors[4];
 
-  private:
+private:
     enum class DescriptorBindingType : uint8_t
     {
         Uniform = 0,
