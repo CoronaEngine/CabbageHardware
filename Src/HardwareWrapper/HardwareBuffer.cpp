@@ -74,7 +74,7 @@ HardwareBuffer::HardwareBuffer(uint32_t bufferSize, uint32_t elementSize, Buffer
 
     const auto handle = globalBufferStorages.allocate([&](ResourceManager::BufferHardwareWrap &buffer)
     {
-        buffer = globalHardwareContext.getMainDevice()->resourceManager.createBuffer(bufferSize, elementSize, vkUsage);
+        buffer = globalHardwareContext.getMainDevice()->resourceManager.createBuffer(bufferSize, elementSize, vkUsage, true, true);
         buffer.refCount = 1;
 
         if (data != nullptr && buffer.bufferAllocInfo.pMappedData != nullptr)
