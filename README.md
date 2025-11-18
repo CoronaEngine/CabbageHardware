@@ -1,5 +1,5 @@
 # TODO（按优先级排序）
-- （紧急）VMA的buffer导入导出bug
+- （BUG）VMA的buffer导入导出
 - （紧急）多线程资源释放、内存泄漏
 - （紧急）多显卡同步（timeline）：VK_KHR_external_semaphore
 - （BUG）多线程同步：display无法使用timeline，无法判断queue任务是否完成
