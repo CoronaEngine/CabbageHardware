@@ -518,8 +518,8 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
             }
 
             // 设置跨设备传输
-            //if (globalHardwareContext.getMainDevice() != displayDevice)
-            if (true)
+            if (globalHardwareContext.getMainDevice() != displayDevice)
+            //if (true)
             {
                 this->displayImage = displayDevice->resourceManager.createImage(sourceImage.imageSize, sourceImage.imageFormat,sourceImage.pixelSize, sourceImage.imageUsage);
 
@@ -574,16 +574,16 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         vkResetFences(displayDevice->deviceManager.getLogicalDevice(), 1, &inFlightFences[currentFrame]);
 
         // 跨设备传输（如果需要）
-        //if (globalHardwareContext.getMainDevice() != displayDevice)
-        if (true)
+        if (globalHardwareContext.getMainDevice() != displayDevice)
+        //if (true)
         {
             CopyImageToBufferCommand copyCmd(sourceImage, srcStaging);
             (*mainDeviceExecutor) << &copyCmd << mainDeviceExecutor->commit();
 
 
-            std::vector<uint8_t> zeroData(dstStaging.bufferAllocInfo.size, 0);
-            displayDevice->resourceManager.copyBufferToHost(dstStaging, zeroData.data(), dstStaging.bufferAllocInfo.size);
-            vkDeviceWaitIdle(displayDevice->deviceManager.getLogicalDevice());
+            //std::vector<uint8_t> zeroData(dstStaging.bufferAllocInfo.size, 0);
+            //displayDevice->resourceManager.copyBufferToHost(dstStaging, zeroData.data(), dstStaging.bufferAllocInfo.size);
+            //vkDeviceWaitIdle(displayDevice->deviceManager.getLogicalDevice());
 
             CopyBufferToImageCommand copyCmd2(dstStaging, this->displayImage);
             (*displayDeviceExecutor) << &copyCmd2;
