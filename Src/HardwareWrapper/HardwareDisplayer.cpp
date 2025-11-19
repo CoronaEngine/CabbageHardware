@@ -17,8 +17,7 @@ void incrementDisplayerRefCount(uintptr_t id)
 {
     if (id != 0)
     {
-        globalDisplayerStorages.write(id, [](DisplayerHardwareWrap &displayer)
-        {
+        globalDisplayerStorages.write(id, [](DisplayerHardwareWrap &displayer) {
             ++displayer.refCount;
         });
     }
@@ -32,8 +31,7 @@ void decrementDisplayerRefCount(uintptr_t id)
     }
 
     bool shouldDestroy = false;
-    globalDisplayerStorages.write(id, [&](DisplayerHardwareWrap &displayer)
-    {
+    globalDisplayerStorages.write(id, [&](DisplayerHardwareWrap &displayer) {
         if (--displayer.refCount == 0)
         {
             displayer.displayManager.reset();
@@ -50,8 +48,7 @@ void decrementDisplayerRefCount(uintptr_t id)
 
 HardwareDisplayer::HardwareDisplayer(void *surface)
 {
-    const auto handle = globalDisplayerStorages.allocate([surface](DisplayerHardwareWrap &displayer)
-    {
+    const auto handle = globalDisplayerStorages.allocate([surface](DisplayerHardwareWrap &displayer) {
         displayer.displaySurface = surface;
         displayer.displayManager = std::make_shared<DisplayManager>();
         displayer.refCount = 1;
@@ -88,16 +85,15 @@ HardwareDisplayer &HardwareDisplayer::operator=(const HardwareDisplayer &other)
 HardwareDisplayer &HardwareDisplayer::wait(HardwareExecutor &executor)
 {
     globalDisplayerStorages.read(*displaySurfaceID,
-        [&executor](const DisplayerHardwareWrap &displayer)
-        {
-            if (displayer.displayManager && executor.getExecutorID())
-            {
-                if (HardwareExecutorVulkan* executorImpl = getExecutorImpl(*executor.getExecutorID()))
-                {
-                    displayer.displayManager->waitExecutor(*executorImpl);
-                }
-            }
-        });
+                                 [&executor](const DisplayerHardwareWrap &displayer) {
+                                     if (displayer.displayManager && executor.getExecutorID())
+                                     {
+                                         if (HardwareExecutorVulkan *executorImpl = getExecutorImpl(*executor.getExecutorID()))
+                                         {
+                                             displayer.displayManager->waitExecutor(*executorImpl);
+                                         }
+                                     }
+                                 });
 
     return *this;
 }
@@ -105,13 +101,12 @@ HardwareDisplayer &HardwareDisplayer::wait(HardwareExecutor &executor)
 HardwareDisplayer &HardwareDisplayer::operator<<(HardwareImage &image)
 {
     globalDisplayerStorages.read(*displaySurfaceID,
-        [&image](const DisplayerHardwareWrap &displayer)
-        {
-            if (displayer.displayManager && displayer.displaySurface)
-            {
-                displayer.displayManager->displayFrame(displayer.displaySurface, image);
-            }
-        });
+                                 [&image](const DisplayerHardwareWrap &displayer) {
+                                     if (displayer.displayManager && displayer.displaySurface)
+                                     {
+                                         displayer.displayManager->displayFrame(displayer.displaySurface, image);
+                                     }
+                                 });
 
     return *this;
 }
