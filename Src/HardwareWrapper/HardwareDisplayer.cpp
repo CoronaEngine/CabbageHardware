@@ -1,8 +1,11 @@
 ﻿#include "CabbageHardware.h"
 #include "Display/DisplayManager.h"
-#include "HardwareWrapper/InternalAccessor.h"
 
 #include "Hardware/HardwareExecutorVulkan.h"
+
+
+HardwareExecutorVulkan *getExecutorImpl(uintptr_t id);
+
 
 struct DisplayerHardwareWrap
 {

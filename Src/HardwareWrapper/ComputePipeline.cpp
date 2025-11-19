@@ -3,6 +3,8 @@
 
 #include "Hardware/HardwareExecutorVulkan.h"
 
+HardwareExecutorVulkan *getExecutorImpl(uintptr_t id);
+
 struct ComputePipelineWrap
 {
     ComputePipelineVulkan *impl = nullptr; // 具体实现对象

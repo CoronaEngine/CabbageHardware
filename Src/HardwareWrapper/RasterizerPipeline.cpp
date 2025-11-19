@@ -1,6 +1,8 @@
 #include "Pipeline/RasterizerPipeline.h"
 #include "CabbageHardware.h"
 
+HardwareExecutorVulkan *getExecutorImpl(uintptr_t id);
+
 struct RasterizerPipelineWrap
 {
     RasterizerPipelineVulkan *impl = nullptr;

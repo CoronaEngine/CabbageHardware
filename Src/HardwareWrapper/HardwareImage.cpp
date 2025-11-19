@@ -4,6 +4,8 @@
 
 #include "Hardware/HardwareExecutorVulkan.h"
 
+HardwareExecutorVulkan *getExecutorImpl(uintptr_t id);
+
 Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageStorages;
 
 struct ImageFormatInfo
