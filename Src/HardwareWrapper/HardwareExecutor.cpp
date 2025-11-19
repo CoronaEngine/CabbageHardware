@@ -54,8 +54,8 @@ HardwareExecutor &HardwareExecutor::operator=(const HardwareExecutor &other)
     if (this != &other)
     {
         incExec(*other.executorID);
-        decExec(*executorID);
-        *executorID = *other.executorID;
+     decExec(*executorID);
+    executorID = other.executorID;  // 浅拷贝 shared_ptr
     }
     return *this;
 }
@@ -95,9 +95,15 @@ HardwareExecutor &HardwareExecutor::operator<<(HardwareExecutor &other)
 
 HardwareExecutor &HardwareExecutor::wait(HardwareExecutor &other)
 {
-    ExecutorWrap otherWrap;
-    gExecutorStorage.read(*other.executorID, [&](const ExecutorWrap &w) { otherWrap = w; });
-    gExecutorStorage.read(*executorID, [&](const ExecutorWrap &wrap) { if(otherWrap.impl) wrap.impl->wait(*otherWrap.impl); });
+    // 在同一个读锁内完成所有操作，避免竞态条件
+    gExecutorStorage.read(*executorID, [&](const ExecutorWrap &wrap) {
+        gExecutorStorage.read(*other.executorID, [&](const ExecutorWrap &otherWrap) {
+            if (otherWrap.impl && wrap.impl)
+            {
+                wrap.impl->wait(*otherWrap.impl);
+            }
+        });
+    });
     return *this;
 }
 

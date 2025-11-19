@@ -3,9 +3,7 @@
 
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 
-
 HardwareExecutorVulkan *getExecutorImpl(uintptr_t id);
-
 
 struct DisplayerHardwareWrap
 {
@@ -87,16 +85,21 @@ HardwareDisplayer &HardwareDisplayer::operator=(const HardwareDisplayer &other)
 
 HardwareDisplayer &HardwareDisplayer::wait(HardwareExecutor &executor)
 {
-    globalDisplayerStorages.read(*displaySurfaceID,
-                                 [&executor](const DisplayerHardwareWrap &displayer) {
-                                     if (displayer.displayManager && executor.getExecutorID())
-                                     {
-                                         if (HardwareExecutorVulkan *executorImpl = getExecutorImpl(*executor.getExecutorID()))
+    // 确保在锁内完成所有操作
+    if (executor.getExecutorID())
+    {
+        const uintptr_t execID = *executor.getExecutorID();
+        globalDisplayerStorages.read(*displaySurfaceID,
+                                     [execID](const DisplayerHardwareWrap &displayer) {
+                                         if (displayer.displayManager)
                                          {
-                                             displayer.displayManager->waitExecutor(*executorImpl);
+                                             if (HardwareExecutorVulkan *executorImpl = getExecutorImpl(execID))
+                                             {
+                                                 displayer.displayManager->waitExecutor(*executorImpl);
+                                             }
                                          }
-                                     }
-                                 });
+                                     });
+    }
 
     return *this;
 }
