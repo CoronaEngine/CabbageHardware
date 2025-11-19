@@ -1,7 +1,7 @@
-#include "Pipeline/ComputePipeline.h"
+#include "HardwareWrapperVulkan/PipelineVulkan/ComputePipeline.h"
 #include "CabbageHardware.h"
 
-#include "Hardware/HardwareExecutorVulkan.h"
+#include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 
 HardwareExecutorVulkan *getExecutorImpl(uintptr_t id);
 

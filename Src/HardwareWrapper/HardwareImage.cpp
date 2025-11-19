@@ -1,8 +1,8 @@
 ﻿#include "CabbageHardware.h"
-#include "Hardware/GlobalContext.h"
-#include "Hardware/ResourceCommand.h"
+#include "HardwareWrapperVulkan/HardwareVulkan/GlobalContext.h"
+#include "HardwareWrapperVulkan/HardwareVulkan/ResourceCommand.h"
 
-#include "Hardware/HardwareExecutorVulkan.h"
+#include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 
 HardwareExecutorVulkan *getExecutorImpl(uintptr_t id);
 

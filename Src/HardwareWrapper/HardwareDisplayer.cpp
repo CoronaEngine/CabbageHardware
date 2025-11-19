@@ -1,7 +1,7 @@
 ﻿#include "CabbageHardware.h"
-#include "Display/DisplayManager.h"
+#include "HardwareWrapperVulkan/DisplayVulkan/DisplayManager.h"
 
-#include "Hardware/HardwareExecutorVulkan.h"
+#include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 
 
 HardwareExecutorVulkan *getExecutorImpl(uintptr_t id);

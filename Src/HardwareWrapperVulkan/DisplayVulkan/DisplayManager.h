@@ -4,9 +4,9 @@
 #include <numeric>
 
 #include "CabbageHardware.h"
-#include "Hardware/HardwareUtil.h"
+#include "HardwareWrapperVulkan/HardwareVulkan/HardwareUtil.h"
 
-#include "Hardware/HardwareExecutorVulkan.h"
+#include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 
 class DisplayManager
 {
