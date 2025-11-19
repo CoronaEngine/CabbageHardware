@@ -122,7 +122,7 @@ namespace RenderConfig
     constexpr int WINDOW_WIDTH = 1920;
     constexpr int WINDOW_HEIGHT = 1080;
     constexpr int WINDOW_COUNT = 1;
-    constexpr int CUBE_COUNT = 0;
+    constexpr int CUBE_COUNT = 10;
     constexpr int COMPUTE_GROUP_SIZE = 8;
     constexpr int FRAME_AVERAGE_COUNT = 100;
 }
