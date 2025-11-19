@@ -130,6 +130,11 @@ HardwareBuffer::operator bool() const
 
 bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareExecutor *executor)
 {
+    if (!executor || !executor->getExecutorID() || *executor->getExecutorID() == 0)
+    {
+        return false;  // 必须提供有效的 executor
+    }
+
     ResourceManager::BufferHardwareWrap srcBuffer;
     ResourceManager::BufferHardwareWrap dstBuffer;
 
@@ -148,9 +153,14 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareE
         return false;
     }
 
-    HardwareExecutorVulkan tempExecutor;
+    HardwareExecutorVulkan *executorImpl = getExecutorImpl(*executor->getExecutorID());
+    if (!executorImpl)
+    {
+        return false;
+    }
+
     CopyBufferCommand copyCmd(srcBuffer, dstBuffer);
-    tempExecutor << &copyCmd << tempExecutor.commit();
+    (*executorImpl) << &copyCmd;
 
     return true;
 }

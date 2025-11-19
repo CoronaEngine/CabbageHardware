@@ -120,7 +120,35 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
 
     if (imageData != nullptr)
     {
-        copyFromData(imageData);
+        // 构造函数中需要立即上传数据，创建临时 executor 并立即提交
+        HardwareExecutorVulkan tempExecutor;
+
+        uint32_t imgWidth = 0;
+        uint32_t imgHeight = 0;
+        uint32_t imgPixelSize = 0;
+
+        globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
+            imgWidth = image.imageSize.x;
+            imgHeight = image.imageSize.y;
+            imgPixelSize = image.pixelSize;
+        });
+
+        const uint64_t bufferSize = static_cast<uint64_t>(imgWidth) * imgHeight * imgPixelSize;
+        HardwareBuffer stagingBuffer(bufferSize, BufferUsage::StorageBuffer, imageData);
+
+        ResourceManager::BufferHardwareWrap srcBuffer;
+        ResourceManager::ImageHardwareWrap dstImage;
+
+        globalBufferStorages.read(*stagingBuffer.bufferID, [&](const ResourceManager::BufferHardwareWrap &buf) {
+            srcBuffer = buf;
+        });
+
+        globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &img) {
+            dstImage = img;
+        });
+
+        CopyBufferToImageCommand copyCmd(srcBuffer, dstImage);
+        tempExecutor << &copyCmd << tempExecutor.commit();
     }
 }
 
@@ -174,8 +202,13 @@ uint32_t HardwareImage::storeDescriptor()
     return index;
 }
 
-HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
+HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer, HardwareExecutor *executor)
 {
+    if (!executor || !executor->getExecutorID() || *executor->getExecutorID() == 0)
+    {
+        return *this;  // 必须提供有效的 executor
+    }
+
     ResourceManager::BufferHardwareWrap srcBuffer;
     ResourceManager::ImageHardwareWrap dstImage;
 
@@ -187,14 +220,19 @@ HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
         dstImage = img;
     });
 
-    HardwareExecutorVulkan tempExecutor;
+    HardwareExecutorVulkan *executorImpl = getExecutorImpl(*executor->getExecutorID());
+    if (!executorImpl)
+    {
+        return *this;
+    }
+
     CopyBufferToImageCommand copyCmd(srcBuffer, dstImage);
-    tempExecutor << &copyCmd << tempExecutor.commit();
+    (*executorImpl) << &copyCmd;
 
     return *this;
 }
 
-HardwareImage &HardwareImage::copyFromData(const void *inputData)
+HardwareImage &HardwareImage::copyFromData(const void *inputData, HardwareExecutor *executor)
 {
     if (inputData == nullptr)
     {
@@ -214,5 +252,5 @@ HardwareImage &HardwareImage::copyFromData(const void *inputData)
     const uint64_t bufferSize = static_cast<uint64_t>(width) * height * pixelSize;
     HardwareBuffer stagingBuffer(bufferSize, BufferUsage::StorageBuffer, inputData);
 
-    return copyFromBuffer(stagingBuffer);
+    return copyFromBuffer(stagingBuffer, executor);
 }

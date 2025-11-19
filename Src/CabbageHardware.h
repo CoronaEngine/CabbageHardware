@@ -147,8 +147,8 @@ public:
         return imageID;
     }
 
-    HardwareImage &copyFromBuffer(const HardwareBuffer &buffer);
-    HardwareImage &copyFromData(const void *inputData);
+    HardwareImage &copyFromBuffer(const HardwareBuffer &buffer, HardwareExecutor *executor);
+    HardwareImage &copyFromData(const void *inputData, HardwareExecutor *executor);
 
   private:
     std::shared_ptr<uintptr_t> imageID;
