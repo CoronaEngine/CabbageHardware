@@ -4,7 +4,7 @@
 #include <memory>
 #include <mutex>
 #include <type_traits>
-#include "Hardware/HardwareExecutor.h"
+#include "Hardware/HardwareExecutorVulkan.h"
 
 enum class ImageFormat : uint32_t
 {
@@ -87,7 +87,7 @@ public:
 
     [[nodiscard]] uint32_t storeDescriptor();
 
-    bool copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareExecutor *executor);
+    bool copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareExecutorVulkan *executor);
 
     bool copyFromData(const void *inputData, uint64_t size);
 
@@ -187,7 +187,7 @@ public:
     HardwareDisplayer &operator=(const HardwareDisplayer &other);
     HardwareDisplayer &operator<<(HardwareImage &image);
 
-    HardwareDisplayer &wait(HardwareExecutor &executor);
+    HardwareDisplayer &wait(HardwareExecutorVulkan &executor);
 
     [[nodiscard]] std::shared_ptr<uintptr_t> getDisplayerID() const
     {

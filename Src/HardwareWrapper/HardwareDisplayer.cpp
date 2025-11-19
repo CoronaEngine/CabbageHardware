@@ -82,7 +82,7 @@ HardwareDisplayer &HardwareDisplayer::operator=(const HardwareDisplayer &other)
     return *this;
 }
 
-HardwareDisplayer &HardwareDisplayer::wait(HardwareExecutor &executor)
+HardwareDisplayer &HardwareDisplayer::wait(HardwareExecutorVulkan &executor)
 {
     globalDisplayerStorages.read(*displaySurfaceID,
         [&executor](const DisplayerHardwareWrap &displayer)

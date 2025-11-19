@@ -19,7 +19,7 @@ public:
     DisplayManager &operator=(DisplayManager &&) = delete;
 
     bool initDisplayManager(void *surface);
-    bool waitExecutor(HardwareExecutor &executor);
+    bool waitExecutor(HardwareExecutorVulkan &executor);
     bool displayFrame(void *surface, HardwareImage displayImage);
 
 private:
@@ -53,9 +53,9 @@ private:
     ResourceManager::BufferHardwareWrap dstStaging{};
 
     // 执行器
-    std::shared_ptr<HardwareExecutor> mainDeviceExecutor;
-    std::shared_ptr<HardwareExecutor> displayDeviceExecutor;
-    std::shared_ptr<HardwareExecutor> waitedExecutor;
+    std::shared_ptr<HardwareExecutorVulkan> mainDeviceExecutor;
+    std::shared_ptr<HardwareExecutorVulkan> displayDeviceExecutor;
+    std::shared_ptr<HardwareExecutorVulkan> waitedExecutor;
 
     // 内部方法
     void cleanUpDisplayManager();

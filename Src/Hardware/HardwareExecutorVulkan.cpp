@@ -1,6 +1,6 @@
-﻿#include "HardwareExecutor.h"
+﻿#include "HardwareExecutorVulkan.h"
 
-DeviceManager::QueueUtils *HardwareExecutor::pickQueueAndCommit(std::atomic_uint16_t &currentQueueIndex,
+DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomic_uint16_t &currentQueueIndex,
                                                                 std::vector<DeviceManager::QueueUtils> &currentQueues,
                                                                 std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand)
 {
@@ -40,7 +40,7 @@ DeviceManager::QueueUtils *HardwareExecutor::pickQueueAndCommit(std::atomic_uint
 
 
 
-HardwareExecutor &HardwareExecutor::commit()
+HardwareExecutorVulkan &HardwareExecutorVulkan::commit()
 {
     if (commandList.size() > 0)
     {

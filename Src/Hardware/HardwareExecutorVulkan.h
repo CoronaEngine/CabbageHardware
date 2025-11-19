@@ -2,7 +2,7 @@
 
 #include "Hardware/GlobalContext.h"
 
-struct HardwareExecutor;
+struct HardwareExecutorVulkan;
 
 struct CommandRecordVulkan
 {
@@ -24,11 +24,11 @@ struct CommandRecordVulkan
     CommandRecordVulkan() = default;
     virtual ~CommandRecordVulkan() = default;
 
-    virtual void commitCommand(HardwareExecutor &hardwareExecutor)
+    virtual void commitCommand(HardwareExecutorVulkan &HardwareExecutorVulkan)
     {
     }
 
-    virtual RequiredBarriers getRequiredBarriers(HardwareExecutor &hardwareExecutor)
+    virtual RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &HardwareExecutorVulkan)
     {
         return RequiredBarriers{};
     }
@@ -42,16 +42,16 @@ struct CommandRecordVulkan
     ExecutorType executorType = ExecutorType::Invalid;
 };
 
-struct HardwareExecutor
+struct HardwareExecutorVulkan
 {
-    HardwareExecutor(std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext = globalHardwareContext.getMainDevice())
+    HardwareExecutorVulkan(std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext = globalHardwareContext.getMainDevice())
         : hardwareContext(hardwareContext)
     {
     }
 
-    ~HardwareExecutor() = default;
+    ~HardwareExecutorVulkan() = default;
 
-    HardwareExecutor &operator<<(CommandRecordVulkan *CommandRecordVulkan)
+    HardwareExecutorVulkan &operator<<(CommandRecordVulkan *CommandRecordVulkan)
     {
         if (CommandRecordVulkan->getExecutorType() != CommandRecordVulkan::ExecutorType::Invalid)
         {
@@ -60,12 +60,12 @@ struct HardwareExecutor
         return *this;
     }
 
-    HardwareExecutor &operator<<(HardwareExecutor &other)
+    HardwareExecutorVulkan &operator<<(HardwareExecutorVulkan &other)
     {
         return other;
     }
 
-    HardwareExecutor &wait(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
+    HardwareExecutorVulkan &wait(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
                            std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
                            VkFence fence = VK_NULL_HANDLE)
     {
@@ -81,7 +81,7 @@ struct HardwareExecutor
         return *this;
     }
 
-    HardwareExecutor &wait(HardwareExecutor &other)
+    HardwareExecutorVulkan &wait(HardwareExecutorVulkan &other)
     {
         VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
         timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
@@ -92,7 +92,7 @@ struct HardwareExecutor
         return *this;
     }
 
-    HardwareExecutor &commit();
+    HardwareExecutorVulkan &commit();
 
     static DeviceManager::QueueUtils *pickQueueAndCommit(std::atomic_uint16_t &queueIndex, std::vector<DeviceManager::QueueUtils> &queues, std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand);
 

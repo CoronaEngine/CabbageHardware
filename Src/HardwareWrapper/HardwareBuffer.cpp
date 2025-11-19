@@ -128,7 +128,7 @@ HardwareBuffer::operator bool() const
     return isValid;
 }
 
-bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareExecutor *executor)
+bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareExecutorVulkan *executor)
 {
     ResourceManager::BufferHardwareWrap srcBuffer;
     ResourceManager::BufferHardwareWrap dstBuffer;
@@ -150,7 +150,7 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareE
         return false;
     }
 
-    HardwareExecutor tempExecutor;
+    HardwareExecutorVulkan tempExecutor;
     CopyBufferCommand copyCmd(srcBuffer, dstBuffer);
     tempExecutor << &copyCmd << tempExecutor.commit();
 

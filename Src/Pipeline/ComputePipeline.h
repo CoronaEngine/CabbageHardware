@@ -23,8 +23,8 @@ struct ComputePipelineVulkan : public CommandRecordVulkan
         return CommandRecordVulkan::ExecutorType::Compute;
     }
 
-    void commitCommand(HardwareExecutor &hardwareExecutor) override;
-    RequiredBarriers getRequiredBarriers(HardwareExecutor &hardwareExecutor) override;
+    void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override;
+    RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override;
 
   private:
     void createComputePipeline();

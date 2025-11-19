@@ -280,8 +280,8 @@ void DisplayManager::choosePresentDevice()
         throw std::runtime_error("Failed to find suitable present device");
     }
 
-    mainDeviceExecutor = std::make_shared<HardwareExecutor>(globalHardwareContext.getMainDevice());
-    displayDeviceExecutor = std::make_shared<HardwareExecutor>(displayDevice);
+    mainDeviceExecutor = std::make_shared<HardwareExecutorVulkan>(globalHardwareContext.getMainDevice());
+    displayDeviceExecutor = std::make_shared<HardwareExecutorVulkan>(displayDevice);
 }
 
 void DisplayManager::createSwapChain()
@@ -485,9 +485,9 @@ void DisplayManager::setupCrossDeviceTransfer(const ResourceManager::ImageHardwa
     dstStaging = displayDevice->resourceManager.importBufferMemory(memHandle, srcStaging.elementCount, srcStaging.elementSize,srcStaging.bufferAllocInfo.size,srcStaging.bufferUsage);*/
 }
 
-bool DisplayManager::waitExecutor(HardwareExecutor &executor)
+bool DisplayManager::waitExecutor(HardwareExecutorVulkan &executor)
 {
-    waitedExecutor = std::make_shared<HardwareExecutor>(executor);
+    waitedExecutor = std::make_shared<HardwareExecutorVulkan>(executor);
     return true;
 }
 
@@ -635,7 +635,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
             return (queueResult == VK_SUCCESS || queueResult == VK_SUBOPTIMAL_KHR);
         };
 
-        HardwareExecutor::pickQueueAndCommit(currentQueueIndex, presentQueues, commitToQueue);
+        HardwareExecutorVulkan::pickQueueAndCommit(currentQueueIndex, presentQueues, commitToQueue);
 
         currentFrame = (currentFrame + 1) % swapChainImages.size();
         return true;

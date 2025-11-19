@@ -1,4 +1,4 @@
-#include "HardwareExecutor.h"
+#include "HardwareExecutorVulkan.h"
 
 struct CopyBufferCommand : public CommandRecordVulkan
 {
@@ -16,12 +16,12 @@ struct CopyBufferCommand : public CommandRecordVulkan
         return CommandRecordVulkan::ExecutorType::Transfer;
     }
 
-    void commitCommand(HardwareExecutor &hardwareExecutor) override
+    void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override
     {
         hardwareExecutor.hardwareContext->resourceManager.copyBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, srcBuffer, dstBuffer);
     }
 
-    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutor& hardwareExecutor)
+    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor)
     {
         CommandRecordVulkan::RequiredBarriers requiredBarriers;
         {
@@ -77,12 +77,12 @@ struct CopyImageCommand : public CommandRecordVulkan
         return CommandRecordVulkan::ExecutorType::Transfer;
     }
 
-    void commitCommand(HardwareExecutor &hardwareExecutor) override
+    void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override
     {
         hardwareExecutor.hardwareContext->resourceManager.copyImage(hardwareExecutor.currentRecordQueue->commandBuffer, srcImage, dstImage);
     }
 
-    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutor &hardwareExecutor)
+    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor)
     {
         CommandRecordVulkan::RequiredBarriers requiredBarriers;
         {
@@ -151,12 +151,12 @@ struct CopyBufferToImageCommand : public CommandRecordVulkan
         return CommandRecordVulkan::ExecutorType::Transfer;
     }
 
-    void commitCommand(HardwareExecutor &hardwareExecutor) override
+    void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override
     {
         hardwareExecutor.hardwareContext->resourceManager.copyBufferToImage(hardwareExecutor.currentRecordQueue->commandBuffer, srcBuffer, dstImage);
     }
 
-    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutor &hardwareExecutor)
+    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor)
     {
         CommandRecordVulkan::RequiredBarriers requiredBarriers;
         {
@@ -218,12 +218,12 @@ struct CopyImageToBufferCommand : public CommandRecordVulkan
         return CommandRecordVulkan::ExecutorType::Transfer;
     }
 
-    void commitCommand(HardwareExecutor &hardwareExecutor) override
+    void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override
     {
         hardwareExecutor.hardwareContext->resourceManager.copyImageToBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, srcImage, dstBuffer);
     }
 
-    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutor &hardwareExecutor) override
+    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override
     {
         CommandRecordVulkan::RequiredBarriers requiredBarriers;
         {
@@ -285,12 +285,12 @@ struct BlitImageCommand : public CommandRecordVulkan
         return CommandRecordVulkan::ExecutorType::Graphics;
     }
 
-    void commitCommand(HardwareExecutor &hardwareExecutor) override
+    void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override
     {
         hardwareExecutor.hardwareContext->resourceManager.blitImage(hardwareExecutor.currentRecordQueue->commandBuffer, srcImage, dstImage);
     }
 
-    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutor &hardwareExecutor) override
+    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override
     {
         CommandRecordVulkan::RequiredBarriers requiredBarriers;
 
@@ -363,12 +363,12 @@ struct TransitionImageLayoutCommand : public CommandRecordVulkan
         return CommandRecordVulkan::ExecutorType::Transfer;
     }
 
-    void commitCommand(HardwareExecutor &hardwareExecutor) override
+    void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override
     {
         hardwareExecutor.hardwareContext->resourceManager.transitionImageLayout(hardwareExecutor.currentRecordQueue->commandBuffer, image, imageLayout, dstStageMask, dstAccessMask);
     }
 
-    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutor &hardwareExecutor) override
+    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override
     {
         return CommandRecordVulkan::RequiredBarriers{};
     }

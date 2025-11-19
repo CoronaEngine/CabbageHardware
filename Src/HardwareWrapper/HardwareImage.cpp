@@ -190,7 +190,7 @@ HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer)
         dstImage = img;
     });
 
-    HardwareExecutor tempExecutor;
+    HardwareExecutorVulkan tempExecutor;
     CopyBufferToImageCommand copyCmd(srcBuffer, dstImage);
     tempExecutor << &copyCmd << tempExecutor.commit();
 

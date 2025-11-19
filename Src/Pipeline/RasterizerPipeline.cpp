@@ -549,7 +549,7 @@ CommandRecordVulkan *RasterizerPipelineVulkan::record(const HardwareBuffer &inde
     return &dumpCommandRecordVulkan;
 }
 
-CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarriers(HardwareExecutor &hardwareExecutor)
+CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor)
 {
     RequiredBarriers requiredBarriers;
 
@@ -663,7 +663,7 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
     return requiredBarriers;
 }
 
-void RasterizerPipelineVulkan::commitCommand(HardwareExecutor &hardwareExecutor)
+void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExecutor)
 {
     if (geomMeshesRecord.size() <= 0)
     {

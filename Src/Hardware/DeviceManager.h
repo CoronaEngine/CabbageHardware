@@ -83,7 +83,7 @@ public:
     }
 
 private:
-    friend class HardwareExecutor;
+    friend class HardwareExecutorVulkan;
 
     void createDevices(const CreateCallback &createInfo, const VkInstance &vkInstance);
     void chooseMainDevice();

@@ -242,7 +242,7 @@ private:
     // 成员变量
     std::atomic_bool& running;
     HardwareDisplayer displayManager;
-    HardwareExecutor executor;
+    HardwareExecutorVulkan executor;
     int threadId;
 
     // 资源 - 按销毁顺序排列

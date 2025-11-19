@@ -76,7 +76,7 @@ ComputePipelineVulkan *ComputePipelineVulkan::operator()(uint16_t x, uint16_t y,
     return this;
 }
 
-CommandRecordVulkan::RequiredBarriers ComputePipelineVulkan::getRequiredBarriers(HardwareExecutor &hardwareExecutor)
+CommandRecordVulkan::RequiredBarriers ComputePipelineVulkan::getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor)
 {
     RequiredBarriers requiredBarriers;
     requiredBarriers.memoryBarriers.resize(1);
@@ -148,7 +148,7 @@ void ComputePipelineVulkan::createComputePipeline()
     vkDestroyShaderModule(device, shaderModule, nullptr);
 }
 
-void ComputePipelineVulkan::commitCommand(HardwareExecutor &hardwareExecutor)
+void ComputePipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExecutor)
 {
     // 延迟创建管线
     if (pipelineLayout == VK_NULL_HANDLE || pipeline == VK_NULL_HANDLE)

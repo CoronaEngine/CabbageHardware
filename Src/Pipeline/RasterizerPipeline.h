@@ -40,8 +40,8 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan
         return CommandRecordVulkan::ExecutorType::Graphics;
     }
 
-    void commitCommand(HardwareExecutor &hardwareExecutor) override;
-    RequiredBarriers getRequiredBarriers(HardwareExecutor &hardwareExecutor) override;
+    void commitCommand(HardwareExecutorVulkan &hardwareExecutorVulkan) override;
+    RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutorVulkan) override;
 
   private:
     struct TriangleGeomMesh
