@@ -4,7 +4,7 @@
 
 struct HardwareExecutor;
 
-struct CommandRecord
+struct CommandRecordVulkan
 {
     enum class ExecutorType
     {
@@ -21,8 +21,8 @@ struct CommandRecord
         std::vector<VkImageMemoryBarrier2> imageBarriers;
     };
 
-    CommandRecord() = default;
-    virtual ~CommandRecord() = default;
+    CommandRecordVulkan() = default;
+    virtual ~CommandRecordVulkan() = default;
 
     virtual void commitCommand(HardwareExecutor &hardwareExecutor)
     {
@@ -51,11 +51,11 @@ struct HardwareExecutor
 
     ~HardwareExecutor() = default;
 
-    HardwareExecutor &operator<<(CommandRecord *commandRecord)
+    HardwareExecutor &operator<<(CommandRecordVulkan *CommandRecordVulkan)
     {
-        if (commandRecord->getExecutorType() != CommandRecord::ExecutorType::Invalid)
+        if (CommandRecordVulkan->getExecutorType() != CommandRecordVulkan::ExecutorType::Invalid)
         {
-            commandList.push_back(commandRecord);
+            commandList.push_back(CommandRecordVulkan);
         }
         return *this;
     }
@@ -97,12 +97,12 @@ struct HardwareExecutor
     static DeviceManager::QueueUtils *pickQueueAndCommit(std::atomic_uint16_t &queueIndex, std::vector<DeviceManager::QueueUtils> &queues, std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand);
 
     // private:
-    //     friend struct CommandRecord;
+    //     friend struct CommandRecordVulkan;
     DeviceManager::QueueUtils *currentRecordQueue = nullptr;
 
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
 
-    std::vector<CommandRecord *> commandList;
+    std::vector<CommandRecordVulkan *> commandList;
 
     std::vector<VkSemaphoreSubmitInfo> waitSemaphores = std::vector<VkSemaphoreSubmitInfo>();
     std::vector<VkSemaphoreSubmitInfo> signalSemaphores = std::vector<VkSemaphoreSubmitInfo>();

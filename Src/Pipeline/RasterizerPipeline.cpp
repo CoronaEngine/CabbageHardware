@@ -76,7 +76,7 @@ VkFormat getVkFormatFromType(const std::string &typeName, uint32_t elementCount)
 
 RasterizerPipelineVulkan::RasterizerPipelineVulkan()
 {
-    executorType = CommandRecord::ExecutorType::Graphics;
+    executorType = CommandRecordVulkan::ExecutorType::Graphics;
 }
 
 RasterizerPipelineVulkan::RasterizerPipelineVulkan(std::string vertexShaderCode,
@@ -525,7 +525,7 @@ RasterizerPipelineVulkan *RasterizerPipelineVulkan::operator()(uint16_t width, u
     return this;
 }
 
-CommandRecord *RasterizerPipelineVulkan::record(const HardwareBuffer &indexBuffer)
+CommandRecordVulkan *RasterizerPipelineVulkan::record(const HardwareBuffer &indexBuffer)
 {
     TriangleGeomMesh mesh;
     mesh.indexBuffer = getBufferFromHandle(*indexBuffer.getBufferID());
@@ -546,10 +546,10 @@ CommandRecord *RasterizerPipelineVulkan::record(const HardwareBuffer &indexBuffe
 
     geomMeshesRecord.push_back(std::move(mesh));
 
-    return &dumpCommandRecord;
+    return &dumpCommandRecordVulkan;
 }
 
-CommandRecord::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarriers(HardwareExecutor &hardwareExecutor)
+CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarriers(HardwareExecutor &hardwareExecutor)
 {
     RequiredBarriers requiredBarriers;
 

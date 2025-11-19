@@ -6,7 +6,7 @@
 #include "Compiler/ShaderCodeCompiler.h"
 #include "CabbageHardware.h"
 
-struct ComputePipelineVulkan : public CommandRecord
+struct ComputePipelineVulkan : public CommandRecordVulkan
 {
   public:
     ComputePipelineVulkan();
@@ -20,7 +20,7 @@ struct ComputePipelineVulkan : public CommandRecord
 
     ExecutorType getExecutorType() override
     {
-        return CommandRecord::ExecutorType::Compute;
+        return CommandRecordVulkan::ExecutorType::Compute;
     }
 
     void commitCommand(HardwareExecutor &hardwareExecutor) override;

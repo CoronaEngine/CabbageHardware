@@ -3,7 +3,7 @@
 
 ComputePipelineVulkan::ComputePipelineVulkan()
 {
-    executorType = CommandRecord::ExecutorType::Compute;
+    executorType = CommandRecordVulkan::ExecutorType::Compute;
 }
 
 ComputePipelineVulkan::ComputePipelineVulkan(std::string shaderCode,
@@ -76,7 +76,7 @@ ComputePipelineVulkan *ComputePipelineVulkan::operator()(uint16_t x, uint16_t y,
     return this;
 }
 
-CommandRecord::RequiredBarriers ComputePipelineVulkan::getRequiredBarriers(HardwareExecutor &hardwareExecutor)
+CommandRecordVulkan::RequiredBarriers ComputePipelineVulkan::getRequiredBarriers(HardwareExecutor &hardwareExecutor)
 {
     RequiredBarriers requiredBarriers;
     requiredBarriers.memoryBarriers.resize(1);

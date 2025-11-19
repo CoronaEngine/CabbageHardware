@@ -6,7 +6,7 @@
 #include "Compiler/ShaderCodeCompiler.h"
 #include "CabbageHardware.h"
 
-struct RasterizerPipelineVulkan : public CommandRecord
+struct RasterizerPipelineVulkan : public CommandRecordVulkan
 {
   public:
     RasterizerPipelineVulkan();
@@ -33,11 +33,11 @@ struct RasterizerPipelineVulkan : public CommandRecord
 
     RasterizerPipelineVulkan *operator()(uint16_t width, uint16_t height);
 
-    CommandRecord *record(const HardwareBuffer &indexBuffer);
+    CommandRecordVulkan *record(const HardwareBuffer &indexBuffer);
 
     ExecutorType getExecutorType() override
     {
-        return CommandRecord::ExecutorType::Graphics;
+        return CommandRecordVulkan::ExecutorType::Graphics;
     }
 
     void commitCommand(HardwareExecutor &hardwareExecutor) override;
@@ -75,7 +75,7 @@ struct RasterizerPipelineVulkan : public CommandRecord
 
     std::vector<TriangleGeomMesh> geomMeshesRecord;
 
-    CommandRecord dumpCommandRecord;
+    CommandRecordVulkan dumpCommandRecordVulkan;
     HardwarePushConstant tempPushConstant;
     std::vector<HardwareBuffer> tempVertexBuffers;
 

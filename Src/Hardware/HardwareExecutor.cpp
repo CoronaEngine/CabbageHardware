@@ -57,7 +57,7 @@ HardwareExecutor &HardwareExecutor::commit()
 
             for (size_t i = 0; i < commandList.size(); i++)
             {
-                CommandRecord::RequiredBarriers requiredBarriers = commandList[i]->getRequiredBarriers(*this);
+                CommandRecordVulkan::RequiredBarriers requiredBarriers = commandList[i]->getRequiredBarriers(*this);
 
                 if (!requiredBarriers.memoryBarriers.empty() || !requiredBarriers.bufferBarriers.empty() || !requiredBarriers.imageBarriers.empty())
                 {
@@ -74,7 +74,7 @@ HardwareExecutor &HardwareExecutor::commit()
                     vkCmdPipelineBarrier2(currentRecordQueue->commandBuffer, &dependencyInfo);
                 }
 
-                if (commandList[i]->getExecutorType() != CommandRecord::ExecutorType::Invalid)
+                if (commandList[i]->getExecutorType() != CommandRecordVulkan::ExecutorType::Invalid)
                 {
                     commandList[i]->commitCommand(*this);
                 }
@@ -119,29 +119,29 @@ HardwareExecutor &HardwareExecutor::commit()
         };
 
 
-        CommandRecord::ExecutorType queueType = CommandRecord::ExecutorType::Transfer;
+        CommandRecordVulkan::ExecutorType queueType = CommandRecordVulkan::ExecutorType::Transfer;
         for (size_t i = 0; i < commandList.size(); i++)
         {
-            if (commandList[i]->getExecutorType() == CommandRecord::ExecutorType::Graphics)
+            if (commandList[i]->getExecutorType() == CommandRecordVulkan::ExecutorType::Graphics)
             {
-                queueType = CommandRecord::ExecutorType::Graphics;
+                queueType = CommandRecordVulkan::ExecutorType::Graphics;
                 break;
             }
-            else if (commandList[i]->getExecutorType() == CommandRecord::ExecutorType::Compute)
+            else if (commandList[i]->getExecutorType() == CommandRecordVulkan::ExecutorType::Compute)
             {
-                queueType = CommandRecord::ExecutorType::Compute;
+                queueType = CommandRecordVulkan::ExecutorType::Compute;
             }
         }
 
         switch (queueType)
         {
-        case CommandRecord::ExecutorType::Graphics:
+        case CommandRecordVulkan::ExecutorType::Graphics:
             pickQueueAndCommit(hardwareContext->deviceManager.currentGraphicsQueueIndex, hardwareContext->deviceManager.graphicsQueues, commitToQueue);
             break;
-        case CommandRecord::ExecutorType::Compute:
+        case CommandRecordVulkan::ExecutorType::Compute:
             pickQueueAndCommit(hardwareContext->deviceManager.currentComputeQueueIndex, hardwareContext->deviceManager.computeQueues, commitToQueue);
             break;
-        case CommandRecord::ExecutorType::Transfer:
+        case CommandRecordVulkan::ExecutorType::Transfer:
             pickQueueAndCommit(hardwareContext->deviceManager.currentTransferQueueIndex, hardwareContext->deviceManager.transferQueues, commitToQueue);
             break;
         }
