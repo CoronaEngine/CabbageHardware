@@ -2,6 +2,8 @@
 #include "Hardware/GlobalContext.h"
 #include "Hardware/ResourceCommand.h"
 
+#include "Hardware/HardwareExecutorVulkan.h"
+
 Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageStorages;
 
 struct ImageFormatInfo

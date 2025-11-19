@@ -123,9 +123,9 @@ private:
     void initializePipelines()
     {
         LOG_RESOURCE("Creating", "Rasterizer Pipeline");
-        rasterizer = std::make_unique<RasterizerPipelineVulkan>(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
+        rasterizer = std::make_unique<RasterizerPipeline>(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
         LOG_RESOURCE("Creating", "Compute Pipeline");
-        computer = std::make_unique<ComputePipelineVulkan>(readStringFile(shaderPath + "/compute.glsl"));
+        computer = std::make_unique<ComputePipeline>(readStringFile(shaderPath + "/compute.glsl"));
     }
 
     void initializeCubes()
@@ -242,14 +242,14 @@ private:
     // 成员变量
     std::atomic_bool& running;
     HardwareDisplayer displayManager;
-    HardwareExecutorVulkan executor;
+    HardwareExecutor executor;
     int threadId;
 
     // 资源 - 按销毁顺序排列
 
     // 管线
-    std::unique_ptr<RasterizerPipelineVulkan> rasterizer;
-    std::unique_ptr<ComputePipelineVulkan> computer;
+    std::unique_ptr<RasterizerPipeline> rasterizer;
+    std::unique_ptr<ComputePipeline> computer;
 
     // 立方体数据
     std::vector<HardwareBuffer> cubeUniformBuffers;

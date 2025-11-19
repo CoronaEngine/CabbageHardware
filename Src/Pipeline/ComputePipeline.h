@@ -5,6 +5,7 @@
 #include "Hardware/ResourceManager.h"
 #include "Compiler/ShaderCodeCompiler.h"
 #include "CabbageHardware.h"
+#include "Hardware/HardwareExecutorVulkan.h"
 
 struct ComputePipelineVulkan : public CommandRecordVulkan
 {

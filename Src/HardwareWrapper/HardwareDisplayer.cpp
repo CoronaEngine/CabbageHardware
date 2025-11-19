@@ -1,5 +1,8 @@
 ﻿#include "CabbageHardware.h"
 #include "Display/DisplayManager.h"
+#include "HardwareWrapper/InternalAccessor.h"
+
+#include "Hardware/HardwareExecutorVulkan.h"
 
 struct DisplayerHardwareWrap
 {
@@ -82,14 +85,17 @@ HardwareDisplayer &HardwareDisplayer::operator=(const HardwareDisplayer &other)
     return *this;
 }
 
-HardwareDisplayer &HardwareDisplayer::wait(HardwareExecutorVulkan &executor)
+HardwareDisplayer &HardwareDisplayer::wait(HardwareExecutor &executor)
 {
     globalDisplayerStorages.read(*displaySurfaceID,
         [&executor](const DisplayerHardwareWrap &displayer)
         {
-            if (displayer.displayManager)
+            if (displayer.displayManager && executor.getExecutorID())
             {
-                displayer.displayManager->waitExecutor(executor);
+                if (HardwareExecutorVulkan* executorImpl = getExecutorImpl(*executor.getExecutorID()))
+                {
+                    displayer.displayManager->waitExecutor(*executorImpl);
+                }
             }
         });
 

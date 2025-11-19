@@ -6,6 +6,8 @@
 #include "CabbageHardware.h"
 #include "Hardware/HardwareUtil.h"
 
+#include "Hardware/HardwareExecutorVulkan.h"
+
 class DisplayManager
 {
 public:

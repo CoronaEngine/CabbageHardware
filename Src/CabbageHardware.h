@@ -4,7 +4,20 @@
 #include <memory>
 #include <mutex>
 #include <type_traits>
-#include "Hardware/HardwareExecutorVulkan.h"
+#include <variant>
+#include <vector>
+
+#include "Compiler/ShaderCodeCompiler.h"
+
+// Forward declare platform-specific types instead of including platform headers
+#if defined(_WIN32)
+    // Forward declare HANDLE without including Windows.h
+    #if !defined(_WINDEF_)
+        typedef void* HANDLE;
+    #endif
+#endif
+
+struct HardwareExecutor;
 
 enum class ImageFormat : uint32_t
 {
@@ -87,7 +100,7 @@ public:
 
     [[nodiscard]] uint32_t storeDescriptor();
 
-    bool copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareExecutorVulkan *executor);
+    bool copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareExecutor *executor);
 
     bool copyFromData(const void *inputData, uint64_t size);
 
@@ -187,7 +200,7 @@ public:
     HardwareDisplayer &operator=(const HardwareDisplayer &other);
     HardwareDisplayer &operator<<(HardwareImage &image);
 
-    HardwareDisplayer &wait(HardwareExecutorVulkan &executor);
+    HardwareDisplayer &wait(HardwareExecutor &executor);
 
     [[nodiscard]] std::shared_ptr<uintptr_t> getDisplayerID() const
     {
@@ -196,4 +209,87 @@ public:
 
 private:
     std::shared_ptr<uintptr_t> displaySurfaceID;
+};
+
+// ================= 对外封装：ComputePipeline =================
+struct ComputePipeline
+{
+  public:
+    ComputePipeline();
+    ComputePipeline(std::string shaderCode,
+                    EmbeddedShader::ShaderLanguage language = EmbeddedShader::ShaderLanguage::GLSL,
+                    const std::source_location &sourceLocation = std::source_location::current());
+    ComputePipeline(const ComputePipeline &other);
+    ~ComputePipeline();
+
+    ComputePipeline &operator=(const ComputePipeline &other);
+
+    std::variant<HardwarePushConstant> operator[](const std::string &resourceName);
+    ComputePipeline &operator()(uint16_t x, uint16_t y, uint16_t z);
+
+    [[nodiscard]] std::shared_ptr<uintptr_t> getComputePipelineID() const
+    {
+        return computePipelineID;
+    }
+
+  private:
+    std::shared_ptr<uintptr_t> computePipelineID; // 内部存储句柄
+};
+
+// ================= 对外封装：RasterizerPipeline =================
+struct RasterizerPipeline
+{
+  public:
+    RasterizerPipeline();
+    RasterizerPipeline(std::string vertexShaderCode,
+                       std::string fragmentShaderCode,
+                       uint32_t multiviewCount = 1,
+                       EmbeddedShader::ShaderLanguage vertexShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
+                       EmbeddedShader::ShaderLanguage fragmentShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
+                       const std::source_location &sourceLocation = std::source_location::current());
+    RasterizerPipeline(const RasterizerPipeline &other);
+    ~RasterizerPipeline();
+
+    RasterizerPipeline &operator=(const RasterizerPipeline &other);
+
+    void setDepthImage(HardwareImage &depthImage);
+    [[nodiscard]] HardwareImage getDepthImage();
+
+    std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> operator[](const std::string &resourceName);
+    RasterizerPipeline &operator()(uint16_t width, uint16_t height);
+    RasterizerPipeline &record(const HardwareBuffer &indexBuffer);
+
+    [[nodiscard]] std::shared_ptr<uintptr_t> getRasterizerPipelineID() const
+    {
+        return rasterizerPipelineID;
+    }
+
+  private:
+    std::shared_ptr<uintptr_t> rasterizerPipelineID; // 内部存储句柄
+};
+
+// ================= 对外封装：HardwareExecutor =================
+struct HardwareExecutor
+{
+  public:
+    HardwareExecutor();
+    HardwareExecutor(const HardwareExecutor &other);
+    ~HardwareExecutor();
+
+    HardwareExecutor &operator=(const HardwareExecutor &other);
+
+    HardwareExecutor &operator<<(ComputePipeline &computePipeline);
+    HardwareExecutor &operator<<(RasterizerPipeline &rasterizerPipeline);
+    HardwareExecutor &operator<<(HardwareExecutor &other); // 透传
+
+    HardwareExecutor &wait(HardwareExecutor &other);
+    HardwareExecutor &commit();
+
+    [[nodiscard]] std::shared_ptr<uintptr_t> getExecutorID() const
+    {
+        return executorID;
+    }
+
+  private:
+    std::shared_ptr<uintptr_t> executorID; // 内部存储句柄
 };

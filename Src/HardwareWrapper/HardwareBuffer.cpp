@@ -2,6 +2,8 @@
 #include "Hardware/GlobalContext.h"
 #include "Hardware/ResourceCommand.h"
 
+#include "Hardware/HardwareExecutorVulkan.h"
+
 Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap> globalBufferStorages;
 
 VkBufferUsageFlags convertBufferUsage(BufferUsage usage)
@@ -128,7 +130,7 @@ HardwareBuffer::operator bool() const
     return isValid;
 }
 
-bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareExecutorVulkan *executor)
+bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareExecutor *executor)
 {
     ResourceManager::BufferHardwareWrap srcBuffer;
     ResourceManager::BufferHardwareWrap dstBuffer;
