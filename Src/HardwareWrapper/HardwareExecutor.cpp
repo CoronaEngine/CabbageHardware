@@ -1,8 +1,8 @@
 #include "CabbageHardware.h"
-#include "Pipeline/ComputePipeline.h"
-#include "Pipeline/RasterizerPipeline.h"
+#include "HardwareWrapperVulkan/PipelineVulkan/ComputePipeline.h"
+#include "HardwareWrapperVulkan/PipelineVulkan/RasterizerPipeline.h"
 
-#include "Hardware/HardwareExecutorVulkan.h"
+#include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 
 // 前向声明内部访问函数
 ComputePipelineVulkan *getComputePipelineImpl(uintptr_t id);

@@ -1,5 +1,5 @@
 ﻿#include "RasterizerPipeline.h"
-#include "Hardware/HardwareUtil.h"
+#include "HardwareWrapperVulkan/HardwareVulkan/HardwareUtil.h"
 
 void extractStageBindings(const EmbeddedShader::ShaderCodeModule::ShaderResources &resources,
                           std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> &inputs,

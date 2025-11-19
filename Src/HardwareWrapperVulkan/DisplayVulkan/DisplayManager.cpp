@@ -1,5 +1,5 @@
 ﻿#include "DisplayManager.h"
-#include "Hardware/ResourceCommand.h"
+#include "HardwareWrapperVulkan/HardwareVulkan/ResourceCommand.h"
 #include "corona/kernel/memory/cache_aligned_allocator.h"
 
 #define USE_SAME_DEVICE

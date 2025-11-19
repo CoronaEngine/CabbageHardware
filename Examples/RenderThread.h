@@ -10,8 +10,8 @@
 #include <stb_image.h>
 
 #include "CabbageHardware.h"
-#include "Pipeline/ComputePipeline.h"
-#include "Pipeline/RasterizerPipeline.h"
+#include "HardwareWrapperVulkan/PipelineVulkan/ComputePipeline.h"
+#include "HardwareWrapperVulkan/PipelineVulkan/RasterizerPipeline.h"
 #include "Config.h"
 #include "CubeData.h"
 
