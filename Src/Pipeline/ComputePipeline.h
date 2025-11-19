@@ -6,17 +6,17 @@
 #include "Compiler/ShaderCodeCompiler.h"
 #include "CabbageHardware.h"
 
-struct ComputePipeline : public CommandRecord
+struct ComputePipelineVulkan : public CommandRecord
 {
   public:
-    ComputePipeline();
-    ~ComputePipeline() override;
+    ComputePipelineVulkan();
+    ~ComputePipelineVulkan() override;
 
-    ComputePipeline(std::string shaderCode, EmbeddedShader::ShaderLanguage language = EmbeddedShader::ShaderLanguage::GLSL, const std::source_location &sourceLocation = std::source_location::current());
+    ComputePipelineVulkan(std::string shaderCode, EmbeddedShader::ShaderLanguage language = EmbeddedShader::ShaderLanguage::GLSL, const std::source_location &sourceLocation = std::source_location::current());
 
     std::variant<HardwarePushConstant> operator[](const std::string &resourceName);
 
-    ComputePipeline *operator()(uint16_t x, uint16_t y, uint16_t z);
+    ComputePipelineVulkan *operator()(uint16_t x, uint16_t y, uint16_t z);
 
     ExecutorType getExecutorType() override
     {

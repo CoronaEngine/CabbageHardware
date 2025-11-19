@@ -74,18 +74,18 @@ VkFormat getVkFormatFromType(const std::string &typeName, uint32_t elementCount)
     throw std::runtime_error("Unsupported vertex attribute type: " + typeName);
 }
 
-RasterizerPipeline::RasterizerPipeline()
+RasterizerPipelineVulkan::RasterizerPipelineVulkan()
 {
     executorType = CommandRecord::ExecutorType::Graphics;
 }
 
-RasterizerPipeline::RasterizerPipeline(std::string vertexShaderCode,
+RasterizerPipelineVulkan::RasterizerPipelineVulkan(std::string vertexShaderCode,
                                        std::string fragmentShaderCode,
                                        uint32_t multiviewCount,
                                        EmbeddedShader::ShaderLanguage vertexShaderLanguage,
                                        EmbeddedShader::ShaderLanguage fragmentShaderLanguage,
                                        const std::source_location &sourceLocation)
-    : RasterizerPipeline()
+    : RasterizerPipelineVulkan()
 {
     // 编译着色器
     EmbeddedShader::ShaderCodeCompiler vertexCompiler(vertexShaderCode,
@@ -136,7 +136,7 @@ RasterizerPipeline::RasterizerPipeline(std::string vertexShaderCode,
     }
 }
 
-RasterizerPipeline::~RasterizerPipeline()
+RasterizerPipelineVulkan::~RasterizerPipelineVulkan()
 {
     VkDevice device = VK_NULL_HANDLE;
     if (const auto mainDevice = globalHardwareContext.getMainDevice())
@@ -174,7 +174,7 @@ RasterizerPipeline::~RasterizerPipeline()
     }
 }
 
-void RasterizerPipeline::createRenderPass(int multiviewCount)
+void RasterizerPipelineVulkan::createRenderPass(int multiviewCount)
 {
     const auto mainDevice = globalHardwareContext.getMainDevice();
     if (!mainDevice)
@@ -268,7 +268,7 @@ void RasterizerPipeline::createRenderPass(int multiviewCount)
     coronaHardwareCheck(vkCreateRenderPass(mainDevice->deviceManager.getLogicalDevice(), &renderPassInfo, nullptr, &renderPass));
 }
 
-void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule &vertShaderCode,
+void RasterizerPipelineVulkan::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule &vertShaderCode,
                                                 EmbeddedShader::ShaderCodeModule &fragShaderCode)
 {
     const auto mainDevice = globalHardwareContext.getMainDevice();
@@ -446,7 +446,7 @@ void RasterizerPipeline::createGraphicsPipeline(EmbeddedShader::ShaderCodeModule
     vkDestroyShaderModule(device, vertShaderModule, nullptr);
 }
 
-void RasterizerPipeline::createFramebuffers(ktm::uvec2 imageSize)
+void RasterizerPipelineVulkan::createFramebuffers(ktm::uvec2 imageSize)
 {
     const auto mainDevice = globalHardwareContext.getMainDevice();
     if (!mainDevice)
@@ -480,7 +480,7 @@ void RasterizerPipeline::createFramebuffers(ktm::uvec2 imageSize)
                                             &frameBuffers));
 }
 
-std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> RasterizerPipeline::operator[](const std::string &resourceName)
+std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> RasterizerPipelineVulkan::operator[](const std::string &resourceName)
 {
     using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
 
@@ -519,13 +519,13 @@ std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> RasterizerPipe
     throw std::runtime_error("Failed to find resource with name: " + resourceName);
 }
 
-RasterizerPipeline *RasterizerPipeline::operator()(uint16_t width, uint16_t height)
+RasterizerPipelineVulkan *RasterizerPipelineVulkan::operator()(uint16_t width, uint16_t height)
 {
     imageSize = {width, height};
     return this;
 }
 
-CommandRecord *RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
+CommandRecord *RasterizerPipelineVulkan::record(const HardwareBuffer &indexBuffer)
 {
     TriangleGeomMesh mesh;
     mesh.indexBuffer = getBufferFromHandle(*indexBuffer.getBufferID());
@@ -549,11 +549,11 @@ CommandRecord *RasterizerPipeline::record(const HardwareBuffer &indexBuffer)
     return &dumpCommandRecord;
 }
 
-CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(HardwareExecutor &hardwareExecutor)
+CommandRecord::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarriers(HardwareExecutor &hardwareExecutor)
 {
     RequiredBarriers requiredBarriers;
 
-    if (geomMeshesRecord.size() < 0)
+    if (geomMeshesRecord.size() <= 0)
     {
         return requiredBarriers;
     }
@@ -663,9 +663,9 @@ CommandRecord::RequiredBarriers RasterizerPipeline::getRequiredBarriers(Hardware
     return requiredBarriers;
 }
 
-void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
+void RasterizerPipelineVulkan::commitCommand(HardwareExecutor &hardwareExecutor)
 {
-    if (geomMeshesRecord.size() < 0)
+    if (geomMeshesRecord.size() <= 0)
     {
         return;
     }
@@ -809,7 +809,7 @@ void RasterizerPipeline::commitCommand(HardwareExecutor &hardwareExecutor)
     geomMeshesRecord.clear();
 }
 
-VkFormat RasterizerPipeline::getVkFormatFromType(const std::string &typeName, uint32_t elementCount) const
+VkFormat RasterizerPipelineVulkan::getVkFormatFromType(const std::string &typeName, uint32_t elementCount) const
 {
     return ::getVkFormatFromType(typeName, elementCount);
 }

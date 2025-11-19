@@ -1,6 +1,10 @@
 ﻿#pragma once
 
+#include <iostream>
 #include <source_location>
+
+#define VK_NO_PROTOTYPES
+#include <volk.h>
 
 static inline const char *coronaHardwareResultStr(VkResult ret)
 {

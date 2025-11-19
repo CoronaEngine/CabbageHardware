@@ -6,13 +6,13 @@
 #include "Compiler/ShaderCodeCompiler.h"
 #include "CabbageHardware.h"
 
-struct RasterizerPipeline : public CommandRecord
+struct RasterizerPipelineVulkan : public CommandRecord
 {
   public:
-    RasterizerPipeline();
-    ~RasterizerPipeline() override;
+    RasterizerPipelineVulkan();
+    ~RasterizerPipelineVulkan() override;
 
-    RasterizerPipeline(std::string vertexShaderCode,
+    RasterizerPipelineVulkan(std::string vertexShaderCode,
                        std::string fragmentShaderCode,
                        uint32_t multiviewCount = 1,
                        EmbeddedShader::ShaderLanguage vertexShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
@@ -31,7 +31,7 @@ struct RasterizerPipeline : public CommandRecord
 
     std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> operator[](const std::string &resourceName);
 
-    RasterizerPipeline *operator()(uint16_t width, uint16_t height);
+    RasterizerPipelineVulkan *operator()(uint16_t width, uint16_t height);
 
     CommandRecord *record(const HardwareBuffer &indexBuffer);
 

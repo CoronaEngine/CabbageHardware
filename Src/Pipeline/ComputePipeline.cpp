@@ -1,15 +1,15 @@
-﻿#include "ComputePipeline.h"
-#include "Hardware/HardwareUtil.h"
+﻿#include "Hardware/HardwareUtil.h"
+#include "ComputePipeline.h"
 
-ComputePipeline::ComputePipeline()
+ComputePipelineVulkan::ComputePipelineVulkan()
 {
     executorType = CommandRecord::ExecutorType::Compute;
 }
 
-ComputePipeline::ComputePipeline(std::string shaderCode,
-                                 EmbeddedShader::ShaderLanguage language,
-                                 const std::source_location &sourceLocation)
-    : ComputePipeline()
+ComputePipelineVulkan::ComputePipelineVulkan(std::string shaderCode,
+                                             EmbeddedShader::ShaderLanguage language,
+                                             const std::source_location &sourceLocation)
+    : ComputePipelineVulkan()
 {
     EmbeddedShader::ShaderCodeCompiler compiler(shaderCode,
                                                 EmbeddedShader::ShaderStage::ComputeShader,
@@ -27,7 +27,7 @@ ComputePipeline::ComputePipeline(std::string shaderCode,
     }
 }
 
-ComputePipeline::~ComputePipeline()
+ComputePipelineVulkan::~ComputePipelineVulkan()
 {
     VkDevice device = VK_NULL_HANDLE;
     if (const auto mainDevice = globalHardwareContext.getMainDevice())
@@ -53,7 +53,7 @@ ComputePipeline::~ComputePipeline()
     }
 }
 
-std::variant<HardwarePushConstant> ComputePipeline::operator[](const std::string &resourceName)
+std::variant<HardwarePushConstant> ComputePipelineVulkan::operator[](const std::string &resourceName)
 {
     auto *resource = shaderResource.findShaderBindInfo(resourceName);
 
@@ -70,13 +70,13 @@ std::variant<HardwarePushConstant> ComputePipeline::operator[](const std::string
     return HardwarePushConstant(resource->typeSize, resource->byteOffset, &pushConstant);
 }
 
-ComputePipeline *ComputePipeline::operator()(uint16_t x, uint16_t y, uint16_t z)
+ComputePipelineVulkan *ComputePipelineVulkan::operator()(uint16_t x, uint16_t y, uint16_t z)
 {
     groupCount = {x, y, z};
     return this;
 }
 
-CommandRecord::RequiredBarriers ComputePipeline::getRequiredBarriers(HardwareExecutor &hardwareExecutor)
+CommandRecord::RequiredBarriers ComputePipelineVulkan::getRequiredBarriers(HardwareExecutor &hardwareExecutor)
 {
     RequiredBarriers requiredBarriers;
     requiredBarriers.memoryBarriers.resize(1);
@@ -92,7 +92,7 @@ CommandRecord::RequiredBarriers ComputePipeline::getRequiredBarriers(HardwareExe
     return requiredBarriers;
 }
 
-void ComputePipeline::createComputePipeline()
+void ComputePipelineVulkan::createComputePipeline()
 {
     const auto mainDevice = globalHardwareContext.getMainDevice();
     if (!mainDevice)
@@ -148,7 +148,7 @@ void ComputePipeline::createComputePipeline()
     vkDestroyShaderModule(device, shaderModule, nullptr);
 }
 
-void ComputePipeline::commitCommand(HardwareExecutor &hardwareExecutor)
+void ComputePipelineVulkan::commitCommand(HardwareExecutor &hardwareExecutor)
 {
     // 延迟创建管线
     if (pipelineLayout == VK_NULL_HANDLE || pipeline == VK_NULL_HANDLE)

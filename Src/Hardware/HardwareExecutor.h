@@ -2,8 +2,6 @@
 
 #include "Hardware/GlobalContext.h"
 
-class RasterizerPipeline;
-class ComputePipeline;
 struct HardwareExecutor;
 
 struct CommandRecord

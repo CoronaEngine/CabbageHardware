@@ -123,9 +123,9 @@ private:
     void initializePipelines()
     {
         LOG_RESOURCE("Creating", "Rasterizer Pipeline");
-        rasterizer = std::make_unique<RasterizerPipeline>(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
+        rasterizer = std::make_unique<RasterizerPipelineVulkan>(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
         LOG_RESOURCE("Creating", "Compute Pipeline");
-        computer = std::make_unique<ComputePipeline>(readStringFile(shaderPath + "/compute.glsl"));
+        computer = std::make_unique<ComputePipelineVulkan>(readStringFile(shaderPath + "/compute.glsl"));
     }
 
     void initializeCubes()
@@ -155,13 +155,14 @@ private:
         {
             renderCube(i, time);
         }
+        // 计算着色器后处理
+        runComputeShader();
 
         // 提交光栅化命令
         executor << (*rasterizer)(RenderConfig::WINDOW_WIDTH, RenderConfig::WINDOW_HEIGHT)
+                 << (*computer)(RenderConfig::WINDOW_WIDTH / RenderConfig::COMPUTE_GROUP_SIZE,
+                                RenderConfig::WINDOW_HEIGHT / RenderConfig::COMPUTE_GROUP_SIZE, 1)
                  << executor.commit();
-
-        // 计算着色器后处理
-        runComputeShader();
 
         // 显示结果
         displayManager.wait(executor) << *finalOutputImage;
@@ -192,10 +193,6 @@ private:
         computeUniformBuffer->copyFromData(&computeUBO, sizeof(computeUBO));
 
         (*computer)["pushConsts.uniformBufferIndex"] = computeUniformBuffer->storeDescriptor();
-
-        executor << (*computer)(RenderConfig::WINDOW_WIDTH / RenderConfig::COMPUTE_GROUP_SIZE,
-                                RenderConfig::WINDOW_HEIGHT / RenderConfig::COMPUTE_GROUP_SIZE, 1)
-                 << executor.commit();
     }
 
     void updateFPSCounter()
@@ -251,8 +248,8 @@ private:
     // 资源 - 按销毁顺序排列
 
     // 管线
-    std::unique_ptr<RasterizerPipeline> rasterizer;
-    std::unique_ptr<ComputePipeline> computer;
+    std::unique_ptr<RasterizerPipelineVulkan> rasterizer;
+    std::unique_ptr<ComputePipelineVulkan> computer;
 
     // 立方体数据
     std::vector<HardwareBuffer> cubeUniformBuffers;
