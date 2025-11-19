@@ -706,7 +706,11 @@ ResourceManager::ExternalMemoryHandle ResourceManager::exportBufferMemory(Buffer
     return memHandle;
 }
 
-ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const ExternalMemoryHandle &memHandle, uint32_t elementCount, uint32_t elementSize, uint32_t allocSize, VkBufferUsageFlags bufferUsage)
+ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const ExternalMemoryHandle &memHandle,
+                                                                        uint32_t elementCount,
+                                                                        uint32_t elementSize,
+                                                                        uint32_t allocSize,
+                                                                        VkBufferUsageFlags bufferUsage)
 {
 #if _WIN32 || _WIN64
     if (memHandle.handle == nullptr || memHandle.handle == INVALID_HANDLE_VALUE)
@@ -716,11 +720,12 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
 #endif
 
 #if _WIN32 || _WIN64
-    constexpr VkExternalMemoryHandleTypeFlagsKHR EXTERNAL_MEMORY_HANDLE_TYPE = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-#elif __linux__
-    constexpr VkExternalMemoryHandleTypeFlagsKHR EXTERNAL_MEMORY_HANDLE_TYPE = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
-#elif __APPLE__
-    constexpr VkExternalMemoryHandleTypeFlagsKHR EXTERNAL_MEMORY_HANDLE_TYPE = 0;
+    constexpr VkExternalMemoryHandleTypeFlagBits EXTERNAL_MEMORY_HANDLE_TYPE =
+        VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+#else
+    // 其他平台略
+    constexpr VkExternalMemoryHandleTypeFlagBits EXTERNAL_MEMORY_HANDLE_TYPE =
+        VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
 
     BufferHardwareWrap importedBuffer{};
@@ -730,55 +735,48 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     importedBuffer.elementCount = elementCount;
     importedBuffer.elementSize = elementSize;
 
+    // allocSize 必须等于 CUDA 导出时的 aligned_size
+    if (allocSize == 0)
+    {
+        throw std::runtime_error("Import failed: allocSize == 0.");
+    }
+    const uint64_t logicalSize = static_cast<uint64_t>(elementCount) * elementSize;
+    if (logicalSize > allocSize)
+    {
+        // 逻辑数据大小不应超过物理分配大小
+        throw std::runtime_error("Import failed: logical data size exceeds external allocation size.");
+    }
+
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = allocSize;
     bufferInfo.usage = bufferUsage;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // 简化：独占更安全
+    bufferInfo.pNext = nullptr;
 
-    // 配置队列族共享模式
-    std::vector<uint32_t> queueFamilyIndices;
-    const uint32_t queueFamilyCount = device->getQueueFamilyNumber();
-
-    if (queueFamilyCount > 1)
-    {
-        queueFamilyIndices.resize(queueFamilyCount);
-        std::iota(queueFamilyIndices.begin(), queueFamilyIndices.end(), 0u);
-
-        bufferInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-        bufferInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueFamilyIndices.size());
-        bufferInfo.pQueueFamilyIndices = queueFamilyIndices.data();
-    }
-    else
-    {
-        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    }
-
-    // 标记为外部内存缓冲区
     VkExternalMemoryBufferCreateInfo externalMemoryInfo{};
-    externalMemoryInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO_KHR;
+    externalMemoryInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO;
     externalMemoryInfo.handleTypes = EXTERNAL_MEMORY_HANDLE_TYPE;
+    externalMemoryInfo.pNext = nullptr;
     bufferInfo.pNext = &externalMemoryInfo;
 
-    VkPhysicalDeviceExternalBufferInfo externalBufferInfo{};
-    externalBufferInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO;
-    externalBufferInfo.flags = bufferInfo.flags;
-    externalBufferInfo.usage = bufferInfo.usage;
-    externalBufferInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+    // 查询外部缓冲区特性
+    VkPhysicalDeviceExternalBufferInfo extBufInfo{};
+    extBufInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO;
+    extBufInfo.usage = bufferInfo.usage;
+    extBufInfo.handleType = EXTERNAL_MEMORY_HANDLE_TYPE;
 
-    VkExternalBufferProperties externalBufferProperties{};
-    externalBufferProperties.sType = VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES;
+    VkExternalBufferProperties extProps{};
+    extProps.sType = VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES;
+    vkGetPhysicalDeviceExternalBufferProperties(device->getPhysicalDevice(), &extBufInfo, &extProps);
 
-    vkGetPhysicalDeviceExternalBufferProperties(device->getPhysicalDevice(), &externalBufferInfo, &externalBufferProperties);
-
-    const auto features = externalBufferProperties.externalMemoryProperties.externalMemoryFeatures;
-    const bool importable = (features & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT) != 0;
+    auto feats = extProps.externalMemoryProperties.externalMemoryFeatures;
+    const bool importable = (feats & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT) != 0;
+    const bool dedicatedOnly = (feats & VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) != 0;
 
     if (!importable)
     {
-        throw std::runtime_error(
-            "This buffer configuration is not importable on the target device. "
-            "External memory features: 0x" +
-            std::to_string(features));
+        throw std::runtime_error("Import failed: buffer not importable (features=" + std::to_string(feats) + ").");
     }
 
 #if _WIN32 || _WIN64
@@ -789,18 +787,32 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     importInfo.name = nullptr;
 #endif
 
+    // 使用专用 + 设备本地，不再请求映射
     VmaAllocationCreateInfo allocInfo{};
-    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
-    allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT |
-                      VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+    allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+    allocInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT; // dedicated
+    // 不添加 MAPPED / HOST flags，避免要求 Host 可见
+    // 如果 extProps 表示需要 dedicatedOnly，则本路径满足
 
-    coronaHardwareCheck(vmaCreateDedicatedBuffer(vmaAllocator,
-                                                 &bufferInfo,
-                                                 &allocInfo,
-                                                 &importInfo,
-                                                 &importedBuffer.bufferHandle,
-                                                 &importedBuffer.bufferAlloc,
-                                                 &importedBuffer.bufferAllocInfo));
+    coronaHardwareCheck(
+        vmaCreateDedicatedBuffer(vmaAllocator,
+                                 &bufferInfo,
+                                 &allocInfo,
+                                 &importInfo,
+                                 &importedBuffer.bufferHandle,
+                                 &importedBuffer.bufferAlloc,
+                                 &importedBuffer.bufferAllocInfo));
+
+    // 覆盖 size 以便后续 copy 时使用逻辑大小
+    importedBuffer.bufferAllocInfo.size = allocSize;
+
+#ifdef CABBAGE_ENGINE_DEBUG
+    std::cout << "[Import] External CUDA buffer imported. "
+              << "logicalSize=" << logicalSize
+              << " allocSize=" << allocSize
+              << " dedicatedOnly=" << dedicatedOnly
+              << " feats=0x" << std::hex << feats << std::dec << std::endl;
+#endif
 
     return importedBuffer;
 }
