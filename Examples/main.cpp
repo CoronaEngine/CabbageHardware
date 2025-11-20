@@ -42,7 +42,7 @@ int main()
     {
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        std::vector<GLFWwindow *> windows(4);
+        std::vector<GLFWwindow *> windows(1);
         for (size_t i = 0; i < windows.size(); i++)
         {
             windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
@@ -74,8 +74,6 @@ int main()
         std::atomic_bool running = true;
 
         auto renderThread = [&](uint32_t threadIndex) {
-            HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
-
             RasterizerUniformBufferObject rasterizerUniformBufferObject;
             ComputeUniformBufferObject computeUniformData;
 
@@ -125,7 +123,13 @@ int main()
                 executors[threadIndex] << rasterizer(1920, 1080)
                                        << computer(1920 / 8, 1080 / 8, 1)
                                        << executors[threadIndex].commit();
+            }
+        };
 
+        auto displayThread = [&](uint32_t threadIndex) {
+            HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
+            while (running.load())
+            {
                 displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
             }
         };
@@ -133,6 +137,7 @@ int main()
         for (size_t i = 0; i < windows.size(); i++)
         {
             std::thread(renderThread, i).detach();
+            std::thread(displayThread, i).detach();
         }
 
         while (running.load())
