@@ -42,7 +42,7 @@ int main()
     {
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        std::vector<GLFWwindow *> windows(8);
+        std::vector<GLFWwindow *> windows(1);
         for (size_t i = 0; i < windows.size(); i++)
         {
             windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
@@ -125,9 +125,7 @@ int main()
                 computer["pushConsts.uniformBufferIndex"] = computeUniformBuffer.storeDescriptor();
 
                 executor << rasterizer(1920, 1080)
-                         << executor.commit();
-
-                executor << computer(1920 / 8, 1080 / 8, 1)
+                         << computer(1920 / 8, 1080 / 8, 1)
                          << executor.commit();
 
                 displayManager.wait(executor) << finalOutputImage;
@@ -135,7 +133,7 @@ int main()
                 auto timeD = std::chrono::duration<float, std::chrono::milliseconds::period>(std::chrono::high_resolution_clock::now() - start);
                 totalTimeMs += timeD.count();
                 frameCount++;
-                if (frameCount >= 100)
+                if (frameCount >= 500)
                 {
                     std::cout << "Average time over " << frameCount << " frames: " << totalTimeMs / frameCount << " ms" << std::endl;
                     totalTimeMs = 0.0;

@@ -38,5 +38,5 @@ void main()
 {
     uint imageID = uniformBufferObjects[pushConsts.uniformBufferIndex].imageID;
     vec4 color = imageLoad(inputImageRGBA16[imageID], ivec2(gl_GlobalInvocationID.xy));
-    imageStore(inputImageRGBA16[imageID], ivec2(gl_GlobalInvocationID.xy), vec4(acesFilmicToneMapCurve(color.xyz + vec3(0.5)), 1.0));
+    imageStore(inputImageRGBA16[imageID], ivec2(gl_GlobalInvocationID.xy), vec4(acesFilmicToneMapCurve(color.xyz), 1.0));
 }
