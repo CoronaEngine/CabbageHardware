@@ -42,11 +42,28 @@ int main()
     {
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        std::vector<GLFWwindow *> windows(1);
+        std::vector<GLFWwindow *> windows(16);
         for (size_t i = 0; i < windows.size(); i++)
         {
             windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
         }
+
+
+        HardwareBuffer postionBuffer = HardwareBuffer(positions, BufferUsage::VertexBuffer);
+        HardwareBuffer normalBuffer = HardwareBuffer(normals, BufferUsage::VertexBuffer);
+        HardwareBuffer uvBuffer = HardwareBuffer(uvs, BufferUsage::VertexBuffer);
+        HardwareBuffer colorBuffer = HardwareBuffer(colors, BufferUsage::VertexBuffer);
+
+        HardwareBuffer indexBuffer = HardwareBuffer(indices, BufferUsage::IndexBuffer);
+
+        int width, height, channels;
+        unsigned char *data = stbi_load(std::string(shaderPath + "/awesomeface.png").c_str(), &width, &height, &channels, 0);
+        if (!data)
+        {
+            std::cerr << "stbi_load failed: " << stbi_failure_reason() << std::endl;
+        }
+
+        HardwareImage texture(width, height, ImageFormat::RGBA8_SRGB, ImageUsage::SampledImage, 1, data);
 
         std::atomic_bool running = true;
 
@@ -55,38 +72,6 @@ int main()
 
             RasterizerUniformBufferObject rasterizerUniformBufferObject;
             ComputeUniformBufferObject computeUniformData;
-
-            HardwareBuffer postionBuffer = HardwareBuffer(positions, BufferUsage::VertexBuffer);
-            HardwareBuffer normalBuffer = HardwareBuffer(normals, BufferUsage::VertexBuffer);
-            HardwareBuffer uvBuffer = HardwareBuffer(uvs, BufferUsage::VertexBuffer);
-            HardwareBuffer colorBuffer = HardwareBuffer(colors, BufferUsage::VertexBuffer);
-
-            HardwareBuffer indexBuffer = HardwareBuffer(indices, BufferUsage::IndexBuffer);
-
-            HardwareBuffer computeUniformBuffer = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::UniformBuffer);
-
-            int width, height, channels;
-            unsigned char *data = stbi_load(std::string(shaderPath + "/awesomeface.png").c_str(), &width, &height, &channels, 0);
-            if (!data)
-            {
-                // if the image fails to load, maby image encryption.
-                std::cerr << "stbi_load failed: " << stbi_failure_reason() << std::endl;
-            }
-
-            HardwareImage texture(width, height, ImageFormat::RGBA8_SRGB, ImageUsage::SampledImage, 1, data);
-
-            HardwareImage finalOutputImage(1920, 1080, ImageFormat::RGBA16_FLOAT, ImageUsage::StorageImage);
-
-            RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
-
-            ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
-
-            auto startTime = std::chrono::high_resolution_clock::now();
-
-            double totalTimeMs = 0.0;
-            int frameCount = 0;
-
-            HardwareExecutor executor;
 
             std::vector<HardwareBuffer> rasterizerUniformBuffers;
             std::vector<ktm::fmat4x4> modelMat;
@@ -99,10 +84,21 @@ int main()
                 rasterizerUniformBuffers.push_back(tempRasterizerUniformBuffers);
             }
 
+
+            HardwareBuffer computeUniformBuffer = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::UniformBuffer);
+
+            HardwareImage finalOutputImage(1920, 1080, ImageFormat::RGBA16_FLOAT, ImageUsage::StorageImage);
+
+            RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
+
+            ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
+
+            auto startTime = std::chrono::high_resolution_clock::now();
+
+            HardwareExecutor executor;
+
             while (running.load())
             {
-                auto start = std::chrono::high_resolution_clock::now();
-
                 float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
                 for (size_t i = 0; i < modelMat.size(); i++)
@@ -129,16 +125,6 @@ int main()
                          << executor.commit();
 
                 displayManager.wait(executor) << finalOutputImage;
-
-                auto timeD = std::chrono::duration<float, std::chrono::milliseconds::period>(std::chrono::high_resolution_clock::now() - start);
-                totalTimeMs += timeD.count();
-                frameCount++;
-                if (frameCount >= 500)
-                {
-                    std::cout << "Average time over " << frameCount << " frames: " << totalTimeMs / frameCount << " ms" << std::endl;
-                    totalTimeMs = 0.0;
-                    frameCount = 0;
-                }
             }
         };
 
