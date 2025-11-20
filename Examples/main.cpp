@@ -42,12 +42,18 @@ int main()
     {
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        std::vector<GLFWwindow *> windows(16);
+        std::vector<GLFWwindow *> windows(4);
         for (size_t i = 0; i < windows.size(); i++)
         {
             windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
         }
 
+        std::vector<HardwareImage> finalOutputImages(windows.size());
+        std::vector<HardwareExecutor> executors(windows.size());
+        for (size_t i = 0; i < finalOutputImages.size(); i++)
+        {
+            finalOutputImages[i] = HardwareImage(1920, 1080, ImageFormat::RGBA16_FLOAT, ImageUsage::StorageImage);
+        }
 
         HardwareBuffer postionBuffer = HardwareBuffer(positions, BufferUsage::VertexBuffer);
         HardwareBuffer normalBuffer = HardwareBuffer(normals, BufferUsage::VertexBuffer);
@@ -67,8 +73,8 @@ int main()
 
         std::atomic_bool running = true;
 
-        auto oneWindowThread = [&](void *surface) {
-            HardwareDisplayer displayManager = HardwareDisplayer(surface);
+        auto renderThread = [&](uint32_t threadIndex) {
+            HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
 
             RasterizerUniformBufferObject rasterizerUniformBufferObject;
             ComputeUniformBufferObject computeUniformData;
@@ -84,10 +90,7 @@ int main()
                 rasterizerUniformBuffers.push_back(tempRasterizerUniformBuffers);
             }
 
-
             HardwareBuffer computeUniformBuffer = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::UniformBuffer);
-
-            HardwareImage finalOutputImage(1920, 1080, ImageFormat::RGBA16_FLOAT, ImageUsage::StorageImage);
 
             RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
 
@@ -95,7 +98,6 @@ int main()
 
             auto startTime = std::chrono::high_resolution_clock::now();
 
-            HardwareExecutor executor;
 
             while (running.load())
             {
@@ -111,26 +113,26 @@ int main()
                     rasterizer["inColor"] = colorBuffer;
                     rasterizer["inTexCoord"] = uvBuffer;
                     rasterizer["inNormal"] = normalBuffer;
-                    rasterizer["outColor"] = finalOutputImage;
+                    rasterizer["outColor"] = finalOutputImages[threadIndex];
 
-                    executor << rasterizer.record(indexBuffer);
+                    executors[threadIndex] << rasterizer.record(indexBuffer);
                 }
 
-                computeUniformData.imageID = finalOutputImage.storeDescriptor();
+                computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
                 computeUniformBuffer.copyFromData(&computeUniformData, sizeof(computeUniformData));
                 computer["pushConsts.uniformBufferIndex"] = computeUniformBuffer.storeDescriptor();
 
-                executor << rasterizer(1920, 1080)
-                         << computer(1920 / 8, 1080 / 8, 1)
-                         << executor.commit();
+                executors[threadIndex] << rasterizer(1920, 1080)
+                                       << computer(1920 / 8, 1080 / 8, 1)
+                                       << executors[threadIndex].commit();
 
-                displayManager.wait(executor) << finalOutputImage;
+                displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
             }
         };
 
         for (size_t i = 0; i < windows.size(); i++)
         {
-            std::thread(oneWindowThread, glfwGetWin32Window(windows[i])).detach();
+            std::thread(renderThread, i).detach();
         }
 
         while (running.load())
