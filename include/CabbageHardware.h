@@ -169,12 +169,14 @@ public:
         copyFromRaw(&data, sizeof(T));
     }
 
+    //the sub and whole must in the same thread
     HardwarePushConstant(uint64_t size, uint64_t offset, HardwarePushConstant *whole = nullptr);
 
     ~HardwarePushConstant();
 
     HardwarePushConstant &operator=(const HardwarePushConstant &other);
 
+    //must in the same thread
     [[nodiscard]] uint8_t *getData() const;
 
     [[nodiscard]] uint64_t getSize() const;
