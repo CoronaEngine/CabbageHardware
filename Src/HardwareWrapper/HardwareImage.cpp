@@ -151,8 +151,8 @@ HardwareImage::operator bool() const {
 }
 
 uint32_t HardwareImage::storeDescriptor() {
-    auto imageHandle = globalImageStorages.acquire_read(*imageID);
-    return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(*imageHandle);
+    auto imageHandle = globalImageStorages.acquire_write(*imageID);
+    return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle);
 }
 
 HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor) {

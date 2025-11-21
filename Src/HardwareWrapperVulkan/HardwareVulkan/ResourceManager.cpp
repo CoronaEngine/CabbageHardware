@@ -817,55 +817,26 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void* host
     return bufferWrap;
 }
 
-uint32_t ResourceManager::storeDescriptor(ImageHardwareWrap image) {
-    uint32_t textureIndex = -1;
-    VkDescriptorType descriptorType = (image.imageUsage & VK_IMAGE_USAGE_STORAGE_BIT) ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    bool updateDescriptorSets = false;
+int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image) {
 
-    if (descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
-        // 查找是否已存在
-        for (auto const& entry : storageImageBindingList) {
-            if (entry.handle == image.imageView) {
-                textureIndex = entry.bindingIndex;
-            }
-        }
+    int32_t bindlessIndex = image->bindlessIndex;
 
-        if (textureIndex == -1) {
-            textureIndex = storageImageBindingIndex++;
-            updateDescriptorSets = true;
-            auto id = storageImageBindingList.allocate();
-            auto handle = storageImageBindingList.acquire_write(id);
-            handle->handle = image.imageView;
-            handle->bindingIndex = textureIndex;
-        }
-    } else {
-        for (auto const& entry : textureBindingList) {
-            if (entry.handle == image.imageView) {
-                textureIndex = entry.bindingIndex;
-            }
-        }
+    if (bindlessIndex < 0) {
+        
+        bindlessIndex = globalImageStorages.seq_id(std::uintptr_t(image.get()));
 
-        if (textureIndex == -1) {
-            textureIndex = textureBindingIndex++;
-            updateDescriptorSets = true;
-            auto id = textureBindingList.allocate();
-            auto handle = textureBindingList.acquire_write(id);
-            handle->handle = image.imageView;
-            handle->bindingIndex = textureIndex;
-        }
-    }
+        VkDescriptorType descriptorType = (image->imageUsage & VK_IMAGE_USAGE_STORAGE_BIT) ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
-    if (updateDescriptorSets) {
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-        imageInfo.imageView = image.imageView;
+        imageInfo.imageView = image->imageView;
         imageInfo.sampler = textureSampler;
 
         VkWriteDescriptorSet write{};
         write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         write.descriptorType = descriptorType;
         write.descriptorCount = 1;
-        write.dstArrayElement = textureIndex;
+        write.dstArrayElement = bindlessIndex;
         write.pImageInfo = &imageInfo;
 
         if (write.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
@@ -880,49 +851,21 @@ uint32_t ResourceManager::storeDescriptor(ImageHardwareWrap image) {
         vkUpdateDescriptorSets(device->getLogicalDevice(), 1, &write, 0, nullptr);
     }
 
-    return textureIndex;
+    return bindlessIndex;
 }
 
-uint32_t ResourceManager::storeDescriptor(BufferHardwareWrap buffer) {
-    uint32_t bufferIndex = -1;
-    VkDescriptorType descriptorType = (buffer.bufferUsage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    bool updateDescriptorSets = false;
+int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& buffer) {
 
-    if (descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
-        for (auto const& entry : storageBufferBindingList) {
-            if (entry.handle == buffer.bufferHandle) {
-                bufferIndex = entry.bindingIndex;
-            }
-        }
+    int32_t bindlessIndex = buffer->bindlessIndex;
 
-        if (bufferIndex == -1) {
-            bufferIndex = storageBufferBindingIndex++;
-            updateDescriptorSets = true;
-            auto id = storageBufferBindingList.allocate();
-            auto handle = storageBufferBindingList.acquire_write(id);
-            handle->handle = buffer.bufferHandle;
-            handle->bindingIndex = bufferIndex;
-        }
-    } else {
-        for(auto const& entry : uniformBindingList) {
-            if (entry.handle == buffer.bufferHandle) {
-                bufferIndex = entry.bindingIndex;
-            }
-        }
+    if (bindlessIndex < 0) {
 
-        if (bufferIndex == -1) {
-            bufferIndex = uniformBindingIndex++;
-            updateDescriptorSets = true;
-            auto id = uniformBindingList.allocate();
-            auto handle = uniformBindingList.acquire_write(id);
-            handle->handle = buffer.bufferHandle;
-            handle->bindingIndex = bufferIndex;
-        }
-    }
+        bindlessIndex = globalBufferStorages.seq_id(std::uintptr_t(buffer.get()));
 
-    if (updateDescriptorSets) {
+        VkDescriptorType descriptorType = (buffer->bufferUsage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
         VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = buffer.bufferHandle;
+        bufferInfo.buffer = buffer->bufferHandle;
         bufferInfo.offset = 0;
         bufferInfo.range = VK_WHOLE_SIZE;
 
@@ -931,7 +874,7 @@ uint32_t ResourceManager::storeDescriptor(BufferHardwareWrap buffer) {
         writes.descriptorCount = 1;
         writes.pBufferInfo = &bufferInfo;
         writes.descriptorType = descriptorType;
-        writes.dstArrayElement = bufferIndex;
+        writes.dstArrayElement = bindlessIndex;
 
         if (writes.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
             writes.dstSet = bindlessDescriptors[uniformBinding].descriptorSet;
@@ -945,7 +888,7 @@ uint32_t ResourceManager::storeDescriptor(BufferHardwareWrap buffer) {
         vkUpdateDescriptorSets(device->getLogicalDevice(), 1, &writes, 0, nullptr);
     }
 
-    return bufferIndex;
+    return bindlessIndex;
 }
 
 ResourceManager& ResourceManager::copyBuffer(VkCommandBuffer& commandBuffer,

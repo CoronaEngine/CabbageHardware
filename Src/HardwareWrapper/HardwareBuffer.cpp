@@ -136,8 +136,8 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareE
 
 uint32_t HardwareBuffer::storeDescriptor()
 {
-    auto bufferHandle = globalBufferStorages.acquire_read(*bufferID);
-    return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(*bufferHandle);
+    auto bufferHandle = globalBufferStorages.acquire_write(*bufferID);
+    return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(bufferHandle);
 }
 
 bool HardwareBuffer::copyFromData(const void *inputData, uint64_t size) {

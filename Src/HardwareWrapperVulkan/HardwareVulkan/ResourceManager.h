@@ -31,6 +31,8 @@ struct ResourceManager
         VmaAllocation bufferAlloc = VK_NULL_HANDLE;
         VmaAllocationInfo bufferAllocInfo = {};
 
+        int32_t bindlessIndex = -1;
+
         DeviceManager *device = nullptr;
         ResourceManager *resourceManager = nullptr;
     };
@@ -56,6 +58,8 @@ struct ResourceManager
 
         VmaAllocation imageAlloc = VK_NULL_HANDLE;
         VmaAllocationInfo imageAllocInfo = {};
+
+        int32_t bindlessIndex = -1;
 
         DeviceManager *device = nullptr;
         ResourceManager *resourceManager = nullptr;
@@ -99,8 +103,8 @@ struct ResourceManager
     [[nodiscard]] BufferHardwareWrap importHostBuffer(void *hostPtr, uint64_t size);
 
     // Descriptor operations
-    [[nodiscard]] uint32_t storeDescriptor(ImageHardwareWrap image);
-    [[nodiscard]] uint32_t storeDescriptor(BufferHardwareWrap buffer);
+    [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image);
+    [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle &buffer);
 
     // Copy operations
     ResourceManager &copyBuffer(VkCommandBuffer &commandBuffer, BufferHardwareWrap &srcBuffer, BufferHardwareWrap &dstBuffer);
@@ -159,20 +163,20 @@ private:
     VmaPool exportBufferPool = VK_NULL_HANDLE;
     VkSampler textureSampler = VK_NULL_HANDLE;
 
-    Corona::Kernel::Utils::Storage<BindingEntry<VkBuffer>> uniformBindingList;
-    Corona::Kernel::Utils::Storage<BindingEntry<VkImageView>> textureBindingList;
-    Corona::Kernel::Utils::Storage<BindingEntry<VkBuffer>> storageBufferBindingList;
-    Corona::Kernel::Utils::Storage<BindingEntry<VkImageView>> storageImageBindingList;
+    //Corona::Kernel::Utils::Storage<BindingEntry<VkBuffer>> uniformBindingList;
+    //Corona::Kernel::Utils::Storage<BindingEntry<VkImageView>> textureBindingList;
+    //Corona::Kernel::Utils::Storage<BindingEntry<VkBuffer>> storageBufferBindingList;
+    //Corona::Kernel::Utils::Storage<BindingEntry<VkImageView>> storageImageBindingList;
 
     const uint32_t uniformBinding = 0;
     const uint32_t textureBinding = 1;
     const uint32_t storageBufferBinding = 2;
     const uint32_t storageImageBinding = 3;
 
-    uint32_t uniformBindingIndex = 0;
-    uint32_t textureBindingIndex = 0;
-    uint32_t storageBufferBindingIndex = 0;
-    uint32_t storageImageBindingIndex = 0;
+    //uint32_t uniformBindingIndex = 0;
+    //uint32_t textureBindingIndex = 0;
+    //uint32_t storageBufferBindingIndex = 0;
+    //uint32_t storageImageBindingIndex = 0;
 
     uint64_t deviceMemorySize = 0;
     uint64_t hostSharedMemorySize = 0;
