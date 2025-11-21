@@ -1,71 +1,68 @@
 #include "HardwareWrapperVulkan/PipelineVulkan/ComputePipeline.h"
-#include "CabbageHardware.h"
 
+#include "CabbageHardware.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 
-HardwareExecutorVulkan *getExecutorImpl(uintptr_t id);
+HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
 
-struct ComputePipelineWrap
-{
-    ComputePipelineVulkan *impl = nullptr; // ¾ßÌåÊµÏÖ¶ÔÏó
+struct ComputePipelineWrap {
+    ComputePipelineVulkan* impl = nullptr;  // ï¿½ï¿½ï¿½ï¿½Êµï¿½Ö¶ï¿½ï¿½ï¿½
     uint64_t refCount = 0;
 };
 
 static Corona::Kernel::Utils::Storage<ComputePipelineWrap> gComputePipelineStorage;
 
-static void incCompute(uintptr_t id)
-{
-    if (id)
-    {
-        gComputePipelineStorage.write(id, [](ComputePipelineWrap &w) { ++w.refCount; });
+static void incCompute(uintptr_t id) {
+    if (id) {
+        ++gComputePipelineStorage.acquire_write(id)->refCount;
     }
 }
 
-static void decCompute(uintptr_t id)
-{
-    if (!id)
+static void decCompute(uintptr_t id) {
+    if (!id) {
         return;
+    }
     bool destroy = false;
-    gComputePipelineStorage.write(id, [&](ComputePipelineWrap &w) {
-        if (--w.refCount == 0)
-        {
-            delete w.impl;
-            w.impl = nullptr;
-            destroy = true;
-        }
-    });
-    if (destroy)
+    auto handle = gComputePipelineStorage.acquire_write(id);
+    if (--handle->refCount == 0) {
+        delete handle->impl;
+        handle->impl = nullptr;
+        destroy = true;
+    }
+    if (destroy) {
         gComputePipelineStorage.deallocate(id);
+    }
 }
 
-ComputePipeline::ComputePipeline()
-{
-    const auto handle = gComputePipelineStorage.allocate([](ComputePipelineWrap &w) { w.impl = new ComputePipelineVulkan(); w.refCount =1; });
-    computePipelineID = std::make_shared<uintptr_t>(handle);
+ComputePipeline::ComputePipeline() {
+    auto const id = gComputePipelineStorage.allocate();
+    auto handle = gComputePipelineStorage.acquire_write(id);
+    handle->impl = new ComputePipelineVulkan();
+    handle->refCount = 1;
+    computePipelineID = std::make_shared<uintptr_t>(id);
 }
 
-ComputePipeline::ComputePipeline(std::string shaderCode, EmbeddedShader::ShaderLanguage language, const std::source_location &src)
-{
-    const auto handle = gComputePipelineStorage.allocate([&](ComputePipelineWrap &w) { w.impl = new ComputePipelineVulkan(shaderCode, language, src); w.refCount =1; });
-    computePipelineID = std::make_shared<uintptr_t>(handle);
+ComputePipeline::ComputePipeline(std::string shaderCode, EmbeddedShader::ShaderLanguage language, const std::source_location& src) {
+    auto const id = gComputePipelineStorage.allocate();
+    auto handle = gComputePipelineStorage.acquire_write(id);
+    handle->impl = new ComputePipelineVulkan(shaderCode, language, src);
+    handle->refCount = 1;
+    computePipelineID = std::make_shared<uintptr_t>(id);
 }
 
-ComputePipeline::ComputePipeline(const ComputePipeline &other)
-    : computePipelineID(other.computePipelineID)
-{
+ComputePipeline::ComputePipeline(const ComputePipeline& other)
+    : computePipelineID(other.computePipelineID) {
     incCompute(*computePipelineID);
 }
 
-ComputePipeline::~ComputePipeline()
-{
-    if (computePipelineID)
+ComputePipeline::~ComputePipeline() {
+    if (computePipelineID) {
         decCompute(*computePipelineID);
+    }
 }
 
-ComputePipeline &ComputePipeline::operator=(const ComputePipeline &other)
-{
-    if (this != &other)
-    {
+ComputePipeline& ComputePipeline::operator=(const ComputePipeline& other) {
+    if (this != &other) {
         incCompute(*other.computePipelineID);
         decCompute(*computePipelineID);
         *computePipelineID = *other.computePipelineID;
@@ -73,23 +70,23 @@ ComputePipeline &ComputePipeline::operator=(const ComputePipeline &other)
     return *this;
 }
 
-std::variant<HardwarePushConstant> ComputePipeline::operator[](const std::string &resourceName)
-{
+std::variant<HardwarePushConstant> ComputePipeline::operator[](const std::string& resourceName) {
     std::variant<HardwarePushConstant> result;
-    gComputePipelineStorage.read(*computePipelineID, [&](const ComputePipelineWrap &w) { result = (*w.impl)[resourceName]; });
+    auto handle = gComputePipelineStorage.acquire_read(*computePipelineID);
+    result = (*handle->impl)[resourceName];
     return result;
 }
 
-ComputePipeline &ComputePipeline::operator()(uint16_t x, uint16_t y, uint16_t z)
-{
-    gComputePipelineStorage.read(*computePipelineID, [&](const ComputePipelineWrap &w) { (*w.impl)(x, y, z); });
+ComputePipeline& ComputePipeline::operator()(uint16_t x, uint16_t y, uint16_t z) {
+    auto handle = gComputePipelineStorage.acquire_read(*computePipelineID);
+    (*handle->impl)(x, y, z);
     return *this;
 }
 
-// ¹©Ö´ÐÐÆ÷ÄÚ²¿·ÃÎÊÊµÏÖ
-ComputePipelineVulkan *getComputePipelineImpl(uintptr_t id)
-{
-    ComputePipelineVulkan *ptr = nullptr;
-    gComputePipelineStorage.read(id, [&](const ComputePipelineWrap &w) { ptr = w.impl; });
+// ï¿½ï¿½Ö´ï¿½ï¿½ï¿½ï¿½ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½
+ComputePipelineVulkan* getComputePipelineImpl(uintptr_t id) {
+    ComputePipelineVulkan* ptr = nullptr;
+    auto handle = gComputePipelineStorage.acquire_read(id);
+    ptr = handle->impl;
     return ptr;
 }

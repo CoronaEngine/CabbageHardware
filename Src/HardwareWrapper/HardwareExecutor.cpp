@@ -1,122 +1,113 @@
 #include "CabbageHardware.h"
+#include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 #include "HardwareWrapperVulkan/PipelineVulkan/ComputePipeline.h"
 #include "HardwareWrapperVulkan/PipelineVulkan/RasterizerPipeline.h"
 
-#include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
+// Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú²ï¿½ï¿½ï¿½ï¿½Êºï¿½ï¿½ï¿½
+ComputePipelineVulkan* getComputePipelineImpl(uintptr_t id);
+RasterizerPipelineVulkan* getRasterizerPipelineImpl(uintptr_t id);
 
-// Ç°ÏòÉùÃ÷ÄÚ²¿·ÃÎÊº¯Êý
-ComputePipelineVulkan *getComputePipelineImpl(uintptr_t id);
-RasterizerPipelineVulkan *getRasterizerPipelineImpl(uintptr_t id);
-
-struct ExecutorWrap
-{
-    HardwareExecutorVulkan *impl = nullptr;
+struct ExecutorWrap {
+    HardwareExecutorVulkan* impl = nullptr;
     uint64_t refCount = 0;
 };
 
 static Corona::Kernel::Utils::Storage<ExecutorWrap> gExecutorStorage;
 
-static void incExec(uintptr_t id)
-{
-    if (id)
-        gExecutorStorage.write(id, [](ExecutorWrap &w) { ++w.refCount; });
+static void incExec(uintptr_t id) {
+    if (id) {
+        auto handle = gExecutorStorage.acquire_write(id);
+        ++handle->refCount;
+    }
 }
-static void decExec(uintptr_t id)
-{
-    if (!id)
+static void decExec(uintptr_t id) {
+    if (!id) {
         return;
+    }
     bool destroy = false;
-    gExecutorStorage.write(id, [&](ExecutorWrap &w) { if(--w.refCount==0){ delete w.impl; w.impl=nullptr; destroy=true; } });
-    if (destroy)
+    auto handle = gExecutorStorage.acquire_write(id);
+    if (--handle->refCount == 0) {
+        delete handle->impl;
+        handle->impl = nullptr;
+        destroy = true;
+    }
+    if (destroy) {
         gExecutorStorage.deallocate(id);
+    }
 }
 
-HardwareExecutor::HardwareExecutor()
-{
-    const auto handle = gExecutorStorage.allocate([](ExecutorWrap &w) { w.impl = new HardwareExecutorVulkan(); w.refCount=1; });
-    executorID = std::make_shared<uintptr_t>(handle);
+HardwareExecutor::HardwareExecutor() {
+    auto id = gExecutorStorage.allocate();
+    auto handle = gExecutorStorage.acquire_write(id);
+    handle->impl = new HardwareExecutorVulkan();
+    handle->refCount = 1;
+    executorID = std::make_shared<uintptr_t>(id);
 }
 
-HardwareExecutor::HardwareExecutor(const HardwareExecutor &other)
-    : executorID(other.executorID)
-{
+HardwareExecutor::HardwareExecutor(const HardwareExecutor& other)
+    : executorID(other.executorID) {
     incExec(*executorID);
 }
 
-HardwareExecutor::~HardwareExecutor()
-{
-    if (executorID)
+HardwareExecutor::~HardwareExecutor() {
+    if (executorID) {
         decExec(*executorID);
+    }
 }
 
-HardwareExecutor &HardwareExecutor::operator=(const HardwareExecutor &other)
-{
-    if (this != &other)
-    {
+HardwareExecutor& HardwareExecutor::operator=(const HardwareExecutor& other) {
+    if (this != &other) {
         incExec(*other.executorID);
-     decExec(*executorID);
-    executorID = other.executorID;  // Ç³¿½±´ shared_ptr
+        decExec(*executorID);
+        executorID = other.executorID;  // Ç³ï¿½ï¿½ï¿½ï¿½ shared_ptr
     }
     return *this;
 }
 
-HardwareExecutor &HardwareExecutor::operator<<(ComputePipeline &computePipeline)
-{
-    gExecutorStorage.read(*executorID, [&](const ExecutorWrap &wrap) {
-        if (computePipeline.getComputePipelineID())
-        {
-            if (auto *impl = getComputePipelineImpl(*computePipeline.getComputePipelineID()))
-            {
-                wrap.impl->operator<<(static_cast<CommandRecordVulkan *>(impl));
-            }
+HardwareExecutor& HardwareExecutor::operator<<(ComputePipeline& computePipeline) {
+    auto handle = gExecutorStorage.acquire_read(*executorID);
+    if (computePipeline.getComputePipelineID()) {
+        if (auto* impl = getComputePipelineImpl(*computePipeline.getComputePipelineID())) {
+            handle->impl->operator<<(static_cast<CommandRecordVulkan*>(impl));
         }
-    });
+    }
     return *this;
 }
 
-HardwareExecutor &HardwareExecutor::operator<<(RasterizerPipeline &rasterizerPipeline)
-{
-    gExecutorStorage.read(*executorID, [&](const ExecutorWrap &wrap) {
-        if (rasterizerPipeline.getRasterizerPipelineID())
-        {
-            if (auto *impl = getRasterizerPipelineImpl(*rasterizerPipeline.getRasterizerPipelineID()))
-            {
-                wrap.impl->operator<<(static_cast<CommandRecordVulkan *>(impl));
-            }
+HardwareExecutor& HardwareExecutor::operator<<(RasterizerPipeline& rasterizerPipeline) {
+    auto handle = gExecutorStorage.acquire_read(*executorID);
+    if (rasterizerPipeline.getRasterizerPipelineID()) {
+        if (auto* impl = getRasterizerPipelineImpl(*rasterizerPipeline.getRasterizerPipelineID())) {
+            handle->impl->operator<<(static_cast<CommandRecordVulkan*>(impl));
         }
-    });
+    }
     return *this;
 }
 
-HardwareExecutor &HardwareExecutor::operator<<(HardwareExecutor &other)
-{
-    return other; // Í¸´«
+HardwareExecutor& HardwareExecutor::operator<<(HardwareExecutor& other) {
+    return other;  // Í¸ï¿½ï¿½
 }
 
-HardwareExecutor &HardwareExecutor::wait(HardwareExecutor &other)
-{
-    // ÔÚÍ¬Ò»¸ö¶ÁËøÄÚÍê³ÉËùÓÐ²Ù×÷£¬±ÜÃâ¾ºÌ¬Ìõ¼þ
-    gExecutorStorage.read(*executorID, [&](const ExecutorWrap &wrap) {
-        gExecutorStorage.read(*other.executorID, [&](const ExecutorWrap &otherWrap) {
-            if (otherWrap.impl && wrap.impl)
-            {
-                wrap.impl->wait(*otherWrap.impl);
-            }
-        });
-    });
+HardwareExecutor& HardwareExecutor::wait(HardwareExecutor& other) {
+    // ï¿½ï¿½Í¬Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½â¾ºÌ¬ï¿½ï¿½ï¿½ï¿½
+    auto handle = gExecutorStorage.acquire_read(*executorID);
+    auto other_handle = gExecutorStorage.acquire_read(*other.executorID);
+    if (other_handle->impl && handle->impl) {
+        handle->impl->wait(*other_handle->impl);
+    }
     return *this;
 }
 
-HardwareExecutor &HardwareExecutor::commit()
-{
-    gExecutorStorage.read(*executorID, [&](const ExecutorWrap &wrap) { wrap.impl->commit(); });
+HardwareExecutor& HardwareExecutor::commit() {
+    auto handle = gExecutorStorage.acquire_read(*executorID);
+    handle->impl->commit();
     return *this;
 }
 
 // Helper for other wrappers to access impl safely
-HardwareExecutorVulkan *getExecutorImpl(uintptr_t id)
-{
-    HardwareExecutorVulkan *impl = nullptr;
-    gExecutorStorage.read(id, [&](const ExecutorWrap &w) { impl = w.impl; });
+HardwareExecutorVulkan* getExecutorImpl(uintptr_t id) {
+    HardwareExecutorVulkan* impl = nullptr;
+    auto handle = gExecutorStorage.acquire_read(id);
+    impl = handle->impl;
     return impl;
 }
