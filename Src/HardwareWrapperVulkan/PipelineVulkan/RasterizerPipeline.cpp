@@ -599,10 +599,8 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
         requiredBarriers.imageBarriers.push_back(imageBarrier);
 
         // 更新图像布局
-        globalImageStorages.write(*renderTarget.getImageID(), [](ResourceManager::ImageHardwareWrap &image)
-        {
-            image.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        });
+        auto handle = globalImageStorages.acquire_write(*renderTarget.getImageID());
+        handle->imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     }
 
     // 深度附件屏障
