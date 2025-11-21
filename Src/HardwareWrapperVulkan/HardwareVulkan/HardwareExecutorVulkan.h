@@ -1,6 +1,11 @@
 ﻿#pragma once
 
-#include "HardwareWrapperVulkan/HardwareVulkan/GlobalContext.h"
+#include <atomic>
+#include <functional>
+#include <memory>
+#include <vector>
+
+#include "HardwareWrapperVulkan/HardwareContext.h"
 
 struct HardwareExecutorVulkan;
 
@@ -44,7 +49,7 @@ struct CommandRecordVulkan
 
 struct HardwareExecutorVulkan
 {
-    HardwareExecutorVulkan(std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext = globalHardwareContext.getMainDevice())
+    explicit HardwareExecutorVulkan(std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext = globalHardwareContext.getMainDevice())
         : hardwareContext(hardwareContext)
     {
     }
@@ -96,7 +101,7 @@ struct HardwareExecutorVulkan
         return *this;
     }
 
-    operator bool()
+    explicit operator bool()
     {
         return (!commandList.empty()) && (currentRecordQueue != nullptr);
     }

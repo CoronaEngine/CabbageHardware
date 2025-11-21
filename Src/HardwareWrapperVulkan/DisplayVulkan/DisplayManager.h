@@ -4,7 +4,7 @@
 #include <numeric>
 
 #include "CabbageHardware.h"
-#include "HardwareWrapperVulkan/HardwareVulkan/HardwareUtil.h"
+#include "HardwareWrapperVulkan/HardwareUtils.h"
 
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 

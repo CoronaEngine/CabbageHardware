@@ -1,5 +1,5 @@
 ﻿#include "RasterizerPipeline.h"
-#include "HardwareWrapperVulkan/HardwareVulkan/HardwareUtil.h"
+#include "HardwareWrapperVulkan/HardwareUtils.h"
 
 void extractStageBindings(const EmbeddedShader::ShaderCodeModule::ShaderResources &resources,
                           std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> &inputs,
@@ -623,10 +623,8 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
         requiredBarriers.imageBarriers.push_back(imageBarrier);
 
         // 更新图像布局
-        globalImageStorages.write(*depthImage.getImageID(), [](ResourceManager::ImageHardwareWrap &image)
-        {
-            image.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        });
+        auto handle = globalImageStorages.acquire_write(*depthImage.getImageID());
+        handle->imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     }
 
     // 缓冲区屏障

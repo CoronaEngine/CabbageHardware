@@ -1,6 +1,7 @@
 ﻿#include "ResourceManager.h"
-#include "HardwareUtil.h"
-#include "GlobalContext.h"
+
+#include "HardwareWrapperVulkan/HardwareContext.h"
+#include "HardwareWrapperVulkan/HardwareUtils.h"
 
 #define VK_NO_PROTOTYPES
 #define VMA_IMPLEMENTATION
@@ -8,13 +9,11 @@
 
 ResourceManager::ResourceManager() = default;
 
-ResourceManager::~ResourceManager()
-{
+ResourceManager::~ResourceManager() {
     cleanUpResourceManager();
 }
 
-void ResourceManager::initResourceManager(DeviceManager &device)
-{
+void ResourceManager::initResourceManager(DeviceManager& device) {
     this->device = &device;
 
     createVmaAllocator();
@@ -23,10 +22,8 @@ void ResourceManager::initResourceManager(DeviceManager &device)
     createExternalBufferMemoryPool();
 }
 
-void ResourceManager::cleanUpResourceManager()
-{
-    if (!device || device->getLogicalDevice() == VK_NULL_HANDLE)
-    {
+void ResourceManager::cleanUpResourceManager() {
+    if (!device || device->getLogicalDevice() == VK_NULL_HANDLE) {
         return;
     }
 
@@ -36,32 +33,27 @@ void ResourceManager::cleanUpResourceManager()
     vkDeviceWaitIdle(logicalDevice);
 
     // 清理描述符相关资源
-    for (auto &bindlessDesc : bindlessDescriptors)
-    {
-        if (bindlessDesc.descriptorPool != VK_NULL_HANDLE)
-        {
+    for (auto& bindlessDesc : bindlessDescriptors) {
+        if (bindlessDesc.descriptorPool != VK_NULL_HANDLE) {
             vkDestroyDescriptorPool(logicalDevice, bindlessDesc.descriptorPool, nullptr);
             bindlessDesc.descriptorPool = VK_NULL_HANDLE;
         }
 
-        if (bindlessDesc.descriptorSetLayout != VK_NULL_HANDLE)
-        {
+        if (bindlessDesc.descriptorSetLayout != VK_NULL_HANDLE) {
             vkDestroyDescriptorSetLayout(logicalDevice, bindlessDesc.descriptorSetLayout, nullptr);
             bindlessDesc.descriptorSetLayout = VK_NULL_HANDLE;
         }
     }
 
     // 清理纹理采样器
-    if (textureSampler != VK_NULL_HANDLE)
-    {
+    if (textureSampler != VK_NULL_HANDLE) {
         vkDestroySampler(logicalDevice, textureSampler, nullptr);
         textureSampler = VK_NULL_HANDLE;
     }
 
     // 清理 VMA 分配器
-    if (vmaAllocator != VK_NULL_HANDLE)
-    {
-        //vmaDestroyAllocator(vmaAllocator);
+    if (vmaAllocator != VK_NULL_HANDLE) {
+        // vmaDestroyAllocator(vmaAllocator);
         vmaAllocator = VK_NULL_HANDLE;
     }
 
@@ -72,8 +64,7 @@ void ResourceManager::cleanUpResourceManager()
     multiInstanceMemorySize = 0;
 }
 
-void ResourceManager::createVmaAllocator()
-{
+void ResourceManager::createVmaAllocator() {
     VmaAllocatorCreateInfo allocatorInfo{};
     allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_4;
     allocatorInfo.physicalDevice = device->getPhysicalDevice();
@@ -99,7 +90,7 @@ void ResourceManager::createVmaAllocator()
 
     coronaHardwareCheck(vmaCreateAllocator(&allocatorInfo, &vmaAllocator));
 
-    const VkPhysicalDeviceMemoryProperties *memoryProperties = nullptr;
+    const VkPhysicalDeviceMemoryProperties* memoryProperties = nullptr;
     vmaGetMemoryProperties(vmaAllocator, &memoryProperties);
 
     // 重置内存统计
@@ -107,28 +98,21 @@ void ResourceManager::createVmaAllocator()
     hostSharedMemorySize = 0;
     multiInstanceMemorySize = 0;
 
-    for (uint32_t heapIndex = 0; heapIndex < memoryProperties->memoryHeapCount; ++heapIndex)
-    {
-        const VkMemoryHeap &heap = memoryProperties->memoryHeaps[heapIndex];
+    for (uint32_t heapIndex = 0; heapIndex < memoryProperties->memoryHeapCount; ++heapIndex) {
+        const VkMemoryHeap& heap = memoryProperties->memoryHeaps[heapIndex];
 
-        if (heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
-        {
+        if (heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
             deviceMemorySize += heap.size;
-        }
-        else if (heap.flags & VK_MEMORY_HEAP_MULTI_INSTANCE_BIT)
-        {
+        } else if (heap.flags & VK_MEMORY_HEAP_MULTI_INSTANCE_BIT) {
             multiInstanceMemorySize += heap.size;
-        }
-        else
-        {
+        } else {
             hostSharedMemorySize += heap.size;
         }
     }
 
 #ifdef CABBAGE_ENGINE_DEBUG
-    const auto toGB = [](uint64_t bytes) -> double
-    {
-        return bytes / 1073741824.0; // 1024^3
+    const auto toGB = [](uint64_t bytes) -> double {
+        return bytes / 1073741824.0;  // 1024^3
     };
 
     std::cout << "[ResourceManager] VMA Allocator created successfully:\n"
@@ -139,8 +123,7 @@ void ResourceManager::createVmaAllocator()
 #endif
 }
 
-void ResourceManager::createTextureSampler()
-{
+void ResourceManager::createTextureSampler() {
     VkPhysicalDeviceProperties properties{};
     vkGetPhysicalDeviceProperties(device->getPhysicalDevice(), &properties);
 
@@ -165,8 +148,7 @@ void ResourceManager::createTextureSampler()
     coronaHardwareCheck(vkCreateSampler(device->getLogicalDevice(), &samplerInfo, nullptr, &textureSampler));
 }
 
-void ResourceManager::createBindlessDescriptorSet()
-{
+void ResourceManager::createBindlessDescriptorSet() {
     VkPhysicalDeviceDescriptorIndexingProperties indexingProperties{};
     indexingProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES_EXT;
 
@@ -176,10 +158,9 @@ void ResourceManager::createBindlessDescriptorSet()
 
     vkGetPhysicalDeviceProperties2(device->getPhysicalDevice(), &deviceProperties);
 
-    struct DescriptorTypeConfig
-    {
+    struct DescriptorTypeConfig {
         VkDescriptorType type;
-        std::function<uint32_t(const VkPhysicalDeviceDescriptorIndexingProperties &)> computeMaxCount;
+        std::function<uint32_t(const VkPhysicalDeviceDescriptorIndexingProperties&)> computeMaxCount;
     };
 
     constexpr uint32_t PREFERRED_MAX_RESOURCES = 10000u;
@@ -188,7 +169,7 @@ void ResourceManager::createBindlessDescriptorSet()
             // Uniform Buffer
             {
                 VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                [](const auto &props) {
+                [](const auto& props) {
                     return std::min({PREFERRED_MAX_RESOURCES,
                                      props.maxUpdateAfterBindDescriptorsInAllPools / 4,
                                      props.maxPerStageUpdateAfterBindResources / 4,
@@ -198,7 +179,7 @@ void ResourceManager::createBindlessDescriptorSet()
             // Combined Image Sampler
             {
                 VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                [](const auto &props) {
+                [](const auto& props) {
                     return std::min({PREFERRED_MAX_RESOURCES,
                                      props.maxUpdateAfterBindDescriptorsInAllPools / 4,
                                      props.maxPerStageUpdateAfterBindResources / 4,
@@ -208,7 +189,7 @@ void ResourceManager::createBindlessDescriptorSet()
             // Storage Buffer
             {
                 VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                [](const auto &props) {
+                [](const auto& props) {
                     return std::min({PREFERRED_MAX_RESOURCES,
                                      props.maxUpdateAfterBindDescriptorsInAllPools / 4,
                                      props.maxPerStageUpdateAfterBindResources / 4,
@@ -218,7 +199,7 @@ void ResourceManager::createBindlessDescriptorSet()
             // Storage Image
             {
                 VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-                [](const auto &props) {
+                [](const auto& props) {
                     return std::min({PREFERRED_MAX_RESOURCES,
                                      props.maxUpdateAfterBindDescriptorsInAllPools / 4,
                                      props.maxPerStageUpdateAfterBindResources / 4,
@@ -227,16 +208,14 @@ void ResourceManager::createBindlessDescriptorSet()
                 }}};
 
     std::array<uint32_t, 4> maxResourceCounts;
-    for (size_t i = 0; i < 4; ++i)
-    {
+    for (size_t i = 0; i < 4; ++i) {
         maxResourceCounts[i] = configs[i].computeMaxCount(indexingProperties);
     }
 
     constexpr VkDescriptorBindingFlags bindingFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
     VkDevice logicalDevice = device->getLogicalDevice();
 
-    for (size_t i = 0; i < 4; ++i)
-    {
+    for (size_t i = 0; i < 4; ++i) {
         const uint32_t maxCount = maxResourceCounts[i];
         const VkDescriptorType descriptorType = configs[i].type;
 
@@ -270,7 +249,7 @@ void ResourceManager::createBindlessDescriptorSet()
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.poolSizeCount = 1;
         poolInfo.pPoolSizes = &poolSize;
-        poolInfo.maxSets = 1; // 每个池只需要一个描述符集
+        poolInfo.maxSets = 1;  // 每个池只需要一个描述符集
         poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
 
         coronaHardwareCheck(vkCreateDescriptorPool(logicalDevice, &poolInfo, nullptr, &bindlessDescriptors[i].descriptorPool));
@@ -292,8 +271,7 @@ void ResourceManager::createBindlessDescriptorSet()
     }
 }
 
-void ResourceManager::createExternalBufferMemoryPool()
-{
+void ResourceManager::createExternalBufferMemoryPool() {
 #if _WIN32 || _WIN64
     constexpr VkExternalMemoryHandleTypeFlagsKHR EXTERNAL_MEMORY_HANDLE_TYPE = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #elif __linux__
@@ -305,15 +283,14 @@ void ResourceManager::createExternalBufferMemoryPool()
 
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = 0x10000; // 64KB 测试大小
+    bufferInfo.size = 0x10000;  // 64KB 测试大小
     bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
     // 配置队列族共享模式
     std::vector<uint32_t> queueFamilyIndices;
     const uint32_t queueFamilyCount = device->getQueueFamilyNumber();
 
-    if (queueFamilyCount > 1)
-    {
+    if (queueFamilyCount > 1) {
         // 多队列族：使用并发模式，允许跨队列共享
         queueFamilyIndices.resize(queueFamilyCount);
         std::iota(queueFamilyIndices.begin(), queueFamilyIndices.end(), 0u);
@@ -321,9 +298,7 @@ void ResourceManager::createExternalBufferMemoryPool()
         bufferInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
         bufferInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueFamilyIndices.size());
         bufferInfo.pQueueFamilyIndices = queueFamilyIndices.data();
-    }
-    else
-    {
+    } else {
         // 单队列族：使用独占模式以获得更好的性能
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
@@ -348,9 +323,9 @@ void ResourceManager::createExternalBufferMemoryPool()
     VmaPoolCreateInfo poolInfo{};
     poolInfo.memoryTypeIndex = memoryTypeIndex;
     poolInfo.pMemoryAllocateNext = &exportMemoryInfo;
-    poolInfo.blockSize = 0;     // 使用 VMA 默认块大小（通常 256MB）
-    poolInfo.minBlockCount = 1; // 至少预分配一个块
-    poolInfo.maxBlockCount = 0; // 无限制，按需动态增长
+    poolInfo.blockSize = 0;      // 使用 VMA 默认块大小（通常 256MB）
+    poolInfo.minBlockCount = 1;  // 至少预分配一个块
+    poolInfo.maxBlockCount = 0;  // 无限制，按需动态增长
     // poolInfo.flags = VMA_POOL_CREATE_IGNORE_BUFFER_IMAGE_GRANULARITY_BIT;
 
     coronaHardwareCheck(vmaCreatePool(vmaAllocator, &poolInfo, &exportBufferPool));
@@ -371,8 +346,7 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
                                                                 VkImageUsageFlags imageUsage,
                                                                 int arrayLayers,
                                                                 int mipLevels,
-                                                                VkImageTiling tiling)
-{
+                                                                VkImageTiling tiling) {
     ImageHardwareWrap resultImage{};
     resultImage.device = device;
     resultImage.resourceManager = this;
@@ -383,14 +357,11 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     resultImage.mipLevels = mipLevels;
     resultImage.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-    if (imageUsage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
-    {
+    if (imageUsage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) {
         // 深度模板图像
         resultImage.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
         resultImage.clearValue.depthStencil = {1.0f, 0};
-    }
-    else
-    {
+    } else {
         // 颜色图像
         resultImage.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         resultImage.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
@@ -402,8 +373,7 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
                   VK_IMAGE_USAGE_SAMPLED_BIT;
     resultImage.imageUsage = imageUsage;
 
-    if (imageSize.x == 0 || imageSize.y == 0)
-    {
+    if (imageSize.x == 0 || imageSize.y == 0) {
         // 无效尺寸，返回空图像
         return resultImage;
     }
@@ -424,8 +394,7 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     std::vector<uint32_t> queueFamilyIndices;
     const uint32_t queueFamilyCount = device->getQueueFamilyNumber();
 
-    if (queueFamilyCount > 1)
-    {
+    if (queueFamilyCount > 1) {
         // 多队列族：使用并发模式
         queueFamilyIndices.resize(queueFamilyCount);
         std::iota(queueFamilyIndices.begin(), queueFamilyIndices.end(), 0u);
@@ -433,15 +402,13 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
         imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
         imageInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueFamilyIndices.size());
         imageInfo.pQueueFamilyIndices = queueFamilyIndices.data();
-    }
-    else
-    {
+    } else {
         // 单队列族：使用独占模式以获得更好性能
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
 
     VmaAllocationCreateInfo allocInfo{};
-    allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE; // 优先使用设备本地内存
+    allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;  // 优先使用设备本地内存
 
     coronaHardwareCheck(vmaCreateImage(vmaAllocator, &imageInfo, &allocInfo, &resultImage.imageHandle, &resultImage.imageAlloc, &resultImage.imageAllocInfo));
 
@@ -468,8 +435,7 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     return resultImage;
 }
 
-VkImageView ResourceManager::createImageView(ImageHardwareWrap &image)
-{
+VkImageView ResourceManager::createImageView(ImageHardwareWrap& image) {
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = image.imageHandle;
@@ -488,23 +454,19 @@ VkImageView ResourceManager::createImageView(ImageHardwareWrap &image)
     return imageView;
 }
 
-void ResourceManager::destroyImage(ImageHardwareWrap &image)
-{
-    if (vmaAllocator == VK_NULL_HANDLE)
-    {
+void ResourceManager::destroyImage(ImageHardwareWrap& image) {
+    if (vmaAllocator == VK_NULL_HANDLE) {
         return;
     }
 
     VkDevice logicalDevice = device->getLogicalDevice();
 
-    if (image.imageView != VK_NULL_HANDLE)
-    {
+    if (image.imageView != VK_NULL_HANDLE) {
         vkDestroyImageView(logicalDevice, image.imageView, nullptr);
         image.imageView = VK_NULL_HANDLE;
     }
 
-    if (image.imageHandle != VK_NULL_HANDLE)
-    {
+    if (image.imageHandle != VK_NULL_HANDLE) {
         vmaDestroyImage(vmaAllocator, image.imageHandle, image.imageAlloc);
         image.imageHandle = VK_NULL_HANDLE;
         image.imageAlloc = VK_NULL_HANDLE;
@@ -515,8 +477,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(uint32_t eleme
                                                                   uint32_t elementSize,
                                                                   VkBufferUsageFlags usage,
                                                                   bool hostVisibleMapped,
-                                                                  bool useDedicated)
-{
+                                                                  bool useDedicated) {
     BufferHardwareWrap resultBuffer{};
     resultBuffer.device = device;
     resultBuffer.resourceManager = this;
@@ -525,8 +486,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(uint32_t eleme
     resultBuffer.bufferUsage = usage;
 
     const uint64_t totalSize = static_cast<uint64_t>(elementCount) * elementSize;
-    if (totalSize == 0)
-    {
+    if (totalSize == 0) {
         return resultBuffer;
     }
 
@@ -547,17 +507,14 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(uint32_t eleme
     std::vector<uint32_t> queueFamilyIndices;
     const uint32_t queueFamilyCount = device->getQueueFamilyNumber();
 
-    if (queueFamilyCount > 1)
-    {
+    if (queueFamilyCount > 1) {
         queueFamilyIndices.resize(queueFamilyCount);
         std::iota(queueFamilyIndices.begin(), queueFamilyIndices.end(), 0u);
 
         bufferInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
         bufferInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueFamilyIndices.size());
         bufferInfo.pQueueFamilyIndices = queueFamilyIndices.data();
-    }
-    else
-    {
+    } else {
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
 
@@ -570,18 +527,14 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(uint32_t eleme
     VmaAllocationCreateInfo allocInfo{};
     allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
 
-    if (hostVisibleMapped)
-    {
+    if (hostVisibleMapped) {
         allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
     }
 
-    if (useDedicated)
-    {
+    if (useDedicated) {
         // 强制使用专用内存
         createDedicatedBuffer(bufferInfo, allocInfo, resultBuffer);
-    }
-    else
-    {
+    } else {
         // 查询外部缓冲区属性
         VkPhysicalDeviceExternalBufferInfo externalBufferInfo{};
         externalBufferInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO;
@@ -599,18 +552,13 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(uint32_t eleme
         const bool importable = (features & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT) != 0;
         const bool dedicatedOnly = (features & VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) != 0;
 
-        if (!exportable || !importable)
-        {
+        if (!exportable || !importable) {
             // 回退到非导出缓冲区
             createNonExportableBuffer(bufferInfo, allocInfo, resultBuffer);
-        }
-        else if (dedicatedOnly)
-        {
+        } else if (dedicatedOnly) {
             // 需要专用内存
             createDedicatedBuffer(bufferInfo, allocInfo, resultBuffer);
-        }
-        else
-        {
+        } else {
             // 使用内存池
             createPooledBuffer(bufferInfo, allocInfo, resultBuffer);
         }
@@ -619,10 +567,9 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(uint32_t eleme
     return resultBuffer;
 }
 
-void ResourceManager::createDedicatedBuffer(const VkBufferCreateInfo &bufferInfo,
-                                            const VmaAllocationCreateInfo &allocInfo,
-                                            BufferHardwareWrap &resultBuffer)
-{
+void ResourceManager::createDedicatedBuffer(const VkBufferCreateInfo& bufferInfo,
+                                            const VmaAllocationCreateInfo& allocInfo,
+                                            BufferHardwareWrap& resultBuffer) {
 #if _WIN32 || _WIN64
     constexpr VkExternalMemoryHandleTypeFlagsKHR EXTERNAL_MEMORY_HANDLE_TYPE = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #elif __linux__
@@ -647,27 +594,23 @@ void ResourceManager::createDedicatedBuffer(const VkBufferCreateInfo &bufferInfo
                                                  &resultBuffer.bufferAllocInfo));
 }
 
-void ResourceManager::createPooledBuffer(const VkBufferCreateInfo &bufferInfo,
-                                         const VmaAllocationCreateInfo &allocInfo,
-                                         BufferHardwareWrap &resultBuffer)
-{
+void ResourceManager::createPooledBuffer(const VkBufferCreateInfo& bufferInfo,
+                                         const VmaAllocationCreateInfo& allocInfo,
+                                         BufferHardwareWrap& resultBuffer) {
     VmaAllocationCreateInfo pooledAllocInfo = allocInfo;
     pooledAllocInfo.pool = exportBufferPool;
 
     coronaHardwareCheck(vmaCreateBuffer(vmaAllocator, &bufferInfo, &pooledAllocInfo, &resultBuffer.bufferHandle, &resultBuffer.bufferAlloc, &resultBuffer.bufferAllocInfo));
 }
 
-void ResourceManager::createNonExportableBuffer(const VkBufferCreateInfo &bufferInfo,
-                                                const VmaAllocationCreateInfo &allocInfo,
-                                                BufferHardwareWrap &resultBuffer)
-{
+void ResourceManager::createNonExportableBuffer(const VkBufferCreateInfo& bufferInfo,
+                                                const VmaAllocationCreateInfo& allocInfo,
+                                                BufferHardwareWrap& resultBuffer) {
     coronaHardwareCheck(vmaCreateBuffer(vmaAllocator, &bufferInfo, &allocInfo, &resultBuffer.bufferHandle, &resultBuffer.bufferAlloc, &resultBuffer.bufferAllocInfo));
 }
 
-void ResourceManager::destroyBuffer(BufferHardwareWrap &buffer)
-{
-    if (buffer.bufferHandle != VK_NULL_HANDLE && vmaAllocator != VK_NULL_HANDLE)
-    {
+void ResourceManager::destroyBuffer(BufferHardwareWrap& buffer) {
+    if (buffer.bufferHandle != VK_NULL_HANDLE && vmaAllocator != VK_NULL_HANDLE) {
         vmaDestroyBuffer(vmaAllocator, buffer.bufferHandle, buffer.bufferAlloc);
 
         buffer.bufferHandle = VK_NULL_HANDLE;
@@ -676,13 +619,12 @@ void ResourceManager::destroyBuffer(BufferHardwareWrap &buffer)
     }
 }
 
-ResourceManager::ExternalMemoryHandle ResourceManager::exportBufferMemory(BufferHardwareWrap &sourceBuffer)
-{
+ResourceManager::ExternalMemoryHandle ResourceManager::exportBufferMemory(BufferHardwareWrap& sourceBuffer) {
     // 验证源缓冲区有效性
-    if (sourceBuffer.bufferHandle == VK_NULL_HANDLE || sourceBuffer.bufferAlloc == VK_NULL_HANDLE)
-    {
-        throw std::runtime_error("Cannot export memory from invalid buffer: "
-                                 "buffer handle or allocation is null");
+    if (sourceBuffer.bufferHandle == VK_NULL_HANDLE || sourceBuffer.bufferAlloc == VK_NULL_HANDLE) {
+        throw std::runtime_error(
+            "Cannot export memory from invalid buffer: "
+            "buffer handle or allocation is null");
     }
 
     ExternalMemoryHandle memHandle{};
@@ -695,8 +637,7 @@ ResourceManager::ExternalMemoryHandle ResourceManager::exportBufferMemory(Buffer
                                                  nullptr,
                                                  &memHandle.handle));
 
-    if (memHandle.handle == nullptr || memHandle.handle == INVALID_HANDLE_VALUE)
-    {
+    if (memHandle.handle == nullptr || memHandle.handle == INVALID_HANDLE_VALUE) {
         throw std::runtime_error(
             "Exported memory handle is invalid: "
             "received null or invalid handle from VMA");
@@ -706,15 +647,13 @@ ResourceManager::ExternalMemoryHandle ResourceManager::exportBufferMemory(Buffer
     return memHandle;
 }
 
-ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const ExternalMemoryHandle &memHandle,
+ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const ExternalMemoryHandle& memHandle,
                                                                         uint32_t elementCount,
                                                                         uint32_t elementSize,
                                                                         uint32_t allocSize,
-                                                                        VkBufferUsageFlags bufferUsage)
-{
+                                                                        VkBufferUsageFlags bufferUsage) {
 #if _WIN32 || _WIN64
-    if (memHandle.handle == nullptr || memHandle.handle == INVALID_HANDLE_VALUE)
-    {
+    if (memHandle.handle == nullptr || memHandle.handle == INVALID_HANDLE_VALUE) {
         throw std::runtime_error("Cannot import buffer with invalid memory handle!");
     }
 #endif
@@ -736,13 +675,11 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     importedBuffer.elementSize = elementSize;
 
     // allocSize 必须等于 CUDA 导出时的 aligned_size
-    if (allocSize == 0)
-    {
+    if (allocSize == 0) {
         throw std::runtime_error("Import failed: allocSize == 0.");
     }
     const uint64_t logicalSize = static_cast<uint64_t>(elementCount) * elementSize;
-    if (logicalSize > allocSize)
-    {
+    if (logicalSize > allocSize) {
         // 逻辑数据大小不应超过物理分配大小
         throw std::runtime_error("Import failed: logical data size exceeds external allocation size.");
     }
@@ -751,7 +688,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = allocSize;
     bufferInfo.usage = bufferUsage;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // 简化：独占更安全
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;  // 简化：独占更安全
     bufferInfo.pNext = nullptr;
 
     VkExternalMemoryBufferCreateInfo externalMemoryInfo{};
@@ -774,8 +711,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     const bool importable = (feats & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT) != 0;
     const bool dedicatedOnly = (feats & VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) != 0;
 
-    if (!importable)
-    {
+    if (!importable) {
         throw std::runtime_error("Import failed: buffer not importable (features=" + std::to_string(feats) + ").");
     }
 
@@ -790,7 +726,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     // 使用专用 + 设备本地，不再请求映射
     VmaAllocationCreateInfo allocInfo{};
     allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-    allocInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT; // dedicated
+    allocInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;  // dedicated
     // 不添加 MAPPED / HOST flags，避免要求 Host 可见
     // 如果 extProps 表示需要 dedicatedOnly，则本路径满足
 
@@ -817,15 +753,12 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     return importedBuffer;
 }
 
-ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *hostPtr, uint64_t size)
-{
-    if (hostPtr == nullptr)
-    {
+ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void* hostPtr, uint64_t size) {
+    if (hostPtr == nullptr) {
         throw std::invalid_argument("Cannot import host buffer: host pointer is null");
     }
 
-    if (size == 0)
-    {
+    if (size == 0) {
         throw std::invalid_argument("Cannot import host buffer: size is zero");
     }
 
@@ -844,8 +777,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *host
                                                           hostPtr,
                                                           &hostPointerProps);
 
-    if (result != VK_SUCCESS)
-    {
+    if (result != VK_SUCCESS) {
         throw std::runtime_error("Failed to query host pointer properties: " + std::to_string(result) + ". The host pointer may not be compatible with this device.");
     }
 
@@ -883,54 +815,45 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *host
     return bufferWrap;
 }
 
-uint32_t ResourceManager::storeDescriptor(ImageHardwareWrap image)
-{
+uint32_t ResourceManager::storeDescriptor(ImageHardwareWrap image) {
     uint32_t textureIndex = -1;
     VkDescriptorType descriptorType = (image.imageUsage & VK_IMAGE_USAGE_STORAGE_BIT) ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     bool updateDescriptorSets = false;
 
-    if (descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-    {
+    if (descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
         // 查找是否已存在
-        storageImageBindingList.for_each_read([&](const BindingEntry<VkImageView> &entry)
-        {
-            if (entry.handle == image.imageView)
+        for (auto const& entry : storageImageBindingList) {
+            if (entry.handle == image.imageView) {
                 textureIndex = entry.bindingIndex;
-        });
+            }
+        }
 
-        if (textureIndex == -1)
-        {
+        if (textureIndex == -1) {
             textureIndex = storageImageBindingIndex++;
             updateDescriptorSets = true;
-            storageImageBindingList.allocate([&](BindingEntry<VkImageView> &entry)
-            {
-                entry.handle = image.imageView;
-                entry.bindingIndex = textureIndex;
-            });
+            auto id = storageImageBindingList.allocate();
+            auto handle = storageImageBindingList.acquire_write(id);
+            handle->handle = image.imageView;
+            handle->bindingIndex = textureIndex;
         }
-    }
-    else
-    {
-        textureBindingList.for_each_read([&](const BindingEntry<VkImageView> &entry)
-        {
-            if (entry.handle == image.imageView)
+    } else {
+        for (auto const& entry : textureBindingList) {
+            if (entry.handle == image.imageView) {
                 textureIndex = entry.bindingIndex;
-        });
+            }
+        }
 
-        if (textureIndex == -1)
-        {
+        if (textureIndex == -1) {
             textureIndex = textureBindingIndex++;
             updateDescriptorSets = true;
-            textureBindingList.allocate([&](BindingEntry<VkImageView> &entry)
-            {
-                entry.handle = image.imageView;
-                entry.bindingIndex = textureIndex;
-            });
+            auto id = textureBindingList.allocate();
+            auto handle = textureBindingList.acquire_write(id);
+            handle->handle = image.imageView;
+            handle->bindingIndex = textureIndex;
         }
     }
 
-    if (updateDescriptorSets)
-    {
+    if (updateDescriptorSets) {
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
         imageInfo.imageView = image.imageView;
@@ -943,13 +866,11 @@ uint32_t ResourceManager::storeDescriptor(ImageHardwareWrap image)
         write.dstArrayElement = textureIndex;
         write.pImageInfo = &imageInfo;
 
-        if (write.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-        {
+        if (write.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
             write.dstSet = bindlessDescriptors[textureBinding].descriptorSet;
             write.dstBinding = 0;
         }
-        if (write.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-        {
+        if (write.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
             write.dstSet = bindlessDescriptors[storageImageBinding].descriptorSet;
             write.dstBinding = 0;
         }
@@ -960,53 +881,44 @@ uint32_t ResourceManager::storeDescriptor(ImageHardwareWrap image)
     return textureIndex;
 }
 
-uint32_t ResourceManager::storeDescriptor(BufferHardwareWrap buffer)
-{
+uint32_t ResourceManager::storeDescriptor(BufferHardwareWrap buffer) {
     uint32_t bufferIndex = -1;
     VkDescriptorType descriptorType = (buffer.bufferUsage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     bool updateDescriptorSets = false;
 
-    if (descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
-    {
-        storageBufferBindingList.for_each_read([&](const BindingEntry<VkBuffer> &entry)
-        {
-            if (entry.handle == buffer.bufferHandle)
+    if (descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
+        for (auto const& entry : storageBufferBindingList) {
+            if (entry.handle == buffer.bufferHandle) {
                 bufferIndex = entry.bindingIndex;
-        });
+            }
+        }
 
-        if (bufferIndex == -1)
-        {
+        if (bufferIndex == -1) {
             bufferIndex = storageBufferBindingIndex++;
             updateDescriptorSets = true;
-            storageBufferBindingList.allocate([&](BindingEntry<VkBuffer> &entry)
-            {
-                entry.handle = buffer.bufferHandle;
-                entry.bindingIndex = bufferIndex;
-            });
+            auto id = storageBufferBindingList.allocate();
+            auto handle = storageBufferBindingList.acquire_write(id);
+            handle->handle = buffer.bufferHandle;
+            handle->bindingIndex = bufferIndex;
         }
-    }
-    else
-    {
-        uniformBindingList.for_each_read([&](const BindingEntry<VkBuffer> &entry)
-        {
-            if (entry.handle == buffer.bufferHandle)
+    } else {
+        for(auto const& entry : uniformBindingList) {
+            if (entry.handle == buffer.bufferHandle) {
                 bufferIndex = entry.bindingIndex;
-        });
+            }
+        }
 
-        if (bufferIndex == -1)
-        {
+        if (bufferIndex == -1) {
             bufferIndex = uniformBindingIndex++;
             updateDescriptorSets = true;
-            uniformBindingList.allocate([&](BindingEntry<VkBuffer> &entry)
-            {
-                entry.handle = buffer.bufferHandle;
-                entry.bindingIndex = bufferIndex;
-            });
+            auto id = uniformBindingList.allocate();
+            auto handle = uniformBindingList.acquire_write(id);
+            handle->handle = buffer.bufferHandle;
+            handle->bindingIndex = bufferIndex;
         }
     }
 
-    if (updateDescriptorSets)
-    {
+    if (updateDescriptorSets) {
         VkDescriptorBufferInfo bufferInfo{};
         bufferInfo.buffer = buffer.bufferHandle;
         bufferInfo.offset = 0;
@@ -1019,13 +931,11 @@ uint32_t ResourceManager::storeDescriptor(BufferHardwareWrap buffer)
         writes.descriptorType = descriptorType;
         writes.dstArrayElement = bufferIndex;
 
-        if (writes.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-        {
+        if (writes.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
             writes.dstSet = bindlessDescriptors[uniformBinding].descriptorSet;
             writes.dstBinding = 0;
         }
-        if (writes.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
-        {
+        if (writes.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
             writes.dstSet = bindlessDescriptors[storageBufferBinding].descriptorSet;
             writes.dstBinding = 0;
         }
@@ -1036,12 +946,10 @@ uint32_t ResourceManager::storeDescriptor(BufferHardwareWrap buffer)
     return bufferIndex;
 }
 
-ResourceManager &ResourceManager::copyBuffer(VkCommandBuffer &commandBuffer,
-                                             BufferHardwareWrap &srcBuffer,
-                                             BufferHardwareWrap &dstBuffer)
-{
-    if (srcBuffer.bufferAllocInfo.size == dstBuffer.bufferAllocInfo.size)
-    {
+ResourceManager& ResourceManager::copyBuffer(VkCommandBuffer& commandBuffer,
+                                             BufferHardwareWrap& srcBuffer,
+                                             BufferHardwareWrap& dstBuffer) {
+    if (srcBuffer.bufferAllocInfo.size == dstBuffer.bufferAllocInfo.size) {
         VkBufferCopy copyRegion{};
         copyRegion.size = srcBuffer.bufferAllocInfo.size;
         vkCmdCopyBuffer(commandBuffer, srcBuffer.bufferHandle, dstBuffer.bufferHandle, 1, &copyRegion);
@@ -1050,12 +958,10 @@ ResourceManager &ResourceManager::copyBuffer(VkCommandBuffer &commandBuffer,
     return *this;
 }
 
-ResourceManager &ResourceManager::copyImage(VkCommandBuffer &commandBuffer,
-                                            ImageHardwareWrap &source,
-                                            ImageHardwareWrap &destination)
-{
-    if (source.imageSize == destination.imageSize && source.imageFormat == destination.imageFormat)
-    {
+ResourceManager& ResourceManager::copyImage(VkCommandBuffer& commandBuffer,
+                                            ImageHardwareWrap& source,
+                                            ImageHardwareWrap& destination) {
+    if (source.imageSize == destination.imageSize && source.imageFormat == destination.imageFormat) {
         VkImageCopy copyRegion{};
         copyRegion.srcSubresource.aspectMask = source.aspectMask;
         copyRegion.srcSubresource.layerCount = source.arrayLayers;
@@ -1077,10 +983,9 @@ ResourceManager &ResourceManager::copyImage(VkCommandBuffer &commandBuffer,
     }
 }
 
-ResourceManager &ResourceManager::copyBufferToImage(VkCommandBuffer &commandBuffer,
-                                                    BufferHardwareWrap &buffer,
-                                                    ImageHardwareWrap &image)
-{
+ResourceManager& ResourceManager::copyBufferToImage(VkCommandBuffer& commandBuffer,
+                                                    BufferHardwareWrap& buffer,
+                                                    ImageHardwareWrap& image) {
     VkBufferImageCopy region{};
     region.bufferOffset = 0;
     region.bufferRowLength = 0;
@@ -1102,10 +1007,9 @@ ResourceManager &ResourceManager::copyBufferToImage(VkCommandBuffer &commandBuff
     return *this;
 }
 
-ResourceManager &ResourceManager::copyImageToBuffer(VkCommandBuffer &commandBuffer,
-                                                    ImageHardwareWrap &image,
-                                                    BufferHardwareWrap &buffer)
-{
+ResourceManager& ResourceManager::copyImageToBuffer(VkCommandBuffer& commandBuffer,
+                                                    ImageHardwareWrap& image,
+                                                    BufferHardwareWrap& buffer) {
     VkBufferImageCopy region{};
     region.bufferOffset = 0;
     region.bufferRowLength = 0;
@@ -1127,10 +1031,9 @@ ResourceManager &ResourceManager::copyImageToBuffer(VkCommandBuffer &commandBuff
     return *this;
 }
 
-ResourceManager &ResourceManager::blitImage(VkCommandBuffer &commandBuffer,
-                                            ImageHardwareWrap &srcImage,
-                                            ImageHardwareWrap &dstImage)
-{
+ResourceManager& ResourceManager::blitImage(VkCommandBuffer& commandBuffer,
+                                            ImageHardwareWrap& srcImage,
+                                            ImageHardwareWrap& dstImage) {
     VkImageBlit blitRegion{};
     blitRegion.srcSubresource.aspectMask = srcImage.aspectMask;
     blitRegion.srcSubresource.layerCount = 1;
@@ -1153,21 +1056,18 @@ ResourceManager &ResourceManager::blitImage(VkCommandBuffer &commandBuffer,
     return *this;
 }
 
-void ResourceManager::copyBufferToHost(BufferHardwareWrap &buffer, void *cpuData, uint64_t size)
-{
-    if (buffer.bufferAllocInfo.pMappedData != nullptr)
-    {
+void ResourceManager::copyBufferToHost(BufferHardwareWrap& buffer, void* cpuData, uint64_t size) {
+    if (buffer.bufferAllocInfo.pMappedData != nullptr) {
         std::memcpy(cpuData, buffer.bufferAllocInfo.pMappedData, size);
     }
 }
 
 // Todo: 有待优化
-void ResourceManager::transitionImageLayout(VkCommandBuffer &commandBuffer,
-                                            ImageHardwareWrap &image,
+void ResourceManager::transitionImageLayout(VkCommandBuffer& commandBuffer,
+                                            ImageHardwareWrap& image,
                                             VkImageLayout newLayout,
                                             VkPipelineStageFlags2 dstStageMask,
-                                            VkAccessFlags2 dstAccessMask)
-{
+                                            VkAccessFlags2 dstAccessMask) {
     std::vector<VkMemoryBarrier2> memoryBarriers;
     std::vector<VkBufferMemoryBarrier2> bufferBarriers;
     std::vector<VkImageMemoryBarrier2> imageBarriers;
@@ -1207,8 +1107,7 @@ void ResourceManager::transitionImageLayout(VkCommandBuffer &commandBuffer,
     vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
 }
 
-VkShaderModule ResourceManager::createShaderModule(const std::vector<uint32_t> &code)
-{
+VkShaderModule ResourceManager::createShaderModule(const std::vector<uint32_t>& code) {
     VkShaderModuleCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = code.size() * sizeof(uint32_t);

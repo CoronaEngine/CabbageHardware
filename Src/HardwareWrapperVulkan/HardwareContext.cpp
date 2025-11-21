@@ -1,5 +1,5 @@
-﻿#include "GlobalContext.h"
-#include "HardwareUtil.h"
+﻿#include "HardwareContext.h"
+#include "HardwareUtils.h"
 
 #define VOLK_IMPLEMENTATION
 #include <volk.h>
