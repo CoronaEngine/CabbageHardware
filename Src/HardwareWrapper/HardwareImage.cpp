@@ -111,12 +111,12 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
     const auto [vkFormat, pixelSize] = convertImageFormat(imageFormat);
     const VkImageUsageFlags vkUsage = convertImageUsage(imageUsage);
 
-    const auto handle = globalImageStorages.allocate([&](ResourceManager::ImageHardwareWrap &image) {
-        image = globalHardwareContext.getMainDevice()->resourceManager.createImage(ktm::uvec2(width, height), vkFormat, pixelSize, vkUsage, arrayLayers);
-        image.refCount = 1;
-    });
+    imageID = std::make_shared<uintptr_t>(globalImageStorages.allocate());
 
-    imageID = std::make_shared<uintptr_t>(handle);
+    auto handle = globalImageStorages.acquire_write(*imageID);
+
+    *handle = globalHardwareContext.getMainDevice()->resourceManager.createImage(ktm::uvec2(width, height), vkFormat, pixelSize, vkUsage, arrayLayers);
+    handle->refCount = 1;
 
     if (imageData != nullptr)
     {
