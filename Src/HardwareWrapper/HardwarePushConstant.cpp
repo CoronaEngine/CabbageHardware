@@ -1,16 +1,10 @@
 ﻿#include "CabbageHardware.h"
-
-#include "corona/kernel/utils/storage.h"
 #include "HardwareWrapperVulkan/HardwareContext.h"
-
-
 #include "HardwareWrapperVulkan/ResourcePool.h"
+#include "corona/kernel/utils/storage.h"
 
-
-void incrementPushConstantRefCount(uintptr_t id)
-{
-    if (id != 0)
-    {
+void incrementPushConstantRefCount(uintptr_t id) {
+    if (id != 0) {
         globalPushConstantStorages.acquire_write(id)->refCount++;
     }
 }
@@ -35,13 +29,11 @@ void decrementPushConstantRefCount(uintptr_t id) {
     }
 }
 
-HardwarePushConstant::HardwarePushConstant() 
-    : pushConstantID(std::make_shared<uintptr_t>(globalPushConstantStorages.allocate()))
-{
+HardwarePushConstant::HardwarePushConstant()
+    : pushConstantID(std::make_shared<uintptr_t>(globalPushConstantStorages.allocate())) {
 }
 
-HardwarePushConstant::HardwarePushConstant(uint64_t size, uint64_t offset, HardwarePushConstant *whole)
-{
+HardwarePushConstant::HardwarePushConstant(uint64_t size, uint64_t offset, HardwarePushConstant* whole) {
     pushConstantID = std::make_shared<uintptr_t>(globalPushConstantStorages.allocate());
 
     auto pushConstantHandle = globalPushConstantStorages.acquire_write(*pushConstantID);
@@ -49,8 +41,7 @@ HardwarePushConstant::HardwarePushConstant(uint64_t size, uint64_t offset, Hardw
     pushConstantHandle->refCount = 1;
     pushConstantHandle->isSub = false;
 
-    if (whole != nullptr)
-    {
+    if (whole != nullptr) {
         auto wholeHandle = globalPushConstantStorages.acquire_read(*(whole->pushConstantID));
         if (wholeHandle->data != nullptr) {
             pushConstantHandle->data = wholeHandle->data + offset;
@@ -58,37 +49,40 @@ HardwarePushConstant::HardwarePushConstant(uint64_t size, uint64_t offset, Hardw
         }
     }
 
-    if (!pushConstantHandle->isSub)
-    {
-        pushConstantHandle->data = static_cast<uint8_t *>(std::malloc(size));
+    if (!pushConstantHandle->isSub) {
+        pushConstantHandle->data = static_cast<uint8_t*>(std::malloc(size));
     }
 }
 
-HardwarePushConstant::HardwarePushConstant(const HardwarePushConstant &other)
-    : pushConstantID(other.pushConstantID)
-{
+HardwarePushConstant::HardwarePushConstant(const HardwarePushConstant& other)
+    : pushConstantID(other.pushConstantID) {
     incrementPushConstantRefCount(*pushConstantID);
 }
 
-HardwarePushConstant::~HardwarePushConstant()
-{
-    if (pushConstantID)
-    {
+HardwarePushConstant::~HardwarePushConstant() {
+    if (pushConstantID) {
         decrementPushConstantRefCount(*pushConstantID);
     }
 }
 
-HardwarePushConstant &HardwarePushConstant::operator=(const HardwarePushConstant &other)
-{
+HardwarePushConstant& HardwarePushConstant::operator=(const HardwarePushConstant& other) {
     if (this != &other) {
-        auto thisPc = globalPushConstantStorages.acquire_write(*pushConstantID);
-        auto otherPc = globalPushConstantStorages.acquire_read(*other.pushConstantID);
+        // 这种写法是为了防止死锁
+        // TODO: 可能需要改进incrementPushConstantRefCount 和 decrementPushConstantRefCount 的实现，不传id，直接传引用
+        bool isSub = false;
+        {
+            auto thisPc = globalPushConstantStorages.acquire_write(*pushConstantID);
+            auto otherPc = globalPushConstantStorages.acquire_read(*other.pushConstantID);
 
-        if (thisPc->isSub) {
-            if (thisPc->data != nullptr && otherPc->data != nullptr) {
-                std::memcpy(thisPc->data, otherPc->data, std::min(thisPc->size, otherPc->size));
+            if (thisPc->isSub) {
+                if (thisPc->data != nullptr && otherPc->data != nullptr) {
+                    std::memcpy(thisPc->data, otherPc->data, std::min(thisPc->size, otherPc->size));
+                }
+                isSub = thisPc->isSub;
             }
-        } else {
+        }
+
+        if (!isSub) {
             incrementPushConstantRefCount(*other.pushConstantID);
             decrementPushConstantRefCount(*pushConstantID);
             *(pushConstantID) = *(other.pushConstantID);
@@ -97,17 +91,15 @@ HardwarePushConstant &HardwarePushConstant::operator=(const HardwarePushConstant
     return *this;
 }
 
-uint8_t *HardwarePushConstant::getData() const
-{
+uint8_t* HardwarePushConstant::getData() const {
     return globalPushConstantStorages.acquire_write(*pushConstantID)->data;
 }
 
-uint64_t HardwarePushConstant::getSize() const
-{
+uint64_t HardwarePushConstant::getSize() const {
     return globalPushConstantStorages.acquire_read(*pushConstantID)->size;
 }
 
-void HardwarePushConstant::copyFromRaw(const void *src, uint64_t size) {
+void HardwarePushConstant::copyFromRaw(const void* src, uint64_t size) {
     if (src != nullptr || size != 0) {
         pushConstantID = std::make_shared<uintptr_t>(globalPushConstantStorages.allocate());
 
@@ -116,7 +108,7 @@ void HardwarePushConstant::copyFromRaw(const void *src, uint64_t size) {
         handle->size = size;
         handle->refCount = 1;
         handle->isSub = false;
-        handle->data = static_cast<uint8_t *>(std::malloc(size));
+        handle->data = static_cast<uint8_t*>(std::malloc(size));
 
         if (handle->data != nullptr) {
             std::memcpy(handle->data, src, size);
