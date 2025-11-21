@@ -56,23 +56,3 @@ struct HardwareContext
 extern HardwareContext globalHardwareContext;
 extern Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap> globalBufferStorages;
 extern Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageStorages;
-
-[[nodiscard]] inline ResourceManager::BufferHardwareWrap getBufferFromHandle(uintptr_t handle)
-{
-    ResourceManager::BufferHardwareWrap buffer;
-    globalBufferStorages.read(handle, [&buffer](const ResourceManager::BufferHardwareWrap &storedBuffer)
-    {
-        buffer = storedBuffer;
-    });
-    return buffer;
-}
-
-[[nodiscard]] inline ResourceManager::ImageHardwareWrap getImageFromHandle(uintptr_t handle)
-{
-    ResourceManager::ImageHardwareWrap image;
-    globalImageStorages.read(handle, [&image](const ResourceManager::ImageHardwareWrap &storedImage)
-    {
-        image = storedImage;
-    });
-    return image;
-}
