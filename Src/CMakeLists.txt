@@ -4,12 +4,19 @@ file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
 
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_FILES})
-add_library(CabbageHardware STATIC ${SOURCE_FILES})
+set(PUBLIC_HEADERS "${PROJECT_SOURCE_DIR}/include/CabbageHardware.h")
 
-target_include_directories(CabbageHardware PUBLIC
-    "${CMAKE_CURRENT_SOURCE_DIR}"
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_FILES})
+source_group("include" FILES ${PUBLIC_HEADERS})
+
+add_library(CabbageHardware STATIC ${SOURCE_FILES} ${PUBLIC_HEADERS})
+
+target_include_directories(CabbageHardware
+    PUBLIC
+    "${PROJECT_SOURCE_DIR}/include"
     "${Helicon_SOURCE_DIR}"
+    PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
 # 链接库依赖
