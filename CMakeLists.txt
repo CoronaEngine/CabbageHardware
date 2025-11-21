@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 4.0)
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 project(
     CabbageHardware
@@ -9,20 +8,15 @@ project(
 )
 
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
+option(CABBAGE_HARDWARE_BUILD_EXAMPLES "Build CabbageHardware examples" ${PROJECT_IS_TOP_LEVEL})
 
-set(CMAKE_C_STANDARD              11)
-set(CMAKE_C_STANDARD_REQUIRED     ON)
-set(CMAKE_C_EXTENSIONS            ON)
-set(CMAKE_CXX_STANDARD            20)
-set(CMAKE_CXX_STANDARD_REQUIRED   ON)
-set(CMAKE_CXX_EXTENSIONS          ON)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS ON)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
-    option(CABBAGE_HARDWARE_BUILD_EXAMPLES "是否构建 CabbageHardware 示例" ON)
-else()
-    option(CABBAGE_HARDWARE_BUILD_EXAMPLES "是否构建 CabbageHardware 示例" OFF)
-endif()
 
 add_compile_definitions(
     $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>

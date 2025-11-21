@@ -6,9 +6,6 @@ file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS
 
 set(PUBLIC_HEADERS "${PROJECT_SOURCE_DIR}/include/CabbageHardware.h")
 
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_FILES})
-source_group("include" FILES ${PUBLIC_HEADERS})
-
 add_library(CabbageHardware STATIC ${SOURCE_FILES} ${PUBLIC_HEADERS})
 
 target_include_directories(CabbageHardware
@@ -27,4 +24,5 @@ target_link_libraries(CabbageHardware PUBLIC
     corona::kernel
     volk
     Vulkan-Headers
-    VulkanMemoryAllocator)
+    VulkanMemoryAllocator
+)
