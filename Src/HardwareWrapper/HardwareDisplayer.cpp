@@ -4,15 +4,10 @@
 #include "HardwareWrapperVulkan/DisplayVulkan/DisplayManager.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 
+#include "HardwareWrapperVulkan/ResourcePool.h"
+
 HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
 
-struct DisplayerHardwareWrap {
-    void* displaySurface = nullptr;
-    std::shared_ptr<DisplayManager> displayManager;
-    uint64_t refCount = 0;
-};
-
-Corona::Kernel::Utils::Storage<DisplayerHardwareWrap> globalDisplayerStorages;
 
 void incrementDisplayerRefCount(uintptr_t id) {
     if (id > 0) {

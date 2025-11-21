@@ -1,6 +1,8 @@
 ﻿#include "RasterizerPipeline.h"
 #include "HardwareWrapperVulkan/HardwareUtils.h"
 
+#include "HardwareWrapperVulkan/ResourcePool.h"
+
 void extractStageBindings(const EmbeddedShader::ShaderCodeModule::ShaderResources &resources,
                           std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> &inputs,
                           std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> &outputs)

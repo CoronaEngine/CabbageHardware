@@ -2,8 +2,6 @@
 
 #include "HardwareWrapperVulkan/HardwareVulkan/ResourceManager.h"
 
-#include "HardwareWrapperVulkan/ResourcePool.h"
-
 class DisplayManager;
 
 struct HardwareContext

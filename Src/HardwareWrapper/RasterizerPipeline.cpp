@@ -3,14 +3,11 @@
 #include "corona/kernel/utils/storage.h"
 #include "CabbageHardware.h"
 
+#include "HardwareWrapperVulkan/ResourcePool.h"
+
 HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
 
-struct RasterizerPipelineWrap {
-    RasterizerPipelineVulkan* impl = nullptr;
-    uint64_t refCount = 0;
-};
 
-static Corona::Kernel::Utils::Storage<RasterizerPipelineWrap> gRasterizerPipelineStorage;
 
 static void incRaster(uintptr_t id) {
     if (id) {

@@ -5,16 +5,13 @@
 #include "HardwareWrapperVulkan/PipelineVulkan/ComputePipeline.h"
 #include "HardwareWrapperVulkan/PipelineVulkan/RasterizerPipeline.h"
 
+#include "HardwareWrapperVulkan/ResourcePool.h"
+
 // ǰ�������ڲ����ʺ���
 ComputePipelineVulkan* getComputePipelineImpl(uintptr_t id);
 RasterizerPipelineVulkan* getRasterizerPipelineImpl(uintptr_t id);
 
-struct ExecutorWrap {
-    HardwareExecutorVulkan* impl = nullptr;
-    uint64_t refCount = 0;
-};
 
-static Corona::Kernel::Utils::Storage<ExecutorWrap> gExecutorStorage;
 
 static void incExec(uintptr_t id) {
     if (id) {

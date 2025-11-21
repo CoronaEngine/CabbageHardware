@@ -3,15 +3,9 @@
 #include "corona/kernel/utils/storage.h"
 #include "HardwareWrapperVulkan/HardwareContext.h"
 
-struct PushConstantWrap
-{
-    uint8_t *data = nullptr;
-    uint64_t size = 0;
-    uint64_t refCount = 0;
-    bool isSub = false;
-};
 
-Corona::Kernel::Utils::Storage<PushConstantWrap> globalPushConstantStorages;
+#include "HardwareWrapperVulkan/ResourcePool.h"
+
 
 void incrementPushConstantRefCount(uintptr_t id)
 {

@@ -4,14 +4,10 @@
 #include "CabbageHardware.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 
+#include "HardwareWrapperVulkan/ResourcePool.h"
+
 HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
 
-struct ComputePipelineWrap {
-    ComputePipelineVulkan* impl = nullptr;  // ����ʵ�ֶ���
-    uint64_t refCount = 0;
-};
-
-static Corona::Kernel::Utils::Storage<ComputePipelineWrap> gComputePipelineStorage;
 
 static void incCompute(uintptr_t id) {
     if (id) {
