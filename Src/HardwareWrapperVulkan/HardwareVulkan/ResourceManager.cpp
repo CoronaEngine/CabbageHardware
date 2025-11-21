@@ -823,7 +823,7 @@ int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<Resource
 
     if (bindlessIndex < 0) {
         
-        bindlessIndex = globalImageStorages.seq_id(std::uintptr_t(image.get()));
+        bindlessIndex = globalImageStorages.seq_id(image);
 
         VkDescriptorType descriptorType = (image->imageUsage & VK_IMAGE_USAGE_STORAGE_BIT) ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
@@ -860,7 +860,7 @@ int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<Resource
 
     if (bindlessIndex < 0) {
 
-        bindlessIndex = globalBufferStorages.seq_id(std::uintptr_t(buffer.get()));
+        bindlessIndex = globalBufferStorages.seq_id(buffer);
 
         VkDescriptorType descriptorType = (buffer->bufferUsage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 
