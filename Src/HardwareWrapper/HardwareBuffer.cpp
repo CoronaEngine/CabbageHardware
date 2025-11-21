@@ -37,31 +37,24 @@ void incrementBufferRefCount(uintptr_t bufferID)
 {
     if (bufferID != 0)
     {
-        globalBufferStorages.write(bufferID, [](ResourceManager::BufferHardwareWrap &buffer) {
-            ++buffer.refCount;
-        });
+        auto handle = globalBufferStorages.acquire_write(bufferID)->refCount++;
     }
 }
 
-void decrementBufferRefCount(uintptr_t bufferID)
-{
-    if (bufferID == 0)
-    {
-        return;
-    }
-
-    bool shouldDestroy = false;
-    globalBufferStorages.write(bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
-        if (--buffer.refCount == 0)
+void decrementBufferRefCount(uintptr_t bufferID) {
+    if (bufferID != 0) {
+        bool shouldDestroy = false;
         {
-            globalHardwareContext.getMainDevice()->resourceManager.destroyBuffer(buffer);
-            shouldDestroy = true;
+            auto handle = globalBufferStorages.acquire_write(bufferID);
+            handle->refCount--;
+            if (handle->refCount == 0) {
+                globalHardwareContext.getMainDevice()->resourceManager.destroyBuffer(*handle);
+                shouldDestroy = true;
+            }
         }
-    });
-
-    if (shouldDestroy)
-    {
-        globalBufferStorages.deallocate(bufferID);
+        if (shouldDestroy) {
+            globalBufferStorages.deallocate(bufferID);
+        }
     }
 }
 
@@ -70,21 +63,17 @@ HardwareBuffer::HardwareBuffer()
 {
 }
 
-HardwareBuffer::HardwareBuffer(uint32_t bufferSize, uint32_t elementSize, BufferUsage usage, const void *data)
-{
-    const VkBufferUsageFlags vkUsage = convertBufferUsage(usage);
+HardwareBuffer::HardwareBuffer(uint32_t bufferSize, uint32_t elementSize, BufferUsage usage, const void *data) {
+    bufferID = std::make_shared<uintptr_t>(globalBufferStorages.allocate());
 
-    const auto handle = globalBufferStorages.allocate([&](ResourceManager::BufferHardwareWrap &buffer) {
-        buffer = globalHardwareContext.getMainDevice()->resourceManager.createBuffer(bufferSize, elementSize, vkUsage, true, true);
-        buffer.refCount = 1;
+    auto handle = globalBufferStorages.acquire_write(*bufferID);
 
-        if (data != nullptr && buffer.bufferAllocInfo.pMappedData != nullptr)
-        {
-            std::memcpy(buffer.bufferAllocInfo.pMappedData, data, static_cast<size_t>(bufferSize) * elementSize);
-        }
-    });
+    *handle = globalHardwareContext.getMainDevice()->resourceManager.createBuffer(bufferSize, elementSize, convertBufferUsage(usage), true, true);
+    handle->refCount = 1;
 
-    bufferID = std::make_shared<uintptr_t>(handle);
+    if (data != nullptr && handle->bufferAllocInfo.pMappedData != nullptr) {
+        std::memcpy(handle->bufferAllocInfo.pMappedData, data, static_cast<size_t>(bufferSize) * elementSize);
+    }
 }
 
 HardwareBuffer::HardwareBuffer(const HardwareBuffer &other)
@@ -113,19 +102,12 @@ HardwareBuffer &HardwareBuffer::operator=(const HardwareBuffer &other)
     return *this;
 }
 
-HardwareBuffer::operator bool() const
-{
-    if (!bufferID || *bufferID == 0)
-    {
+HardwareBuffer::operator bool() const {
+    if (bufferID && *bufferID != 0) {
+        return globalBufferStorages.acquire_read(*bufferID)->bufferHandle != VK_NULL_HANDLE;
+    } else {
         return false;
     }
-
-    bool isValid = false;
-    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
-        isValid = (buffer.bufferHandle != VK_NULL_HANDLE);
-    });
-
-    return isValid;
 }
 
 bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareExecutor *executor)
@@ -135,23 +117,8 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareE
         return false;  // 必须提供有效的 executor
     }
 
-    ResourceManager::BufferHardwareWrap srcBuffer;
-    ResourceManager::BufferHardwareWrap dstBuffer;
-
-    const bool srcValid = globalBufferStorages.read(*inputBuffer.bufferID,
-                                                    [&](const ResourceManager::BufferHardwareWrap &buffer) {
-                                                        srcBuffer = buffer;
-                                                    });
-
-    const bool dstValid = globalBufferStorages.read(*bufferID,
-                                                    [&](const ResourceManager::BufferHardwareWrap &buffer) {
-                                                        dstBuffer = buffer;
-                                                    });
-
-    if (!srcValid || !dstValid)
-    {
-        return false;
-    }
+    auto srcBuffer = globalBufferStorages.acquire_write(*inputBuffer.bufferID);
+    auto dstBuffer = globalBufferStorages.acquire_write(*bufferID);
 
     HardwareExecutorVulkan *executorImpl = getExecutorImpl(*executor->getExecutorID());
     if (!executorImpl)
@@ -159,7 +126,7 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareE
         return false;
     }
 
-    CopyBufferCommand copyCmd(srcBuffer, dstBuffer);
+    CopyBufferCommand copyCmd(*srcBuffer, *dstBuffer);
     (*executorImpl) << &copyCmd;
 
     return true;
@@ -167,12 +134,8 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareE
 
 uint32_t HardwareBuffer::storeDescriptor()
 {
-    uint32_t index = 0;
-    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
-        index = globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(buffer);
-    });
-
-    return index;
+    auto bufferHandle = globalBufferStorages.acquire_read(*bufferID);
+    return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(*bufferHandle);
 }
 
 bool HardwareBuffer::copyFromData(const void *inputData, uint64_t size)
