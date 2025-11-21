@@ -4,10 +4,11 @@
 #include "HardwareWrapperVulkan/HardwareVulkan/ResourceCommand.h"
 #include "corona/kernel/utils/storage.h"
 
+#include "HardwareWrapperVulkan/ResourcePool.h"
+
 
 HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
 
-Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageStorages;
 
 struct ImageFormatInfo {
     VkFormat vkFormat;
