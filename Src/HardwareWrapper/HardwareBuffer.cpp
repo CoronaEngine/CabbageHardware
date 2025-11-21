@@ -138,86 +138,64 @@ uint32_t HardwareBuffer::storeDescriptor()
     return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(*bufferHandle);
 }
 
-bool HardwareBuffer::copyFromData(const void *inputData, uint64_t size)
-{
-    if (inputData == nullptr || size == 0)
-    {
+bool HardwareBuffer::copyFromData(const void *inputData, uint64_t size) {
+    if (inputData == nullptr || size == 0) {
         return false;
     }
 
     bool success = false;
-    globalBufferStorages.write(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
-        if (buffer.bufferAllocInfo.pMappedData != nullptr)
-        {
-            std::memcpy(buffer.bufferAllocInfo.pMappedData, inputData, size);
-            success = true;
-        }
-    });
+    auto handle = globalBufferStorages.acquire_write(*bufferID);
+
+    if (handle->bufferAllocInfo.pMappedData != nullptr) {
+        std::memcpy(handle->bufferAllocInfo.pMappedData, inputData, size);
+        success = true;
+    }
 
     return success;
 }
 
-bool HardwareBuffer::copyToData(void *outputData, uint64_t size)
-{
-    if (outputData == nullptr || size == 0)
-    {
+bool HardwareBuffer::copyToData(void *outputData, uint64_t size) {
+    if (outputData == nullptr || size == 0) {
         return false;
     }
 
     bool success = false;
-    globalBufferStorages.write(*bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
-        if (buffer.bufferAllocInfo.pMappedData != nullptr)
-        {
-            globalHardwareContext.getMainDevice()->resourceManager.copyBufferToHost(buffer, outputData, size);
-            success = true;
-        }
-    });
+    auto handle = globalBufferStorages.acquire_write(*bufferID);
+    if (handle->bufferAllocInfo.pMappedData != nullptr) {
+        globalHardwareContext.getMainDevice()->resourceManager.copyBufferToHost(*handle, outputData, size);
+        success = true;
+    }
 
     return success;
 }
 
 void *HardwareBuffer::getMappedData()
 {
-    void *mappedData = nullptr;
-    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
-        mappedData = buffer.bufferAllocInfo.pMappedData;
-    });
-
-    return mappedData;
+    return globalBufferStorages.acquire_read(*bufferID)->bufferAllocInfo.pMappedData;
 }
 
 uint64_t HardwareBuffer::getElementCount() const
 {
-    uint64_t totalSize = 0;
-    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
-        totalSize = buffer.elementCount;
-    });
-
-    return totalSize;
+    return globalBufferStorages.acquire_read(*bufferID)->elementCount;
 }
 
 uint64_t HardwareBuffer::getElementSize() const
 {
-    uint64_t totalSize = 0;
-    globalBufferStorages.read(*bufferID, [&](const ResourceManager::BufferHardwareWrap &buffer) {
-        totalSize = buffer.elementSize;
-    });
-
-    return totalSize;
+    return globalBufferStorages.acquire_read(*bufferID)->elementSize;
 }
 
-ExternalHandle HardwareBuffer::exportBufferMemory()
-{
-    ExternalHandle handle{};
-    globalBufferStorages.write(*bufferID, [&](ResourceManager::BufferHardwareWrap &buffer) {
-        ResourceManager::ExternalMemoryHandle mempryHandle = globalHardwareContext.getMainDevice()->resourceManager.exportBufferMemory(buffer);
+ExternalHandle HardwareBuffer::exportBufferMemory() {
+    ExternalHandle winHandle{};
+    auto bufferHandle = globalBufferStorages.acquire_write(*bufferID);
+
+    ResourceManager::ExternalMemoryHandle mempryHandle = globalHardwareContext.getMainDevice()->resourceManager.exportBufferMemory(*bufferHandle);
 #if _WIN32 || _WIN64
-        handle.handle = mempryHandle.handle;
+    winHandle.handle = mempryHandle.handle;
 #else
-        handle.fd = mempryHandle.fd;
+    winHandle.fd = mempryHandle.fd;
 #endif
-    });
-    return handle;
+
+    return winHandle;
 }
 
 HardwareBuffer::HardwareBuffer(const ExternalHandle &memHandle, uint32_t bufferSize, uint32_t elementSize, uint32_t allocSize, BufferUsage usage)
@@ -231,10 +209,9 @@ HardwareBuffer::HardwareBuffer(const ExternalHandle &memHandle, uint32_t bufferS
 
     const VkBufferUsageFlags vkUsage = convertBufferUsage(usage);
 
-    const auto handle = globalBufferStorages.allocate([&](ResourceManager::BufferHardwareWrap &buffer) {
-        buffer = globalHardwareContext.getMainDevice()->resourceManager.importBufferMemory(mempryHandle, bufferSize, elementSize, allocSize, vkUsage);
-        buffer.refCount = 1;
-    });
+    bufferID = std::make_shared<uintptr_t>(globalBufferStorages.allocate());
+    auto bufferHandle = globalBufferStorages.acquire_write(*bufferID);
 
-    bufferID = std::make_shared<uintptr_t>(handle);
+    *bufferHandle = globalHardwareContext.getMainDevice()->resourceManager.importBufferMemory(mempryHandle, bufferSize, elementSize, allocSize, vkUsage);
+    bufferHandle->refCount = 1;
 }
