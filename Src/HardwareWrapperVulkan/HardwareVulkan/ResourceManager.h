@@ -163,20 +163,10 @@ private:
     VmaPool exportBufferPool = VK_NULL_HANDLE;
     VkSampler textureSampler = VK_NULL_HANDLE;
 
-    //Corona::Kernel::Utils::Storage<BindingEntry<VkBuffer>> uniformBindingList;
-    //Corona::Kernel::Utils::Storage<BindingEntry<VkImageView>> textureBindingList;
-    //Corona::Kernel::Utils::Storage<BindingEntry<VkBuffer>> storageBufferBindingList;
-    //Corona::Kernel::Utils::Storage<BindingEntry<VkImageView>> storageImageBindingList;
-
     const uint32_t uniformBinding = 0;
     const uint32_t textureBinding = 1;
     const uint32_t storageBufferBinding = 2;
     const uint32_t storageImageBinding = 3;
-
-    //uint32_t uniformBindingIndex = 0;
-    //uint32_t textureBindingIndex = 0;
-    //uint32_t storageBufferBindingIndex = 0;
-    //uint32_t storageImageBindingIndex = 0;
 
     uint64_t deviceMemorySize = 0;
     uint64_t hostSharedMemorySize = 0;
