@@ -73,31 +73,31 @@ void incrementImageRefCount(uintptr_t imageID)
 {
     if (imageID != 0)
     {
-        globalImageStorages.write(imageID, [](ResourceManager::ImageHardwareWrap &image) {
-            ++image.refCount;
-        });
+        auto imageHandle = globalImageStorages.acquire_write(imageID);
+        imageHandle->refCount++;
     }
 }
 
 void decrementImageRefCount(uintptr_t imageID)
 {
-    if (imageID == 0)
+    if (imageID != 0) 
     {
-        return;
-    }
+        bool shouldDestroy = false;
 
-    bool shouldDestroy = false;
-    globalImageStorages.write(imageID, [&](ResourceManager::ImageHardwareWrap &image) {
-        if (--image.refCount == 0)
         {
-            globalHardwareContext.getMainDevice()->resourceManager.destroyImage(image);
-            shouldDestroy = true;
+            auto imageHandle = globalImageStorages.acquire_write(imageID);
+            --imageHandle->refCount;
+            if (imageHandle->refCount == 0) 
+            {
+                globalHardwareContext.getMainDevice()->resourceManager.destroyImage(*imageHandle);
+                shouldDestroy = true;
+            }
         }
-    });
 
-    if (shouldDestroy)
-    {
-        globalImageStorages.deallocate(imageID);
+        if (shouldDestroy) 
+        {
+            globalImageStorages.deallocate(imageID);
+        }
     }
 }
 
@@ -120,34 +120,14 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
 
     if (imageData != nullptr)
     {
-        // 构造函数中需要立即上传数据，创建临时 executor 并立即提交
         HardwareExecutorVulkan tempExecutor;
 
-        uint32_t imgWidth = 0;
-        uint32_t imgHeight = 0;
-        uint32_t imgPixelSize = 0;
+        auto imageHandle = globalImageStorages.acquire_write(*imageID);
 
-        globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
-            imgWidth = image.imageSize.x;
-            imgHeight = image.imageSize.y;
-            imgPixelSize = image.pixelSize;
-        });
+        HardwareBuffer stagingBuffer(imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize, BufferUsage::StorageBuffer, imageData);
+        auto bufferHandle = globalBufferStorages.acquire_write(*stagingBuffer.bufferID);
 
-        const uint64_t bufferSize = static_cast<uint64_t>(imgWidth) * imgHeight * imgPixelSize;
-        HardwareBuffer stagingBuffer(bufferSize, BufferUsage::StorageBuffer, imageData);
-
-        ResourceManager::BufferHardwareWrap srcBuffer;
-        ResourceManager::ImageHardwareWrap dstImage;
-
-        globalBufferStorages.read(*stagingBuffer.bufferID, [&](const ResourceManager::BufferHardwareWrap &buf) {
-            srcBuffer = buf;
-        });
-
-        globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &img) {
-            dstImage = img;
-        });
-
-        CopyBufferToImageCommand copyCmd(srcBuffer, dstImage);
+        CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle);
         tempExecutor << &copyCmd << tempExecutor.commit();
     }
 }
@@ -179,27 +159,20 @@ HardwareImage &HardwareImage::operator=(const HardwareImage &other)
 
 HardwareImage::operator bool() const
 {
-    if (!imageID || *imageID == 0)
+    if (imageID && *imageID != 0)
+    {
+        return globalImageStorages.acquire_read(*imageID)->imageHandle != VK_NULL_HANDLE;
+    }
+    else
     {
         return false;
     }
-
-    bool isValid = false;
-    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
-        isValid = (image.imageHandle != VK_NULL_HANDLE);
-    });
-
-    return isValid;
 }
 
 uint32_t HardwareImage::storeDescriptor()
 {
-    uint32_t index = 0;
-    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
-        index = globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(image);
-    });
-
-    return index;
+    auto imageHandle = globalImageStorages.acquire_read(*imageID);
+    return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(*imageHandle);
 }
 
 HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer, HardwareExecutor *executor)
@@ -209,16 +182,8 @@ HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer, Hardw
         return *this;  // 必须提供有效的 executor
     }
 
-    ResourceManager::BufferHardwareWrap srcBuffer;
-    ResourceManager::ImageHardwareWrap dstImage;
-
-    globalBufferStorages.read(*buffer.bufferID, [&](const ResourceManager::BufferHardwareWrap &buf) {
-        srcBuffer = buf;
-    });
-
-    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &img) {
-        dstImage = img;
-    });
+    auto imageHandle = globalImageStorages.acquire_write(*imageID);
+    auto bufferHandle = globalBufferStorages.acquire_write(*buffer.bufferID);
 
     HardwareExecutorVulkan *executorImpl = getExecutorImpl(*executor->getExecutorID());
     if (!executorImpl)
@@ -226,7 +191,7 @@ HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer, Hardw
         return *this;
     }
 
-    CopyBufferToImageCommand copyCmd(srcBuffer, dstImage);
+    CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle);
     (*executorImpl) << &copyCmd;
 
     return *this;
@@ -234,23 +199,17 @@ HardwareImage &HardwareImage::copyFromBuffer(const HardwareBuffer &buffer, Hardw
 
 HardwareImage &HardwareImage::copyFromData(const void *inputData, HardwareExecutor *executor)
 {
-    if (inputData == nullptr)
+    if (inputData != nullptr)
     {
-        return *this;
+        uint64_t bufferSize = 0;
+        {
+            auto imageHandle = globalImageStorages.acquire_read(*imageID);
+            bufferSize = imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize;
+        }
+
+        HardwareBuffer stagingBuffer(bufferSize, BufferUsage::StorageBuffer, inputData);
+
+        copyFromBuffer(stagingBuffer, executor);
     }
-
-    uint32_t width = 0;
-    uint32_t height = 0;
-    uint32_t pixelSize = 0;
-
-    globalImageStorages.read(*imageID, [&](const ResourceManager::ImageHardwareWrap &image) {
-        width = image.imageSize.x;
-        height = image.imageSize.y;
-        pixelSize = image.pixelSize;
-    });
-
-    const uint64_t bufferSize = static_cast<uint64_t>(width) * height * pixelSize;
-    HardwareBuffer stagingBuffer(bufferSize, BufferUsage::StorageBuffer, inputData);
-
-    return copyFromBuffer(stagingBuffer, executor);
+    return *this;
 }
