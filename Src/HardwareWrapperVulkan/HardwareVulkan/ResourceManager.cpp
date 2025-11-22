@@ -918,9 +918,8 @@ ResourceManager& ResourceManager::copyImage(VkCommandBuffer& commandBuffer,
                        destination.imageLayout,
                        1,
                        &copyRegion);
-
-        return *this;
     }
+    return *this;
 }
 
 ResourceManager& ResourceManager::copyBufferToImage(VkCommandBuffer& commandBuffer,
