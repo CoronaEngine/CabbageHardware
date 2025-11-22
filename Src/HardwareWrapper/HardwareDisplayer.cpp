@@ -4,8 +4,6 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/utils/storage.h"
 
-HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
-
 void incrementDisplayerRefCount(uintptr_t id) {
     if (id > 0) {
         auto handle = globalDisplayerStorages.acquire_write(id);

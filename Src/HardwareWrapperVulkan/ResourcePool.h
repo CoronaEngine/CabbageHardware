@@ -60,3 +60,17 @@ extern Corona::Kernel::Utils::Storage<PushConstantWrap> globalPushConstantStorag
     image = *read_handle;
     return image;
 }
+
+HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
+
+HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
+
+HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
+
+HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
+
+// ǰ�������ڲ����ʺ���
+ComputePipelineVulkan* getComputePipelineImpl(uintptr_t id);
+RasterizerPipelineVulkan* getRasterizerPipelineImpl(uintptr_t id);
+
+HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);

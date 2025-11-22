@@ -1,8 +1,5 @@
 ﻿#pragma once
 
-#include <algorithm>
-#include <chrono>
-#include <iostream>
 #include <mutex>
 
 #include "FeaturesChain.h"

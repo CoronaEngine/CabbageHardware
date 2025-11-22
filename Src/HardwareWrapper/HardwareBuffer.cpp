@@ -5,8 +5,6 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/utils/storage.h"
 
-HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
-
 VkBufferUsageFlags convertBufferUsage(BufferUsage usage) {
     VkBufferUsageFlags vkUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 

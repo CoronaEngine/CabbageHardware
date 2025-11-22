@@ -1,5 +1,7 @@
 ﻿#include "DeviceManager.h"
 
+#include <algorithm>
+
 DeviceManager::DeviceManager() = default;
 
 DeviceManager::~DeviceManager() {

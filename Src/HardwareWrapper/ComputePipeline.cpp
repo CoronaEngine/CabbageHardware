@@ -5,8 +5,6 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/utils/storage.h"
 
-HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
-
 static void incCompute(uintptr_t id) {
     if (id) {
         ++gComputePipelineStorage.acquire_write(id)->refCount;

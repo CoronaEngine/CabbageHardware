@@ -4,8 +4,6 @@
 #include "HardwareWrapperVulkan/HardwareVulkan/ResourceCommand.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
 
-HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
-
 struct ImageFormatInfo {
     VkFormat vkFormat;
     uint32_t pixelSize;

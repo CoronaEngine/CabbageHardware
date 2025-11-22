@@ -5,10 +5,6 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/utils/storage.h"
 
-// ǰ�������ڲ����ʺ���
-ComputePipelineVulkan* getComputePipelineImpl(uintptr_t id);
-RasterizerPipelineVulkan* getRasterizerPipelineImpl(uintptr_t id);
-
 static void incExec(uintptr_t id) {
     if (id) {
         auto handle = gExecutorStorage.acquire_write(id);

@@ -1,5 +1,7 @@
 ﻿#include "HardwareContext.h"
 
+#include <algorithm>
+
 #include "HardwareUtils.h"
 
 #define VOLK_IMPLEMENTATION

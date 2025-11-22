@@ -4,8 +4,6 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/utils/storage.h"
 
-HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
-
 static void incRaster(uintptr_t id) {
     if (id) {
         auto handle = gRasterizerPipelineStorage.acquire_write(id);

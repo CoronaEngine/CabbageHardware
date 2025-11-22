@@ -1,9 +1,9 @@
 ﻿#pragma once
 
+#include <corona/pal/cfw_platform.h>
+
 #include <iostream>
 #include <source_location>
-
-#include <corona/pal/cfw_platform.h>
 
 #if defined(CFW_PLATFORM_WINDOWS)
 #include <Windows.h>
@@ -17,9 +17,8 @@
 #endif
 
 #define VK_NO_PROTOTYPES
-#include <volk.h>
-
 #include <vk_mem_alloc.h>
+#include <volk.h>
 
 static inline const char* coronaHardwareResultStr(VkResult ret) {
     switch ((VkResult)ret) {

@@ -1,5 +1,7 @@
 ﻿#include "DisplayManager.h"
 
+#include <algorithm>
+
 #include "HardwareWrapperVulkan/HardwareVulkan/ResourceCommand.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/memory/cache_aligned_allocator.h"
