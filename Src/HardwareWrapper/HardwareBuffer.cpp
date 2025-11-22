@@ -28,11 +28,11 @@ VkBufferUsageFlags convertBufferUsage(BufferUsage const usage) {
     return vkUsage;
 }
 
-void incrementBufferRefCount(const Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& handle) {
+static void incrementBufferRefCount(const Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& handle) {
     ++handle->refCount;
 }
 
-bool decrementBufferRefCount(const Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& handle) {
+static bool decrementBufferRefCount(const Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& handle) {
     if (--handle->refCount == 0) {
         globalHardwareContext.getMainDevice()->resourceManager.destroyBuffer(*handle);
         return true;
