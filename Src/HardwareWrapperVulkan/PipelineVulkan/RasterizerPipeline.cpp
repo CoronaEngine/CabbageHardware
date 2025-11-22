@@ -486,11 +486,11 @@ RasterizerPipelineVulkan* RasterizerPipelineVulkan::operator()(uint16_t width, u
 
 CommandRecordVulkan* RasterizerPipelineVulkan::record(const HardwareBuffer& indexBuffer) {
     TriangleGeomMesh mesh;
-    mesh.indexBuffer = getBufferFromHandle(*indexBuffer.getBufferID());
+    mesh.indexBuffer = indexBuffer;
 
     mesh.vertexBuffers.reserve(tempVertexBuffers.size());
     for (const auto& vertexBuffer : tempVertexBuffers) {
-        mesh.vertexBuffers.push_back(getBufferFromHandle(*vertexBuffer.getBufferID()));
+        mesh.vertexBuffers.push_back(vertexBuffer);
     }
 
     mesh.pushConstant = tempPushConstant;
@@ -590,8 +590,12 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
 
     for (const auto& mesh : geomMeshesRecord) {
         // 索引缓冲区屏障
+
         VkBufferMemoryBarrier2 indexBarrier = bufferBarrierTemplate;
-        indexBarrier.buffer = mesh.indexBuffer.bufferHandle;
+        {
+            auto handle = globalBufferStorages.acquire_read(*mesh.indexBuffer.getBufferID());
+            indexBarrier.buffer = handle->bufferHandle;
+        }
         indexBarrier.dstStageMask = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
         indexBarrier.dstAccessMask = VK_ACCESS_2_INDEX_READ_BIT;
         requiredBarriers.bufferBarriers.push_back(indexBarrier);
@@ -599,7 +603,10 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
         // 顶点缓冲区屏障
         for (const auto& vertexBuffer : mesh.vertexBuffers) {
             VkBufferMemoryBarrier2 vertexBarrier = bufferBarrierTemplate;
-            vertexBarrier.buffer = vertexBuffer.bufferHandle;
+            {
+                auto handle = globalBufferStorages.acquire_read(*vertexBuffer.getBufferID());
+                vertexBarrier.buffer = handle->bufferHandle;
+            }
             vertexBarrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
             vertexBarrier.dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
             requiredBarriers.bufferBarriers.push_back(vertexBarrier);
@@ -708,7 +715,8 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExe
         offsets.reserve(mesh.vertexBuffers.size());
 
         for (const auto& vertexBuffer : mesh.vertexBuffers) {
-            vertexBuffers.push_back(vertexBuffer.bufferHandle);
+            auto handle = globalBufferStorages.acquire_read(*vertexBuffer.getBufferID());
+            vertexBuffers.push_back(handle->bufferHandle);
             offsets.push_back(0);
         }
 
@@ -720,10 +728,13 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExe
                                offsets.data());
 
         // 绑定索引缓冲区
-        vkCmdBindIndexBuffer(commandBuffer,
-                             mesh.indexBuffer.bufferHandle,
-                             0,
-                             VK_INDEX_TYPE_UINT32);
+        {
+            auto handle = globalBufferStorages.acquire_read(*mesh.indexBuffer.getBufferID());
+            vkCmdBindIndexBuffer(commandBuffer,
+                                 handle->bufferHandle,
+                                 0,
+                                 VK_INDEX_TYPE_UINT32);
+        }
 
         // 推送常量
         if (const void* pushConstData = mesh.pushConstant.getData(); pushConstData != nullptr && pushConstantSize > 0) {
@@ -735,8 +746,11 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExe
                                pushConstData);
         }
 
-        // 绘制
-        vkCmdDrawIndexed(commandBuffer, mesh.indexBuffer.elementCount, 1, 0, 0, 0);
+        {
+            auto handle = globalBufferStorages.acquire_read(*mesh.indexBuffer.getBufferID());
+            // 绘制
+            vkCmdDrawIndexed(commandBuffer, handle->elementCount, 1, 0, 0, 0);
+        }
     }
 
     vkCmdEndRenderPass(commandBuffer);

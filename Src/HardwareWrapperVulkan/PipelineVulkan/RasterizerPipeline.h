@@ -43,8 +43,8 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan {
 
    private:
     struct TriangleGeomMesh {
-        ResourceManager::BufferHardwareWrap indexBuffer;
-        std::vector<ResourceManager::BufferHardwareWrap> vertexBuffers;
+        HardwareBuffer indexBuffer;
+        std::vector<HardwareBuffer> vertexBuffers;
         HardwarePushConstant pushConstant;
     };
 

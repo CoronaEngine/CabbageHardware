@@ -47,12 +47,6 @@ struct PushConstantWrap {
 
 extern Corona::Kernel::Utils::Storage<PushConstantWrap> globalPushConstantStorages;
 
-[[nodiscard]] inline ResourceManager::BufferHardwareWrap getBufferFromHandle(uintptr_t handle) {
-    auto const read_handle = globalBufferStorages.acquire_read(handle);
-    ResourceManager::BufferHardwareWrap const buffer = *read_handle;
-    return buffer;
-}
-
 [[nodiscard]] inline ResourceManager::ImageHardwareWrap getImageFromHandle(uintptr_t handle) {
     auto const read_handle = globalImageStorages.acquire_read(handle);
     ResourceManager::ImageHardwareWrap const image = *read_handle;
