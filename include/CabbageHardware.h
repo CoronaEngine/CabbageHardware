@@ -200,7 +200,7 @@ struct HardwareDisplayer {
 struct ComputePipeline {
    public:
     ComputePipeline();
-    ComputePipeline(std::string shaderCode,
+    ComputePipeline(const std::string& shaderCode,
                     EmbeddedShader::ShaderLanguage language = EmbeddedShader::ShaderLanguage::GLSL,
                     const std::source_location& sourceLocation = std::source_location::current());
     ComputePipeline(const ComputePipeline& other);

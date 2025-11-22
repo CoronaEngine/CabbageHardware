@@ -56,7 +56,7 @@ HardwareExecutor& HardwareExecutor::operator=(const HardwareExecutor& other) {
 }
 
 HardwareExecutor& HardwareExecutor::operator<<(ComputePipeline& computePipeline) {
-    auto handle = gExecutorStorage.acquire_read(*executorID);
+    auto const handle = gExecutorStorage.acquire_read(*executorID);
     if (computePipeline.getComputePipelineID()) {
         if (auto* impl = getComputePipelineImpl(*computePipeline.getComputePipelineID())) {
             handle->impl->operator<<(static_cast<CommandRecordVulkan*>(impl));

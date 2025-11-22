@@ -2,6 +2,7 @@
 .vs/
 .vscode/
 .cache/
+.idea/
 
 # 构建目录
 build/

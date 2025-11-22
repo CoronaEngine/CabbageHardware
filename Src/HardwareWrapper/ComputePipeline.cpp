@@ -5,39 +5,45 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/utils/storage.h"
 
-static void incCompute(uintptr_t id) {
-    if (id) {
-        ++gComputePipelineStorage.acquire_write(id)->refCount;
-    }
+/**
+ * @brief 计算管线引用计数加一
+ *
+ * @param write_handle
+ */
+static void incCompute(const Corona::Kernel::Utils::Storage<ComputePipelineWrap>::WriteHandle& write_handle) {
+    ++write_handle->refCount;
 }
 
-static void decCompute(uintptr_t id) {
-    if (!id) {
-        return;
+/**
+ * @brief 计算管线引用计数减一
+ *
+ * @param write_handle
+ * @return true 如果引用计数为零，需要销毁
+ * @return false 如果引用计数不为零，不需要销毁
+ */
+static bool decCompute(const Corona::Kernel::Utils::Storage<ComputePipelineWrap>::WriteHandle& write_handle) {
+    if (!write_handle.valid()) {
+        return false;
     }
-    bool destroy = false;
-    auto handle = gComputePipelineStorage.acquire_write(id);
-    if (--handle->refCount == 0) {
-        delete handle->impl;
-        handle->impl = nullptr;
-        destroy = true;
+    if (--write_handle->refCount == 0) {
+        delete write_handle->impl;
+        write_handle->impl = nullptr;
+        return true;
     }
-    if (destroy) {
-        gComputePipelineStorage.deallocate(id);
-    }
+    return false;
 }
 
 ComputePipeline::ComputePipeline() {
     auto const id = gComputePipelineStorage.allocate();
-    auto handle = gComputePipelineStorage.acquire_write(id);
+    auto const handle = gComputePipelineStorage.acquire_write(id);
     handle->impl = new ComputePipelineVulkan();
     handle->refCount = 1;
     computePipelineID = std::make_shared<uintptr_t>(id);
 }
 
-ComputePipeline::ComputePipeline(std::string shaderCode, EmbeddedShader::ShaderLanguage language, const std::source_location& src) {
+ComputePipeline::ComputePipeline(const std::string& shaderCode, EmbeddedShader::ShaderLanguage language, const std::source_location& src) {
     auto const id = gComputePipelineStorage.allocate();
-    auto handle = gComputePipelineStorage.acquire_write(id);
+    auto const handle = gComputePipelineStorage.acquire_write(id);
     handle->impl = new ComputePipelineVulkan(shaderCode, language, src);
     handle->refCount = 1;
     computePipelineID = std::make_shared<uintptr_t>(id);
@@ -45,33 +51,40 @@ ComputePipeline::ComputePipeline(std::string shaderCode, EmbeddedShader::ShaderL
 
 ComputePipeline::ComputePipeline(const ComputePipeline& other)
     : computePipelineID(other.computePipelineID) {
-    incCompute(*computePipelineID);
+    auto const write_handle = gComputePipelineStorage.acquire_write(*computePipelineID);
+    incCompute(write_handle);
 }
 
 ComputePipeline::~ComputePipeline() {
     if (computePipelineID) {
-        decCompute(*computePipelineID);
+        if (auto const write_handle = gComputePipelineStorage.acquire_write(*computePipelineID); decCompute(write_handle)) {
+            gComputePipelineStorage.deallocate(*computePipelineID);
+        }
     }
 }
 
 ComputePipeline& ComputePipeline::operator=(const ComputePipeline& other) {
     if (this != &other) {
-        incCompute(*other.computePipelineID);
-        decCompute(*computePipelineID);
+        {
+            auto const other_write_handle = gComputePipelineStorage.acquire_write(*other.computePipelineID);
+            incCompute(other_write_handle);
+        }
+        if (auto const write_handle = gComputePipelineStorage.acquire_write(*computePipelineID); decCompute(write_handle)) {
+            gComputePipelineStorage.deallocate(*computePipelineID);
+        }
         *computePipelineID = *other.computePipelineID;
     }
     return *this;
 }
 
 std::variant<HardwarePushConstant> ComputePipeline::operator[](const std::string& resourceName) {
-    std::variant<HardwarePushConstant> result;
-    auto handle = gComputePipelineStorage.acquire_read(*computePipelineID);
-    result = (*handle->impl)[resourceName];
+    auto const handle = gComputePipelineStorage.acquire_read(*computePipelineID);
+    std::variant<HardwarePushConstant> result = (*handle->impl)[resourceName];
     return result;
 }
 
 ComputePipeline& ComputePipeline::operator()(uint16_t x, uint16_t y, uint16_t z) {
-    auto handle = gComputePipelineStorage.acquire_read(*computePipelineID);
+    auto const handle = gComputePipelineStorage.acquire_read(*computePipelineID);
     (*handle->impl)(x, y, z);
     return *this;
 }
@@ -79,7 +92,7 @@ ComputePipeline& ComputePipeline::operator()(uint16_t x, uint16_t y, uint16_t z)
 // ��ִ�����ڲ�����ʵ��
 ComputePipelineVulkan* getComputePipelineImpl(uintptr_t id) {
     ComputePipelineVulkan* ptr = nullptr;
-    auto handle = gComputePipelineStorage.acquire_read(id);
+    auto const handle = gComputePipelineStorage.acquire_read(id);
     ptr = handle->impl;
     return ptr;
 }
