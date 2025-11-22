@@ -100,11 +100,3 @@ ComputePipeline& ComputePipeline::operator()(uint16_t x, uint16_t y, uint16_t z)
     (*handle->impl)(x, y, z);
     return *this;
 }
-
-// ��ִ�����ڲ�����ʵ��
-ComputePipelineVulkan* getComputePipelineImpl(uintptr_t id) {
-    ComputePipelineVulkan* ptr = nullptr;
-    auto const handle = gComputePipelineStorage.acquire_read(id);
-    ptr = handle->impl;
-    return ptr;
-}

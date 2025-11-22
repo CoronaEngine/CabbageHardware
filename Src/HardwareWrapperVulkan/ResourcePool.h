@@ -47,7 +47,6 @@ struct PushConstantWrap {
 
 extern Corona::Kernel::Utils::Storage<PushConstantWrap> globalPushConstantStorages;
 
-ComputePipelineVulkan* getComputePipelineImpl(uintptr_t id);
 RasterizerPipelineVulkan* getRasterizerPipelineImpl(uintptr_t id);
 
 HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
