@@ -5,26 +5,17 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/utils/storage.h"
 
-static void incExec(uintptr_t id) {
-    if (id) {
-        auto handle = gExecutorStorage.acquire_write(id);
-        ++handle->refCount;
-    }
+static void incExec(const Corona::Kernel::Utils::Storage<ExecutorWrap>::WriteHandle& handle) {
+    ++handle->refCount;
 }
-static void decExec(uintptr_t id) {
-    if (!id) {
-        return;
-    }
-    bool destroy = false;
-    auto handle = gExecutorStorage.acquire_write(id);
+
+static bool decExec(const Corona::Kernel::Utils::Storage<ExecutorWrap>::WriteHandle& handle) {
     if (--handle->refCount == 0) {
         delete handle->impl;
         handle->impl = nullptr;
-        destroy = true;
+        return true;
     }
-    if (destroy) {
-        gExecutorStorage.deallocate(id);
-    }
+    return false;
 }
 
 HardwareExecutor::HardwareExecutor() {
@@ -37,20 +28,42 @@ HardwareExecutor::HardwareExecutor() {
 
 HardwareExecutor::HardwareExecutor(const HardwareExecutor& other)
     : executorID(other.executorID) {
-    incExec(*executorID);
+    if (*executorID > 0) {
+        auto const handle = gExecutorStorage.acquire_write(*executorID);
+        incExec(handle);
+    }
 }
 
 HardwareExecutor::~HardwareExecutor() {
-    if (executorID) {
-        decExec(*executorID);
+    if (executorID && *executorID > 0) {
+        bool destroy = false;
+        if (auto const handle = gExecutorStorage.acquire_write(*executorID); decExec(handle)) {
+            destroy = true;
+        }
+        if (destroy) {
+            gExecutorStorage.deallocate(*executorID);
+        }
     }
 }
 
 HardwareExecutor& HardwareExecutor::operator=(const HardwareExecutor& other) {
     if (this != &other) {
-        incExec(*other.executorID);
-        decExec(*executorID);
-        executorID = other.executorID;  // ǳ���� shared_ptr
+        {
+            auto const handle = gExecutorStorage.acquire_write(*other.executorID);
+            incExec(handle);
+        }
+        {
+            if (executorID && *executorID > 0) {
+                bool destroy = false;
+                if (auto const handle = gExecutorStorage.acquire_write(*executorID); decExec(handle)) {
+                    destroy = true;
+                }
+                if (destroy) {
+                    gExecutorStorage.deallocate(*executorID);
+                }
+            }
+        }
+        executorID = other.executorID;
     }
     return *this;
 }
@@ -81,8 +94,8 @@ HardwareExecutor& HardwareExecutor::operator<<(HardwareExecutor& other) {
 
 HardwareExecutor& HardwareExecutor::wait(HardwareExecutor& other) {
     // ��ͬһ��������������в��������⾺̬����
-    auto handle = gExecutorStorage.acquire_read(*executorID);
-    auto other_handle = gExecutorStorage.acquire_read(*other.executorID);
+    auto const handle = gExecutorStorage.acquire_read(*executorID);
+    auto const other_handle = gExecutorStorage.acquire_read(*other.executorID);
     if (other_handle->impl && handle->impl) {
         handle->impl->wait(*other_handle->impl);
     }

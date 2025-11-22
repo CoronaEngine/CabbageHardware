@@ -4,26 +4,17 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/utils/storage.h"
 
-static void incRaster(uintptr_t id) {
-    if (id) {
-        auto handle = gRasterizerPipelineStorage.acquire_write(id);
-        ++handle->refCount;
-    }
+static void incRaster(const Corona::Kernel::Utils::Storage<RasterizerPipelineWrap>::WriteHandle& handle) {
+    ++handle->refCount;
 }
-static void decRaster(uintptr_t id) {
-    if (!id) {
-        return;
-    }
-    bool destroy = false;
-    auto handle = gRasterizerPipelineStorage.acquire_write(id);
+
+static bool decRaster(const Corona::Kernel::Utils::Storage<RasterizerPipelineWrap>::WriteHandle& handle) {
     if (--handle->refCount == 0) {
         delete handle->impl;
         handle->impl = nullptr;
-        destroy = true;
+        return true;
     }
-    if (destroy) {
-        gRasterizerPipelineStorage.deallocate(id);
-    }
+    return false;
 }
 
 RasterizerPipeline::RasterizerPipeline() {
@@ -44,19 +35,41 @@ RasterizerPipeline::RasterizerPipeline(std::string vs, std::string fs, uint32_t 
 
 RasterizerPipeline::RasterizerPipeline(const RasterizerPipeline& other)
     : rasterizerPipelineID(other.rasterizerPipelineID) {
-    incRaster(*rasterizerPipelineID);
+    if (*rasterizerPipelineID > 0) {
+        auto const handle = gRasterizerPipelineStorage.acquire_write(*rasterizerPipelineID);
+        incRaster(handle);
+    }
 }
 
 RasterizerPipeline::~RasterizerPipeline() {
-    if (rasterizerPipelineID) {
-        decRaster(*rasterizerPipelineID);
+    if (rasterizerPipelineID && *rasterizerPipelineID > 0) {
+        bool destroy = false;
+        if (auto const handle = gRasterizerPipelineStorage.acquire_write(*rasterizerPipelineID); decRaster(handle)) {
+            destroy = true;
+        }
+        if (destroy) {
+            gRasterizerPipelineStorage.deallocate(*rasterizerPipelineID);
+        }
     }
 }
 
 RasterizerPipeline& RasterizerPipeline::operator=(const RasterizerPipeline& other) {
     if (this != &other) {
-        incRaster(*other.rasterizerPipelineID);
-        decRaster(*rasterizerPipelineID);
+        {
+            auto const handle = gRasterizerPipelineStorage.acquire_write(*other.rasterizerPipelineID);
+            incRaster(handle);
+        }
+        {
+            if (rasterizerPipelineID && *rasterizerPipelineID > 0) {
+                bool destroy = false;
+                if (auto const handle = gRasterizerPipelineStorage.acquire_write(*rasterizerPipelineID); decRaster(handle)) {
+                    destroy = true;
+                }
+                if (destroy) {
+                    gRasterizerPipelineStorage.deallocate(*rasterizerPipelineID);
+                }
+            }
+        }
         *rasterizerPipelineID = *other.rasterizerPipelineID;
     }
     return *this;

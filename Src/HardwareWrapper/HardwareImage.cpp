@@ -60,30 +60,16 @@ VkImageUsageFlags convertImageUsage(ImageUsage usage) {
     return vkUsage;
 }
 
-void incrementImageRefCount(uintptr_t imageID) {
-    if (imageID != 0) {
-        auto imageHandle = globalImageStorages.acquire_write(imageID);
-        imageHandle->refCount++;
-    }
+static void incrementImageRefCount(const Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& handle) {
+    ++handle->refCount;
 }
 
-void decrementImageRefCount(uintptr_t imageID) {
-    if (imageID != 0) {
-        bool shouldDestroy = false;
-
-        {
-            auto imageHandle = globalImageStorages.acquire_write(imageID);
-            --imageHandle->refCount;
-            if (imageHandle->refCount == 0) {
-                globalHardwareContext.getMainDevice()->resourceManager.destroyImage(*imageHandle);
-                shouldDestroy = true;
-            }
-        }
-
-        if (shouldDestroy) {
-            globalImageStorages.deallocate(imageID);
-        }
+static bool decrementImageRefCount(const Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& handle) {
+    if (--handle->refCount == 0) {
+        globalHardwareContext.getMainDevice()->resourceManager.destroyImage(*handle);
+        return true;
     }
+    return false;
 }
 
 HardwareImage::HardwareImage()
@@ -118,19 +104,41 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
 
 HardwareImage::HardwareImage(const HardwareImage& other)
     : imageID(other.imageID) {
-    incrementImageRefCount(*imageID);
+    if (*imageID > 0) {
+        auto const handle = globalImageStorages.acquire_write(*imageID);
+        incrementImageRefCount(handle);
+    }
 }
 
 HardwareImage::~HardwareImage() {
-    if (imageID) {
-        decrementImageRefCount(*imageID);
+    if (imageID && *imageID > 0) {
+        bool destroy = false;
+        if (auto const handle = globalImageStorages.acquire_write(*imageID); decrementImageRefCount(handle)) {
+            destroy = true;
+        }
+        if (destroy) {
+            globalImageStorages.deallocate(*imageID);
+        }
     }
 }
 
 HardwareImage& HardwareImage::operator=(const HardwareImage& other) {
     if (this != &other) {
-        incrementImageRefCount(*other.imageID);
-        decrementImageRefCount(*imageID);
+        {
+            auto const handle = globalImageStorages.acquire_write(*other.imageID);
+            incrementImageRefCount(handle);
+        }
+        {
+            if (imageID && *imageID > 0) {
+                bool destroy = false;
+                if (auto const handle = globalImageStorages.acquire_write(*imageID); decrementImageRefCount(handle)) {
+                    destroy = true;
+                }
+                if (destroy) {
+                    globalImageStorages.deallocate(*imageID);
+                }
+            }
+        }
         *(this->imageID) = *(other.imageID);
     }
     return *this;

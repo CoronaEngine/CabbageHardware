@@ -66,12 +66,12 @@ HardwareDisplayer& HardwareDisplayer::operator=(const HardwareDisplayer& other) 
     return *this;
 }
 
-HardwareDisplayer& HardwareDisplayer::wait(HardwareExecutor& executor) {
+HardwareDisplayer& HardwareDisplayer::wait(const HardwareExecutor& executor) {
     // 确保在锁内完成所有操作
     if (executor.getExecutorID()) {
         const uintptr_t execID = *executor.getExecutorID();
-        auto handle = globalDisplayerStorages.acquire_read(*displaySurfaceID);
-        if (handle->displayManager) {
+        if (auto const handle = globalDisplayerStorages.acquire_read(*displaySurfaceID);
+            handle->displayManager) {
             if (HardwareExecutorVulkan* executorImpl = getExecutorImpl(execID)) {
                 handle->displayManager->waitExecutor(*executorImpl);
             }
@@ -81,9 +81,9 @@ HardwareDisplayer& HardwareDisplayer::wait(HardwareExecutor& executor) {
     return *this;
 }
 
-HardwareDisplayer& HardwareDisplayer::operator<<(HardwareImage& image) {
-    auto handle = globalDisplayerStorages.acquire_read(*displaySurfaceID);
-    if (handle->displayManager && handle->displaySurface) {
+HardwareDisplayer& HardwareDisplayer::operator<<(const HardwareImage& image) {
+    if (auto const handle = globalDisplayerStorages.acquire_read(*displaySurfaceID);
+        handle->displayManager && handle->displaySurface) {
         handle->displayManager->displayFrame(handle->displaySurface, image);
     }
     return *this;

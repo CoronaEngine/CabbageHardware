@@ -3,30 +3,19 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/utils/storage.h"
 
-void incrementPushConstantRefCount(uintptr_t id) {
-    if (id != 0) {
-        globalPushConstantStorages.acquire_write(id)->refCount++;
-    }
+static void incrementPushConstantRefCount(const Corona::Kernel::Utils::Storage<PushConstantWrap>::WriteHandle& handle) {
+    ++handle->refCount;
 }
 
-void decrementPushConstantRefCount(uintptr_t id) {
-    if (id != 0) {
-        bool shouldDestroy = false;
-        {
-            auto pushConstantHandle = globalPushConstantStorages.acquire_write(id);
-            --pushConstantHandle->refCount;
-            if (pushConstantHandle->refCount == 0) {
-                if (pushConstantHandle->data != nullptr && !pushConstantHandle->isSub) {
-                    std::free(pushConstantHandle->data);
-                    pushConstantHandle->data = nullptr;
-                }
-                shouldDestroy = true;
-            }
+static bool decrementPushConstantRefCount(const Corona::Kernel::Utils::Storage<PushConstantWrap>::WriteHandle& handle) {
+    if (--handle->refCount == 0) {
+        if (handle->data != nullptr && !handle->isSub) {
+            std::free(handle->data);
+            handle->data = nullptr;
         }
-        if (shouldDestroy) {
-            globalPushConstantStorages.deallocate(id);
-        }
+        return true;
     }
+    return false;
 }
 
 HardwarePushConstant::HardwarePushConstant()
@@ -56,19 +45,26 @@ HardwarePushConstant::HardwarePushConstant(uint64_t size, uint64_t offset, Hardw
 
 HardwarePushConstant::HardwarePushConstant(const HardwarePushConstant& other)
     : pushConstantID(other.pushConstantID) {
-    incrementPushConstantRefCount(*pushConstantID);
+    if (*pushConstantID > 0) {
+        auto const handle = globalPushConstantStorages.acquire_write(*pushConstantID);
+        incrementPushConstantRefCount(handle);
+    }
 }
 
 HardwarePushConstant::~HardwarePushConstant() {
-    if (pushConstantID) {
-        decrementPushConstantRefCount(*pushConstantID);
+    if (pushConstantID && *pushConstantID > 0) {
+        bool destroy = false;
+        if (auto const handle = globalPushConstantStorages.acquire_write(*pushConstantID); decrementPushConstantRefCount(handle)) {
+            destroy = true;
+        }
+        if (destroy) {
+            globalPushConstantStorages.deallocate(*pushConstantID);
+        }
     }
 }
 
 HardwarePushConstant& HardwarePushConstant::operator=(const HardwarePushConstant& other) {
     if (this != &other) {
-        // 这种写法是为了防止死锁
-        // TODO: 可能需要改进incrementPushConstantRefCount 和 decrementPushConstantRefCount 的实现，不传id，直接传引用
         bool isSub = false;
         {
             auto thisPc = globalPushConstantStorages.acquire_write(*pushConstantID);
@@ -83,8 +79,21 @@ HardwarePushConstant& HardwarePushConstant::operator=(const HardwarePushConstant
         }
 
         if (!isSub) {
-            incrementPushConstantRefCount(*other.pushConstantID);
-            decrementPushConstantRefCount(*pushConstantID);
+            {
+                auto const handle = globalPushConstantStorages.acquire_write(*other.pushConstantID);
+                incrementPushConstantRefCount(handle);
+            }
+            {
+                if (pushConstantID && *pushConstantID > 0) {
+                    bool destroy = false;
+                    if (auto const handle = globalPushConstantStorages.acquire_write(*pushConstantID); decrementPushConstantRefCount(handle)) {
+                        destroy = true;
+                    }
+                    if (destroy) {
+                        globalPushConstantStorages.deallocate(*pushConstantID);
+                    }
+                }
+            }
             *(pushConstantID) = *(other.pushConstantID);
         }
     }

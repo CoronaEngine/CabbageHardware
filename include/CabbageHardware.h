@@ -184,9 +184,9 @@ struct HardwareDisplayer {
     ~HardwareDisplayer();
 
     HardwareDisplayer& operator=(const HardwareDisplayer& other);
-    HardwareDisplayer& operator<<(HardwareImage& image);
+    HardwareDisplayer& operator<<(const HardwareImage& image);
 
-    HardwareDisplayer& wait(HardwareExecutor& executor);
+    HardwareDisplayer& wait(const HardwareExecutor& executor);
 
     [[nodiscard]] std::shared_ptr<uintptr_t> getDisplayerID() const {
         return displaySurfaceID;
