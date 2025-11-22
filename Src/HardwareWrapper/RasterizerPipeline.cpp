@@ -105,11 +105,3 @@ RasterizerPipeline& RasterizerPipeline::record(const HardwareBuffer& indexBuffer
     handle->impl->record(indexBuffer);
     return *this;
 }
-
-// ��ִ��������ʵ��
-RasterizerPipelineVulkan* getRasterizerPipelineImpl(uintptr_t id) {
-    RasterizerPipelineVulkan* ptr = nullptr;
-    auto handle = gRasterizerPipelineStorage.acquire_read(id);
-    ptr = handle->impl;
-    return ptr;
-}

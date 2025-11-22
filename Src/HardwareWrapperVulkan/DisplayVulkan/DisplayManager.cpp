@@ -441,10 +441,9 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
     }
 
     try {
-        ResourceManager::ImageHardwareWrap sourceImage = getImageFromHandle(*displayImage.getImageID());
-
         // 检查是否需要重新初始化
-        if (this->displaySurface != surface) {
+        if (auto const handle = globalImageStorages.acquire_read(*displayImage.getImageID());
+            this->displaySurface != surface) {
             this->displaySurface = surface;
 
             if (vkSurface != VK_NULL_HANDLE || swapChain != VK_NULL_HANDLE) {
@@ -459,11 +458,11 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
             if (globalHardwareContext.getMainDevice() != displayDevice)
             // if (true)
             {
-                this->displayImage = displayDevice->resourceManager.createImage(sourceImage.imageSize, sourceImage.imageFormat, sourceImage.pixelSize, sourceImage.imageUsage);
+                this->displayImage = displayDevice->resourceManager.createImage(handle->imageSize, handle->imageFormat, handle->pixelSize, handle->imageUsage);
 
-                setupCrossDeviceTransfer(sourceImage);
+                setupCrossDeviceTransfer(*handle);
             } else {
-                this->displayImage = sourceImage;
+                this->displayImage = *handle;
             }
         }
 
@@ -505,10 +504,11 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
         vkResetFences(displayDevice->deviceManager.getLogicalDevice(), 1, &inFlightFences[currentFrame]);
 
         // 跨设备传输（如果需要）
-        if (globalHardwareContext.getMainDevice() != displayDevice)
+        if (auto const handle = globalImageStorages.acquire_write(*displayImage.getImageID());
+            globalHardwareContext.getMainDevice() != displayDevice)
         // if (true)
         {
-            CopyImageToBufferCommand copyCmd(sourceImage, srcStaging);
+            CopyImageToBufferCommand copyCmd(*handle, srcStaging);
             (*mainDeviceExecutor) << &copyCmd << mainDeviceExecutor->commit();
 
             // std::vector<uint8_t> zeroData(dstStaging.bufferAllocInfo.size, 0);

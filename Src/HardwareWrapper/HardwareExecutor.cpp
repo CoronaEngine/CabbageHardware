@@ -69,20 +69,22 @@ HardwareExecutor& HardwareExecutor::operator=(const HardwareExecutor& other) {
 }
 
 HardwareExecutor& HardwareExecutor::operator<<(ComputePipeline& computePipeline) {
-    auto const handle = gExecutorStorage.acquire_read(*executorID);
-    if (computePipeline.getComputePipelineID()) {
-        if (auto* impl = getComputePipelineImpl(*computePipeline.getComputePipelineID())) {
-            handle->impl->operator<<(static_cast<CommandRecordVulkan*>(impl));
+    if (auto const executor_handle = gExecutorStorage.acquire_read(*executorID);
+        computePipeline.getComputePipelineID()) {
+        if (auto const pipeline_handle = gComputePipelineStorage.acquire_write(*computePipeline.getComputePipelineID());
+            pipeline_handle.valid()) {
+            *executor_handle->impl << static_cast<CommandRecordVulkan*>(pipeline_handle->impl);
         }
     }
     return *this;
 }
 
 HardwareExecutor& HardwareExecutor::operator<<(RasterizerPipeline& rasterizerPipeline) {
-    auto handle = gExecutorStorage.acquire_read(*executorID);
-    if (rasterizerPipeline.getRasterizerPipelineID()) {
-        if (auto* impl = getRasterizerPipelineImpl(*rasterizerPipeline.getRasterizerPipelineID())) {
-            handle->impl->operator<<(static_cast<CommandRecordVulkan*>(impl));
+    if (auto const executor_handle = gExecutorStorage.acquire_read(*executorID);
+        rasterizerPipeline.getRasterizerPipelineID()) {
+        if (auto const raster_handle = gRasterizerPipelineStorage.acquire_write(*rasterizerPipeline.getRasterizerPipelineID());
+            raster_handle->impl) {
+            *executor_handle->impl << static_cast<CommandRecordVulkan*>(raster_handle->impl);
         }
     }
     return *this;
@@ -106,12 +108,4 @@ HardwareExecutor& HardwareExecutor::commit() {
     auto handle = gExecutorStorage.acquire_read(*executorID);
     handle->impl->commit();
     return *this;
-}
-
-// Helper for other wrappers to access impl safely
-HardwareExecutorVulkan* getExecutorImpl(uintptr_t id) {
-    HardwareExecutorVulkan* impl = nullptr;
-    auto handle = gExecutorStorage.acquire_read(id);
-    impl = handle->impl;
-    return impl;
 }

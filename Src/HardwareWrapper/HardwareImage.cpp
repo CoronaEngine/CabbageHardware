@@ -165,13 +165,15 @@ HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, Hardw
     auto imageHandle = globalImageStorages.acquire_write(*imageID);
     auto bufferHandle = globalBufferStorages.acquire_write(*buffer.bufferID);
 
-    HardwareExecutorVulkan* executorImpl = getExecutorImpl(*executor->getExecutorID());
-    if (!executorImpl) {
-        return *this;
-    }
+    {
+        auto const executor_handle = gExecutorStorage.acquire_read(*executor->getExecutorID());
+        if (!executor_handle->impl) {
+            return *this;
+        }
 
-    CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle);
-    (*executorImpl) << &copyCmd;
+        CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle);
+        *executor_handle->impl << &copyCmd;
+    }
 
     return *this;
 }

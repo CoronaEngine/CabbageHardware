@@ -72,8 +72,9 @@ HardwareDisplayer& HardwareDisplayer::wait(const HardwareExecutor& executor) {
         const uintptr_t execID = *executor.getExecutorID();
         if (auto const handle = globalDisplayerStorages.acquire_read(*displaySurfaceID);
             handle->displayManager) {
-            if (HardwareExecutorVulkan* executorImpl = getExecutorImpl(execID)) {
-                handle->displayManager->waitExecutor(*executorImpl);
+            auto const executor_handle = gExecutorStorage.acquire_read(execID);
+            if (executor_handle->impl) {
+                handle->displayManager->waitExecutor(*executor_handle->impl);
             }
         }
     }

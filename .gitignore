@@ -3,6 +3,7 @@
 .vscode/
 .cache/
 .idea/
+.github/
 
 # 构建目录
 build/
