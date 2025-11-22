@@ -3,12 +3,14 @@
 #include <iostream>
 #include <source_location>
 
-#if defined(_WIN32)
+#include <corona/pal/cfw_platform.h>
+
+#if defined(CFW_PLATFORM_WINDOWS)
 #include <Windows.h>
 #define VK_USE_PLATFORM_WIN32_KHR
-#elif defined(__linux__) || defined(__unix__)
+#elif defined(CFW_PLATFORM_LINUX) || defined(CFW_PLATFORM_UNIX)
 #define VK_USE_PLATFORM_XLIB_KHR
-#elif defined(__APPLE__)
+#elif defined(CFW_PLATFORM_APPLE)
 #define VK_USE_PLATFORM_MACOS_MVK
 #else
 #error "Platform not supported by this example."
@@ -16,6 +18,8 @@
 
 #define VK_NO_PROTOTYPES
 #include <volk.h>
+
+#include <vk_mem_alloc.h>
 
 static inline const char* coronaHardwareResultStr(VkResult ret) {
     switch ((VkResult)ret) {

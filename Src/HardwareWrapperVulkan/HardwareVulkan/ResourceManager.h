@@ -1,12 +1,9 @@
 ﻿#pragma once
 
-// clang-format off
-#include "DeviceManager.h"
-#include <vk_mem_alloc.h>
-// clang-format on
-
 #include <ktm/ktm.h>
 
+#include "DeviceManager.h"
+#include "HardwareWrapperVulkan/HardwareUtils.h"
 #include "corona/kernel/utils/storage.h"
 
 class HardwareExecutor;
@@ -142,7 +139,7 @@ struct ResourceManager {
 
     template <typename THandle>
     struct BindingEntry {
-        THandle handle = (THandle)VK_NULL_HANDLE;
+        THandle handle = static_cast<THandle>(VK_NULL_HANDLE);
         int bindingIndex = -1;
     };
 
