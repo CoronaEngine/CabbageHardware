@@ -117,8 +117,7 @@ int main() {
         auto displayThread = [&](uint32_t threadIndex) {
             HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
             while (running.load()) {
-                displayManager << finalOutputImages[threadIndex];
-                // displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
+                displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
             }
         };
 
