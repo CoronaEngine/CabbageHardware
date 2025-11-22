@@ -116,13 +116,15 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer& inputBuffer, const Har
     auto const srcBuffer = globalBufferStorages.acquire_write(*inputBuffer.bufferID);
     auto const dstBuffer = globalBufferStorages.acquire_write(*bufferID);
 
-    HardwareExecutorVulkan* executorImpl = getExecutorImpl(*executor->getExecutorID());
-    if (!executorImpl) {
-        return false;
-    }
+    {
+        auto const executor_handle = gExecutorStorage.acquire_read(*executor->getExecutorID());
+        if (!executor_handle->impl) {
+            return false;
+        }
 
-    CopyBufferCommand copyCmd(*srcBuffer, *dstBuffer);
-    (*executorImpl) << &copyCmd;
+        CopyBufferCommand copyCmd(*srcBuffer, *dstBuffer);
+        *executor_handle->impl << &copyCmd;
+    }
 
     return true;
 }
