@@ -48,12 +48,14 @@ ComputePipeline::ComputePipeline(const std::string& shaderCode, EmbeddedShader::
 
 ComputePipeline::ComputePipeline(const ComputePipeline& other)
     : computePipelineID(other.computePipelineID) {
-    auto const write_handle = gComputePipelineStorage.acquire_write(*computePipelineID);
-    incCompute(write_handle);
+    if (*computePipelineID > 0) {
+        auto const write_handle = gComputePipelineStorage.acquire_write(*computePipelineID);
+        incCompute(write_handle);
+    }
 }
 
 ComputePipeline::~ComputePipeline() {
-    if (computePipelineID) {
+    if (computePipelineID && *computePipelineID > 0) {
         // NOTE: 不要修改写法，避免死锁
         bool destroy = false;
         if (auto const write_handle = gComputePipelineStorage.acquire_write(*computePipelineID); decCompute(write_handle)) {
@@ -71,13 +73,15 @@ ComputePipeline& ComputePipeline::operator=(const ComputePipeline& other) {
             auto const other_write_handle = gComputePipelineStorage.acquire_write(*other.computePipelineID);
             incCompute(other_write_handle);
         }
-        {
-            bool destroy = false;
-            if (auto const write_handle = gComputePipelineStorage.acquire_write(*computePipelineID); decCompute(write_handle)) {
-                destroy = true;
-            }
-            if (destroy) {
-                gComputePipelineStorage.deallocate(*computePipelineID);
+        {  // Note: 不要修改写法 避免死锁
+            if (computePipelineID && *computePipelineID > 0) {
+                bool destroy = false;
+                if (auto const write_handle = gComputePipelineStorage.acquire_write(*computePipelineID); decCompute(write_handle)) {
+                    destroy = true;
+                }
+                if (destroy) {
+                    gComputePipelineStorage.deallocate(*computePipelineID);
+                }
             }
         }
         *computePipelineID = *other.computePipelineID;

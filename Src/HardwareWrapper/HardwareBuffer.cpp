@@ -58,18 +58,22 @@ HardwareBuffer::HardwareBuffer(const uint32_t bufferSize, const uint32_t element
 
 HardwareBuffer::HardwareBuffer(const HardwareBuffer& other)
     : bufferID(other.bufferID) {
-    auto const handle = globalBufferStorages.acquire_write(*bufferID);
-    incrementBufferRefCount(handle);
+    if (*bufferID > 0) {
+        auto const handle = globalBufferStorages.acquire_write(*bufferID);
+        incrementBufferRefCount(handle);
+    }
 }
 
 HardwareBuffer::~HardwareBuffer() {
     // NOTE: 不要修改写法，避免死锁
-    bool destroy = false;
-    if (auto const handle = globalBufferStorages.acquire_write(*bufferID); decrementBufferRefCount(handle)) {
-        destroy = true;
-    }
-    if (destroy) {
-        globalBufferStorages.deallocate(*bufferID);
+    if (bufferID && *bufferID > 0) {
+        bool destroy = false;
+        if (auto const handle = globalBufferStorages.acquire_write(*bufferID); decrementBufferRefCount(handle)) {
+            destroy = true;
+        }
+        if (destroy) {
+            globalBufferStorages.deallocate(*bufferID);
+        }
     }
 }
 
@@ -80,12 +84,14 @@ HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer& other) {
             incrementBufferRefCount(handle);
         }
         {  // NOTE: 不要修改写法，避免死锁
-            bool destroy = false;
-            if (auto const handle = globalBufferStorages.acquire_write(*bufferID); decrementBufferRefCount(handle)) {
-                destroy = true;
-            }
-            if (destroy) {
-                globalBufferStorages.deallocate(*bufferID);
+            if (bufferID && *bufferID > 0) {
+                bool destroy = false;
+                if (auto const handle = globalBufferStorages.acquire_write(*bufferID); decrementBufferRefCount(handle)) {
+                    destroy = true;
+                }
+                if (destroy) {
+                    globalBufferStorages.deallocate(*bufferID);
+                }
             }
         }
         *(this->bufferID) = *(other.bufferID);
