@@ -1,19 +1,19 @@
 ﻿#pragma once
 
+#include <algorithm>
 #include <chrono>
 #include <iostream>
 #include <mutex>
-#include <algorithm>
 
 #if defined(_WIN32)
-    #include<Windows.h>
-    #define VK_USE_PLATFORM_WIN32_KHR
+#include <Windows.h>
+#define VK_USE_PLATFORM_WIN32_KHR
 #elif defined(__linux__) || defined(__unix__)
-    #define VK_USE_PLATFORM_XLIB_KHR
+#define VK_USE_PLATFORM_XLIB_KHR
 #elif defined(__APPLE__)
-    #define VK_USE_PLATFORM_MACOS_MVK
+#define VK_USE_PLATFORM_MACOS_MVK
 #else
-    #error "Platform not supported by this example."
+#error "Platform not supported by this example."
 #endif
 
 #define VK_NO_PROTOTYPES
@@ -21,11 +21,9 @@
 
 #include "FeaturesChain.h"
 
-class DeviceManager
-{
-public:
-    struct ExternalSemaphoreHandle
-    {
+class DeviceManager {
+   public:
+    struct ExternalSemaphoreHandle {
 #if _WIN32 || _WIN64
         HANDLE handle = nullptr;
 #else
@@ -33,8 +31,7 @@ public:
 #endif
     };
 
-    struct QueueUtils
-    {
+    struct QueueUtils {
         std::shared_ptr<std::mutex> queueMutex;
         std::shared_ptr<std::atomic_uint64_t> timelineValue;
         VkSemaphore timelineSemaphore = VK_NULL_HANDLE;
@@ -42,13 +39,12 @@ public:
         VkQueue vkQueue = VK_NULL_HANDLE;
         VkCommandPool commandPool = VK_NULL_HANDLE;
         VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
-        DeviceManager *deviceManager = nullptr;
+        DeviceManager* deviceManager = nullptr;
     };
 
-    struct FeaturesUtils
-    {
-        std::set<const char *> instanceExtensions;
-        std::set<const char *> deviceExtensions;
+    struct FeaturesUtils {
+        std::set<const char*> instanceExtensions;
+        std::set<const char*> deviceExtensions;
         VkPhysicalDeviceAccelerationStructurePropertiesKHR accelerationStructureProperties{};
         VkPhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingPipelineProperties{};
         VkPhysicalDeviceProperties2 supportedProperties{};
@@ -58,18 +54,18 @@ public:
     DeviceManager();
     ~DeviceManager();
 
-    DeviceManager(const DeviceManager &) = delete;
-    DeviceManager& operator=(const DeviceManager &) = delete;
-    DeviceManager(DeviceManager &&) = delete;
-    DeviceManager& operator=(DeviceManager &&) = delete;
+    DeviceManager(const DeviceManager&) = delete;
+    DeviceManager& operator=(const DeviceManager&) = delete;
+    DeviceManager(DeviceManager&&) = delete;
+    DeviceManager& operator=(DeviceManager&&) = delete;
 
-    void initDeviceManager(const CreateCallback &createCallback, const VkInstance &vkInstance, const VkPhysicalDevice &physicalDevice);
+    void initDeviceManager(const CreateCallback& createCallback, const VkInstance& vkInstance, const VkPhysicalDevice& physicalDevice);
     void cleanUpDeviceManager();
 
-    ExternalSemaphoreHandle exportSemaphore(VkSemaphore &semaphore);
-    VkSemaphore importSemaphore(const ExternalSemaphoreHandle &memHandle, const VkSemaphore &semaphore);
+    ExternalSemaphoreHandle exportSemaphore(VkSemaphore& semaphore);
+    VkSemaphore importSemaphore(const ExternalSemaphoreHandle& memHandle, const VkSemaphore& semaphore);
 
-    std::vector<QueueUtils> pickAvailableQueues(std::function<bool(const QueueUtils &)> predicate) const;
+    std::vector<QueueUtils> pickAvailableQueues(std::function<bool(const QueueUtils&)> predicate) const;
 
     VkPhysicalDevice getPhysicalDevice() const { return physicalDevice; }
     VkDevice getLogicalDevice() const { return logicalDevice; }
@@ -77,21 +73,20 @@ public:
     FeaturesUtils& getFeaturesUtils() { return deviceFeaturesUtils; }
     uint16_t getQueueFamilyNumber() const { return static_cast<uint16_t>(queueFamilies.size()); }
 
-    bool operator==(const DeviceManager &other) const
-    {
+    bool operator==(const DeviceManager& other) const {
         return physicalDevice == other.physicalDevice && logicalDevice == other.logicalDevice;
     }
 
-private:
+   private:
     friend class HardwareExecutorVulkan;
 
-    void createDevices(const CreateCallback &createInfo, const VkInstance &vkInstance);
+    void createDevices(const CreateCallback& createInfo, const VkInstance& vkInstance);
     void chooseMainDevice();
     void choosePresentQueueFamily();
     bool createCommandBuffers();
     void createTimelineSemaphore();
 
-    void destroyQueueResources(std::vector<QueueUtils> &queues);
+    void destroyQueueResources(std::vector<QueueUtils>& queues);
 
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     VkDevice logicalDevice = VK_NULL_HANDLE;

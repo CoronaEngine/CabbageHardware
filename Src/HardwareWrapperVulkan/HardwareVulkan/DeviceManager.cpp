@@ -1,15 +1,14 @@
 ﻿#include "DeviceManager.h"
+
 #include "HardwareWrapperVulkan/HardwareUtils.h"
 
 DeviceManager::DeviceManager() = default;
 
-DeviceManager::~DeviceManager()
-{
+DeviceManager::~DeviceManager() {
     cleanUpDeviceManager();
 }
 
-void DeviceManager::initDeviceManager(const CreateCallback &createCallback, const VkInstance &vkInstance, const VkPhysicalDevice &physicalDevice)
-{
+void DeviceManager::initDeviceManager(const CreateCallback& createCallback, const VkInstance& vkInstance, const VkPhysicalDevice& physicalDevice) {
     this->physicalDevice = physicalDevice;
 
     createDevices(createCallback, vkInstance);
@@ -18,10 +17,8 @@ void DeviceManager::initDeviceManager(const CreateCallback &createCallback, cons
     createTimelineSemaphore();
 }
 
-void DeviceManager::cleanUpDeviceManager()
-{
-    if (logicalDevice == VK_NULL_HANDLE)
-    {
+void DeviceManager::cleanUpDeviceManager() {
+    if (logicalDevice == VK_NULL_HANDLE) {
         graphicsQueues.clear();
         computeQueues.clear();
         transferQueues.clear();
@@ -50,24 +47,19 @@ void DeviceManager::cleanUpDeviceManager()
     currentTransferQueueIndex = 0;
 }
 
-void DeviceManager::destroyQueueResources(std::vector<QueueUtils> &queues)
-{
-    for (auto &queue : queues)
-    {
-        if (queue.commandBuffer != VK_NULL_HANDLE && queue.commandPool != VK_NULL_HANDLE)
-        {
+void DeviceManager::destroyQueueResources(std::vector<QueueUtils>& queues) {
+    for (auto& queue : queues) {
+        if (queue.commandBuffer != VK_NULL_HANDLE && queue.commandPool != VK_NULL_HANDLE) {
             vkFreeCommandBuffers(logicalDevice, queue.commandPool, 1, &queue.commandBuffer);
             queue.commandBuffer = VK_NULL_HANDLE;
         }
 
-        if (queue.commandPool != VK_NULL_HANDLE)
-        {
+        if (queue.commandPool != VK_NULL_HANDLE) {
             vkDestroyCommandPool(logicalDevice, queue.commandPool, nullptr);
             queue.commandPool = VK_NULL_HANDLE;
         }
 
-        if (queue.timelineSemaphore != VK_NULL_HANDLE)
-        {
+        if (queue.timelineSemaphore != VK_NULL_HANDLE) {
             vkDestroySemaphore(logicalDevice, queue.timelineSemaphore, nullptr);
             queue.timelineSemaphore = VK_NULL_HANDLE;
         }
@@ -82,9 +74,8 @@ void DeviceManager::destroyQueueResources(std::vector<QueueUtils> &queues)
     queues.clear();
 }
 
-void DeviceManager::createTimelineSemaphore()
-{
-    auto createTimelineSemaphoreForQueue = [&](QueueUtils &queue) {
+void DeviceManager::createTimelineSemaphore() {
+    auto createTimelineSemaphoreForQueue = [&](QueueUtils& queue) {
         VkExportSemaphoreCreateInfo exportInfo{};
         exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
         exportInfo.pNext = nullptr;
@@ -104,18 +95,17 @@ void DeviceManager::createTimelineSemaphore()
         coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &queue.timelineSemaphore));
     };
 
-    for (auto &queue : graphicsQueues)
+    for (auto& queue : graphicsQueues)
         createTimelineSemaphoreForQueue(queue);
-    for (auto &queue : computeQueues)
+    for (auto& queue : computeQueues)
         createTimelineSemaphoreForQueue(queue);
-    for (auto &queue : transferQueues)
+    for (auto& queue : transferQueues)
         createTimelineSemaphoreForQueue(queue);
 }
 
-void DeviceManager::createDevices(const CreateCallback &initInfo, const VkInstance &vkInstance)
-{
-    std::set<const char *> inputExtensions = initInfo.requiredDeviceExtensions(vkInstance, physicalDevice);
-    std::vector<const char *> requiredExtensions = std::vector<const char *>(inputExtensions.begin(), inputExtensions.end());
+void DeviceManager::createDevices(const CreateCallback& initInfo, const VkInstance& vkInstance) {
+    std::set<const char*> inputExtensions = initInfo.requiredDeviceExtensions(vkInstance, physicalDevice);
+    std::vector<const char*> requiredExtensions = std::vector<const char*>(inputExtensions.begin(), inputExtensions.end());
 
     deviceFeaturesUtils.supportedProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
     deviceFeaturesUtils.rayTracingPipelineProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
@@ -135,23 +125,18 @@ void DeviceManager::createDevices(const CreateCallback &initInfo, const VkInstan
     vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, availableExtensions.data());
 
     requiredExtensions.erase(std::remove_if(requiredExtensions.begin(), requiredExtensions.end(),
-        [&availableExtensions](const char *required)
-        {
-            bool supported = std::any_of(availableExtensions.begin(), availableExtensions.end(),
-                [required](const VkExtensionProperties &available)
-                {
-                    return strcmp(required, available.extensionName) == 0;
-                }
-            );
+                                            [&availableExtensions](const char* required) {
+                                                bool supported = std::any_of(availableExtensions.begin(), availableExtensions.end(),
+                                                                             [required](const VkExtensionProperties& available) {
+                                                                                 return strcmp(required, available.extensionName) == 0;
+                                                                             });
 
-            if (!supported)
-            {
-                printExtensionWarning(required);
-            }
-            return !supported;
-        }),
-        requiredExtensions.end()
-    );
+                                                if (!supported) {
+                                                    printExtensionWarning(required);
+                                                }
+                                                return !supported;
+                                            }),
+                             requiredExtensions.end());
 
     vkGetPhysicalDeviceFeatures2(physicalDevice, deviceFeaturesUtils.featuresChain.getChainHead());
     deviceFeaturesUtils.featuresChain = deviceFeaturesUtils.featuresChain & initInfo.requiredDeviceFeatures(vkInstance, physicalDevice);
@@ -164,8 +149,7 @@ void DeviceManager::createDevices(const CreateCallback &initInfo, const VkInstan
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::vector<std::vector<float>> queuePriorities(queueFamilies.size());
 
-    for (int i = 0; i < queueFamilies.size(); i++)
-    {
+    for (int i = 0; i < queueFamilies.size(); i++) {
         queuePriorities[i].resize(queueFamilies[i].queueCount, 1.0f);
 
         VkDeviceQueueCreateInfo queueCreateInfo{};
@@ -191,17 +175,14 @@ void DeviceManager::createDevices(const CreateCallback &initInfo, const VkInstan
     coronaHardwareCheck(vkCreateDevice(physicalDevice, &createInfo, nullptr, &logicalDevice));
 }
 
-void DeviceManager::choosePresentQueueFamily()
-{
-    for (int i = 0; i < queueFamilies.size(); i++)
-    {
+void DeviceManager::choosePresentQueueFamily() {
+    for (int i = 0; i < queueFamilies.size(); i++) {
         QueueUtils baseQueueUtils;
         baseQueueUtils.queueFamilyIndex = static_cast<uint32_t>(i);
         baseQueueUtils.deviceManager = this;
         // tempQueueUtils.timelineValue.store(0);
 
-        for (uint32_t queueIndex = 0; queueIndex < queueFamilies[i].queueCount; queueIndex++)
-        {
+        for (uint32_t queueIndex = 0; queueIndex < queueFamilies[i].queueCount; queueIndex++) {
             QueueUtils queueUtils = baseQueueUtils;
             queueUtils.queueMutex = std::make_shared<std::mutex>();
             queueUtils.timelineValue = std::make_shared<std::atomic_uint64_t>(0);
@@ -209,42 +190,30 @@ void DeviceManager::choosePresentQueueFamily()
             vkGetDeviceQueue(logicalDevice, static_cast<uint32_t>(i), queueIndex, &queueUtils.vkQueue);
 
             const VkQueueFlags flags = queueFamilies[i].queueFlags;
-            if (flags & VK_QUEUE_GRAPHICS_BIT)
-            {
+            if (flags & VK_QUEUE_GRAPHICS_BIT) {
                 graphicsQueues.push_back(queueUtils);
-            }
-            else if (flags & VK_QUEUE_COMPUTE_BIT)
-            {
+            } else if (flags & VK_QUEUE_COMPUTE_BIT) {
                 computeQueues.push_back(queueUtils);
-            }
-            else if (flags & VK_QUEUE_TRANSFER_BIT)
-            {
+            } else if (flags & VK_QUEUE_TRANSFER_BIT) {
                 transferQueues.push_back(queueUtils);
             }
         }
     }
 
-    if (!graphicsQueues.empty())
-    {
-        if (computeQueues.empty())
-        {
+    if (!graphicsQueues.empty()) {
+        if (computeQueues.empty()) {
             computeQueues.push_back(graphicsQueues[0]);
         }
-        if (transferQueues.empty())
-        {
+        if (transferQueues.empty()) {
             transferQueues.push_back(graphicsQueues[0]);
         }
-    }
-    else
-    {
+    } else {
         throw std::runtime_error("No graphics queues found!");
     }
 }
 
-bool DeviceManager::createCommandBuffers()
-{
-    auto createCommandBuffer = [this](QueueUtils &queue)
-    {
+bool DeviceManager::createCommandBuffers() {
+    auto createCommandBuffer = [this](QueueUtils& queue) {
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -261,23 +230,19 @@ bool DeviceManager::createCommandBuffers()
         coronaHardwareCheck(vkAllocateCommandBuffers(logicalDevice, &allocInfo, &queue.commandBuffer));
     };
 
-    for (auto &queue : graphicsQueues) createCommandBuffer(queue);
-    for (auto &queue : computeQueues) createCommandBuffer(queue);
-    for (auto &queue : transferQueues) createCommandBuffer(queue);
+    for (auto& queue : graphicsQueues) createCommandBuffer(queue);
+    for (auto& queue : computeQueues) createCommandBuffer(queue);
+    for (auto& queue : transferQueues) createCommandBuffer(queue);
 
     return true;
 }
 
-std::vector<DeviceManager::QueueUtils> DeviceManager::pickAvailableQueues(std::function<bool(const QueueUtils &)> predicate) const
-{
+std::vector<DeviceManager::QueueUtils> DeviceManager::pickAvailableQueues(std::function<bool(const QueueUtils&)> predicate) const {
     std::vector<QueueUtils> result;
 
-    auto addMatchingQueues = [&](const std::vector<QueueUtils> &queues)
-    {
-        for (const auto &queue : queues)
-        {
-            if (predicate(queue))
-            {
+    auto addMatchingQueues = [&](const std::vector<QueueUtils>& queues) {
+        for (const auto& queue : queues) {
+            if (predicate(queue)) {
                 result.push_back(queue);
             }
         }
@@ -290,8 +255,7 @@ std::vector<DeviceManager::QueueUtils> DeviceManager::pickAvailableQueues(std::f
     return result;
 }
 
-DeviceManager::ExternalSemaphoreHandle DeviceManager::exportSemaphore(VkSemaphore &semaphore)
-{
+DeviceManager::ExternalSemaphoreHandle DeviceManager::exportSemaphore(VkSemaphore& semaphore) {
     ExternalSemaphoreHandle handleInfo{};
 
 #if _WIN32 || _WIN64
@@ -304,8 +268,7 @@ DeviceManager::ExternalSemaphoreHandle DeviceManager::exportSemaphore(VkSemaphor
     HANDLE handle = nullptr;
     coronaHardwareCheck(vkGetSemaphoreWin32HandleKHR(logicalDevice, &getHandleInfo, &handle));
 
-    if (handle == nullptr)
-    {
+    if (handle == nullptr) {
         throw std::runtime_error("Failed to export semaphore: handle is null");
     }
 
@@ -317,8 +280,7 @@ DeviceManager::ExternalSemaphoreHandle DeviceManager::exportSemaphore(VkSemaphor
     return handleInfo;
 }
 
-VkSemaphore DeviceManager::importSemaphore(const DeviceManager::ExternalSemaphoreHandle &memHandle, const VkSemaphore &semaphore)
-{
+VkSemaphore DeviceManager::importSemaphore(const DeviceManager::ExternalSemaphoreHandle& memHandle, const VkSemaphore& semaphore) {
 #if _WIN32 || _WIN64
     VkImportSemaphoreWin32HandleInfoKHR importInfo{};
     importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR;

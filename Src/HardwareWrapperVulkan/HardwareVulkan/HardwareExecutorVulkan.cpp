@@ -1,50 +1,38 @@
 ﻿#include "HardwareExecutorVulkan.h"
 
-DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomic_uint16_t &currentQueueIndex,
-                                                                std::vector<DeviceManager::QueueUtils> &currentQueues,
-                                                                std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand)
-{
-    DeviceManager::QueueUtils *queue;
+DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomic_uint16_t& currentQueueIndex,
+                                                                      std::vector<DeviceManager::QueueUtils>& currentQueues,
+                                                                      std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand) {
+    DeviceManager::QueueUtils* queue;
     uint16_t queueIndex = 0;
 
-    while (true)
-    {
+    while (true) {
         uint16_t queueIndex = currentQueueIndex.fetch_add(1) % currentQueues.size();
         queue = &currentQueues[queueIndex];
 
-        if (queue->queueMutex->try_lock())
-        {
+        if (queue->queueMutex->try_lock()) {
             uint64_t timelineCounterValue = 0;
             vkGetSemaphoreCounterValue(queue->deviceManager->logicalDevice, queue->timelineSemaphore, &timelineCounterValue);
-            if (timelineCounterValue >= queue->timelineValue->fetch_add(0))
-            {
+            if (timelineCounterValue >= queue->timelineValue->fetch_add(0)) {
                 break;
-            }
-            else
-            {
+            } else {
                 queue->queueMutex->unlock();
             }
         }
 
-        //std::this_thread::yield();
+        // std::this_thread::yield();
     }
 
-
     commitCommand(queue);
-
 
     queue->queueMutex->unlock();
 
     return queue;
 }
 
-
-
-HardwareExecutorVulkan &HardwareExecutorVulkan::commit()
-{
-    if (commandList.size() > 0)
-    {
-        auto commitToQueue = [&](DeviceManager::QueueUtils *currentRecordQueue) -> bool {
+HardwareExecutorVulkan& HardwareExecutorVulkan::commit() {
+    if (commandList.size() > 0) {
+        auto commitToQueue = [&](DeviceManager::QueueUtils* currentRecordQueue) -> bool {
             this->currentRecordQueue = currentRecordQueue;
 
             vkResetCommandBuffer(currentRecordQueue->commandBuffer, 0);
@@ -55,12 +43,10 @@ HardwareExecutorVulkan &HardwareExecutorVulkan::commit()
 
             vkBeginCommandBuffer(currentRecordQueue->commandBuffer, &beginInfo);
 
-            for (size_t i = 0; i < commandList.size(); i++)
-            {
+            for (size_t i = 0; i < commandList.size(); i++) {
                 CommandRecordVulkan::RequiredBarriers requiredBarriers = commandList[i]->getRequiredBarriers(*this);
 
-                if (!requiredBarriers.memoryBarriers.empty() || !requiredBarriers.bufferBarriers.empty() || !requiredBarriers.imageBarriers.empty())
-                {
+                if (!requiredBarriers.memoryBarriers.empty() || !requiredBarriers.bufferBarriers.empty() || !requiredBarriers.imageBarriers.empty()) {
                     VkDependencyInfo dependencyInfo{};
                     dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
                     dependencyInfo.memoryBarrierCount = static_cast<uint32_t>(requiredBarriers.memoryBarriers.size());
@@ -74,8 +60,7 @@ HardwareExecutorVulkan &HardwareExecutorVulkan::commit()
                     vkCmdPipelineBarrier2(currentRecordQueue->commandBuffer, &dependencyInfo);
                 }
 
-                if (commandList[i]->getExecutorType() != CommandRecordVulkan::ExecutorType::Invalid)
-                {
+                if (commandList[i]->getExecutorType() != CommandRecordVulkan::ExecutorType::Invalid) {
                     commandList[i]->commitCommand(*this);
                 }
             }
@@ -110,40 +95,33 @@ HardwareExecutorVulkan &HardwareExecutorVulkan::commit()
             submitInfo.pCommandBufferInfos = &commandBufferSubmitInfo;
 
             VkResult result = vkQueueSubmit2(currentRecordQueue->vkQueue, 1, &submitInfo, waitFence);
-            if (result != VK_SUCCESS)
-            {
+            if (result != VK_SUCCESS) {
                 throw std::runtime_error("Failed to submit command buffer!");
             }
 
             return true;
         };
 
-
         CommandRecordVulkan::ExecutorType queueType = CommandRecordVulkan::ExecutorType::Transfer;
-        for (size_t i = 0; i < commandList.size(); i++)
-        {
-            if (commandList[i]->getExecutorType() == CommandRecordVulkan::ExecutorType::Graphics)
-            {
+        for (size_t i = 0; i < commandList.size(); i++) {
+            if (commandList[i]->getExecutorType() == CommandRecordVulkan::ExecutorType::Graphics) {
                 queueType = CommandRecordVulkan::ExecutorType::Graphics;
                 break;
-            }
-            else if (commandList[i]->getExecutorType() == CommandRecordVulkan::ExecutorType::Compute)
-            {
+            } else if (commandList[i]->getExecutorType() == CommandRecordVulkan::ExecutorType::Compute) {
                 queueType = CommandRecordVulkan::ExecutorType::Compute;
             }
         }
 
-        switch (queueType)
-        {
-        case CommandRecordVulkan::ExecutorType::Graphics:
-            pickQueueAndCommit(hardwareContext->deviceManager.currentGraphicsQueueIndex, hardwareContext->deviceManager.graphicsQueues, commitToQueue);
-            break;
-        case CommandRecordVulkan::ExecutorType::Compute:
-            pickQueueAndCommit(hardwareContext->deviceManager.currentComputeQueueIndex, hardwareContext->deviceManager.computeQueues, commitToQueue);
-            break;
-        case CommandRecordVulkan::ExecutorType::Transfer:
-            pickQueueAndCommit(hardwareContext->deviceManager.currentTransferQueueIndex, hardwareContext->deviceManager.transferQueues, commitToQueue);
-            break;
+        switch (queueType) {
+            case CommandRecordVulkan::ExecutorType::Graphics:
+                pickQueueAndCommit(hardwareContext->deviceManager.currentGraphicsQueueIndex, hardwareContext->deviceManager.graphicsQueues, commitToQueue);
+                break;
+            case CommandRecordVulkan::ExecutorType::Compute:
+                pickQueueAndCommit(hardwareContext->deviceManager.currentComputeQueueIndex, hardwareContext->deviceManager.computeQueues, commitToQueue);
+                break;
+            case CommandRecordVulkan::ExecutorType::Transfer:
+                pickQueueAndCommit(hardwareContext->deviceManager.currentTransferQueueIndex, hardwareContext->deviceManager.transferQueues, commitToQueue);
+                break;
         }
 
         commandList.clear();

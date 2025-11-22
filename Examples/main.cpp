@@ -1,12 +1,12 @@
-﻿#include <string>
-#include <vector>
+﻿#include <ktm/ktm.h>
+
 #include <filesystem>
 #include <fstream>
-#include <sstream>
-#include <regex>
 #include <iostream>
-
-#include <ktm/ktm.h>
+#include <regex>
+#include <sstream>
+#include <string>
+#include <vector>
 
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
@@ -16,12 +16,10 @@
 #include <stb_image.h>
 
 #include "CabbageHardware.h"
-
-#include "CubeData.h"
 #include "Config.h"
+#include "CubeData.h"
 
-struct RasterizerUniformBufferObject
-{
+struct RasterizerUniformBufferObject {
     uint32_t textureIndex;
     ktm::fmat4x4 model = ktm::rotate3d_axis(ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
     ktm::fmat4x4 view = ktm::look_at_lh(ktm::fvec3(2.0f, 2.0f, 2.0f), ktm::fvec3(0.0f, 0.0f, 0.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
@@ -31,27 +29,22 @@ struct RasterizerUniformBufferObject
     ktm::fvec3 lightPos = ktm::fvec3(1.0f, 1.0f, 1.0f);
 };
 
-struct ComputeUniformBufferObject
-{
+struct ComputeUniformBufferObject {
     uint32_t imageID;
 };
 
-int main()
-{
-    if (glfwInit() >= 0)
-    {
+int main() {
+    if (glfwInit() >= 0) {
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        std::vector<GLFWwindow *> windows(1);
-        for (size_t i = 0; i < windows.size(); i++)
-        {
+        std::vector<GLFWwindow*> windows(1);
+        for (size_t i = 0; i < windows.size(); i++) {
             windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
         }
 
         std::vector<HardwareImage> finalOutputImages(windows.size());
         std::vector<HardwareExecutor> executors(windows.size());
-        for (size_t i = 0; i < finalOutputImages.size(); i++)
-        {
+        for (size_t i = 0; i < finalOutputImages.size(); i++) {
             finalOutputImages[i] = HardwareImage(1920, 1080, ImageFormat::RGBA16_FLOAT, ImageUsage::StorageImage);
         }
 
@@ -63,9 +56,8 @@ int main()
         HardwareBuffer indexBuffer = HardwareBuffer(indices, BufferUsage::IndexBuffer);
 
         int width, height, channels;
-        unsigned char *data = stbi_load(std::string(shaderPath + "/awesomeface.png").c_str(), &width, &height, &channels, 0);
-        if (!data)
-        {
+        unsigned char* data = stbi_load(std::string(shaderPath + "/awesomeface.png").c_str(), &width, &height, &channels, 0);
+        if (!data) {
             std::cerr << "stbi_load failed: " << stbi_failure_reason() << std::endl;
         }
 
@@ -79,8 +71,7 @@ int main()
 
             std::vector<HardwareBuffer> rasterizerUniformBuffers;
             std::vector<ktm::fmat4x4> modelMat;
-            for (size_t i = 0; i < 20; i++)
-            {
+            for (size_t i = 0; i < 20; i++) {
                 ktm::fmat4x4 tempModelMat = ktm::translate3d(ktm::fvec3((i % 5) - 2.0f, (i / 5) - 0.5f, 0.0f)) * ktm::scale3d(ktm::fvec3(0.1, 0.1, 0.1)) * ktm::rotate3d_axis(ktm::radians(i * 30.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
                 HardwareBuffer tempRasterizerUniformBuffers = HardwareBuffer(sizeof(RasterizerUniformBufferObject), BufferUsage::UniformBuffer);
 
@@ -96,13 +87,10 @@ int main()
 
             auto startTime = std::chrono::high_resolution_clock::now();
 
-
-            while (running.load())
-            {
+            while (running.load()) {
                 float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
-                for (size_t i = 0; i < modelMat.size(); i++)
-                {
+                for (size_t i = 0; i < modelMat.size(); i++) {
                     rasterizerUniformBufferObject.textureIndex = texture.storeDescriptor();
                     rasterizerUniformBufferObject.model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
                     rasterizerUniformBuffers[i].copyFromData(&rasterizerUniformBufferObject, sizeof(rasterizerUniformBufferObject));
@@ -128,34 +116,28 @@ int main()
 
         auto displayThread = [&](uint32_t threadIndex) {
             HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
-            while (running.load())
-            {
+            while (running.load()) {
                 displayManager << finalOutputImages[threadIndex];
-                //displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
+                // displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
             }
         };
 
-        for (size_t i = 0; i < windows.size(); i++)
-        {
+        for (size_t i = 0; i < windows.size(); i++) {
             std::thread(renderThread, i).detach();
             std::thread(displayThread, i).detach();
         }
 
-        while (running.load())
-        {
+        while (running.load()) {
             glfwPollEvents();
-            for (size_t i = 0; i < windows.size(); i++)
-            {
-                if (glfwWindowShouldClose(windows[i]))
-                {
+            for (size_t i = 0; i < windows.size(); i++) {
+                if (glfwWindowShouldClose(windows[i])) {
                     running.store(false);
                     break;
                 }
             }
         }
 
-        for (size_t i = 0; i < windows.size(); i++)
-        {
+        for (size_t i = 0; i < windows.size(); i++) {
             glfwDestroyWindow(windows[i]);
         }
         glfwTerminate();

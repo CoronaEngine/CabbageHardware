@@ -1,44 +1,37 @@
 ﻿#include "CabbageHardware.h"
-
-#include "corona/kernel/utils/storage.h"
 #include "HardwareWrapperVulkan/HardwareContext.h"
-#include "HardwareWrapperVulkan/HardwareVulkan/ResourceCommand.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
-
+#include "HardwareWrapperVulkan/HardwareVulkan/ResourceCommand.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
+#include "corona/kernel/utils/storage.h"
 
-HardwareExecutorVulkan *getExecutorImpl(uintptr_t id);
+HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
 
-
-VkBufferUsageFlags convertBufferUsage(BufferUsage usage)
-{
+VkBufferUsageFlags convertBufferUsage(BufferUsage usage) {
     VkBufferUsageFlags vkUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-    switch (usage)
-    {
-    case BufferUsage::VertexBuffer:
-        vkUsage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-        break;
-    case BufferUsage::IndexBuffer:
-        vkUsage |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-        break;
-    case BufferUsage::UniformBuffer:
-        vkUsage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-        break;
-    case BufferUsage::StorageBuffer:
-        vkUsage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-        break;
-    default:
-        break;
+    switch (usage) {
+        case BufferUsage::VertexBuffer:
+            vkUsage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+            break;
+        case BufferUsage::IndexBuffer:
+            vkUsage |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+            break;
+        case BufferUsage::UniformBuffer:
+            vkUsage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+            break;
+        case BufferUsage::StorageBuffer:
+            vkUsage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+            break;
+        default:
+            break;
     }
 
     return vkUsage;
 }
 
-void incrementBufferRefCount(uintptr_t bufferID)
-{
-    if (bufferID != 0)
-    {
+void incrementBufferRefCount(uintptr_t bufferID) {
+    if (bufferID != 0) {
         auto handle = globalBufferStorages.acquire_write(bufferID)->refCount++;
     }
 }
@@ -61,11 +54,10 @@ void decrementBufferRefCount(uintptr_t bufferID) {
 }
 
 HardwareBuffer::HardwareBuffer()
-    : bufferID(std::make_shared<uintptr_t>(0))
-{
+    : bufferID(std::make_shared<uintptr_t>(0)) {
 }
 
-HardwareBuffer::HardwareBuffer(uint32_t bufferSize, uint32_t elementSize, BufferUsage usage, const void *data) {
+HardwareBuffer::HardwareBuffer(uint32_t bufferSize, uint32_t elementSize, BufferUsage usage, const void* data) {
     bufferID = std::make_shared<uintptr_t>(globalBufferStorages.allocate());
 
     auto handle = globalBufferStorages.acquire_write(*bufferID);
@@ -78,24 +70,19 @@ HardwareBuffer::HardwareBuffer(uint32_t bufferSize, uint32_t elementSize, Buffer
     }
 }
 
-HardwareBuffer::HardwareBuffer(const HardwareBuffer &other)
-    : bufferID(other.bufferID)
-{
+HardwareBuffer::HardwareBuffer(const HardwareBuffer& other)
+    : bufferID(other.bufferID) {
     incrementBufferRefCount(*bufferID);
 }
 
-HardwareBuffer::~HardwareBuffer()
-{
-    if (bufferID)
-    {
+HardwareBuffer::~HardwareBuffer() {
+    if (bufferID) {
         decrementBufferRefCount(*bufferID);
     }
 }
 
-HardwareBuffer &HardwareBuffer::operator=(const HardwareBuffer &other)
-{
-    if (this != &other)
-    {
+HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer& other) {
+    if (this != &other) {
         incrementBufferRefCount(*other.bufferID);
         decrementBufferRefCount(*bufferID);
         *(this->bufferID) = *(other.bufferID);
@@ -112,19 +99,16 @@ HardwareBuffer::operator bool() const {
     }
 }
 
-bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareExecutor *executor)
-{
-    if (!executor || !executor->getExecutorID() || *executor->getExecutorID() == 0)
-    {
+bool HardwareBuffer::copyFromBuffer(const HardwareBuffer& inputBuffer, HardwareExecutor* executor) {
+    if (!executor || !executor->getExecutorID() || *executor->getExecutorID() == 0) {
         return false;  // 必须提供有效的 executor
     }
 
     auto srcBuffer = globalBufferStorages.acquire_write(*inputBuffer.bufferID);
     auto dstBuffer = globalBufferStorages.acquire_write(*bufferID);
 
-    HardwareExecutorVulkan *executorImpl = getExecutorImpl(*executor->getExecutorID());
-    if (!executorImpl)
-    {
+    HardwareExecutorVulkan* executorImpl = getExecutorImpl(*executor->getExecutorID());
+    if (!executorImpl) {
         return false;
     }
 
@@ -134,13 +118,12 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer &inputBuffer, HardwareE
     return true;
 }
 
-uint32_t HardwareBuffer::storeDescriptor()
-{
+uint32_t HardwareBuffer::storeDescriptor() {
     auto bufferHandle = globalBufferStorages.acquire_write(*bufferID);
     return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(bufferHandle);
 }
 
-bool HardwareBuffer::copyFromData(const void *inputData, uint64_t size) {
+bool HardwareBuffer::copyFromData(const void* inputData, uint64_t size) {
     if (inputData == nullptr || size == 0) {
         return false;
     }
@@ -156,7 +139,7 @@ bool HardwareBuffer::copyFromData(const void *inputData, uint64_t size) {
     return success;
 }
 
-bool HardwareBuffer::copyToData(void *outputData, uint64_t size) {
+bool HardwareBuffer::copyToData(void* outputData, uint64_t size) {
     if (outputData == nullptr || size == 0) {
         return false;
     }
@@ -171,18 +154,15 @@ bool HardwareBuffer::copyToData(void *outputData, uint64_t size) {
     return success;
 }
 
-void *HardwareBuffer::getMappedData()
-{
+void* HardwareBuffer::getMappedData() {
     return globalBufferStorages.acquire_read(*bufferID)->bufferAllocInfo.pMappedData;
 }
 
-uint64_t HardwareBuffer::getElementCount() const
-{
+uint64_t HardwareBuffer::getElementCount() const {
     return globalBufferStorages.acquire_read(*bufferID)->elementCount;
 }
 
-uint64_t HardwareBuffer::getElementSize() const
-{
+uint64_t HardwareBuffer::getElementSize() const {
     return globalBufferStorages.acquire_read(*bufferID)->elementSize;
 }
 
@@ -200,8 +180,7 @@ ExternalHandle HardwareBuffer::exportBufferMemory() {
     return winHandle;
 }
 
-HardwareBuffer::HardwareBuffer(const ExternalHandle &memHandle, uint32_t bufferSize, uint32_t elementSize, uint32_t allocSize, BufferUsage usage)
-{
+HardwareBuffer::HardwareBuffer(const ExternalHandle& memHandle, uint32_t bufferSize, uint32_t elementSize, uint32_t allocSize, BufferUsage usage) {
     ResourceManager::ExternalMemoryHandle mempryHandle;
 #if _WIN32 || _WIN64
     mempryHandle.handle = memHandle.handle;

@@ -1,8 +1,7 @@
 ﻿#include "FeaturesChain.h"
 
 #define CORONA_APPLY_BOOL_OP(dst, src, op)       \
-    do                                           \
-    {                                            \
+    do {                                         \
         dst = static_cast<VkBool32>(dst op src); \
     } while (0)
 
@@ -12,13 +11,11 @@
 #define CORONA_OR_FEATURES(result, field) \
     CORONA_APPLY_BOOL_OP(result.field, features.field, |)
 
-DeviceFeaturesChain::DeviceFeaturesChain()
-{
+DeviceFeaturesChain::DeviceFeaturesChain() {
     initializeChain();
 }
 
-void DeviceFeaturesChain::initializeChain()
-{
+void DeviceFeaturesChain::initializeChain() {
     // rayQueryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
     // rayQueryFeatures.pNext = nullptr;
 
@@ -44,25 +41,21 @@ void DeviceFeaturesChain::initializeChain()
     deviceFeatures2.pNext = &deviceFeatures11;
 }
 
-VkPhysicalDeviceFeatures2* DeviceFeaturesChain::getChainHead()
-{
+VkPhysicalDeviceFeatures2* DeviceFeaturesChain::getChainHead() {
     return &deviceFeatures2;
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator&(const DeviceFeaturesChain &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator&(const DeviceFeaturesChain& features) const {
     return (*this & features.deviceFeatures2.features & features.deviceFeatures11 & features.deviceFeatures12 & features.deviceFeatures13 & features.deviceFeatures14);
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceFeatures2 &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceFeatures2& features) const {
     return (*this & features.features);
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceFeatures &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceFeatures& features) const {
     DeviceFeaturesChain result = *this;
-    auto &dst = result.deviceFeatures2.features;
+    auto& dst = result.deviceFeatures2.features;
 
     CORONA_AND_FEATURES(dst, robustBufferAccess);
     CORONA_AND_FEATURES(dst, fullDrawIndexUint32);
@@ -123,10 +116,9 @@ DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceFeature
     return result;
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceVulkan11Features &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceVulkan11Features& features) const {
     DeviceFeaturesChain result = *this;
-    auto &dst = result.deviceFeatures11;
+    auto& dst = result.deviceFeatures11;
 
     CORONA_AND_FEATURES(dst, storageBuffer16BitAccess);
     CORONA_AND_FEATURES(dst, uniformAndStorageBuffer16BitAccess);
@@ -144,10 +136,9 @@ DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceVulkan1
     return result;
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceVulkan12Features &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceVulkan12Features& features) const {
     DeviceFeaturesChain result = *this;
-    auto &dst = result.deviceFeatures12;
+    auto& dst = result.deviceFeatures12;
 
     CORONA_AND_FEATURES(dst, samplerMirrorClampToEdge);
     CORONA_AND_FEATURES(dst, drawIndirectCount);
@@ -200,10 +191,9 @@ DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceVulkan1
     return result;
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceVulkan13Features &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceVulkan13Features& features) const {
     DeviceFeaturesChain result = *this;
-    auto &dst = result.deviceFeatures13;
+    auto& dst = result.deviceFeatures13;
 
     CORONA_AND_FEATURES(dst, robustImageAccess);
     CORONA_AND_FEATURES(dst, inlineUniformBlock);
@@ -224,10 +214,9 @@ DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceVulkan1
     return result;
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceVulkan14Features &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceVulkan14Features& features) const {
     DeviceFeaturesChain result = *this;
-    auto &dst = result.deviceFeatures14;
+    auto& dst = result.deviceFeatures14;
 
     CORONA_AND_FEATURES(dst, globalPriorityQuery);
     CORONA_AND_FEATURES(dst, shaderSubgroupRotate);
@@ -254,10 +243,9 @@ DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceVulkan1
     return result;
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceAccelerationStructureFeaturesKHR &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceAccelerationStructureFeaturesKHR& features) const {
     DeviceFeaturesChain result = *this;
-    auto &dst = result.accelerationStructureFeatures;
+    auto& dst = result.accelerationStructureFeatures;
 
     CORONA_AND_FEATURES(dst, accelerationStructure);
     CORONA_AND_FEATURES(dst, accelerationStructureCaptureReplay);
@@ -268,10 +256,9 @@ DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceAcceler
     return result;
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceRayTracingPipelineFeaturesKHR &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceRayTracingPipelineFeaturesKHR& features) const {
     DeviceFeaturesChain result = *this;
-    auto &dst = result.rayTracingPipelineFeatures;
+    auto& dst = result.rayTracingPipelineFeatures;
 
     CORONA_AND_FEATURES(dst, rayTracingPipeline);
     CORONA_AND_FEATURES(dst, rayTracingPipelineShaderGroupHandleCaptureReplay);
@@ -282,27 +269,23 @@ DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceRayTrac
     return result;
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceRayQueryFeaturesKHR &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceRayQueryFeaturesKHR& features) const {
     DeviceFeaturesChain result = *this;
     CORONA_AND_FEATURES(result.rayQueryFeatures, rayQuery);
     return result;
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator|(const DeviceFeaturesChain &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator|(const DeviceFeaturesChain& features) const {
     return (*this | features.deviceFeatures2.features | features.deviceFeatures11 | features.deviceFeatures12 | features.deviceFeatures13 | features.deviceFeatures14);
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceFeatures2 &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceFeatures2& features) const {
     return (*this | features.features);
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceFeatures &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceFeatures& features) const {
     DeviceFeaturesChain result = *this;
-    auto &dst = result.deviceFeatures2.features;
+    auto& dst = result.deviceFeatures2.features;
 
     CORONA_OR_FEATURES(dst, robustBufferAccess);
     CORONA_OR_FEATURES(dst, fullDrawIndexUint32);
@@ -363,10 +346,9 @@ DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceFeature
     return result;
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceVulkan11Features &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceVulkan11Features& features) const {
     DeviceFeaturesChain result = *this;
-    auto &dst = result.deviceFeatures11;
+    auto& dst = result.deviceFeatures11;
 
     CORONA_OR_FEATURES(dst, storageBuffer16BitAccess);
     CORONA_OR_FEATURES(dst, uniformAndStorageBuffer16BitAccess);
@@ -384,10 +366,9 @@ DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceVulkan1
     return result;
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceVulkan12Features &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceVulkan12Features& features) const {
     DeviceFeaturesChain result = *this;
-    auto &dst = result.deviceFeatures12;
+    auto& dst = result.deviceFeatures12;
 
     CORONA_OR_FEATURES(dst, samplerMirrorClampToEdge);
     CORONA_OR_FEATURES(dst, drawIndirectCount);
@@ -440,10 +421,9 @@ DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceVulkan1
     return result;
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceVulkan13Features &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceVulkan13Features& features) const {
     DeviceFeaturesChain result = *this;
-    auto &dst = result.deviceFeatures13;
+    auto& dst = result.deviceFeatures13;
 
     CORONA_OR_FEATURES(dst, robustImageAccess);
     CORONA_OR_FEATURES(dst, inlineUniformBlock);
@@ -464,10 +444,9 @@ DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceVulkan1
     return result;
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceVulkan14Features &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceVulkan14Features& features) const {
     DeviceFeaturesChain result = *this;
-    auto &dst = result.deviceFeatures14;
+    auto& dst = result.deviceFeatures14;
 
     CORONA_OR_FEATURES(dst, globalPriorityQuery);
     CORONA_OR_FEATURES(dst, shaderSubgroupRotate);
@@ -494,10 +473,9 @@ DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceVulkan1
     return result;
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceAccelerationStructureFeaturesKHR &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceAccelerationStructureFeaturesKHR& features) const {
     DeviceFeaturesChain result = *this;
-    auto &dst = result.accelerationStructureFeatures;
+    auto& dst = result.accelerationStructureFeatures;
 
     CORONA_OR_FEATURES(dst, accelerationStructure);
     CORONA_OR_FEATURES(dst, accelerationStructureCaptureReplay);
@@ -508,10 +486,9 @@ DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceAcceler
     return result;
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceRayTracingPipelineFeaturesKHR &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceRayTracingPipelineFeaturesKHR& features) const {
     DeviceFeaturesChain result = *this;
-    auto &dst = result.rayTracingPipelineFeatures;
+    auto& dst = result.rayTracingPipelineFeatures;
 
     CORONA_OR_FEATURES(dst, rayTracingPipeline);
     CORONA_OR_FEATURES(dst, rayTracingPipelineShaderGroupHandleCaptureReplay);
@@ -522,8 +499,7 @@ DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceRayTrac
     return result;
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceRayQueryFeaturesKHR &features) const
-{
+DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceRayQueryFeaturesKHR& features) const {
     DeviceFeaturesChain result = *this;
     CORONA_OR_FEATURES(result.rayQueryFeatures, rayQuery);
     return result;

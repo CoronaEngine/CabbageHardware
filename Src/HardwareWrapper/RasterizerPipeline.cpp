@@ -1,13 +1,10 @@
 #include "HardwareWrapperVulkan/PipelineVulkan/RasterizerPipeline.h"
 
-#include "corona/kernel/utils/storage.h"
 #include "CabbageHardware.h"
-
 #include "HardwareWrapperVulkan/ResourcePool.h"
+#include "corona/kernel/utils/storage.h"
 
 HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
-
-
 
 static void incRaster(uintptr_t id) {
     if (id) {

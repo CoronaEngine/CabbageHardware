@@ -1,12 +1,10 @@
 ﻿#pragma once
 
+#include "HardwareWrapperVulkan/DisplayVulkan/DisplayManager.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/ResourceManager.h"
+#include "HardwareWrapperVulkan/PipelineVulkan/ComputePipeline.h"
+#include "HardwareWrapperVulkan/PipelineVulkan/RasterizerPipeline.h"
 #include "corona/kernel/utils/storage.h"
-
-#include"HardwareWrapperVulkan/PipelineVulkan/ComputePipeline.h"
-#include"HardwareWrapperVulkan/PipelineVulkan/RasterizerPipeline.h"
-
-#include"HardwareWrapperVulkan/DisplayVulkan/DisplayManager.h"
 
 extern Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap> globalBufferStorages;
 extern Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageStorages;
@@ -18,12 +16,10 @@ struct RasterizerPipelineWrap {
 
 extern Corona::Kernel::Utils::Storage<RasterizerPipelineWrap> gRasterizerPipelineStorage;
 
-
 struct ComputePipelineWrap {
     ComputePipelineVulkan* impl = nullptr;  // ����ʵ�ֶ���
     uint64_t refCount = 0;
 };
-
 
 struct DisplayerHardwareWrap {
     void* displaySurface = nullptr;
@@ -50,7 +46,6 @@ struct PushConstantWrap {
 };
 
 extern Corona::Kernel::Utils::Storage<PushConstantWrap> globalPushConstantStorages;
-
 
 [[nodiscard]] inline ResourceManager::BufferHardwareWrap getBufferFromHandle(uintptr_t handle) {
     ResourceManager::BufferHardwareWrap buffer;

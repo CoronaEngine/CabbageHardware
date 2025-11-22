@@ -1,13 +1,10 @@
 ﻿#include "CabbageHardware.h"
-
-#include "corona/kernel/utils/storage.h"
 #include "HardwareWrapperVulkan/DisplayVulkan/DisplayManager.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
-
 #include "HardwareWrapperVulkan/ResourcePool.h"
+#include "corona/kernel/utils/storage.h"
 
 HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
-
 
 void incrementDisplayerRefCount(uintptr_t id) {
     if (id > 0) {

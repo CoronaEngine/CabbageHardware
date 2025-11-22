@@ -2,16 +2,14 @@
 
 #include "HardwareWrapperVulkan/HardwareUtils.h"
 
-ComputePipelineVulkan::ComputePipelineVulkan()
-{
+ComputePipelineVulkan::ComputePipelineVulkan() {
     executorType = CommandRecordVulkan::ExecutorType::Compute;
 }
 
 ComputePipelineVulkan::ComputePipelineVulkan(std::string shaderCode,
                                              EmbeddedShader::ShaderLanguage language,
-                                             const std::source_location &sourceLocation)
-    : ComputePipelineVulkan()
-{
+                                             const std::source_location& sourceLocation)
+    : ComputePipelineVulkan() {
     EmbeddedShader::ShaderCodeCompiler compiler(shaderCode,
                                                 EmbeddedShader::ShaderStage::ComputeShader,
                                                 language,
@@ -22,67 +20,56 @@ ComputePipelineVulkan::ComputePipelineVulkan(std::string shaderCode,
     this->shaderResource = this->shaderCode.shaderResources;
 
     const uint32_t pushConstantSize = this->shaderCode.shaderResources.pushConstantSize;
-    if (pushConstantSize > 0)
-    {
+    if (pushConstantSize > 0) {
         this->pushConstant = HardwarePushConstant(pushConstantSize, 0);
     }
 }
 
-ComputePipelineVulkan::~ComputePipelineVulkan()
-{
+ComputePipelineVulkan::~ComputePipelineVulkan() {
     VkDevice device = VK_NULL_HANDLE;
-    if (const auto mainDevice = globalHardwareContext.getMainDevice())
-    {
+    if (const auto mainDevice = globalHardwareContext.getMainDevice()) {
         device = mainDevice->deviceManager.getLogicalDevice();
     }
 
-    if (device != VK_NULL_HANDLE)
-    {
+    if (device != VK_NULL_HANDLE) {
         vkDeviceWaitIdle(device);
 
-        if (pipeline != VK_NULL_HANDLE)
-        {
+        if (pipeline != VK_NULL_HANDLE) {
             vkDestroyPipeline(device, pipeline, nullptr);
             pipeline = VK_NULL_HANDLE;
         }
 
-        if (pipelineLayout != VK_NULL_HANDLE)
-        {
+        if (pipelineLayout != VK_NULL_HANDLE) {
             vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
             pipelineLayout = VK_NULL_HANDLE;
         }
     }
 }
 
-std::variant<HardwarePushConstant> ComputePipelineVulkan::operator[](const std::string &resourceName)
-{
-    auto *resource = shaderResource.findShaderBindInfo(resourceName);
+std::variant<HardwarePushConstant> ComputePipelineVulkan::operator[](const std::string& resourceName) {
+    auto* resource = shaderResource.findShaderBindInfo(resourceName);
 
-    if (resource == nullptr)
-    {
+    if (resource == nullptr) {
         throw std::runtime_error("Failed to find resource with name: " + resourceName);
     }
 
-    if (resource->bindType != EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::pushConstantMembers)
-    {
+    if (resource->bindType != EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::pushConstantMembers) {
         throw std::runtime_error("Resource '" + resourceName + "' is not a push constant member");
     }
 
     return HardwarePushConstant(resource->typeSize, resource->byteOffset, &pushConstant);
 }
 
-ComputePipelineVulkan *ComputePipelineVulkan::operator()(uint16_t x, uint16_t y, uint16_t z)
-{
+ComputePipelineVulkan* ComputePipelineVulkan::operator()(uint16_t x, uint16_t y, uint16_t z) {
     groupCount = {x, y, z};
     return this;
 }
 
-CommandRecordVulkan::RequiredBarriers ComputePipelineVulkan::getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor)
-{
+CommandRecordVulkan::RequiredBarriers ComputePipelineVulkan::getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) {
     RequiredBarriers requiredBarriers;
     requiredBarriers.memoryBarriers.resize(1);
 
-    auto &barrier = requiredBarriers.memoryBarriers[0];
+    auto& barrier = requiredBarriers.memoryBarriers[0];
     barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
     barrier.pNext = nullptr;
     barrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
@@ -93,11 +80,9 @@ CommandRecordVulkan::RequiredBarriers ComputePipelineVulkan::getRequiredBarriers
     return requiredBarriers;
 }
 
-void ComputePipelineVulkan::createComputePipeline()
-{
+void ComputePipelineVulkan::createComputePipeline() {
     const auto mainDevice = globalHardwareContext.getMainDevice();
-    if (!mainDevice)
-    {
+    if (!mainDevice) {
         throw std::runtime_error("No main device available");
     }
 
@@ -122,8 +107,7 @@ void ComputePipelineVulkan::createComputePipeline()
     // 获取描述符集布局
     std::vector<VkDescriptorSetLayout> setLayouts;
     setLayouts.reserve(4);
-    for (size_t i = 0; i < 4; ++i)
-    {
+    for (size_t i = 0; i < 4; ++i) {
         setLayouts.push_back(mainDevice->resourceManager.bindlessDescriptors[i].descriptorSetLayout);
     }
 
@@ -149,11 +133,9 @@ void ComputePipelineVulkan::createComputePipeline()
     vkDestroyShaderModule(device, shaderModule, nullptr);
 }
 
-void ComputePipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExecutor)
-{
+void ComputePipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExecutor) {
     // 延迟创建管线
-    if (pipelineLayout == VK_NULL_HANDLE || pipeline == VK_NULL_HANDLE)
-    {
+    if (pipelineLayout == VK_NULL_HANDLE || pipeline == VK_NULL_HANDLE) {
         createComputePipeline();
     }
 
@@ -165,8 +147,7 @@ void ComputePipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExecut
     // 绑定描述符集
     std::vector<VkDescriptorSet> descriptorSets;
     descriptorSets.reserve(4);
-    for (size_t i = 0; i < 4; ++i)
-    {
+    for (size_t i = 0; i < 4; ++i) {
         descriptorSets.push_back(globalHardwareContext.getMainDevice()->resourceManager.bindlessDescriptors[i].descriptorSet);
     }
 
@@ -180,11 +161,9 @@ void ComputePipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExecut
                             nullptr);
 
     // 推送常量
-    if (const void *data = pushConstant.getData(); data != nullptr)
-    {
+    if (const void* data = pushConstant.getData(); data != nullptr) {
         const uint32_t pushConstantSize = shaderCode.shaderResources.pushConstantSize;
-        if (pushConstantSize > 0)
-        {
+        if (pushConstantSize > 0) {
             vkCmdPushConstants(commandBuffer,
                                pipelineLayout,
                                VK_SHADER_STAGE_COMPUTE_BIT,

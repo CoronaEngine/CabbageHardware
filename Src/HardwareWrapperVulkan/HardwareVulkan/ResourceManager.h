@@ -1,17 +1,17 @@
 ﻿#pragma once
 
-#include"DeviceManager.h"
 #include <ktm/ktm.h>
 #include <vk_mem_alloc.h>
+
 #include <numeric>
+
+#include "DeviceManager.h"
 #include "corona/kernel/utils/storage.h"
 
 class HardwareExecutor;
 
-struct ResourceManager
-{
-    struct ExternalMemoryHandle
-    {
+struct ResourceManager {
+    struct ExternalMemoryHandle {
 #if _WIN32 || _WIN64
         HANDLE handle = nullptr;
 #else
@@ -19,8 +19,7 @@ struct ResourceManager
 #endif
     };
 
-    struct BufferHardwareWrap
-    {
+    struct BufferHardwareWrap {
         uint32_t elementCount = 0;
         uint32_t elementSize = 0;
         uint64_t refCount = 0;
@@ -33,12 +32,11 @@ struct ResourceManager
 
         int32_t bindlessIndex = -1;
 
-        DeviceManager *device = nullptr;
-        ResourceManager *resourceManager = nullptr;
+        DeviceManager* device = nullptr;
+        ResourceManager* resourceManager = nullptr;
     };
 
-    struct ImageHardwareWrap
-    {
+    struct ImageHardwareWrap {
         VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         uint32_t pixelSize = 0;
         ktm::uvec2 imageSize = {0, 0};
@@ -61,12 +59,11 @@ struct ResourceManager
 
         int32_t bindlessIndex = -1;
 
-        DeviceManager *device = nullptr;
-        ResourceManager *resourceManager = nullptr;
+        DeviceManager* device = nullptr;
+        ResourceManager* resourceManager = nullptr;
     };
 
-    struct BindlessDescriptorSet
-    {
+    struct BindlessDescriptorSet {
         VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
         VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
         VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
@@ -75,7 +72,7 @@ struct ResourceManager
     ResourceManager();
     ~ResourceManager();
 
-    void initResourceManager(DeviceManager &device);
+    void initResourceManager(DeviceManager& device);
     void cleanUpResourceManager();
 
     // Image operations
@@ -86,8 +83,8 @@ struct ResourceManager
                                                 int arrayLayers = 1,
                                                 int mipLevels = 1,
                                                 VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
-    [[nodiscard]] VkImageView createImageView(ImageHardwareWrap &image);
-    void destroyImage(ImageHardwareWrap &image);
+    [[nodiscard]] VkImageView createImageView(ImageHardwareWrap& image);
+    void destroyImage(ImageHardwareWrap& image);
 
     // Buffer operations
     [[nodiscard]] BufferHardwareWrap createBuffer(uint32_t elementCount,
@@ -95,35 +92,35 @@ struct ResourceManager
                                                   VkBufferUsageFlags usage,
                                                   bool hostVisibleMapped = true,
                                                   bool useDedicated = false);
-    void destroyBuffer(BufferHardwareWrap &buffer);
+    void destroyBuffer(BufferHardwareWrap& buffer);
 
     // External memory operations
-    [[nodiscard]] ExternalMemoryHandle exportBufferMemory(BufferHardwareWrap &sourceBuffer);
-    [[nodiscard]] BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle &memHandle, uint32_t elementCount, uint32_t elementSize, uint32_t allocSize, VkBufferUsageFlags usage);
-    [[nodiscard]] BufferHardwareWrap importHostBuffer(void *hostPtr, uint64_t size);
+    [[nodiscard]] ExternalMemoryHandle exportBufferMemory(BufferHardwareWrap& sourceBuffer);
+    [[nodiscard]] BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle& memHandle, uint32_t elementCount, uint32_t elementSize, uint32_t allocSize, VkBufferUsageFlags usage);
+    [[nodiscard]] BufferHardwareWrap importHostBuffer(void* hostPtr, uint64_t size);
 
     // Descriptor operations
     [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image);
-    [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle &buffer);
+    [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& buffer);
 
     // Copy operations
-    ResourceManager &copyBuffer(VkCommandBuffer &commandBuffer, BufferHardwareWrap &srcBuffer, BufferHardwareWrap &dstBuffer);
-    ResourceManager &copyImage(VkCommandBuffer &commandBuffer, ImageHardwareWrap &source, ImageHardwareWrap &destination);
-    ResourceManager &copyBufferToImage(VkCommandBuffer &commandBuffer, BufferHardwareWrap &buffer, ImageHardwareWrap &image);
-    ResourceManager &copyImageToBuffer(VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, BufferHardwareWrap &buffer);
-    ResourceManager &blitImage(VkCommandBuffer &commandBuffer, ImageHardwareWrap &srcImage, ImageHardwareWrap &dstImage);
+    ResourceManager& copyBuffer(VkCommandBuffer& commandBuffer, BufferHardwareWrap& srcBuffer, BufferHardwareWrap& dstBuffer);
+    ResourceManager& copyImage(VkCommandBuffer& commandBuffer, ImageHardwareWrap& source, ImageHardwareWrap& destination);
+    ResourceManager& copyBufferToImage(VkCommandBuffer& commandBuffer, BufferHardwareWrap& buffer, ImageHardwareWrap& image);
+    ResourceManager& copyImageToBuffer(VkCommandBuffer& commandBuffer, ImageHardwareWrap& image, BufferHardwareWrap& buffer);
+    ResourceManager& blitImage(VkCommandBuffer& commandBuffer, ImageHardwareWrap& srcImage, ImageHardwareWrap& dstImage);
 
-    void copyBufferToHost(BufferHardwareWrap &buffer, void *cpuData, uint64_t size);
+    void copyBufferToHost(BufferHardwareWrap& buffer, void* cpuData, uint64_t size);
 
     // Layout transition
-    void transitionImageLayout(VkCommandBuffer &commandBuffer,
-                               ImageHardwareWrap &image,
+    void transitionImageLayout(VkCommandBuffer& commandBuffer,
+                               ImageHardwareWrap& image,
                                VkImageLayout imageLayout,
                                VkPipelineStageFlags2 dstStageMask,
                                VkAccessFlags2 dstAccessMask);
 
     // Shader module
-    [[nodiscard]] VkShaderModule createShaderModule(const std::vector<unsigned int> &code);
+    [[nodiscard]] VkShaderModule createShaderModule(const std::vector<unsigned int>& code);
 
     // Memory statistics
     [[nodiscard]] uint64_t getHostSharedMemorySize() const { return hostSharedMemorySize; }
@@ -134,9 +131,8 @@ struct ResourceManager
 
     BindlessDescriptorSet bindlessDescriptors[4];
 
-private:
-    enum class DescriptorBindingType : uint8_t
-    {
+   private:
+    enum class DescriptorBindingType : uint8_t {
         Uniform = 0,
         Texture = 1,
         StorageBuffer = 2,
@@ -144,8 +140,7 @@ private:
     };
 
     template <typename THandle>
-    struct BindingEntry
-    {
+    struct BindingEntry {
         THandle handle = (THandle)VK_NULL_HANDLE;
         int bindingIndex = -1;
     };
@@ -155,9 +150,9 @@ private:
     void createBindlessDescriptorSet();
     void createExternalBufferMemoryPool();
 
-    void createDedicatedBuffer(const VkBufferCreateInfo &bufferInfo, const VmaAllocationCreateInfo &allocInfo, BufferHardwareWrap &resultBuffer);
-    void createPooledBuffer(const VkBufferCreateInfo &bufferInfo, const VmaAllocationCreateInfo &allocInfo, BufferHardwareWrap &resultBuffer);
-    void createNonExportableBuffer(const VkBufferCreateInfo &bufferInfo, const VmaAllocationCreateInfo &allocInfo, BufferHardwareWrap &resultBuffer);
+    void createDedicatedBuffer(const VkBufferCreateInfo& bufferInfo, const VmaAllocationCreateInfo& allocInfo, BufferHardwareWrap& resultBuffer);
+    void createPooledBuffer(const VkBufferCreateInfo& bufferInfo, const VmaAllocationCreateInfo& allocInfo, BufferHardwareWrap& resultBuffer);
+    void createNonExportableBuffer(const VkBufferCreateInfo& bufferInfo, const VmaAllocationCreateInfo& allocInfo, BufferHardwareWrap& resultBuffer);
 
     VmaAllocator vmaAllocator = VK_NULL_HANDLE;
     VmaPool exportBufferPool = VK_NULL_HANDLE;
@@ -172,5 +167,5 @@ private:
     uint64_t hostSharedMemorySize = 0;
     uint64_t multiInstanceMemorySize = 0;
 
-    DeviceManager *device = nullptr;
+    DeviceManager* device = nullptr;
 };

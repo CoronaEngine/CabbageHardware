@@ -2,7 +2,6 @@
 
 #include "HardwareWrapperVulkan/HardwareContext.h"
 #include "HardwareWrapperVulkan/HardwareUtils.h"
-
 #include "HardwareWrapperVulkan/ResourcePool.h"
 
 #define VK_NO_PROTOTYPES
@@ -818,11 +817,9 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void* host
 }
 
 int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image) {
-
     int32_t bindlessIndex = image->bindlessIndex;
 
     if (bindlessIndex < 0) {
-        
         bindlessIndex = globalImageStorages.seq_id(image);
 
         VkDescriptorType descriptorType = (image->imageUsage & VK_IMAGE_USAGE_STORAGE_BIT) ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -855,11 +852,9 @@ int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<Resource
 }
 
 int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& buffer) {
-
     int32_t bindlessIndex = buffer->bindlessIndex;
 
     if (bindlessIndex < 0) {
-
         bindlessIndex = globalBufferStorages.seq_id(buffer);
 
         VkDescriptorType descriptorType = (buffer->bufferUsage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;

@@ -9,18 +9,15 @@
 
 struct HardwareExecutorVulkan;
 
-struct CommandRecordVulkan
-{
-    enum class ExecutorType
-    {
+struct CommandRecordVulkan {
+    enum class ExecutorType {
         Graphics,
         Compute,
         Transfer,
         Invalid
     };
 
-    struct RequiredBarriers
-    {
+    struct RequiredBarriers {
         std::vector<VkMemoryBarrier2> memoryBarriers;
         std::vector<VkBufferMemoryBarrier2> bufferBarriers;
         std::vector<VkImageMemoryBarrier2> imageBarriers;
@@ -29,67 +26,54 @@ struct CommandRecordVulkan
     CommandRecordVulkan() = default;
     virtual ~CommandRecordVulkan() = default;
 
-    virtual void commitCommand(HardwareExecutorVulkan &HardwareExecutorVulkan)
-    {
+    virtual void commitCommand(HardwareExecutorVulkan& HardwareExecutorVulkan) {
     }
 
-    virtual RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &HardwareExecutorVulkan)
-    {
+    virtual RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& HardwareExecutorVulkan) {
         return RequiredBarriers{};
     }
 
-    virtual ExecutorType getExecutorType()
-    {
+    virtual ExecutorType getExecutorType() {
         return ExecutorType::Invalid;
     }
 
-  protected:
+   protected:
     ExecutorType executorType = ExecutorType::Invalid;
 };
 
-struct HardwareExecutorVulkan
-{
+struct HardwareExecutorVulkan {
     explicit HardwareExecutorVulkan(std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext = globalHardwareContext.getMainDevice())
-        : hardwareContext(hardwareContext)
-    {
+        : hardwareContext(hardwareContext) {
     }
 
     ~HardwareExecutorVulkan() = default;
 
-    HardwareExecutorVulkan &operator<<(CommandRecordVulkan *CommandRecordVulkan)
-    {
-        if (CommandRecordVulkan->getExecutorType() != CommandRecordVulkan::ExecutorType::Invalid)
-        {
+    HardwareExecutorVulkan& operator<<(CommandRecordVulkan* CommandRecordVulkan) {
+        if (CommandRecordVulkan->getExecutorType() != CommandRecordVulkan::ExecutorType::Invalid) {
             commandList.push_back(CommandRecordVulkan);
         }
         return *this;
     }
 
-    HardwareExecutorVulkan &operator<<(HardwareExecutorVulkan &other)
-    {
+    HardwareExecutorVulkan& operator<<(HardwareExecutorVulkan& other) {
         return other;
     }
 
-    HardwareExecutorVulkan &wait(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
-                           std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
-                           VkFence fence = VK_NULL_HANDLE)
-    {
+    HardwareExecutorVulkan& wait(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
+                                 std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
+                                 VkFence fence = VK_NULL_HANDLE) {
         waitFence = fence;
-        for (size_t i = 0; i < waitSemaphoreInfos.size(); i++)
-        {
+        for (size_t i = 0; i < waitSemaphoreInfos.size(); i++) {
             waitSemaphores.push_back(waitSemaphoreInfos[i]);
         }
-        for (size_t i = 0; i < signalSemaphoreInfos.size(); i++)
-        {
+        for (size_t i = 0; i < signalSemaphoreInfos.size(); i++) {
             signalSemaphores.push_back(signalSemaphoreInfos[i]);
         }
         return *this;
     }
 
-    HardwareExecutorVulkan &wait(HardwareExecutorVulkan &other)
-    {
-        if (other)
-        {
+    HardwareExecutorVulkan& wait(HardwareExecutorVulkan& other) {
+        if (other) {
             VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
             timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             timelineWaitSemaphoreSubmitInfo.semaphore = other.currentRecordQueue->timelineSemaphore;
@@ -101,22 +85,21 @@ struct HardwareExecutorVulkan
         return *this;
     }
 
-    explicit operator bool()
-    {
+    explicit operator bool() {
         return (!commandList.empty()) && (currentRecordQueue != nullptr);
     }
 
-    HardwareExecutorVulkan &commit();
+    HardwareExecutorVulkan& commit();
 
-    static DeviceManager::QueueUtils *pickQueueAndCommit(std::atomic_uint16_t &queueIndex, std::vector<DeviceManager::QueueUtils> &queues, std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand);
+    static DeviceManager::QueueUtils* pickQueueAndCommit(std::atomic_uint16_t& queueIndex, std::vector<DeviceManager::QueueUtils>& queues, std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand);
 
     // private:
     //     friend struct CommandRecordVulkan;
-    DeviceManager::QueueUtils *currentRecordQueue = nullptr;
+    DeviceManager::QueueUtils* currentRecordQueue = nullptr;
 
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
 
-    std::vector<CommandRecordVulkan *> commandList;
+    std::vector<CommandRecordVulkan*> commandList;
 
     std::vector<VkSemaphoreSubmitInfo> waitSemaphores = std::vector<VkSemaphoreSubmitInfo>();
     std::vector<VkSemaphoreSubmitInfo> signalSemaphores = std::vector<VkSemaphoreSubmitInfo>();
