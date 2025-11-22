@@ -36,10 +36,32 @@ enum class ImageFormat : uint32_t {
     D32_FLOAT,
 };
 
+enum class TextureCompressionFormat : uint32_t {
+    None = 0,       // 无压缩
+    BC1 = 1,        // DXT1 (RGB, 1-bit alpha)
+    BC2 = 2,        // DXT3 (RGBA)
+    BC3 = 3,        // DXT5 (RGBA)
+    BC4 = 4,        // RGTC1 (单通道)
+    BC5 = 5,        // RGTC2 (双通道)
+    BC6H = 6,       // HDR (浮点)
+    BC7 = 7,        // 高质量 RGBA
+    ETC2_RGB = 8,   // ETC2 RGB
+    ETC2_RGBA = 9,  // ETC2 RGBA
+    ASTC_4x4 = 10,  // ASTC 4x4 块
+    ASTC_8x8 = 11,  // ASTC 8x8 块
+};
+
 enum class ImageUsage : uint32_t {
     SampledImage = 1,
     StorageImage = 2,
     DepthImage = 3,
+};
+
+enum class TextureCreateFlags : uint32_t {
+    None = 0,
+    GenerateMipmaps = 1 << 0,    // 自动生成 mipmap
+    Compressed = 1 << 1,         // 使用压缩格式
+    CubemapCompatible = 1 << 2,  // 支持 Cubemap
 };
 
 enum class BufferUsage : uint32_t {
@@ -63,6 +85,26 @@ struct ExternalHandle {
     int fd = -1;
 #endif
 };
+
+struct TextureCreateInfo {
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t mipLevels = 1;  // mipmap 层数，1 表示无 mipmap
+    uint32_t arrayLayers = 1;
+    ImageFormat format = ImageFormat::RGBA8_UINT;
+    ImageUsage usage = ImageUsage::SampledImage;
+    TextureCompressionFormat compression = TextureCompressionFormat::None;
+    TextureCreateFlags flags = TextureCreateFlags::None;
+    const void* initialData = nullptr;
+};
+
+inline TextureCreateFlags operator|(TextureCreateFlags a, TextureCreateFlags b) {
+    return static_cast<TextureCreateFlags>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+}
+
+inline bool operator&(TextureCreateFlags a, TextureCreateFlags b) {
+    return (static_cast<uint32_t>(a) & static_cast<uint32_t>(b)) != 0;
+}
 
 struct HardwareBuffer {
    public:
@@ -123,19 +165,23 @@ struct HardwareImage {
     HardwareImage(const HardwareImage& other);
     HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage = ImageUsage::SampledImage, int arrayLayers = 1, void* imageData = nullptr);
 
+    HardwareImage(const TextureCreateInfo& createInfo);
+
     ~HardwareImage();
 
     HardwareImage& operator=(const HardwareImage& other);
     explicit operator bool() const;
 
     [[nodiscard]] uint32_t storeDescriptor();
-
+    [[nodiscard]] uint32_t getMipLevels() const;
+    [[nodiscard]] bool isCompressed() const;
     [[nodiscard]] std::shared_ptr<uintptr_t> getImageID() const {
         return imageID;
     }
 
     HardwareImage& copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor);
     HardwareImage& copyFromData(const void* inputData, HardwareExecutor* executor);
+    HardwareImage& generateMipmaps(HardwareExecutor* executor);
 
    private:
     std::shared_ptr<uintptr_t> imageID;
