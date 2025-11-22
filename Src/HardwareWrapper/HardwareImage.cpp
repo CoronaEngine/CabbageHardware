@@ -97,7 +97,7 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
     imageID = std::make_shared<uintptr_t>(globalImageStorages.allocate());
 
     {
-        auto handle = globalImageStorages.acquire_write(*imageID);
+        const auto handle = globalImageStorages.acquire_write(*imageID);
 
         *handle = globalHardwareContext.getMainDevice()->resourceManager.createImage(ktm::uvec2(width, height), vkFormat, pixelSize, vkUsage, arrayLayers);
         handle->refCount = 1;

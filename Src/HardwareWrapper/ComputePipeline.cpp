@@ -22,9 +22,6 @@ static void incCompute(const Corona::Kernel::Utils::Storage<ComputePipelineWrap>
  * @return false 如果引用计数不为零，不需要销毁
  */
 static bool decCompute(const Corona::Kernel::Utils::Storage<ComputePipelineWrap>::WriteHandle& write_handle) {
-    if (!write_handle.valid()) {
-        return false;
-    }
     if (--write_handle->refCount == 0) {
         delete write_handle->impl;
         write_handle->impl = nullptr;
@@ -57,7 +54,12 @@ ComputePipeline::ComputePipeline(const ComputePipeline& other)
 
 ComputePipeline::~ComputePipeline() {
     if (computePipelineID) {
+        // NOTE: 不要修改写法，避免死锁
+        bool destroy = false;
         if (auto const write_handle = gComputePipelineStorage.acquire_write(*computePipelineID); decCompute(write_handle)) {
+            destroy = true;
+        }
+        if (destroy) {
             gComputePipelineStorage.deallocate(*computePipelineID);
         }
     }
@@ -69,8 +71,14 @@ ComputePipeline& ComputePipeline::operator=(const ComputePipeline& other) {
             auto const other_write_handle = gComputePipelineStorage.acquire_write(*other.computePipelineID);
             incCompute(other_write_handle);
         }
-        if (auto const write_handle = gComputePipelineStorage.acquire_write(*computePipelineID); decCompute(write_handle)) {
-            gComputePipelineStorage.deallocate(*computePipelineID);
+        {
+            bool destroy = false;
+            if (auto const write_handle = gComputePipelineStorage.acquire_write(*computePipelineID); decCompute(write_handle)) {
+                destroy = true;
+            }
+            if (destroy) {
+                gComputePipelineStorage.deallocate(*computePipelineID);
+            }
         }
         *computePipelineID = *other.computePipelineID;
     }

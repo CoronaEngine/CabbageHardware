@@ -89,20 +89,20 @@ struct HardwareBuffer {
     ExternalHandle exportBufferMemory();
     // HardwareBuffer importBufferMemory(const ExternalHandle &memHandle);
 
-    [[nodiscard]] uint32_t storeDescriptor();
+    [[nodiscard]] uint32_t storeDescriptor() const;
 
-    bool copyFromBuffer(const HardwareBuffer& inputBuffer, HardwareExecutor* executor);
+    bool copyFromBuffer(const HardwareBuffer& inputBuffer, const HardwareExecutor* executor) const;
 
-    bool copyFromData(const void* inputData, uint64_t size);
+    bool copyFromData(const void* inputData, uint64_t size) const;
 
-    bool copyToData(void* outputData, uint64_t size);
+    bool copyToData(void* outputData, uint64_t size) const;
 
     template <typename T>
     bool copyFromVector(const std::vector<T>& input) {
         return copyFromData(input.data(), input.size() * sizeof(T));
     }
 
-    [[nodiscard]] void* getMappedData();
+    [[nodiscard]] void* getMappedData() const;
 
     [[nodiscard]] uint64_t getElementSize() const;
     [[nodiscard]] uint64_t getElementCount() const;
