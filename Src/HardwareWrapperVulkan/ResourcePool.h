@@ -47,12 +47,6 @@ struct PushConstantWrap {
 
 extern Corona::Kernel::Utils::Storage<PushConstantWrap> globalPushConstantStorages;
 
-[[nodiscard]] inline ResourceManager::ImageHardwareWrap getImageFromHandle(uintptr_t handle) {
-    auto const read_handle = globalImageStorages.acquire_read(handle);
-    ResourceManager::ImageHardwareWrap const image = *read_handle;
-    return image;
-}
-
 ComputePipelineVulkan* getComputePipelineImpl(uintptr_t id);
 RasterizerPipelineVulkan* getRasterizerPipelineImpl(uintptr_t id);
 

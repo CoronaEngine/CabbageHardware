@@ -164,7 +164,10 @@ void RasterizerPipelineVulkan::createRenderPass(int multiviewCount) {
     // 颜色附件
     for (const auto& renderTarget : renderTargets) {
         VkAttachmentDescription attachment{};
-        attachment.format = getImageFromHandle(*renderTarget.getImageID()).imageFormat;
+        {
+            auto const handle = globalImageStorages.acquire_read(*renderTarget.getImageID());
+            attachment.format = handle->imageFormat;
+        }
         attachment.samples = VK_SAMPLE_COUNT_1_BIT;
         attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -425,9 +428,13 @@ void RasterizerPipelineVulkan::createFramebuffers(ktm::uvec2 imageSize) {
     attachments.reserve(renderTargets.size() + 1);
 
     for (const auto& renderTarget : renderTargets) {
-        attachments.push_back(getImageFromHandle(*renderTarget.getImageID()).imageView);
+        auto const handle = globalImageStorages.acquire_read(*renderTarget.getImageID());
+        attachments.push_back(handle->imageView);
     }
-    attachments.push_back(getImageFromHandle(*depthImage.getImageID()).imageView);
+    {
+        auto const depthHandle = globalImageStorages.acquire_read(*depthImage.getImageID());
+        attachments.push_back(depthHandle->imageView);
+    }
 
     // 创建帧缓冲
     VkFramebufferCreateInfo framebufferInfo{};
@@ -538,43 +545,47 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
 
     // 颜色附件屏障
     for (auto& renderTarget : renderTargets) {
-        const auto imageWrap = getImageFromHandle(*renderTarget.getImageID());
-
-        VkImageMemoryBarrier2 imageBarrier = imageBarrierTemplate;
-        imageBarrier.image = imageWrap.imageHandle;
-        imageBarrier.oldLayout = imageWrap.imageLayout;
-        imageBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-        imageBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
-                                     VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-        imageBarrier.subresourceRange.aspectMask = imageWrap.aspectMask;
-
-        requiredBarriers.imageBarriers.push_back(imageBarrier);
+        {
+            auto const handle = globalImageStorages.acquire_read(*renderTarget.getImageID());
+            VkImageMemoryBarrier2 imageBarrier = imageBarrierTemplate;
+            imageBarrier.image = handle->imageHandle;
+            imageBarrier.oldLayout = handle->imageLayout;
+            imageBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            imageBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
+                                         VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            imageBarrier.subresourceRange.aspectMask = handle->aspectMask;
+            requiredBarriers.imageBarriers.push_back(imageBarrier);
+        }
 
         // 更新图像布局
-        auto handle = globalImageStorages.acquire_write(*renderTarget.getImageID());
-        handle->imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        {
+            auto handle = globalImageStorages.acquire_write(*renderTarget.getImageID());
+            handle->imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        }
     }
 
     // 深度附件屏障
     if (depthImage) {
-        const auto depthImageWrap = getImageFromHandle(*depthImage.getImageID());
-
-        VkImageMemoryBarrier2 imageBarrier = imageBarrierTemplate;
-        imageBarrier.image = depthImageWrap.imageHandle;
-        imageBarrier.oldLayout = depthImageWrap.imageLayout;
-        imageBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
-                                    VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
-        imageBarrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                                     VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        imageBarrier.subresourceRange.aspectMask = depthImageWrap.aspectMask;
-
-        requiredBarriers.imageBarriers.push_back(imageBarrier);
+        {
+            auto const handle = globalImageStorages.acquire_read(*depthImage.getImageID());
+            VkImageMemoryBarrier2 imageBarrier = imageBarrierTemplate;
+            imageBarrier.image = handle->imageHandle;
+            imageBarrier.oldLayout = handle->imageLayout;
+            imageBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+                                        VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+            imageBarrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                                         VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            imageBarrier.subresourceRange.aspectMask = handle->aspectMask;
+            requiredBarriers.imageBarriers.push_back(imageBarrier);
+        }
 
         // 更新图像布局
-        auto handle = globalImageStorages.acquire_write(*depthImage.getImageID());
-        handle->imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        {
+            auto handle = globalImageStorages.acquire_write(*depthImage.getImageID());
+            handle->imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        }
     }
 
     // 缓冲区屏障
@@ -634,13 +645,14 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExe
         }
 
         // 转换深度图像布局
-        auto depthImageWrap = getImageFromHandle(*depthImage.getImageID());
-        mainDevice->resourceManager.transitionImageLayout(hardwareExecutor.currentRecordQueue->commandBuffer,
-                                                          depthImageWrap,
-                                                          VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                                                          VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-                                                          VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
-
+        {
+            auto const handle = globalImageStorages.acquire_write(*depthImage.getImageID());
+            mainDevice->resourceManager.transitionImageLayout(hardwareExecutor.currentRecordQueue->commandBuffer,
+                                                              *handle,
+                                                              VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                                                              VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                                                              VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+        }
         createRenderPass(multiviewCount);
         createGraphicsPipeline(vertShaderCode, fragShaderCode);
         createFramebuffers(imageSize);
@@ -653,39 +665,45 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExe
     clearValues.reserve(renderTargets.size() + 1);
 
     for (const auto& renderTarget : renderTargets) {
-        clearValues.push_back(getImageFromHandle(*renderTarget.getImageID()).clearValue);
+        auto const handle = globalImageStorages.acquire_read(*renderTarget.getImageID());
+        clearValues.push_back(handle->clearValue);
     }
-    clearValues.push_back(getImageFromHandle(*depthImage.getImageID()).clearValue);
 
-    const auto depthImageWrap = getImageFromHandle(*depthImage.getImageID());
+    {
+        auto const handle = globalImageStorages.acquire_read(*depthImage.getImageID());
+        clearValues.push_back(handle->clearValue);
+    }
 
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = renderPass;
-    renderPassInfo.framebuffer = frameBuffers;
-    renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent.width = depthImageWrap.imageSize.x;
-    renderPassInfo.renderArea.extent.height = depthImageWrap.imageSize.y;
-    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-    renderPassInfo.pClearValues = clearValues.data();
+    {
+        auto const handle = globalImageStorages.acquire_read(*depthImage.getImageID());
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = renderPass;
+        renderPassInfo.framebuffer = frameBuffers;
+        renderPassInfo.renderArea.offset = {0, 0};
+        renderPassInfo.renderArea.extent.width = handle->imageSize.x;
+        renderPassInfo.renderArea.extent.height = handle->imageSize.y;
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
 
-    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    // 设置动态视口和裁剪区
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(depthImageWrap.imageSize.x);
-    viewport.height = static_cast<float>(depthImageWrap.imageSize.y);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        // 设置动态视口和裁剪区
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = static_cast<float>(handle->imageSize.x);
+        viewport.height = static_cast<float>(handle->imageSize.y);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent.width = depthImageWrap.imageSize.x;
-    scissor.extent.height = depthImageWrap.imageSize.y;
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+        VkRect2D scissor{};
+        scissor.offset = {0, 0};
+        scissor.extent.width = handle->imageSize.x;
+        scissor.extent.height = handle->imageSize.y;
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+    }
 
     // 绑定管线
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
