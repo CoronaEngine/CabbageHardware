@@ -1,6 +1,5 @@
 # TODO（按优先级排序）
-- （紧急）多线程资源释放、内存泄漏
-- （紧急）多线程crash
+- （紧急）多线程内存泄漏、多线程死锁、多线程crash
 - （紧急）多显卡同步（timeline）：VK_KHR_external_semaphore
 - （BUG）多线程同步：display无法使用timeline，无法判断queue任务是否完成
 - 自动判断image的layout
