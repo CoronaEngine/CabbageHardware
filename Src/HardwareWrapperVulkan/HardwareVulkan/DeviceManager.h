@@ -1,16 +1,18 @@
 ﻿#pragma once
 
+#include <corona/pal/cfw_platform.h>
+
 #include <algorithm>
 #include <chrono>
 #include <iostream>
 #include <mutex>
 
-#if defined(_WIN32)
+#if defined(CFW_PLATFORM_WINDOWS)
 #include <Windows.h>
 #define VK_USE_PLATFORM_WIN32_KHR
-#elif defined(__linux__) || defined(__unix__)
+#elif defined(CFW_PLATFORM_LINUX) || defined(CFW_PLATFORM_UNIX)
 #define VK_USE_PLATFORM_XLIB_KHR
-#elif defined(__APPLE__)
+#elif defined(CFW_PLATFORM_APPLE)
 #define VK_USE_PLATFORM_MACOS_MVK
 #else
 #error "Platform not supported by this example."

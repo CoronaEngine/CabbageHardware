@@ -1,11 +1,12 @@
 ﻿#pragma once
 
-#include <ktm/ktm.h>
-#include <vk_mem_alloc.h>
-
-#include <numeric>
-
+// clang-format off
 #include "DeviceManager.h"
+#include <vk_mem_alloc.h>
+// clang-format on
+
+#include <ktm/ktm.h>
+
 #include "corona/kernel/utils/storage.h"
 
 class HardwareExecutor;
