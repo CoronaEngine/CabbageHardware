@@ -17,7 +17,7 @@ struct CopyBufferCommand : public CommandRecordVulkan {
         hardwareExecutor.hardwareContext->resourceManager.copyBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, srcBuffer, dstBuffer);
     }
 
-    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) {
+    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) override {
         CommandRecordVulkan::RequiredBarriers requiredBarriers;
         {
             VkBufferMemoryBarrier2 srcBufferBarrier{};
@@ -73,7 +73,7 @@ struct CopyImageCommand : public CommandRecordVulkan {
         hardwareExecutor.hardwareContext->resourceManager.copyImage(hardwareExecutor.currentRecordQueue->commandBuffer, srcImage, dstImage);
     }
 
-    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) {
+    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) override {
         CommandRecordVulkan::RequiredBarriers requiredBarriers;
         {
             VkImageMemoryBarrier2 srcImageBarrier{};
@@ -83,7 +83,7 @@ struct CopyImageCommand : public CommandRecordVulkan {
             srcImageBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
             srcImageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             srcImageBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
-            srcImageBarrier.oldLayout = srcImage.imageLayout;  // Ðè¸ù¾ÝÊµ¼ÊÇé¿öÉèÖÃ
+            srcImageBarrier.oldLayout = srcImage.imageLayout;  // ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             srcImageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             srcImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             srcImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -142,7 +142,7 @@ struct CopyBufferToImageCommand : public CommandRecordVulkan {
         hardwareExecutor.hardwareContext->resourceManager.copyBufferToImage(hardwareExecutor.currentRecordQueue->commandBuffer, srcBuffer, dstImage);
     }
 
-    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) {
+    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) override {
         CommandRecordVulkan::RequiredBarriers requiredBarriers;
         {
             VkBufferMemoryBarrier2 srcBufferBarrier{};

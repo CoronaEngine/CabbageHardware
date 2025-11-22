@@ -3,7 +3,6 @@
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/ResourceCommand.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
-#include "corona/kernel/utils/storage.h"
 
 HardwareExecutorVulkan* getExecutorImpl(uintptr_t id);
 
