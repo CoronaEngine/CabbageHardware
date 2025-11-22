@@ -106,6 +106,7 @@ inline bool operator&(TextureCreateFlags a, TextureCreateFlags b) {
     return (static_cast<uint32_t>(a) & static_cast<uint32_t>(b)) != 0;
 }
 
+// ================= 对外封装：HardwareBuffer =================
 struct HardwareBuffer {
    public:
     HardwareBuffer();
@@ -159,6 +160,7 @@ struct HardwareBuffer {
     friend class HardwareImage;
 };
 
+// ================= 对外封装：HardwareImage =================
 struct HardwareImage {
    public:
     HardwareImage();
@@ -175,6 +177,7 @@ struct HardwareImage {
     [[nodiscard]] uint32_t storeDescriptor();
     [[nodiscard]] uint32_t getMipLevels() const;
     [[nodiscard]] bool isCompressed() const;
+
     [[nodiscard]] std::shared_ptr<uintptr_t> getImageID() const {
         return imageID;
     }
@@ -189,6 +192,7 @@ struct HardwareImage {
     friend class HardwareDisplayer;
 };
 
+// ================= 对外封装：HardwarePushConstant =================
 struct HardwarePushConstant {
    public:
     HardwarePushConstant();
@@ -223,6 +227,7 @@ struct HardwarePushConstant {
     std::shared_ptr<uintptr_t> pushConstantID;
 };
 
+// ================= 对外封装：HardwareDisplayer =================
 struct HardwareDisplayer {
    public:
     explicit HardwareDisplayer(void* surface = nullptr);
