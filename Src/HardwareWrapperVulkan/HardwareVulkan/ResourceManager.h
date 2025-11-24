@@ -57,6 +57,9 @@ struct ResourceManager {
 
         int32_t bindlessIndex = -1;
 
+        std::vector<VkImageView> mipLevelViews;
+        std::vector<int32_t> mipLevelBindlessIndices;
+
         DeviceManager* device = nullptr;
         ResourceManager* resourceManager = nullptr;
     };
@@ -82,6 +85,7 @@ struct ResourceManager {
                                                 int mipLevels = 1,
                                                 VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
     [[nodiscard]] VkImageView createImageView(ImageHardwareWrap& image);
+    VkImageView createImageViewForMipLevel(ImageHardwareWrap& image, uint32_t mipLevel);
     void destroyImage(ImageHardwareWrap& image);
 
     // Buffer operations
@@ -99,12 +103,14 @@ struct ResourceManager {
 
     // Descriptor operations
     [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image);
+    [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image, uint32_t mipLevel);
     [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& buffer);
 
     // Copy operations
     ResourceManager& copyBuffer(VkCommandBuffer& commandBuffer, BufferHardwareWrap& srcBuffer, BufferHardwareWrap& dstBuffer);
     ResourceManager& copyImage(VkCommandBuffer& commandBuffer, ImageHardwareWrap& source, ImageHardwareWrap& destination);
     ResourceManager& copyBufferToImage(VkCommandBuffer& commandBuffer, BufferHardwareWrap& buffer, ImageHardwareWrap& image);
+    ResourceManager& copyBufferToImage(VkCommandBuffer& commandBuffer, BufferHardwareWrap& buffer, ImageHardwareWrap& image, uint32_t mipLevel = 0);
     ResourceManager& copyImageToBuffer(VkCommandBuffer& commandBuffer, ImageHardwareWrap& image, BufferHardwareWrap& buffer);
     ResourceManager& blitImage(VkCommandBuffer& commandBuffer, ImageHardwareWrap& srcImage, ImageHardwareWrap& dstImage);
 

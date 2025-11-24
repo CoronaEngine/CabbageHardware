@@ -284,6 +284,7 @@ HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, Hardw
 
         auto bufferHandle = globalBufferStorages.acquire_write(*buffer.bufferID);
 
+        // 传递 mipLevel 参数
         CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, mipLevel);
         tempExecutor << &copyCmd << tempExecutor.commit();
 
