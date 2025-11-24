@@ -198,11 +198,11 @@ uint32_t HardwareImage::storeDescriptor(uint32_t mipLevel) {
         mipLevel = 0;
     }
 
-    if (mipLevel == 0 && imageHandle->mipLevels > 1) {
+    if (mipLevel == 0 && imageHandle->mipLevels == 1) {
         return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle);
+    } else {
+        return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle, mipLevel);
     }
-
-    return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle, mipLevel);
 }
 
 uint32_t HardwareImage::getMipLevels() const {
