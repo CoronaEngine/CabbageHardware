@@ -14,6 +14,7 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#include <stb_dxt.h>
 
 #include "CabbageHardware.h"
 #include "Config.h"
