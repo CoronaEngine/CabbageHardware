@@ -358,6 +358,11 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     resultImage.mipLevels = mipLevels;
     resultImage.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
+    if (mipLevels > 1) {
+        resultImage.mipLevelViews.resize(mipLevels, VK_NULL_HANDLE);
+        resultImage.mipLevelBindlessIndices.resize(mipLevels, -1);
+    }
+
     if (imageUsage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) {
         // 深度模板图像
         resultImage.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -455,6 +460,37 @@ VkImageView ResourceManager::createImageView(ImageHardwareWrap& image) {
     return imageView;
 }
 
+VkImageView ResourceManager::createImageViewForMipLevel(ImageHardwareWrap& image, uint32_t mipLevel) {
+    // 验证 mipLevel 有效性
+    if (mipLevel >= image.mipLevels) {
+        throw std::runtime_error("Invalid mip level: " + std::to_string(mipLevel) + 
+                                 " (max: " + std::to_string(image.mipLevels - 1) + ")");
+    }
+
+    VkImageViewCreateInfo viewInfo{};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = image.imageHandle;
+    viewInfo.viewType = image.arrayLayers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = image.imageFormat;
+    viewInfo.subresourceRange.aspectMask = image.aspectMask;
+    viewInfo.subresourceRange.baseMipLevel = mipLevel;  // 指定特定的 mip level
+    viewInfo.subresourceRange.levelCount = 1;           // 只包含一个层级
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = image.arrayLayers;
+    viewInfo.flags = 0;
+
+    VkImageView imageView;
+    coronaHardwareCheck(vkCreateImageView(device->getLogicalDevice(), &viewInfo, nullptr, &imageView));
+
+#ifdef CABBAGE_ENGINE_DEBUG
+    std::cout << "[ResourceManager] Created ImageView for mip level " << mipLevel 
+              << " (size: " << (image.imageSize.x >> mipLevel) << "x" 
+              << (image.imageSize.y >> mipLevel) << ")" << std::endl;
+#endif
+
+    return imageView;
+}
+
 void ResourceManager::destroyImage(ImageHardwareWrap& image) {
     if (vmaAllocator == VK_NULL_HANDLE) {
         return;
@@ -462,11 +498,22 @@ void ResourceManager::destroyImage(ImageHardwareWrap& image) {
 
     VkDevice logicalDevice = device->getLogicalDevice();
 
+    // 清理 mip level views
+    for (auto& mipView : image.mipLevelViews) {
+        if (mipView != VK_NULL_HANDLE) {
+            vkDestroyImageView(logicalDevice, mipView, nullptr);
+        }
+    }
+    image.mipLevelViews.clear();
+    image.mipLevelBindlessIndices.clear();
+
+    // 清理主 ImageView
     if (image.imageView != VK_NULL_HANDLE) {
         vkDestroyImageView(logicalDevice, image.imageView, nullptr);
         image.imageView = VK_NULL_HANDLE;
     }
 
+    // 销毁图像
     if (image.imageHandle != VK_NULL_HANDLE) {
         vmaDestroyImage(vmaAllocator, image.imageHandle, image.imageAlloc);
         image.imageHandle = VK_NULL_HANDLE;
@@ -851,6 +898,63 @@ int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<Resource
     return bindlessIndex;
 }
 
+int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image, uint32_t mipLevel) {
+    if (mipLevel >= image->mipLevels) {
+        return -1;
+    }
+
+    // 确保 vectors 的大小
+    if (image->mipLevelViews.size() < image->mipLevels) {
+        image->mipLevelViews.resize(image->mipLevels, VK_NULL_HANDLE);
+        image->mipLevelBindlessIndices.resize(image->mipLevels, -1);
+    }
+
+    // 如果已经创建过，直接返回
+    if (image->mipLevelBindlessIndices[mipLevel] >= 0) {
+        return image->mipLevelBindlessIndices[mipLevel];
+    }
+
+    // 创建 mip level 专用的 ImageView
+    if (image->mipLevelViews[mipLevel] == VK_NULL_HANDLE) {
+        image->mipLevelViews[mipLevel] = createImageViewForMipLevel(*image, mipLevel);
+    }
+
+    // 生成 bindless index
+    int32_t bindlessIndex = globalImageStorages.seq_id(image) * image->mipLevels + mipLevel;
+
+    VkDescriptorType descriptorType = (image->imageUsage & VK_IMAGE_USAGE_STORAGE_BIT)
+                                          ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
+                                          : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imageInfo.imageView = image->mipLevelViews[mipLevel];
+    imageInfo.sampler = textureSampler;
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.descriptorType = descriptorType;
+    write.descriptorCount = 1;
+    write.dstArrayElement = bindlessIndex;
+    write.pImageInfo = &imageInfo;
+
+    if (write.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
+        write.dstSet = bindlessDescriptors[textureBinding].descriptorSet;
+        write.dstBinding = 0;
+    }
+    if (write.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
+        write.dstSet = bindlessDescriptors[storageImageBinding].descriptorSet;
+        write.dstBinding = 0;
+    }
+
+    vkUpdateDescriptorSets(device->getLogicalDevice(), 1, &write, 0, nullptr);
+
+    // 保存 bindless index
+    image->mipLevelBindlessIndices[mipLevel] = bindlessIndex;
+
+    return bindlessIndex;
+}
+
 int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& buffer) {
     int32_t bindlessIndex = buffer->bindlessIndex;
 
@@ -935,6 +1039,39 @@ ResourceManager& ResourceManager::copyBufferToImage(VkCommandBuffer& commandBuff
     region.imageSubresource.layerCount = image.arrayLayers;
     region.imageOffset = {0, 0, 0};
     region.imageExtent = {image.imageSize.x, image.imageSize.y, 1};
+
+    vkCmdCopyBufferToImage(commandBuffer,
+                           buffer.bufferHandle,
+                           image.imageHandle,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                           1,
+                           &region);
+
+    return *this;
+}
+
+ResourceManager& ResourceManager::copyBufferToImage(VkCommandBuffer& commandBuffer,
+                                                    BufferHardwareWrap& buffer,
+                                                    ImageHardwareWrap& image,
+                                                    uint32_t mipLevel) {
+    if (mipLevel >= image.mipLevels) {
+        return *this;  // Invalid mip level
+    }
+
+    // 计算指定 mip level 的尺寸
+    uint32_t mipWidth = std::max(1u, image.imageSize.x >> mipLevel);
+    uint32_t mipHeight = std::max(1u, image.imageSize.y >> mipLevel);
+
+    VkBufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = image.aspectMask;
+    region.imageSubresource.mipLevel = mipLevel;  // 指定 mip level
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = image.arrayLayers;
+    region.imageOffset = {0, 0, 0};
+    region.imageExtent = {mipWidth, mipHeight, 1};
 
     vkCmdCopyBufferToImage(commandBuffer,
                            buffer.bufferHandle,

@@ -638,10 +638,16 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExe
     if (pipelineLayout == VK_NULL_HANDLE || graphicsPipeline == VK_NULL_HANDLE) {
         // 创建默认深度图像
         if (!depthImage) {
-            depthImage = HardwareImage(imageSize.x,
-                                       imageSize.y,
-                                       ImageFormat::D32_FLOAT,
-                                       ImageUsage::DepthImage);
+            HardwareImageCreateInfo depthCreateInfo;
+            depthCreateInfo.width = imageSize.x;
+            depthCreateInfo.height = imageSize.y;
+            depthCreateInfo.format = ImageFormat::D32_FLOAT;
+            depthCreateInfo.usage = ImageUsage::DepthImage;
+            depthCreateInfo.arrayLayers = 1;
+            depthCreateInfo.mipLevels = 1;
+            depthCreateInfo.initialData = nullptr;
+
+            depthImage = HardwareImage(depthCreateInfo);
         }
 
         // 转换深度图像布局
