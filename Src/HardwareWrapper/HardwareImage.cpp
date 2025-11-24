@@ -39,26 +39,32 @@ ImageFormatInfo convertImageFormat(ImageFormat format) {
             return {VK_FORMAT_D32_SFLOAT, 4, false};
 
         // BC compressed formats - Desktop
-        case ImageFormat::BC1_RGBA_UNORM:
-            return {VK_FORMAT_BC1_RGBA_UNORM_BLOCK, 8, true};
-        case ImageFormat::BC3_UNORM:
+        case ImageFormat::BC1_RGB_UNORM:
+            return {VK_FORMAT_BC1_RGB_UNORM_BLOCK, 8, true};
+        case ImageFormat::BC1_RGB_SRGB:
+            return {VK_FORMAT_BC1_RGB_SRGB_BLOCK, 8, true};
+        case ImageFormat::BC2_RGBA_UNORM:
+            return {VK_FORMAT_BC2_UNORM_BLOCK, 16, true};
+        case ImageFormat::BC2_RGBA_SRGB:
+            return {VK_FORMAT_BC2_SRGB_BLOCK, 16, true};
+        case ImageFormat::BC3_RGBA_UNORM:
             return {VK_FORMAT_BC3_UNORM_BLOCK, 16, true};
-        case ImageFormat::BC5_UNORM:
+        case ImageFormat::BC3_RGBA_SRGB:
+            return {VK_FORMAT_BC3_SRGB_BLOCK, 16, true};
+        case ImageFormat::BC4_R_UNORM:
+            return {VK_FORMAT_BC4_UNORM_BLOCK, 8, true};
+        case ImageFormat::BC4_R_SNORM:
+            return {VK_FORMAT_BC4_SNORM_BLOCK, 8, true};
+        case ImageFormat::BC5_RG_UNORM:
             return {VK_FORMAT_BC5_UNORM_BLOCK, 16, true};
-        case ImageFormat::BC7_UNORM:
-            return {VK_FORMAT_BC7_UNORM_BLOCK, 16, true};
-        case ImageFormat::BC7_SRGB:
-            return {VK_FORMAT_BC7_SRGB_BLOCK, 16, true};
+        case ImageFormat::BC5_RG_SNORM:
+            return {VK_FORMAT_BC5_SNORM_BLOCK, 16, true};
 
         // ASTC compressed formats - Mobile
         case ImageFormat::ASTC_4x4_UNORM:
             return {VK_FORMAT_ASTC_4x4_UNORM_BLOCK, 16, true};
         case ImageFormat::ASTC_4x4_SRGB:
             return {VK_FORMAT_ASTC_4x4_SRGB_BLOCK, 16, true};
-        case ImageFormat::ASTC_6x6_UNORM:
-            return {VK_FORMAT_ASTC_6x6_UNORM_BLOCK, 16, true};
-        case ImageFormat::ASTC_8x8_UNORM:
-            return {VK_FORMAT_ASTC_8x8_UNORM_BLOCK, 16, true};
 
         default:
             return {VK_FORMAT_R8G8B8A8_UNORM, 4, false};
@@ -85,12 +91,6 @@ VkImageUsageFlags convertImageUsage(ImageUsage usage) {
     return vkUsage;
 }
 
-// 计算最大 mipmap 层级数
-static uint32_t calculateMaxMipLevels(uint32_t width, uint32_t height) {
-    uint32_t maxDimension = std::max(width, height);
-    return static_cast<uint32_t>(std::floor(std::log2(maxDimension))) + 1;
-}
-
 static void incrementImageRefCount(const Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& handle) {
     ++handle->refCount;
 }
@@ -111,12 +111,6 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
     const auto [vkFormat, pixelSize, isCompressed] = convertImageFormat(createInfo.format);
     const VkImageUsageFlags vkUsage = convertImageUsage(createInfo.usage);
 
-    // 如果 mipLevels == 0, 自动计算最大层级
-    int mipLevels = createInfo.mipLevels;
-    if (mipLevels == 0) {
-        mipLevels = calculateMaxMipLevels(createInfo.width, createInfo.height);
-    }
-
     imageID = std::make_shared<uintptr_t>(globalImageStorages.allocate());
 
     {
@@ -128,7 +122,7 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
             pixelSize,
             vkUsage,
             createInfo.arrayLayers,
-            mipLevels);
+            createInfo.mipLevels);
         handle->refCount = 1;
     }
 
