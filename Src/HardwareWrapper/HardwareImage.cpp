@@ -119,9 +119,10 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
 
     imageID = std::make_shared<uintptr_t>(globalImageStorages.allocate());
 
-    const auto handle = globalImageStorages.acquire_write(*imageID);
+    {
+        const auto handle = globalImageStorages.acquire_write(*imageID);
 
-    *handle = globalHardwareContext.getMainDevice()->resourceManager.createImage(
+        *handle = globalHardwareContext.getMainDevice()->resourceManager.createImage(
             ktm::uvec2(createInfo.width, createInfo.height),
             vkFormat,
             pixelSize,
@@ -129,7 +130,7 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
             createInfo.arrayLayers,
             mipLevels);
         handle->refCount = 1;
-    
+    }
 
     if (createInfo.initialData != nullptr) {
         /*HardwareExecutorVulkan tempExecutor;
