@@ -80,9 +80,9 @@ HardwareExecutor& HardwareExecutor::operator<<(ComputePipeline& computePipeline)
 }
 
 HardwareExecutor& HardwareExecutor::operator<<(RasterizerPipeline& rasterizerPipeline) {
-    if (auto const executor_handle = gExecutorStorage.acquire_read(*executorID);
+    if (auto const executor_handle = gExecutorStorage.acquire_write(*executorID);
         rasterizerPipeline.getRasterizerPipelineID()) {
-        if (auto const raster_handle = gRasterizerPipelineStorage.acquire_write(*rasterizerPipeline.getRasterizerPipelineID());
+        if (auto const raster_handle = gRasterizerPipelineStorage.acquire_read(*rasterizerPipeline.getRasterizerPipelineID());
             raster_handle->impl) {
             *executor_handle->impl << static_cast<CommandRecordVulkan*>(raster_handle->impl);
         }

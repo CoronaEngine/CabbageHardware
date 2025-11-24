@@ -236,7 +236,6 @@ std::pair<uint32_t, uint32_t> HardwareImage::getMipLevelSize(uint32_t mipLevel) 
     return {0, 0};
 }
 
-
 HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor) {
     if (!executor || !executor->getExecutorID() || *executor->getExecutorID() == 0) {
         return *this;  // 必须提供有效的 executor
@@ -246,7 +245,7 @@ HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, Hardw
     auto bufferHandle = globalBufferStorages.acquire_write(*buffer.bufferID);
 
     {
-        auto const executor_handle = gExecutorStorage.acquire_read(*executor->getExecutorID());
+        auto const executor_handle = gExecutorStorage.acquire_write(*executor->getExecutorID());
         if (!executor_handle->impl) {
             return *this;
         }
@@ -300,7 +299,7 @@ HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, Hardw
     auto bufferHandle = globalBufferStorages.acquire_write(*buffer.bufferID);
 
     {
-        auto const executor_handle = gExecutorStorage.acquire_read(*executor->getExecutorID());
+        auto const executor_handle = gExecutorStorage.acquire_write(*executor->getExecutorID());
         if (!executor_handle->impl) {
             return *this;
         }

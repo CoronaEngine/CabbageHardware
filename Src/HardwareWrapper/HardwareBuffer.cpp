@@ -117,7 +117,7 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer& inputBuffer, const Har
     auto const dstBuffer = globalBufferStorages.acquire_write(*bufferID);
 
     {
-        auto const executor_handle = gExecutorStorage.acquire_read(*executor->getExecutorID());
+        auto const executor_handle = gExecutorStorage.acquire_write(*executor->getExecutorID());
         if (!executor_handle->impl) {
             return false;
         }
