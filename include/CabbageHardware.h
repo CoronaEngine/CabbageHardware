@@ -34,34 +34,25 @@ enum class ImageFormat : uint32_t {
 
     D16_UNORM,
     D32_FLOAT,
-};
 
-enum class TextureCompressionFormat : uint32_t {
-    None = 0,       // 无压缩
-    BC1 = 1,        // DXT1 (RGB, 1-bit alpha)
-    BC2 = 2,        // DXT3 (RGBA)
-    BC3 = 3,        // DXT5 (RGBA)
-    BC4 = 4,        // RGTC1 (单通道)
-    BC5 = 5,        // RGTC2 (双通道)
-    BC6H = 6,       // HDR (浮点)
-    BC7 = 7,        // 高质量 RGBA
-    ETC2_RGB = 8,   // ETC2 RGB
-    ETC2_RGBA = 9,  // ETC2 RGBA
-    ASTC_4x4 = 10,  // ASTC 4x4 块
-    ASTC_8x8 = 11,  // ASTC 8x8 块
+    // Compressed formats - BC (Desktop, most widely supported)
+    BC1_RGBA_UNORM,  // DXT1, 4-bit per pixel
+    BC3_UNORM,       // DXT5, 8-bit per pixel, alpha channel
+    BC5_UNORM,       // Normal maps, 8-bit per pixel
+    BC7_UNORM,       // High quality, 8-bit per pixel
+    BC7_SRGB,        // High quality sRGB
+
+    // Compressed formats - ASTC (Mobile, flexible block sizes)
+    ASTC_4x4_UNORM,  // 8-bit per pixel, best quality
+    ASTC_4x4_SRGB,   // 8-bit per pixel sRGB
+    ASTC_6x6_UNORM,  // 3.56-bit per pixel, balanced
+    ASTC_8x8_UNORM,  // 2-bit per pixel, best compression
 };
 
 enum class ImageUsage : uint32_t {
     SampledImage = 1,
     StorageImage = 2,
     DepthImage = 3,
-};
-
-enum class TextureCreateFlags : uint32_t {
-    None = 0,
-    GenerateMipmaps = 1 << 0,    // 自动生成 mipmap
-    Compressed = 1 << 1,         // 使用压缩格式
-    CubemapCompatible = 1 << 2,  // 支持 Cubemap
 };
 
 enum class BufferUsage : uint32_t {
@@ -85,26 +76,6 @@ struct ExternalHandle {
     int fd = -1;
 #endif
 };
-
-struct TextureCreateInfo {
-    uint32_t width = 0;
-    uint32_t height = 0;
-    uint32_t mipLevels = 1;  // mipmap 层数，1 表示无 mipmap
-    uint32_t arrayLayers = 1;
-    ImageFormat format = ImageFormat::RGBA8_UINT;
-    ImageUsage usage = ImageUsage::SampledImage;
-    TextureCompressionFormat compression = TextureCompressionFormat::None;
-    TextureCreateFlags flags = TextureCreateFlags::None;
-    const void* initialData = nullptr;
-};
-
-inline TextureCreateFlags operator|(TextureCreateFlags a, TextureCreateFlags b) {
-    return static_cast<TextureCreateFlags>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
-}
-
-inline bool operator&(TextureCreateFlags a, TextureCreateFlags b) {
-    return (static_cast<uint32_t>(a) & static_cast<uint32_t>(b)) != 0;
-}
 
 // ================= 对外封装：HardwareBuffer =================
 struct HardwareBuffer {
@@ -135,9 +106,7 @@ struct HardwareBuffer {
     [[nodiscard]] uint32_t storeDescriptor() const;
 
     bool copyFromBuffer(const HardwareBuffer& inputBuffer, const HardwareExecutor* executor) const;
-
     bool copyFromData(const void* inputData, uint64_t size) const;
-
     bool copyToData(void* outputData, uint64_t size) const;
 
     template <typename T>
@@ -146,7 +115,6 @@ struct HardwareBuffer {
     }
 
     [[nodiscard]] void* getMappedData() const;
-
     [[nodiscard]] uint64_t getElementSize() const;
     [[nodiscard]] uint64_t getElementCount() const;
 
@@ -160,31 +128,55 @@ struct HardwareBuffer {
     friend class HardwareImage;
 };
 
+// ================= HardwareImage 参数结构体 =================
+struct HardwareImageCreateInfo {
+    uint32_t width = 0;
+    uint32_t height = 0;
+    ImageFormat format = ImageFormat::RGBA8_SRGB;
+    ImageUsage usage = ImageUsage::SampledImage;
+    int arrayLayers = 1;
+    int mipLevels = 1;  // 1 = 无 mipmap, 0 = 自动计算最大层级
+    void* initialData = nullptr;
+
+    // 便捷构造函数
+    HardwareImageCreateInfo() = default;
+
+    HardwareImageCreateInfo(uint32_t w, uint32_t h, ImageFormat fmt = ImageFormat::RGBA8_SRGB)
+        : width(w), height(h), format(fmt) {}
+};
+
 // ================= 对外封装：HardwareImage =================
 struct HardwareImage {
    public:
     HardwareImage();
     HardwareImage(const HardwareImage& other);
-    HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage = ImageUsage::SampledImage, int arrayLayers = 1, void* imageData = nullptr);
+    //HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage = ImageUsage::SampledImage, int arrayLayers = 1, void* imageData = nullptr);
 
-    HardwareImage(const TextureCreateInfo& createInfo);
+    HardwareImage(const HardwareImageCreateInfo& createInfo);
 
     ~HardwareImage();
 
     HardwareImage& operator=(const HardwareImage& other);
     explicit operator bool() const;
 
+    // 描述符操作
     [[nodiscard]] uint32_t storeDescriptor();
-    [[nodiscard]] uint32_t getMipLevels() const;
-    [[nodiscard]] bool isCompressed() const;
+    [[nodiscard]] uint32_t storeDescriptor(uint32_t mipLevel);  // 存储特定 mip 层级
 
     [[nodiscard]] std::shared_ptr<uintptr_t> getImageID() const {
         return imageID;
     }
 
+    // Mipmap 信息查询
+    [[nodiscard]] uint32_t getMipLevels() const;
+    [[nodiscard]] std::pair<uint32_t, uint32_t> getMipLevelSize(uint32_t mipLevel) const;
+
     HardwareImage& copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor);
     HardwareImage& copyFromData(const void* inputData, HardwareExecutor* executor);
-    HardwareImage& generateMipmaps(HardwareExecutor* executor);
+
+    // 复制到指定 mipmap 层级
+    HardwareImage& copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor, uint32_t mipLevel);
+    HardwareImage& copyFromData(const void* inputData, HardwareExecutor* executor, uint32_t mipLevel);
 
    private:
     std::shared_ptr<uintptr_t> imageID;

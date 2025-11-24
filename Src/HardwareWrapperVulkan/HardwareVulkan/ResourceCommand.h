@@ -128,9 +128,12 @@ struct CopyImageCommand : public CommandRecordVulkan {
 struct CopyBufferToImageCommand : public CommandRecordVulkan {
     ResourceManager::BufferHardwareWrap& srcBuffer;
     ResourceManager::ImageHardwareWrap& dstImage;
+    uint32_t mipLevel;
 
-    CopyBufferToImageCommand(ResourceManager::BufferHardwareWrap& srcBuf, ResourceManager::ImageHardwareWrap& dstImg)
-        : srcBuffer(srcBuf), dstImage(dstImg) {
+    CopyBufferToImageCommand(ResourceManager::BufferHardwareWrap& srcBuf,
+                             ResourceManager::ImageHardwareWrap& dstImg,
+                             uint32_t mip = 0)
+        : srcBuffer(srcBuf), dstImage(dstImg), mipLevel(mip) {
         executorType = ExecutorType::Transfer;
     }
 
@@ -139,7 +142,12 @@ struct CopyBufferToImageCommand : public CommandRecordVulkan {
     }
 
     void commitCommand(HardwareExecutorVulkan& hardwareExecutor) override {
-        hardwareExecutor.hardwareContext->resourceManager.copyBufferToImage(hardwareExecutor.currentRecordQueue->commandBuffer, srcBuffer, dstImage);
+        // 使用带 mipLevel 参数的重载版本
+        hardwareExecutor.hardwareContext->resourceManager.copyBufferToImage(
+            hardwareExecutor.currentRecordQueue->commandBuffer,
+            srcBuffer,
+            dstImage,
+            mipLevel);
     }
 
     CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) override {
@@ -173,7 +181,7 @@ struct CopyBufferToImageCommand : public CommandRecordVulkan {
             dstImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             dstImageBarrier.image = dstImage.imageHandle;
             dstImageBarrier.subresourceRange.aspectMask = dstImage.aspectMask;
-            dstImageBarrier.subresourceRange.baseMipLevel = 0;
+            dstImageBarrier.subresourceRange.baseMipLevel = mipLevel;  // 使用指定的 mipLevel
             dstImageBarrier.subresourceRange.levelCount = 1;
             dstImageBarrier.subresourceRange.baseArrayLayer = 0;
             dstImageBarrier.subresourceRange.layerCount = 1;
