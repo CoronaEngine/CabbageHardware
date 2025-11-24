@@ -70,7 +70,7 @@ HardwareDisplayer& HardwareDisplayer::wait(const HardwareExecutor& executor) {
     // 确保在锁内完成所有操作
     if (executor.getExecutorID()) {
         const uintptr_t execID = *executor.getExecutorID();
-        if (auto const handle = globalDisplayerStorages.acquire_read(*displaySurfaceID);
+        if (auto const handle = globalDisplayerStorages.acquire_write(*displaySurfaceID);
             handle->displayManager) {
             auto const executor_handle = gExecutorStorage.acquire_read(execID);
             if (executor_handle->impl) {

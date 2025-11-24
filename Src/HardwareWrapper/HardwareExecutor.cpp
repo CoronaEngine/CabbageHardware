@@ -96,7 +96,7 @@ HardwareExecutor& HardwareExecutor::operator<<(HardwareExecutor& other) {
 
 HardwareExecutor& HardwareExecutor::wait(HardwareExecutor& other) {
     // ��ͬһ��������������в��������⾺̬����
-    auto const handle = gExecutorStorage.acquire_read(*executorID);
+    auto const handle = gExecutorStorage.acquire_write(*executorID);
     auto const other_handle = gExecutorStorage.acquire_read(*other.executorID);
     if (other_handle->impl && handle->impl) {
         handle->impl->wait(*other_handle->impl);
