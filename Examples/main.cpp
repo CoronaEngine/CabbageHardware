@@ -36,6 +36,7 @@ struct ComputeUniformBufferObject {
     uint32_t imageID;
 };
 
+// TODO: 测试mipmap生成
 // BC1压缩辅助函数
 std::vector<uint8_t> compressToBC1(const unsigned char* data, int width, int height, int channels) {
     // BC1每4x4像素块占8字节
