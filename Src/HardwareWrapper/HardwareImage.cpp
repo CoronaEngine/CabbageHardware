@@ -127,17 +127,17 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
     }
 
     if (createInfo.initialData != nullptr) {
-        /*HardwareExecutorVulkan tempExecutor;
+        HardwareExecutorVulkan tempExecutor;
 
         auto imageHandle = globalImageStorages.acquire_write(*imageID);
+        HardwareBuffer stagingBuffer(imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize,
+                                     BufferUsage::StorageBuffer,
+                                     createInfo.initialData);
 
-        HardwareBuffer stagingBuffer(imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize, BufferUsage::StorageBuffer, imageData);
         auto bufferHandle = globalBufferStorages.acquire_write(*stagingBuffer.bufferID);
 
-        CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle);
-        tempExecutor << &copyCmd << tempExecutor.commit();*/
-
-        copyFromData(createInfo.initialData, nullptr);
+        CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, 0);
+        tempExecutor << &copyCmd << tempExecutor.commit();
     }
 }
 
