@@ -45,7 +45,15 @@ int main() {
         std::vector<HardwareImage> finalOutputImages(windows.size());
         std::vector<HardwareExecutor> executors(windows.size());
         for (size_t i = 0; i < finalOutputImages.size(); i++) {
-            finalOutputImages[i] = HardwareImage(1920, 1080, ImageFormat::RGBA16_FLOAT, ImageUsage::StorageImage);
+            HardwareImageCreateInfo createInfo;
+            createInfo.width = 1920;
+            createInfo.height = 1080;
+            createInfo.format = ImageFormat::RGBA16_FLOAT;
+            createInfo.usage = ImageUsage::StorageImage;
+            createInfo.arrayLayers = 1;
+            createInfo.mipLevels = 1;
+
+            finalOutputImages[i] = HardwareImage(createInfo);
         }
 
         HardwareBuffer postionBuffer = HardwareBuffer(positions, BufferUsage::VertexBuffer);
@@ -61,7 +69,16 @@ int main() {
             std::cerr << "stbi_load failed: " << stbi_failure_reason() << std::endl;
         }
 
-        HardwareImage texture(width, height, ImageFormat::RGBA8_SRGB, ImageUsage::SampledImage, 1, data);
+        HardwareImageCreateInfo textureCreateInfo;
+        textureCreateInfo.width = width;
+        textureCreateInfo.height = height;
+        textureCreateInfo.format = ImageFormat::RGBA8_SRGB;
+        textureCreateInfo.usage = ImageUsage::SampledImage;
+        textureCreateInfo.arrayLayers = 1;
+        textureCreateInfo.mipLevels = 1;
+        textureCreateInfo.initialData = data;
+
+        HardwareImage texture(textureCreateInfo);
 
         std::atomic_bool running = true;
 
