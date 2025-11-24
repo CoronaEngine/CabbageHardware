@@ -191,16 +191,15 @@ HardwareImage::operator bool() const {
     }
 }
 
-uint32_t HardwareImage::storeDescriptor() {
-    auto imageHandle = globalImageStorages.acquire_write(*imageID);
-    return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle);
-}
-
 uint32_t HardwareImage::storeDescriptor(uint32_t mipLevel) {
     auto imageHandle = globalImageStorages.acquire_write(*imageID);
 
     if (mipLevel >= imageHandle->mipLevels) {
-        return 0;  // Invalid mip level
+        mipLevel = 0;
+    }
+
+    if (mipLevel == 0 && imageHandle->mipLevels > 1) {
+        return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle);
     }
 
     return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle, mipLevel);
@@ -230,60 +229,9 @@ std::pair<uint32_t, uint32_t> HardwareImage::getMipLevelSize(uint32_t mipLevel) 
     return {0, 0};
 }
 
-
-HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor) {
-    if (!executor || !executor->getExecutorID() || *executor->getExecutorID() == 0) {
-        return *this;  // 必须提供有效的 executor
-    }
-
-    auto imageHandle = globalImageStorages.acquire_write(*imageID);
-    auto bufferHandle = globalBufferStorages.acquire_write(*buffer.bufferID);
-
-    {
-        auto const executor_handle = gExecutorStorage.acquire_read(*executor->getExecutorID());
-        if (!executor_handle->impl) {
-            return *this;
-        }
-
-        CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle);
-        *executor_handle->impl << &copyCmd;
-    }
-
-    return *this;
-}
-
-HardwareImage& HardwareImage::copyFromData(const void* inputData, HardwareExecutor* executor) {
-    if (inputData != nullptr) {
-        uint64_t bufferSize = 0;
-        {
-            auto imageHandle = globalImageStorages.acquire_read(*imageID);
-            bufferSize = imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize;
-        }
-
-        HardwareBuffer stagingBuffer(bufferSize, BufferUsage::StorageBuffer, inputData);
-
-        copyFromBuffer(stagingBuffer, executor);
-    }
-    return *this;
-}
-
 HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor, uint32_t mipLevel) {
     if (!executor || !executor->getExecutorID() || *executor->getExecutorID() == 0) {
-        // 如果没有提供 executor, 创建临时的
-        HardwareExecutorVulkan tempExecutor;
-
-        auto imageHandle = globalImageStorages.acquire_write(*imageID);
-        if (mipLevel >= imageHandle->mipLevels) {
-            return *this;
-        }
-
-        auto bufferHandle = globalBufferStorages.acquire_write(*buffer.bufferID);
-
-        // 传递 mipLevel 参数
-        CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, mipLevel);
-        tempExecutor << &copyCmd << tempExecutor.commit();
-
-        return *this;
+        return *this;  // 必须提供有效的 executor
     }
 
     auto imageHandle = globalImageStorages.acquire_write(*imageID);

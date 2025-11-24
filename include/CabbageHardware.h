@@ -156,9 +156,7 @@ struct HardwareImage {
     HardwareImage& operator=(const HardwareImage& other);
     explicit operator bool() const;
 
-    // 可以合并
-    [[nodiscard]] uint32_t storeDescriptor();
-    [[nodiscard]] uint32_t storeDescriptor(uint32_t mipLevel);
+    [[nodiscard]] uint32_t storeDescriptor(uint32_t mipLevel = 0);
 
     [[nodiscard]] std::shared_ptr<uintptr_t> getImageID() const {
         return imageID;
@@ -167,11 +165,8 @@ struct HardwareImage {
     [[nodiscard]] uint32_t getMipLevels() const;
     [[nodiscard]] std::pair<uint32_t, uint32_t> getMipLevelSize(uint32_t mipLevel) const;
 
-    // 可以合并
-    HardwareImage& copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor);
-    HardwareImage& copyFromData(const void* inputData, HardwareExecutor* executor);
-    HardwareImage& copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor, uint32_t mipLevel);
-    HardwareImage& copyFromData(const void* inputData, HardwareExecutor* executor, uint32_t mipLevel);
+    HardwareImage& copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor, uint32_t mipLevel = 0);
+    HardwareImage& copyFromData(const void* inputData, HardwareExecutor* executor, uint32_t mipLevel = 0);
 
    private:
     std::shared_ptr<uintptr_t> imageID;
