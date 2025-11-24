@@ -14,6 +14,8 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+
+#define STB_DXT_IMPLEMENTATION
 #include <stb_dxt.h>
 
 #include "CabbageHardware.h"
@@ -34,7 +36,110 @@ struct ComputeUniformBufferObject {
     uint32_t imageID;
 };
 
+// BC1压缩辅助函数
+std::vector<uint8_t> compressToBC1(const unsigned char* data, int& width, int& height, int channels) {
+    // BC1每4x4像素块占8字节
+    uint32_t blockCountX = (width + 3) / 4;
+    uint32_t blockCountY = (height + 3) / 4;
+    std::vector<uint8_t> compressedData(blockCountX * blockCountY * 8);
+
+    for (int by = 0; by < blockCountY; ++by) {
+        for (int bx = 0; bx < blockCountX; ++bx) {
+            uint8_t block[64];  // 4x4像素块，RGBA格式
+
+            // 提取4x4块
+            for (int py = 0; py < 4; ++py) {
+                for (int px = 0; px < 4; ++px) {
+                    int x = bx * 4 + px;
+                    int y = by * 4 + py;
+
+                    if (x < width && y < height) {
+                        int srcIdx = (y * width + x) * channels;
+                        block[(py * 4 + px) * 4 + 0] = data[srcIdx + 0];                                // R
+                        block[(py * 4 + px) * 4 + 1] = channels > 1 ? data[srcIdx + 1] : data[srcIdx];  // G
+                        block[(py * 4 + px) * 4 + 2] = channels > 2 ? data[srcIdx + 2] : data[srcIdx];  // B
+                        block[(py * 4 + px) * 4 + 3] = 255;                                             // A
+                    } else {
+                        // 填充边界
+                        block[(py * 4 + px) * 4 + 0] = 0;
+                        block[(py * 4 + px) * 4 + 1] = 0;
+                        block[(py * 4 + px) * 4 + 2] = 0;
+                        block[(py * 4 + px) * 4 + 3] = 255;
+                    }
+                }
+            }
+
+            // 使用stb_dxt压缩块
+            uint8_t* outBlock = &compressedData[(by * blockCountX + bx) * 8];
+            stb_compress_dxt_block(outBlock, block, 0, STB_DXT_NORMAL);
+        }
+    }
+
+    width = blockCountX;
+    height = blockCountY;
+    return compressedData;
+}
+
+void testCompressedTextures() {
+    std::cout << "\n=== 开始测试纹理压缩格式 ===" << std::endl;
+
+    // 加载原始图像
+    int width, height, channels;
+    unsigned char* data = stbi_load(std::string(shaderPath + "/awesomeface.png").c_str(), &width, &height, &channels, 4);
+    if (!data) {
+        std::cerr << "加载纹理失败: " << stbi_failure_reason() << std::endl;
+        return;
+    }
+
+    std::cout << "原始纹理尺寸: " << width << "x" << height << ", 通道数: " << channels << std::endl;
+
+    // 压缩为BC1格式
+    auto compressedData = compressToBC1(data, width, height, 4);
+    std::cout << "BC1压缩数据大小: " << compressedData.size() << " 字节" << std::endl;
+    std::cout << "压缩比: " << (float)(width * height * 4) / compressedData.size() << ":1" << std::endl;
+
+    try {
+        // 测试BC1_RGB_UNORM格式
+        std::cout << "\n测试 BC1_RGB_UNORM 格式..." << std::endl;
+        HardwareImageCreateInfo bc1UnormCreateInfo;
+        bc1UnormCreateInfo.width = width;
+        bc1UnormCreateInfo.height = height;
+        bc1UnormCreateInfo.format = ImageFormat::BC1_RGB_UNORM;
+        bc1UnormCreateInfo.usage = ImageUsage::SampledImage;
+        bc1UnormCreateInfo.arrayLayers = 1;
+        bc1UnormCreateInfo.mipLevels = 1;
+        bc1UnormCreateInfo.initialData = compressedData.data();
+
+        HardwareImage textureBC1Unorm(bc1UnormCreateInfo);
+        std::cout << "✓ BC1_RGB_UNORM 纹理创建成功，描述符ID: " << textureBC1Unorm.storeDescriptor() << std::endl;
+
+        // 测试BC1_RGB_SRGB格式
+        std::cout << "\n测试 BC1_RGB_SRGB 格式..." << std::endl;
+        HardwareImageCreateInfo bc1SrgbCreateInfo;
+        bc1SrgbCreateInfo.width = width;
+        bc1SrgbCreateInfo.height = height;
+        bc1SrgbCreateInfo.format = ImageFormat::BC1_RGB_SRGB;
+        bc1SrgbCreateInfo.usage = ImageUsage::SampledImage;
+        bc1SrgbCreateInfo.arrayLayers = 1;
+        bc1SrgbCreateInfo.mipLevels = 1;
+        bc1SrgbCreateInfo.initialData = compressedData.data();
+
+        HardwareImage textureBC1Srgb(bc1SrgbCreateInfo);
+        std::cout << "✓ BC1_RGB_SRGB 纹理创建成功，描述符ID: " << textureBC1Srgb.storeDescriptor() << std::endl;
+
+        std::cout << "\n=== 所有压缩格式测试通过 ===" << std::endl;
+
+    } catch (const std::exception& e) {
+        std::cerr << "✗ 压缩纹理测试失败: " << e.what() << std::endl;
+    }
+
+    stbi_image_free(data);
+}
+
 int main() {
+    // 首先运行压缩纹理测试
+    testCompressedTextures();
+
     if (glfwInit() >= 0) {
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
@@ -70,16 +175,30 @@ int main() {
             std::cerr << "stbi_load failed: " << stbi_failure_reason() << std::endl;
         }
 
-        HardwareImageCreateInfo textureCreateInfo;
+        // 创建BC1压缩纹理用于实际渲染测试
+        auto compressedData = compressToBC1(data, width, height, channels);
+
+        /*HardwareImageCreateInfo textureCreateInfo;
         textureCreateInfo.width = width;
         textureCreateInfo.height = height;
         textureCreateInfo.format = ImageFormat::RGBA8_SRGB;
         textureCreateInfo.usage = ImageUsage::SampledImage;
         textureCreateInfo.arrayLayers = 1;
         textureCreateInfo.mipLevels = 1;
-        textureCreateInfo.initialData = data;
+        textureCreateInfo.initialData = data;*/
+
+        HardwareImageCreateInfo textureCreateInfo;
+        textureCreateInfo.width = width;
+        textureCreateInfo.height = height;
+        textureCreateInfo.format = ImageFormat::BC1_RGB_SRGB;  // 使用BC1_RGB_SRGB进行渲染测试
+        textureCreateInfo.usage = ImageUsage::SampledImage;
+        textureCreateInfo.arrayLayers = 1;
+        textureCreateInfo.mipLevels = 1;
+        textureCreateInfo.initialData = compressedData.data();
 
         HardwareImage texture(textureCreateInfo);
+
+        std::cout << "\n使用BC1_RGB_SRGB压缩纹理进行渲染..." << std::endl;
 
         std::vector<std::vector<HardwareBuffer>> rasterizerUniformBuffers(windows.size());
         std::vector<HardwareBuffer> computeUniformBuffers(windows.size());

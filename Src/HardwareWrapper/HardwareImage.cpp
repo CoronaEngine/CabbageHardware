@@ -40,9 +40,9 @@ ImageFormatInfo convertImageFormat(ImageFormat format) {
 
         // BC compressed formats - Desktop
         case ImageFormat::BC1_RGB_UNORM:
-            return {VK_FORMAT_BC1_RGB_UNORM_BLOCK, 8, true};
+            return {VK_FORMAT_BC1_RGB_UNORM_BLOCK, 2, true};
         case ImageFormat::BC1_RGB_SRGB:
-            return {VK_FORMAT_BC1_RGB_SRGB_BLOCK, 8, true};
+            return {VK_FORMAT_BC1_RGB_SRGB_BLOCK, 2, true};
         case ImageFormat::BC2_RGBA_UNORM:
             return {VK_FORMAT_BC2_UNORM_BLOCK, 16, true};
         case ImageFormat::BC2_RGBA_SRGB:
@@ -71,15 +71,23 @@ ImageFormatInfo convertImageFormat(ImageFormat format) {
     }
 }
 
-VkImageUsageFlags convertImageUsage(ImageUsage usage) {
+VkImageUsageFlags convertImageUsage(ImageUsage usage, bool isCompressed) {
     VkImageUsageFlags vkUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
     switch (usage) {
         case ImageUsage::SampledImage:
-            vkUsage |= VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+            vkUsage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+            // 压缩格式不支持 COLOR_ATTACHMENT_BIT
+            if (!isCompressed) {
+                vkUsage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+            }
             break;
         case ImageUsage::StorageImage:
-            vkUsage |= VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+            vkUsage |= VK_IMAGE_USAGE_STORAGE_BIT;
+            // 压缩格式不支持 COLOR_ATTACHMENT_BIT 和 STORAGE_BIT
+            if (!isCompressed) {
+                vkUsage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+            }
             break;
         case ImageUsage::DepthImage:
             vkUsage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
@@ -103,13 +111,26 @@ static bool decrementImageRefCount(const Corona::Kernel::Utils::Storage<Resource
     return false;
 }
 
+// 辅助函数：计算压缩格式的实际数据大小
+static size_t calculateCompressedImageSize(uint32_t width, uint32_t height, uint32_t blockSize, bool isCompressed) {
+    if (isCompressed) {
+        // 对于块压缩格式，计算块数而不是像素数
+        const uint32_t blocksX = (width + 3) / 4;
+        const uint32_t blocksY = (height + 3) / 4;
+        return static_cast<size_t>(blocksX) * blocksY * blockSize;
+    } else {
+        // 对于非压缩格式，直接使用像素数
+        return static_cast<size_t>(width) * height * blockSize;
+    }
+}
+
 HardwareImage::HardwareImage()
     : imageID(std::make_shared<uintptr_t>(0)) {
 }
 
 HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
     const auto [vkFormat, pixelSize, isCompressed] = convertImageFormat(createInfo.format);
-    const VkImageUsageFlags vkUsage = convertImageUsage(createInfo.usage);
+    const VkImageUsageFlags vkUsage = convertImageUsage(createInfo.usage, isCompressed);
 
     imageID = std::make_shared<uintptr_t>(globalImageStorages.allocate());
 
