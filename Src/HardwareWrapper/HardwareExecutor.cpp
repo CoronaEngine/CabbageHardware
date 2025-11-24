@@ -96,14 +96,26 @@ HardwareExecutor& HardwareExecutor::operator<<(HardwareExecutor& other) {
 
 HardwareExecutor& HardwareExecutor::wait(HardwareExecutor& other) {
     // ��ͬһ��������������в��������⾺̬����
-    auto const handle = gExecutorStorage.acquire_write(*executorID);
-    auto const other_handle = gExecutorStorage.acquire_read(*other.executorID);
-    if (other_handle->impl && handle->impl) {
-        handle->impl->wait(*other_handle->impl);
+    std::uintptr_t selfID = *executorID;
+    std::uintptr_t otherID = *other.executorID;
+    // 按id排序加锁，避免死锁
+    if (selfID < otherID) {
+        auto const handle = gExecutorStorage.acquire_write(*executorID);
+        auto const other_handle = gExecutorStorage.acquire_read(*other.executorID);
+        if (other_handle->impl && handle->impl) {
+            handle->impl->wait(*other_handle->impl);
+        }
+        return *this;
+    } else {
+        auto const other_handle = gExecutorStorage.acquire_read(*other.executorID);
+        auto const handle = gExecutorStorage.acquire_write(*executorID);
+        if (other_handle->impl && handle->impl) {
+            handle->impl->wait(*other_handle->impl);
+        }
+        return *this;
     }
     return *this;
 }
-
 HardwareExecutor& HardwareExecutor::commit() {
     auto handle = gExecutorStorage.acquire_write(*executorID);
     handle->impl->commit();

@@ -241,17 +241,22 @@ HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, Hardw
         return *this;  // 必须提供有效的 executor
     }
 
-    auto imageHandle = globalImageStorages.acquire_write(*imageID);
-    auto bufferHandle = globalBufferStorages.acquire_write(*buffer.bufferID);
-
     {
         auto const executor_handle = gExecutorStorage.acquire_write(*executor->getExecutorID());
         if (!executor_handle->impl) {
             return *this;
         }
-
-        CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle);
-        *executor_handle->impl << &copyCmd;
+        if (*imageID < *buffer.bufferID) {
+            auto imageHandle = globalImageStorages.acquire_write(*imageID);
+            auto bufferHandle = globalBufferStorages.acquire_write(*buffer.bufferID);
+            CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle);
+            *executor_handle->impl << &copyCmd;
+        } else {
+            auto bufferHandle = globalBufferStorages.acquire_write(*buffer.bufferID);
+            auto imageHandle = globalImageStorages.acquire_write(*imageID);
+            CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle);
+            *executor_handle->impl << &copyCmd;
+        }
     }
 
     return *this;
@@ -291,14 +296,12 @@ HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, Hardw
         return *this;
     }
 
-    auto imageHandle = globalImageStorages.acquire_write(*imageID);
-    if (mipLevel >= imageHandle->mipLevels) {
-        return *this;
-    }
-
-    auto bufferHandle = globalBufferStorages.acquire_write(*buffer.bufferID);
-
     {
+        auto imageHandle = globalImageStorages.acquire_write(*imageID);
+        if (mipLevel >= imageHandle->mipLevels) {
+            return *this;
+        }
+        auto bufferHandle = globalBufferStorages.acquire_write(*buffer.bufferID);
         auto const executor_handle = gExecutorStorage.acquire_write(*executor->getExecutorID());
         if (!executor_handle->impl) {
             return *this;
