@@ -81,38 +81,45 @@ int main() {
 
         HardwareImage texture(textureCreateInfo);
 
+        std::vector<std::vector<HardwareBuffer>> rasterizerUniformBuffers(windows.size());
+        std::vector<HardwareBuffer> computeUniformBuffers(windows.size());
+
         std::atomic_bool running = true;
 
-        auto renderThread = [&](uint32_t threadIndex) {
-            RasterizerUniformBufferObject rasterizerUniformBufferObject;
-            ComputeUniformBufferObject computeUniformData;
+        auto meshThread = [&](uint32_t threadIndex) {
+            ComputeUniformBufferObject computeUniformData(windows.size());
+            computeUniformBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::UniformBuffer);
 
-            std::vector<HardwareBuffer> rasterizerUniformBuffers;
-            std::vector<ktm::fmat4x4> modelMat;
-            for (size_t i = 0; i < 20; i++) {
-                ktm::fmat4x4 tempModelMat = ktm::translate3d(ktm::fvec3((i % 5) - 2.0f, (i / 5) - 0.5f, 0.0f)) * ktm::scale3d(ktm::fvec3(0.1, 0.1, 0.1)) * ktm::rotate3d_axis(ktm::radians(i * 30.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
-                HardwareBuffer tempRasterizerUniformBuffers = HardwareBuffer(sizeof(RasterizerUniformBufferObject), BufferUsage::UniformBuffer);
-
-                modelMat.push_back(tempModelMat);
-                rasterizerUniformBuffers.push_back(tempRasterizerUniformBuffers);
+            std::vector<ktm::fmat4x4> modelMat(20);
+            std::vector<RasterizerUniformBufferObject> rasterizerUniformBufferObject(modelMat.size());
+            for (size_t i = 0; i < modelMat.size(); i++) {
+                modelMat[i]=(ktm::translate3d(ktm::fvec3((i % 5) - 2.0f, (i / 5) - 0.5f, 0.0f)) * ktm::scale3d(ktm::fvec3(0.1, 0.1, 0.1)) * ktm::rotate3d_axis(ktm::radians(i * 30.0f), ktm::fvec3(0.0f, 0.0f, 1.0f)));
+                rasterizerUniformBuffers[threadIndex].push_back(HardwareBuffer(sizeof(RasterizerUniformBufferObject), BufferUsage::UniformBuffer, &(modelMat[i])));
             }
-
-            HardwareBuffer computeUniformBuffer = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::UniformBuffer);
-
-            RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
-
-            ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
 
             auto startTime = std::chrono::high_resolution_clock::now();
 
             while (running.load()) {
+
                 float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
-                for (size_t i = 0; i < modelMat.size(); i++) {
-                    rasterizerUniformBufferObject.textureIndex = texture.storeDescriptor();
-                    rasterizerUniformBufferObject.model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
-                    rasterizerUniformBuffers[i].copyFromData(&rasterizerUniformBufferObject, sizeof(rasterizerUniformBufferObject));
-                    rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffers[i].storeDescriptor();
+                for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
+                    rasterizerUniformBufferObject[i].textureIndex = texture.storeDescriptor();
+                    rasterizerUniformBufferObject[i].model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
+                    rasterizerUniformBuffers[threadIndex][i].copyFromData(&(rasterizerUniformBufferObject[i]), sizeof(rasterizerUniformBufferObject[i]));
+                }
+
+                computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
+                computeUniformBuffers[threadIndex].copyFromData(&computeUniformData, sizeof(computeUniformData));
+            }
+        };
+
+        auto renderThread = [&](uint32_t threadIndex) {
+            RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
+            ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
+            while (running.load()) {
+                for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
+                    rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffers[threadIndex][i].storeDescriptor();
                     rasterizer["inPosition"] = postionBuffer;
                     rasterizer["inColor"] = colorBuffer;
                     rasterizer["inTexCoord"] = uvBuffer;
@@ -122,9 +129,7 @@ int main() {
                     executors[threadIndex] << rasterizer.record(indexBuffer);
                 }
 
-                computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
-                computeUniformBuffer.copyFromData(&computeUniformData, sizeof(computeUniformData));
-                computer["pushConsts.uniformBufferIndex"] = computeUniformBuffer.storeDescriptor();
+                computer["pushConsts.uniformBufferIndex"] = computeUniformBuffers[threadIndex].storeDescriptor();
 
                 executors[threadIndex] << rasterizer(1920, 1080)
                                        << computer(1920 / 8, 1080 / 8, 1)
@@ -135,12 +140,12 @@ int main() {
         auto displayThread = [&](uint32_t threadIndex) {
             HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
             while (running.load()) {
-                //displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
-                displayManager << finalOutputImages[threadIndex];
+                displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
             }
         };
 
         for (size_t i = 0; i < windows.size(); i++) {
+            std::thread(meshThread, i).detach();
             std::thread(renderThread, i).detach();
             std::thread(displayThread, i).detach();
         }

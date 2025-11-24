@@ -69,9 +69,9 @@ HardwareExecutor& HardwareExecutor::operator=(const HardwareExecutor& other) {
 }
 
 HardwareExecutor& HardwareExecutor::operator<<(ComputePipeline& computePipeline) {
-    if (auto const executor_handle = gExecutorStorage.acquire_read(*executorID);
+    if (auto const executor_handle = gExecutorStorage.acquire_write(*executorID);
         computePipeline.getComputePipelineID()) {
-        if (auto const pipeline_handle = gComputePipelineStorage.acquire_write(*computePipeline.getComputePipelineID());
+        if (auto const pipeline_handle = gComputePipelineStorage.acquire_read(*computePipeline.getComputePipelineID());
             pipeline_handle.valid()) {
             *executor_handle->impl << static_cast<CommandRecordVulkan*>(pipeline_handle->impl);
         }
@@ -80,9 +80,9 @@ HardwareExecutor& HardwareExecutor::operator<<(ComputePipeline& computePipeline)
 }
 
 HardwareExecutor& HardwareExecutor::operator<<(RasterizerPipeline& rasterizerPipeline) {
-    if (auto const executor_handle = gExecutorStorage.acquire_read(*executorID);
+    if (auto const executor_handle = gExecutorStorage.acquire_write(*executorID);
         rasterizerPipeline.getRasterizerPipelineID()) {
-        if (auto const raster_handle = gRasterizerPipelineStorage.acquire_write(*rasterizerPipeline.getRasterizerPipelineID());
+        if (auto const raster_handle = gRasterizerPipelineStorage.acquire_read(*rasterizerPipeline.getRasterizerPipelineID());
             raster_handle->impl) {
             *executor_handle->impl << static_cast<CommandRecordVulkan*>(raster_handle->impl);
         }
@@ -96,16 +96,28 @@ HardwareExecutor& HardwareExecutor::operator<<(HardwareExecutor& other) {
 
 HardwareExecutor& HardwareExecutor::wait(HardwareExecutor& other) {
     // ��ͬһ��������������в��������⾺̬����
-    auto const handle = gExecutorStorage.acquire_write(*executorID);
-    auto const other_handle = gExecutorStorage.acquire_read(*other.executorID);
-    if (other_handle->impl && handle->impl) {
-        handle->impl->wait(*other_handle->impl);
+    std::uintptr_t selfID = *executorID;
+    std::uintptr_t otherID = *other.executorID;
+    // 按id排序加锁，避免死锁
+    if (selfID < otherID) {
+        auto const handle = gExecutorStorage.acquire_write(*executorID);
+        auto const other_handle = gExecutorStorage.acquire_read(*other.executorID);
+        if (other_handle->impl && handle->impl) {
+            handle->impl->wait(*other_handle->impl);
+        }
+        return *this;
+    } else {
+        auto const other_handle = gExecutorStorage.acquire_read(*other.executorID);
+        auto const handle = gExecutorStorage.acquire_write(*executorID);
+        if (other_handle->impl && handle->impl) {
+            handle->impl->wait(*other_handle->impl);
+        }
+        return *this;
     }
     return *this;
 }
-
 HardwareExecutor& HardwareExecutor::commit() {
-    auto handle = gExecutorStorage.acquire_read(*executorID);
+    auto handle = gExecutorStorage.acquire_write(*executorID);
     handle->impl->commit();
     return *this;
 }
