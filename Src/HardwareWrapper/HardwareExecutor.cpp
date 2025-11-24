@@ -69,9 +69,9 @@ HardwareExecutor& HardwareExecutor::operator=(const HardwareExecutor& other) {
 }
 
 HardwareExecutor& HardwareExecutor::operator<<(ComputePipeline& computePipeline) {
-    if (auto const executor_handle = gExecutorStorage.acquire_read(*executorID);
+    if (auto const executor_handle = gExecutorStorage.acquire_write(*executorID);
         computePipeline.getComputePipelineID()) {
-        if (auto const pipeline_handle = gComputePipelineStorage.acquire_write(*computePipeline.getComputePipelineID());
+        if (auto const pipeline_handle = gComputePipelineStorage.acquire_read(*computePipeline.getComputePipelineID());
             pipeline_handle.valid()) {
             *executor_handle->impl << static_cast<CommandRecordVulkan*>(pipeline_handle->impl);
         }
@@ -105,7 +105,7 @@ HardwareExecutor& HardwareExecutor::wait(HardwareExecutor& other) {
 }
 
 HardwareExecutor& HardwareExecutor::commit() {
-    auto handle = gExecutorStorage.acquire_read(*executorID);
+    auto handle = gExecutorStorage.acquire_write(*executorID);
     handle->impl->commit();
     return *this;
 }

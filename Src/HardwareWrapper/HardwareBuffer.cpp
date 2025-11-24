@@ -113,10 +113,9 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer& inputBuffer, const Har
         return false;  // 必须提供有效的 executor
     }
 
-    auto const srcBuffer = globalBufferStorages.acquire_write(*inputBuffer.bufferID);
-    auto const dstBuffer = globalBufferStorages.acquire_write(*bufferID);
-
     {
+        auto const srcBuffer = globalBufferStorages.acquire_write(*inputBuffer.bufferID);
+        auto const dstBuffer = globalBufferStorages.acquire_write(*bufferID);
         auto const executor_handle = gExecutorStorage.acquire_write(*executor->getExecutorID());
         if (!executor_handle->impl) {
             return false;
