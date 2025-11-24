@@ -35,18 +35,19 @@ enum class ImageFormat : uint32_t {
     D16_UNORM,
     D32_FLOAT,
 
-    // Compressed formats - BC (Desktop, most widely supported)
-    BC1_RGBA_UNORM,  // DXT1, 4-bit per pixel
-    BC3_UNORM,       // DXT5, 8-bit per pixel, alpha channel
-    BC5_UNORM,       // Normal maps, 8-bit per pixel
-    BC7_UNORM,       // High quality, 8-bit per pixel
-    BC7_SRGB,        // High quality sRGB
+    BC1_RGB_UNORM,
+    BC1_RGB_SRGB,
+    BC2_RGBA_UNORM,
+    BC2_RGBA_SRGB,
+    BC3_RGBA_UNORM,
+    BC3_RGBA_SRGB,
+    BC4_R_UNORM,
+    BC4_R_SNORM,
+    BC5_RG_UNORM,
+    BC5_RG_SNORM,
 
-    // Compressed formats - ASTC (Mobile, flexible block sizes)
-    ASTC_4x4_UNORM,  // 8-bit per pixel, best quality
-    ASTC_4x4_SRGB,   // 8-bit per pixel sRGB
-    ASTC_6x6_UNORM,  // 3.56-bit per pixel, balanced
-    ASTC_8x8_UNORM,  // 2-bit per pixel, best compression
+    ASTC_4x4_UNORM,
+    ASTC_4x4_SRGB,
 };
 
 enum class ImageUsage : uint32_t {
@@ -135,12 +136,10 @@ struct HardwareImageCreateInfo {
     ImageFormat format = ImageFormat::RGBA8_SRGB;
     ImageUsage usage = ImageUsage::SampledImage;
     int arrayLayers = 1;
-    int mipLevels = 1;  // 1 = 无 mipmap, 0 = 自动计算最大层级
+    int mipLevels = 1;
     void* initialData = nullptr;
 
-    // 便捷构造函数
     HardwareImageCreateInfo() = default;
-
     HardwareImageCreateInfo(uint32_t w, uint32_t h, ImageFormat fmt = ImageFormat::RGBA8_SRGB)
         : width(w), height(h), format(fmt) {}
 };
@@ -150,8 +149,6 @@ struct HardwareImage {
    public:
     HardwareImage();
     HardwareImage(const HardwareImage& other);
-    //HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage = ImageUsage::SampledImage, int arrayLayers = 1, void* imageData = nullptr);
-
     HardwareImage(const HardwareImageCreateInfo& createInfo);
 
     ~HardwareImage();
@@ -159,24 +156,17 @@ struct HardwareImage {
     HardwareImage& operator=(const HardwareImage& other);
     explicit operator bool() const;
 
-    // 描述符操作
-    [[nodiscard]] uint32_t storeDescriptor();
-    [[nodiscard]] uint32_t storeDescriptor(uint32_t mipLevel);  // 存储特定 mip 层级
+    [[nodiscard]] uint32_t storeDescriptor(uint32_t mipLevel = 0);
 
     [[nodiscard]] std::shared_ptr<uintptr_t> getImageID() const {
         return imageID;
     }
 
-    // Mipmap 信息查询
     [[nodiscard]] uint32_t getMipLevels() const;
     [[nodiscard]] std::pair<uint32_t, uint32_t> getMipLevelSize(uint32_t mipLevel) const;
 
-    HardwareImage& copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor);
-    HardwareImage& copyFromData(const void* inputData, HardwareExecutor* executor);
-
-    // 复制到指定 mipmap 层级
-    HardwareImage& copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor, uint32_t mipLevel);
-    HardwareImage& copyFromData(const void* inputData, HardwareExecutor* executor, uint32_t mipLevel);
+    HardwareImage& copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor, uint32_t mipLevel = 0);
+    HardwareImage& copyFromData(const void* inputData, HardwareExecutor* executor, uint32_t mipLevel = 0);
 
    private:
     std::shared_ptr<uintptr_t> imageID;
@@ -197,18 +187,16 @@ struct HardwarePushConstant {
         copyFromRaw(&data, sizeof(T));
     }
 
-    // the sub and whole must in the same thread
+    // NOTE: the sub and whole must in the same thread
     HardwarePushConstant(uint64_t size, uint64_t offset, HardwarePushConstant* whole = nullptr);
 
     ~HardwarePushConstant();
 
     HardwarePushConstant& operator=(const HardwarePushConstant& other);
 
-    // must in the same thread
+    // NOTE: must in the same thread
     [[nodiscard]] uint8_t* getData() const;
-
     [[nodiscard]] uint64_t getSize() const;
-
     [[nodiscard]] std::shared_ptr<uintptr_t> getPushConstantID() const {
         return pushConstantID;
     }
@@ -259,7 +247,7 @@ struct ComputePipeline {
     }
 
    private:
-    std::shared_ptr<uintptr_t> computePipelineID;  // 内部存储句柄
+    std::shared_ptr<uintptr_t> computePipelineID;
 };
 
 // ================= 对外封装：RasterizerPipeline =================
@@ -289,7 +277,7 @@ struct RasterizerPipeline {
     }
 
    private:
-    std::shared_ptr<uintptr_t> rasterizerPipelineID;  // 内部存储句柄
+    std::shared_ptr<uintptr_t> rasterizerPipelineID;
 };
 
 // ================= 对外封装：HardwareExecutor =================
@@ -300,10 +288,9 @@ struct HardwareExecutor {
     ~HardwareExecutor();
 
     HardwareExecutor& operator=(const HardwareExecutor& other);
-
     HardwareExecutor& operator<<(ComputePipeline& computePipeline);
     HardwareExecutor& operator<<(RasterizerPipeline& rasterizerPipeline);
-    HardwareExecutor& operator<<(HardwareExecutor& other);  // 透传
+    HardwareExecutor& operator<<(HardwareExecutor& other);
 
     HardwareExecutor& wait(HardwareExecutor& other);
     HardwareExecutor& commit();
@@ -313,5 +300,5 @@ struct HardwareExecutor {
     }
 
    private:
-    std::shared_ptr<uintptr_t> executorID;  // 内部存储句柄
+    std::shared_ptr<uintptr_t> executorID;
 };
