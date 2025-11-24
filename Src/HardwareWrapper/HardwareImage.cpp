@@ -6,7 +6,7 @@
 
 struct ImageFormatInfo {
     VkFormat vkFormat;
-    uint32_t pixelSize;
+    float pixelSize;
     bool isCompressed;
 };
 
@@ -40,9 +40,9 @@ ImageFormatInfo convertImageFormat(ImageFormat format) {
 
         // BC compressed formats - Desktop
         case ImageFormat::BC1_RGB_UNORM:
-            return {VK_FORMAT_BC1_RGB_UNORM_BLOCK, 2, true};
+            return {VK_FORMAT_BC1_RGB_UNORM_BLOCK, 0.5, true};
         case ImageFormat::BC1_RGB_SRGB:
-            return {VK_FORMAT_BC1_RGB_SRGB_BLOCK, 2, true};
+            return {VK_FORMAT_BC1_RGB_SRGB_BLOCK, 0.5, true};
         case ImageFormat::BC2_RGBA_UNORM:
             return {VK_FORMAT_BC2_UNORM_BLOCK, 16, true};
         case ImageFormat::BC2_RGBA_SRGB:

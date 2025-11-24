@@ -36,7 +36,7 @@ struct ResourceManager {
 
     struct ImageHardwareWrap {
         VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        uint32_t pixelSize = 0;
+        float pixelSize = 0;
         ktm::uvec2 imageSize = {0, 0};
         uint64_t refCount = 0;
 
@@ -79,7 +79,7 @@ struct ResourceManager {
     // Image operations
     [[nodiscard]] ImageHardwareWrap createImage(ktm::uvec2 imageSize,
                                                 VkFormat imageFormat,
-                                                uint32_t pixelSize,
+                                                float pixelSize,
                                                 VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                                                 int arrayLayers = 1,
                                                 int mipLevels = 1,

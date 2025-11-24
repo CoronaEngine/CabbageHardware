@@ -343,7 +343,7 @@ void ResourceManager::createExternalBufferMemoryPool() {
 
 ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 imageSize,
                                                                 VkFormat imageFormat,
-                                                                uint32_t pixelSize,
+                                                                float pixelSize,
                                                                 VkImageUsageFlags imageUsage,
                                                                 int arrayLayers,
                                                                 int mipLevels,

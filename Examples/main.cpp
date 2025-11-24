@@ -37,7 +37,7 @@ struct ComputeUniformBufferObject {
 };
 
 // BC1压缩辅助函数
-std::vector<uint8_t> compressToBC1(const unsigned char* data, int& width, int& height, int channels) {
+std::vector<uint8_t> compressToBC1(const unsigned char* data, int width, int height, int channels) {
     // BC1每4x4像素块占8字节
     uint32_t blockCountX = (width + 3) / 4;
     uint32_t blockCountY = (height + 3) / 4;
@@ -75,8 +75,6 @@ std::vector<uint8_t> compressToBC1(const unsigned char* data, int& width, int& h
         }
     }
 
-    width = blockCountX;
-    height = blockCountY;
     return compressedData;
 }
 
