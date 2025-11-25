@@ -48,14 +48,24 @@ HardwareExecutor::~HardwareExecutor() {
 
 HardwareExecutor& HardwareExecutor::operator=(const HardwareExecutor& other) {
     if (this != &other) {
-        {
-            auto const handle = gExecutorStorage.acquire_write(*other.executorID);
-            incExec(handle);
-        }
-        {
-            if (executorID && *executorID > 0) {
+        if (executorID && *executorID > 0) {
+            if (*executorID < *other.executorID) {
+                auto const handle = gExecutorStorage.acquire_write(*executorID);
+                auto const other_handle = gExecutorStorage.acquire_write(*other.executorID);
+                incExec(other_handle);
                 bool destroy = false;
-                if (auto const handle = gExecutorStorage.acquire_write(*executorID); decExec(handle)) {
+                if (decExec(handle)) {
+                    destroy = true;
+                }
+                if (destroy) {
+                    gExecutorStorage.deallocate(*executorID);
+                }
+            } else {
+                auto const other_handle = gExecutorStorage.acquire_write(*other.executorID);
+                auto const handle = gExecutorStorage.acquire_write(*executorID);
+                incExec(other_handle);
+                bool destroy = false;
+                if (decExec(handle)) {
                     destroy = true;
                 }
                 if (destroy) {

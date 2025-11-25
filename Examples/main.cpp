@@ -21,6 +21,7 @@
 #include "CabbageHardware.h"
 #include "Config.h"
 #include "CubeData.h"
+#include "corona/kernel/core/i_logger.h"
 
 struct RasterizerUniformBufferObject {
     uint32_t textureIndex;
@@ -136,12 +137,16 @@ void testCompressedTextures() {
 
 int main() {
     // 首先运行压缩纹理测试
-    testCompressedTextures();
+    // testCompressedTextures();
+    auto const file_sink = Corona::Kernel::create_file_sink("log.log");
+    Corona::Kernel::CoronaLogger::get_default()->add_sink(file_sink);
+    Corona::Kernel::CoronaLogger::info("Starting main application...");
 
     if (glfwInit() >= 0) {
+        Corona::Kernel::CoronaLogger::info("Main thread started...");
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        std::vector<GLFWwindow*> windows(1);
+        std::vector<GLFWwindow*> windows(2);
         for (size_t i = 0; i < windows.size(); i++) {
             windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
         }
@@ -204,20 +209,20 @@ int main() {
         std::atomic_bool running = true;
 
         auto meshThread = [&](uint32_t threadIndex) {
+            Corona::Kernel::CoronaLogger::info("Mesh thread started...");
             ComputeUniformBufferObject computeUniformData(windows.size());
             computeUniformBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::UniformBuffer);
 
             std::vector<ktm::fmat4x4> modelMat(20);
             std::vector<RasterizerUniformBufferObject> rasterizerUniformBufferObject(modelMat.size());
             for (size_t i = 0; i < modelMat.size(); i++) {
-                modelMat[i]=(ktm::translate3d(ktm::fvec3((i % 5) - 2.0f, (i / 5) - 0.5f, 0.0f)) * ktm::scale3d(ktm::fvec3(0.1, 0.1, 0.1)) * ktm::rotate3d_axis(ktm::radians(i * 30.0f), ktm::fvec3(0.0f, 0.0f, 1.0f)));
+                modelMat[i] = (ktm::translate3d(ktm::fvec3((i % 5) - 2.0f, (i / 5) - 0.5f, 0.0f)) * ktm::scale3d(ktm::fvec3(0.1, 0.1, 0.1)) * ktm::rotate3d_axis(ktm::radians(i * 30.0f), ktm::fvec3(0.0f, 0.0f, 1.0f)));
                 rasterizerUniformBuffers[threadIndex].push_back(HardwareBuffer(sizeof(RasterizerUniformBufferObject), BufferUsage::UniformBuffer, &(modelMat[i])));
             }
 
             auto startTime = std::chrono::high_resolution_clock::now();
 
             while (running.load()) {
-
                 float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
                 for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
@@ -232,6 +237,7 @@ int main() {
         };
 
         auto renderThread = [&](uint32_t threadIndex) {
+            Corona::Kernel::CoronaLogger::info("Render thread started...");
             RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
             ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
             while (running.load()) {
@@ -255,6 +261,7 @@ int main() {
         };
 
         auto displayThread = [&](uint32_t threadIndex) {
+            Corona::Kernel::CoronaLogger::info("Display thread started...");
             HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
             while (running.load()) {
                 displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
