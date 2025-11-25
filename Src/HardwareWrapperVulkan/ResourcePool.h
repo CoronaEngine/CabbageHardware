@@ -17,9 +17,11 @@ struct RasterizerPipelineWrap {
 extern Corona::Kernel::Utils::Storage<RasterizerPipelineWrap> gRasterizerPipelineStorage;
 
 struct ComputePipelineWrap {
-    ComputePipelineVulkan* impl = nullptr;  // ����ʵ�ֶ���
+    ComputePipelineVulkan* impl = nullptr;
     uint64_t refCount = 0;
 };
+
+extern Corona::Kernel::Utils::Storage<ComputePipelineWrap> gComputePipelineStorage;
 
 struct DisplayerHardwareWrap {
     void* displaySurface = nullptr;
@@ -28,8 +30,6 @@ struct DisplayerHardwareWrap {
 };
 
 extern Corona::Kernel::Utils::Storage<DisplayerHardwareWrap> globalDisplayerStorages;
-
-extern Corona::Kernel::Utils::Storage<ComputePipelineWrap> gComputePipelineStorage;
 
 struct ExecutorWrap {
     HardwareExecutorVulkan* impl = nullptr;
