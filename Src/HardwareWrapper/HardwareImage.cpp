@@ -111,6 +111,7 @@ static bool decrementImageRefCount(const Corona::Kernel::Utils::Storage<Resource
     return false;
 }
 
+// TODO: 准备干掉
 // 辅助函数：计算压缩格式的实际数据大小
 static size_t calculateCompressedImageSize(uint32_t width, uint32_t height, uint32_t blockSize, bool isCompressed) {
     if (isCompressed) {
