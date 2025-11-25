@@ -149,6 +149,7 @@ int main() {
 
     auto const file_sink = Corona::Kernel::create_file_sink(std::string(time_buffer) + "_log.log");
     Corona::Kernel::CoronaLogger::get_default()->add_sink(file_sink);
+    Corona::Kernel::CoronaLogger::get_default()->set_level(Corona::Kernel::LogLevel::debug);
     Corona::Kernel::CoronaLogger::info("Starting main application...");
 
     if (glfwInit() >= 0) {
