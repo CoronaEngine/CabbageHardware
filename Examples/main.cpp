@@ -138,7 +138,15 @@ void testCompressedTextures() {
 int main() {
     // 首先运行压缩纹理测试
     // testCompressedTextures();
-    auto const file_sink = Corona::Kernel::create_file_sink("log.log");
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    
+    std::tm now_tm;
+    localtime_s(&now_tm, &now_c);
+    char time_buffer[64];
+    std::strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d_%H-%M-%S", &now_tm);
+
+    auto const file_sink = Corona::Kernel::create_file_sink(std::string(time_buffer) + "_log.log");
     Corona::Kernel::CoronaLogger::get_default()->add_sink(file_sink);
     Corona::Kernel::CoronaLogger::info("Starting main application...");
 
