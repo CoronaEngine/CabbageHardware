@@ -149,17 +149,19 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
     }
 
     if (createInfo.initialData != nullptr) {
-        HardwareExecutorVulkan tempExecutor;
+        // HardwareExecutorVulkan tempExecutor;
 
-        auto imageHandle = globalImageStorages.acquire_write(*imageID);
-        HardwareBuffer stagingBuffer(imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize,
-                                     BufferUsage::StorageBuffer,
-                                     createInfo.initialData);
+        // auto imageHandle = globalImageStorages.acquire_write(*imageID);
+        // HardwareBuffer stagingBuffer(imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize,
+        //                              BufferUsage::StorageBuffer,
+        //                              createInfo.initialData);
 
-        auto bufferHandle = globalBufferStorages.acquire_write(*stagingBuffer.bufferID);
+        // auto bufferHandle = globalBufferStorages.acquire_write(*stagingBuffer.bufferID);
 
-        CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, 0);
-        tempExecutor << &copyCmd << tempExecutor.commit();
+        // CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, 0);
+        // tempExecutor << &copyCmd << tempExecutor.commit();
+        // TODO: 暂时使用该方式，后续核查
+        copyFromData(createInfo.initialData, nullptr);
     }
 }
 
