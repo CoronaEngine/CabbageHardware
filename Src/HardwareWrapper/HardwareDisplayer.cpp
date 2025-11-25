@@ -69,11 +69,10 @@ HardwareDisplayer& HardwareDisplayer::operator=(const HardwareDisplayer& other) 
 HardwareDisplayer& HardwareDisplayer::wait(const HardwareExecutor& executor) {
     // 确保在锁内完成所有操作
     if (executor.getExecutorID()) {
-        const uintptr_t execID = *executor.getExecutorID();
-        if (auto const display_handle = globalDisplayerStorages.acquire_write(*displaySurfaceID);
-            display_handle->displayManager) {
-            if (auto const executor_handle = gExecutorStorage.acquire_read(execID);
-                executor_handle->impl) {
+        if (auto const executor_handle = gExecutorStorage.acquire_read(*executor.getExecutorID());
+            executor_handle->impl) {
+            if (auto const display_handle = globalDisplayerStorages.acquire_write(*displaySurfaceID);
+                display_handle->displayManager) {
                 display_handle->displayManager->waitExecutor(*executor_handle->impl);
             }
         }
