@@ -162,6 +162,10 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
         // tempExecutor << &copyCmd << tempExecutor.commit();
         // TODO: 暂时使用该方式，后续核查
         copyFromData(createInfo.initialData, nullptr);
+
+        /*HardwareExecutor tempExecutor;
+        copyFromData(createInfo.initialData, &tempExecutor, 0);
+        tempExecutor.commit();*/
     }
 }
 
