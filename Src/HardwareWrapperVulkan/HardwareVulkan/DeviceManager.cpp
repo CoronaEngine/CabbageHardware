@@ -49,6 +49,10 @@ void DeviceManager::cleanUpDeviceManager() {
 
 void DeviceManager::destroyQueueResources(std::vector<QueueUtils>& queues) {
     for (auto& queue : queues) {
+
+        // TODO: 使用锁保护清理过程，虽然通常 cleanup 是单线程的
+        //std::lock_guard<std::mutex> lock(queue.queueMutex.);
+
         if (queue.commandBuffer != VK_NULL_HANDLE && queue.commandPool != VK_NULL_HANDLE) {
             vkFreeCommandBuffers(logicalDevice, queue.commandPool, 1, &queue.commandBuffer);
             queue.commandBuffer = VK_NULL_HANDLE;
@@ -95,12 +99,9 @@ void DeviceManager::createTimelineSemaphore() {
         coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &queue.timelineSemaphore));
     };
 
-    for (auto& queue : graphicsQueues)
-        createTimelineSemaphoreForQueue(queue);
-    for (auto& queue : computeQueues)
-        createTimelineSemaphoreForQueue(queue);
-    for (auto& queue : transferQueues)
-        createTimelineSemaphoreForQueue(queue);
+    for (auto& queue : graphicsQueues) createTimelineSemaphoreForQueue(queue);
+    for (auto& queue : computeQueues) createTimelineSemaphoreForQueue(queue);
+    for (auto& queue : transferQueues) createTimelineSemaphoreForQueue(queue);
 }
 
 void DeviceManager::createDevices(const CreateCallback& initInfo, const VkInstance& vkInstance) {
