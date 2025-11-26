@@ -65,7 +65,6 @@ class DeviceManager {
     friend class HardwareExecutorVulkan;
 
     void createDevices(const CreateCallback& createInfo, const VkInstance& vkInstance);
-    void chooseMainDevice();
     void choosePresentQueueFamily();
     bool createCommandBuffers();
     void createTimelineSemaphore();
