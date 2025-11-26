@@ -1,5 +1,6 @@
 ﻿#include <ktm/ktm.h>
 
+#include <csignal>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -135,7 +136,43 @@ void testCompressedTextures() {
     stbi_image_free(data);
 }
 
+/* 系统信号处理 */
+void signal_segv_handler(int signum) {
+    std::cout << "Segmentation fault (signal " << signum << ")" << std::endl;
+    exit(signum);
+}
+void signal_arbt_handler(int signum) {
+    std::cout << "Abort signal (signal " << signum << ")" << std::endl;
+    exit(signum);
+}
+void signal_fpe_handler(int signum) {
+    std::cout << "Floating point exception (signal " << signum << ")" << std::endl;
+    exit(signum);
+}
+void signal_ill_handler(int signum) {
+    std::cout << "Illegal instruction (signal " << signum << ")" << std::endl;
+    exit(signum);
+}
+void signal_int_handler(int signum) {
+    std::cout << "Interrupt signal (signal " << signum << ")" << std::endl;
+    exit(signum);
+}
+void signal_term_handler(int signum) {
+    std::cout << "Termination signal (signal " << signum << ")" << std::endl;
+    exit(signum);
+}
+/* 系统信号处理 */
+
 int main() {
+    /* 捕获系统信号 */
+    signal(SIGSEGV, signal_segv_handler);
+    signal(SIGABRT, signal_arbt_handler);
+    signal(SIGFPE, signal_fpe_handler);
+    signal(SIGILL, signal_ill_handler);
+    signal(SIGINT, signal_int_handler);
+    signal(SIGTERM, signal_term_handler);
+    /* 捕获系统信号 */
+    
     // 首先运行压缩纹理测试
     // testCompressedTextures();
     auto now = std::chrono::system_clock::now();
@@ -155,7 +192,7 @@ int main() {
         Corona::Kernel::CoronaLogger::info("Main thread started...");
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        constexpr std::size_t WINDOD_COUNT = 1;
+        constexpr std::size_t WINDOD_COUNT = 3;
         std::vector<GLFWwindow*> windows(WINDOD_COUNT);
         for (size_t i = 0; i < windows.size(); i++) {
             windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
@@ -233,16 +270,22 @@ int main() {
             auto startTime = std::chrono::high_resolution_clock::now();
 
             while (running.load()) {
-                float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
+                try {
+                    float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
-                for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
-                    rasterizerUniformBufferObject[i].textureIndex = texture.storeDescriptor();
-                    rasterizerUniformBufferObject[i].model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
-                    rasterizerUniformBuffers[threadIndex][i].copyFromData(&(rasterizerUniformBufferObject[i]), sizeof(rasterizerUniformBufferObject[i]));
+                    for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
+                        rasterizerUniformBufferObject[i].textureIndex = texture.storeDescriptor();
+                        rasterizerUniformBufferObject[i].model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
+                        rasterizerUniformBuffers[threadIndex][i].copyFromData(&(rasterizerUniformBufferObject[i]), sizeof(rasterizerUniformBufferObject[i]));
+                    }
+
+                    computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
+                    computeUniformBuffers[threadIndex].copyFromData(&computeUniformData, sizeof(computeUniformData));
+                } catch (const std::exception& e) {
+                    Corona::Kernel::CoronaLogger::error(std::format("Mesh thread exception: {}", e.what()));
+                } catch (...) {
+                    Corona::Kernel::CoronaLogger::error("Mesh thread unknown exception!");
                 }
-
-                computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
-                computeUniformBuffers[threadIndex].copyFromData(&computeUniformData, sizeof(computeUniformData));
             }
         };
 
@@ -251,22 +294,28 @@ int main() {
             RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
             ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
             while (running.load()) {
-                for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
-                    rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffers[threadIndex][i].storeDescriptor();
-                    rasterizer["inPosition"] = postionBuffer;
-                    rasterizer["inColor"] = colorBuffer;
-                    rasterizer["inTexCoord"] = uvBuffer;
-                    rasterizer["inNormal"] = normalBuffer;
-                    rasterizer["outColor"] = finalOutputImages[threadIndex];
+                try {
+                    for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
+                        rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffers[threadIndex][i].storeDescriptor();
+                        rasterizer["inPosition"] = postionBuffer;
+                        rasterizer["inColor"] = colorBuffer;
+                        rasterizer["inTexCoord"] = uvBuffer;
+                        rasterizer["inNormal"] = normalBuffer;
+                        rasterizer["outColor"] = finalOutputImages[threadIndex];
 
-                    executors[threadIndex] << rasterizer.record(indexBuffer);
+                        executors[threadIndex] << rasterizer.record(indexBuffer);
+                    }
+
+                    computer["pushConsts.uniformBufferIndex"] = computeUniformBuffers[threadIndex].storeDescriptor();
+
+                    executors[threadIndex] << rasterizer(1920, 1080)
+                                           << computer(1920 / 8, 1080 / 8, 1)
+                                           << executors[threadIndex].commit();
+                } catch (const std::exception& e) {
+                    Corona::Kernel::CoronaLogger::error(std::format("Render thread exception: {}", e.what()));
+                } catch (...) {
+                    Corona::Kernel::CoronaLogger::error("Render thread unknown exception!");
                 }
-
-                computer["pushConsts.uniformBufferIndex"] = computeUniformBuffers[threadIndex].storeDescriptor();
-
-                executors[threadIndex] << rasterizer(1920, 1080)
-                                       << computer(1920 / 8, 1080 / 8, 1)
-                                       << executors[threadIndex].commit();
             }
         };
 
@@ -274,7 +323,13 @@ int main() {
             Corona::Kernel::CoronaLogger::info("Display thread started...");
             HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
             while (running.load()) {
-                displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
+                try {
+                    displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
+                } catch (const std::exception& e) {
+                    Corona::Kernel::CoronaLogger::error(std::format("Display thread exception: {}", e.what()));
+                } catch (...) {
+                    Corona::Kernel::CoronaLogger::error("Display thread unknown exception!");
+                }
             }
         };
 
