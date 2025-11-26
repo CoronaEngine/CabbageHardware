@@ -26,10 +26,9 @@ struct CommandRecordVulkan {
     CommandRecordVulkan() = default;
     virtual ~CommandRecordVulkan() = default;
 
-    virtual void commitCommand(HardwareExecutorVulkan& HardwareExecutorVulkan) {
-    }
+    virtual void commitCommand(HardwareExecutorVulkan& executor) {}
 
-    virtual RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& HardwareExecutorVulkan) {
+    virtual RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& executor) {
         return RequiredBarriers{};
     }
 
@@ -42,15 +41,26 @@ struct CommandRecordVulkan {
 };
 
 struct HardwareExecutorVulkan {
-    explicit HardwareExecutorVulkan(std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext = globalHardwareContext.getMainDevice())
-        : hardwareContext(hardwareContext) {
+    explicit HardwareExecutorVulkan(std::shared_ptr<HardwareContext::HardwareUtils> context)
+        : hardwareContext(std::move(context)) {
+        if (!hardwareContext) {
+            throw std::invalid_argument("Hardware context cannot be null");
+        }
     }
+
+    // 兼容旧代码的构造函数，但建议逐步废弃，建议在调用处显式传递
+    explicit HardwareExecutorVulkan()
+        : hardwareContext(globalHardwareContext.getMainDevice()) {
+    }
+
+    // 删除默认构造函数，强制显式传递上下文
+    HardwareExecutorVulkan() = delete;
 
     ~HardwareExecutorVulkan() = default;
 
-    HardwareExecutorVulkan& operator<<(CommandRecordVulkan* CommandRecordVulkan) {
-        if (CommandRecordVulkan->getExecutorType() != CommandRecordVulkan::ExecutorType::Invalid) {
-            commandList.push_back(CommandRecordVulkan);
+    HardwareExecutorVulkan& operator<<(CommandRecordVulkan* commandRecord) {
+        if (commandRecord && commandRecord->getExecutorType() != CommandRecordVulkan::ExecutorType::Invalid) {
+            commandList.push_back(commandRecord);
         }
         return *this;
     }
@@ -59,49 +69,45 @@ struct HardwareExecutorVulkan {
         return other;
     }
 
-    HardwareExecutorVulkan& wait(std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
-                                 std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos = std::vector<VkSemaphoreSubmitInfo>(),
+    HardwareExecutorVulkan& wait(const std::vector<VkSemaphoreSubmitInfo>& waitInfos = {},
+                                 const std::vector<VkSemaphoreSubmitInfo>& signalInfos = {},
                                  VkFence fence = VK_NULL_HANDLE) {
         waitFence = fence;
-        for (size_t i = 0; i < waitSemaphoreInfos.size(); i++) {
-            waitSemaphores.push_back(waitSemaphoreInfos[i]);
-        }
-        for (size_t i = 0; i < signalSemaphoreInfos.size(); i++) {
-            signalSemaphores.push_back(signalSemaphoreInfos[i]);
-        }
+        waitSemaphores.insert(waitSemaphores.end(), waitInfos.begin(), waitInfos.end());
+        signalSemaphores.insert(signalSemaphores.end(), signalInfos.begin(), signalInfos.end());
         return *this;
     }
 
     HardwareExecutorVulkan& wait(HardwareExecutorVulkan& other) {
-        if (other) {
-            VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
-            timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-            timelineWaitSemaphoreSubmitInfo.semaphore = other.currentRecordQueue->timelineSemaphore;
-            timelineWaitSemaphoreSubmitInfo.value = other.currentRecordQueue->timelineValue->fetch_add(0);
-            timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-            waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);
+        // 检查 other 是否有效且有正在进行的队列操作
+        if (other.currentRecordQueue) {
+            VkSemaphoreSubmitInfo timelineWaitInfo{};
+            timelineWaitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            timelineWaitInfo.semaphore = other.currentRecordQueue->timelineSemaphore;
+            // 注意：这里 fetch_add(0) 获取当前值，逻辑需确保 other 已经 commit 过了
+            timelineWaitInfo.value = other.currentRecordQueue->timelineValue->load();
+            timelineWaitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+            waitSemaphores.push_back(timelineWaitInfo);
         }
-
         return *this;
     }
 
-    explicit operator bool() {
+    explicit operator bool() const {
         return (!commandList.empty()) && (currentRecordQueue != nullptr);
     }
 
     HardwareExecutorVulkan& commit();
 
-    static DeviceManager::QueueUtils* pickQueueAndCommit(std::atomic_uint16_t& queueIndex, std::vector<DeviceManager::QueueUtils>& queues, std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand);
+    static DeviceManager::QueueUtils* pickQueueAndCommit(std::atomic_uint16_t& queueIndex,
+                                                         std::vector<DeviceManager::QueueUtils>& queues,
+                                                         std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand);
 
-    // private:
-    //     friend struct CommandRecordVulkan;
     DeviceManager::QueueUtils* currentRecordQueue = nullptr;
-
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
 
     std::vector<CommandRecordVulkan*> commandList;
 
-    std::vector<VkSemaphoreSubmitInfo> waitSemaphores = std::vector<VkSemaphoreSubmitInfo>();
-    std::vector<VkSemaphoreSubmitInfo> signalSemaphores = std::vector<VkSemaphoreSubmitInfo>();
+    std::vector<VkSemaphoreSubmitInfo> waitSemaphores;
+    std::vector<VkSemaphoreSubmitInfo> signalSemaphores;
     VkFence waitFence = VK_NULL_HANDLE;
 };
