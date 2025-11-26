@@ -53,9 +53,7 @@ struct HardwareExecutorVulkan {
         : hardwareContext(globalHardwareContext.getMainDevice()) {
     }
 
-    // 删除默认构造函数，强制显式传递上下文
     HardwareExecutorVulkan() = delete;
-
     ~HardwareExecutorVulkan() = default;
 
     HardwareExecutorVulkan& operator<<(CommandRecordVulkan* commandRecord) {
@@ -79,7 +77,6 @@ struct HardwareExecutorVulkan {
     }
 
     HardwareExecutorVulkan& wait(HardwareExecutorVulkan& other) {
-        // 检查 other 是否有效且有正在进行的队列操作
         if (other.currentRecordQueue) {
             VkSemaphoreSubmitInfo timelineWaitInfo{};
             timelineWaitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
