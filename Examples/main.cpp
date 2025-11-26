@@ -155,7 +155,8 @@ int main() {
         Corona::Kernel::CoronaLogger::info("Main thread started...");
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        std::vector<GLFWwindow*> windows(6);
+        constexpr std::size_t WINDOD_COUNT = 1;
+        std::vector<GLFWwindow*> windows(WINDOD_COUNT);
         for (size_t i = 0; i < windows.size(); i++) {
             windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
         }
@@ -269,18 +270,18 @@ int main() {
             }
         };
 
-        // auto displayThread = [&](uint32_t threadIndex) {
-        //     Corona::Kernel::CoronaLogger::info("Display thread started...");
-        //     HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
-        //     while (running.load()) {
-        //         displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
-        //     }
-        // };
+        auto displayThread = [&](uint32_t threadIndex) {
+            Corona::Kernel::CoronaLogger::info("Display thread started...");
+            HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
+            while (running.load()) {
+                displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
+            }
+        };
 
         for (size_t i = 0; i < windows.size(); i++) {
             std::thread(meshThread, i).detach();
             std::thread(renderThread, i).detach();
-            // std::thread(displayThread, i).detach();
+            std::thread(displayThread, i).detach();
         }
 
         while (running.load()) {

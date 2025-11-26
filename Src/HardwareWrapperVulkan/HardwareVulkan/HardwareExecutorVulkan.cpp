@@ -1,5 +1,7 @@
 ﻿#include "HardwareExecutorVulkan.h"
 
+#include <format>
+
 DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomic_uint16_t& currentQueueIndex,
                                                                       std::vector<DeviceManager::QueueUtils>& currentQueues,
                                                                       std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand) {
@@ -13,7 +15,16 @@ DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
         if (queue->queueMutex->try_lock()) {
             uint64_t timelineCounterValue = 0;
             vkGetSemaphoreCounterValue(queue->deviceManager->logicalDevice, queue->timelineSemaphore, &timelineCounterValue);
-            if (timelineCounterValue >= queue->timelineValue->fetch_add(0)) {
+            if (timelineCounterValue == UINT64_MAX) {
+                Corona::Kernel::CoronaLogger::error(std::format("Error timeline, queue index: {}, queue addr: {}, vk queue addr: {}, timeline semaphore addr: {}, timeline value: {}",
+                                                                queueIndex,
+                                                                reinterpret_cast<std::uintptr_t>(queue),
+                                                                reinterpret_cast<std::uintptr_t>(queue->vkQueue),
+                                                                reinterpret_cast<std::uintptr_t>(queue->timelineSemaphore),
+                                                                timelineCounterValue));
+                queue->queueMutex->unlock();
+                continue;
+            } else if (timelineCounterValue >= queue->timelineValue->fetch_add(0)) {
                 break;
             } else {
                 queue->queueMutex->unlock();
@@ -93,6 +104,12 @@ HardwareExecutorVulkan& HardwareExecutorVulkan::commit() {
             submitInfo.pSignalSemaphoreInfos = signalSemaphores.data();
             submitInfo.commandBufferInfoCount = 1;
             submitInfo.pCommandBufferInfos = &commandBufferSubmitInfo;
+
+            Corona::Kernel::CoronaLogger::debug(std::format("CurrentRecordQueue addr: {}, CurrentVKQueue addr: {}, timelineWaitSemaphoreSubmitInfo: {}, timelineSignalSemaphoreSubmitInfo: {}",
+                                                            reinterpret_cast<std::uintptr_t>(currentRecordQueue),
+                                                            reinterpret_cast<std::uintptr_t>(currentRecordQueue->vkQueue),
+                                                            timelineWaitSemaphoreSubmitInfo.value,
+                                                            timelineSignalSemaphoreSubmitInfo.value));
 
             VkResult result = vkQueueSubmit2(currentRecordQueue->vkQueue, 1, &submitInfo, waitFence);
             if (result != VK_SUCCESS) {
