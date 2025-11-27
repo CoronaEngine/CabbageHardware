@@ -486,13 +486,18 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
 
         // 等待前一帧完成
         vkWaitForFences(displayDevice->deviceManager.getLogicalDevice(),
-                        1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+                        1, 
+                        &inFlightFences[currentFrame], 
+                        VK_TRUE, UINT64_MAX);
 
         // 获取下一个交换链图像
         uint32_t imageIndex;
-        VkResult result = vkAcquireNextImageKHR(
-            displayDevice->deviceManager.getLogicalDevice(), swapChain, UINT64_MAX,
-            imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+        VkResult result = vkAcquireNextImageKHR(displayDevice->deviceManager.getLogicalDevice(), 
+                                                swapChain, 
+                                                UINT64_MAX,
+                                                imageAvailableSemaphores[currentFrame], 
+                                                VK_NULL_HANDLE, 
+                                                &imageIndex);
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR) {
             recreateSwapChain();
@@ -542,9 +547,10 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
 
         // 执行 Blit 和转换布局
         BlitImageCommand blitCmd(this->displayImage, swapChainImages[imageIndex]);
-        TransitionImageLayoutCommand transitionCmd(
-            swapChainImages[imageIndex], VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_NONE);
+        TransitionImageLayoutCommand transitionCmd(swapChainImages[imageIndex], 
+                                                   VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                                                   VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, 
+                                                   VK_ACCESS_2_NONE);
 
         *displayDeviceExecutor << &blitCmd << &transitionCmd
                                << displayDeviceExecutor->wait(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame])
