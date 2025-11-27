@@ -111,20 +111,6 @@ static bool decrementImageRefCount(const Corona::Kernel::Utils::Storage<Resource
     return false;
 }
 
-// TODO: 准备干掉
-// 辅助函数：计算压缩格式的实际数据大小
-static size_t calculateCompressedImageSize(uint32_t width, uint32_t height, uint32_t blockSize, bool isCompressed) {
-    if (isCompressed) {
-        // 对于块压缩格式，计算块数而不是像素数
-        const uint32_t blocksX = (width + 3) / 4;
-        const uint32_t blocksY = (height + 3) / 4;
-        return static_cast<size_t>(blocksX) * blocksY * blockSize;
-    } else {
-        // 对于非压缩格式，直接使用像素数
-        return static_cast<size_t>(width) * height * blockSize;
-    }
-}
-
 HardwareImage::HardwareImage()
     : imageID(std::make_shared<uintptr_t>(0)) {
 }
@@ -160,8 +146,6 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
 
         CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, 0);
         tempExecutor << &copyCmd << tempExecutor.commit();
-        // TODO: 暂时使用该方式，后续核查
-        // copyFromData(createInfo.initialData, nullptr);
     }
 }
 
