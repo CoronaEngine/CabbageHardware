@@ -513,19 +513,51 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
             recreateSwapChain();
         }
 
+        // ---------------------------------------------------------------------
+        // 使用 Timeline Semaphore 进行主机同步（替代 Fence）
+        // ---------------------------------------------------------------------
+
         // 等待前一帧完成
-        vkWaitForFences(displayDevice->deviceManager.getLogicalDevice(),
+        /*vkWaitForFences(displayDevice->deviceManager.getLogicalDevice(),
                         1,
                         &inFlightFences[currentFrame],
-                        VK_TRUE, UINT64_MAX);
+                        VK_TRUE, UINT64_MAX);*/
 
+        timelineValue++;
+
+        // 限制飞行帧数，防止 CPU 领先 GPU 太多
+        // 同时也确保了复用的二进制信号量在 GPU 上已被消耗
+        const uint64_t framesInFlight = swapChainImages.size();
+        if (timelineValue > framesInFlight) {
+            uint64_t waitValue = timelineValue - framesInFlight;
+
+            VkSemaphoreWaitInfo waitInfo{};
+            waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+            waitInfo.semaphoreCount = 1;
+            waitInfo.pSemaphores = &timelineSemaphore;
+            waitInfo.pValues = &waitValue;
+
+            // 在主机端等待
+            vkWaitSemaphores(displayDevice->deviceManager.getLogicalDevice(), &waitInfo, UINT64_MAX);
+        }
+
+        // ---------------------------------------------------------------------
         // 获取下一个交换链图像
+        // ---------------------------------------------------------------------
         uint32_t imageIndex;
-        VkResult result = vkAcquireNextImageKHR(displayDevice->deviceManager.getLogicalDevice(), 
+        /*VkResult result = vkAcquireNextImageKHR(displayDevice->deviceManager.getLogicalDevice(), 
                                                 swapChain, 
                                                 UINT64_MAX,
                                                 imageAvailableSemaphores[currentFrame],
                                                 VK_NULL_HANDLE, 
+                                                &imageIndex);*/
+
+        // 使用单一的二进制信号量 binaryAcquireSemaphore
+        VkResult result = vkAcquireNextImageKHR(displayDevice->deviceManager.getLogicalDevice(),
+                                                swapChain,
+                                                UINT64_MAX,
+                                                binaryAcquireSemaphore,
+                                                VK_NULL_HANDLE,
                                                 &imageIndex);
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -535,7 +567,7 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
             throw std::runtime_error("Failed to acquire swap chain image");
         }
 
-        vkResetFences(displayDevice->deviceManager.getLogicalDevice(), 1, &inFlightFences[currentFrame]);
+        //vkResetFences(displayDevice->deviceManager.getLogicalDevice(), 1, &inFlightFences[currentFrame]);
 
         // 跨设备传输（如果需要）
         if (auto const handle = globalImageStorages.acquire_write(*displayImage.getImageID());
@@ -553,8 +585,10 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
             (*displayDeviceExecutor) << &copyCmd2;
         }
 
+        // ---------------------------------------------------------------------
         // 设置同步信息
-        std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos;
+        // ---------------------------------------------------------------------
+        /*std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos;
         {
             VkSemaphoreSubmitInfo waitInfo{};
             waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
@@ -572,6 +606,36 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
             signalInfo.value = 0;
             signalInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
             signalSemaphoreInfos.push_back(signalInfo);
+        }*/
+
+        std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos;
+        {
+            // 等待 Acquire 信号量
+            VkSemaphoreSubmitInfo waitInfo{};
+            waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            waitInfo.semaphore = binaryAcquireSemaphore;
+            waitInfo.value = 0;  // 二进制信号量忽略此值
+            waitInfo.stageMask = VK_PIPELINE_STAGE_2_BLIT_BIT;
+            waitSemaphoreInfos.push_back(waitInfo);
+        }
+
+        std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos;
+        {
+            // 信号 Timeline Semaphore，表示帧渲染完成
+            VkSemaphoreSubmitInfo signalInfoTimeline{};
+            signalInfoTimeline.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            signalInfoTimeline.semaphore = timelineSemaphore;
+            signalInfoTimeline.value = timelineValue;
+            signalInfoTimeline.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+            signalSemaphoreInfos.push_back(signalInfoTimeline);
+
+            // 信号 Present Binary Semaphore，用于 Present 等待
+            VkSemaphoreSubmitInfo signalInfoPresent{};
+            signalInfoPresent.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            signalInfoPresent.semaphore = binaryPresentSemaphore;
+            signalInfoPresent.value = 0;
+            signalInfoPresent.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+            signalSemaphoreInfos.push_back(signalInfoPresent);
         }
 
         // 执行 Blit 和转换布局
@@ -582,14 +646,16 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
                                                    VK_ACCESS_2_NONE);
 
         *displayDeviceExecutor << &blitCmd << &transitionCmd
-                               << displayDeviceExecutor->wait(waitSemaphoreInfos, signalSemaphoreInfos, inFlightFences[currentFrame])
+                               << displayDeviceExecutor->wait(waitSemaphoreInfos, signalSemaphoreInfos, VK_NULL_HANDLE)
                                << displayDeviceExecutor->commit();
 
+        // ---------------------------------------------------------------------
         // 呈现
+        // ---------------------------------------------------------------------
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = &renderFinishedSemaphores[currentFrame];
+        presentInfo.pWaitSemaphores = &binaryPresentSemaphore;
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = &swapChain;
         presentInfo.pImageIndices = &imageIndex;

@@ -47,7 +47,7 @@ class DisplayManager {
     // 可用于呈现
     VkSemaphore binaryPresentSemaphore;
     // 用于所有内部同步
-    VkSemaphore timelineSemaphore;  
+    VkSemaphore timelineSemaphore;
     uint64_t timelineValue = 0;
 
     // 队列和设备
