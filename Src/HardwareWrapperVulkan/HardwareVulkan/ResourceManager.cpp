@@ -659,6 +659,8 @@ void ResourceManager::createNonExportableBuffer(const VkBufferCreateInfo& buffer
 
 void ResourceManager::destroyBuffer(BufferHardwareWrap& buffer) {
     if (buffer.bufferHandle != VK_NULL_HANDLE && vmaAllocator != VK_NULL_HANDLE) {
+        // TODO: 考虑异步销毁以避免阻塞
+        vkDeviceWaitIdle(device->getLogicalDevice());
         vmaDestroyBuffer(vmaAllocator, buffer.bufferHandle, buffer.bufferAlloc);
 
         buffer.bufferHandle = VK_NULL_HANDLE;
