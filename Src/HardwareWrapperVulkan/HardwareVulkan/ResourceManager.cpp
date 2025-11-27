@@ -1,7 +1,6 @@
 ﻿#include "ResourceManager.h"
 
 #include "HardwareWrapperVulkan/HardwareContext.h"
-#include "HardwareWrapperVulkan/HardwareUtils.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
 
 #define VK_NO_PROTOTYPES

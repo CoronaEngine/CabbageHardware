@@ -4,7 +4,6 @@
 #include <functional>
 #include <memory>
 #include <vector>
-
 #include "HardwareWrapperVulkan/HardwareContext.h"
 
 struct HardwareExecutorVulkan;

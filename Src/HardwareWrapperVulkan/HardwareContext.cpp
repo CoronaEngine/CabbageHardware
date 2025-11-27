@@ -1,8 +1,6 @@
 ﻿#include "HardwareContext.h"
-
 #include <algorithm>
-
-#include "HardwareUtils.h"
+#include "HardwareUtilsVulkan.h"
 
 #define VOLK_IMPLEMENTATION
 #include <volk.h>

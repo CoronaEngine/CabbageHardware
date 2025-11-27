@@ -1,7 +1,6 @@
 ﻿#pragma once
 
 #include <vector>
-
 #include "CabbageHardware.h"
 #include "Compiler/ShaderCodeCompiler.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/DeviceManager.h"

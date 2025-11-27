@@ -1,6 +1,5 @@
 ﻿#include "ComputePipeline.h"
-
-#include "HardwareWrapperVulkan/HardwareUtils.h"
+#include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 
 ComputePipelineVulkan::ComputePipelineVulkan() {
     executorType = CommandRecordVulkan::ExecutorType::Compute;

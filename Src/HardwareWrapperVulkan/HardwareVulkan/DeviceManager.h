@@ -1,9 +1,8 @@
 ﻿#pragma once
 
 #include <mutex>
-
 #include "FeaturesChain.h"
-#include "HardwareWrapperVulkan/HardwareUtils.h"
+#include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 
 class DeviceManager {
    public:

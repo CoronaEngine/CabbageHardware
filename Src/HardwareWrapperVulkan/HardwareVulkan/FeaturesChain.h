@@ -3,8 +3,7 @@
 #include <functional>
 #include <set>
 #include <stdexcept>
-
-#include "HardwareWrapperVulkan/HardwareUtils.h"
+#include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 
 struct DeviceFeaturesChain {
    public:

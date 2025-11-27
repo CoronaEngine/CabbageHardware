@@ -1,9 +1,8 @@
 ﻿#pragma once
 
 #include <ktm/ktm.h>
-
 #include "DeviceManager.h"
-#include "HardwareWrapperVulkan/HardwareUtils.h"
+#include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 #include "corona/kernel/utils/storage.h"
 
 class HardwareExecutor;
