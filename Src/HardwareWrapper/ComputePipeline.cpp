@@ -5,22 +5,10 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/utils/storage.h"
 
-/**
- * @brief 计算管线引用计数加一
- *
- * @param write_handle
- */
 static void incCompute(const Corona::Kernel::Utils::Storage<ComputePipelineWrap>::WriteHandle& write_handle) {
     ++write_handle->refCount;
 }
 
-/**
- * @brief 计算管线引用计数减一
- *
- * @param write_handle
- * @return true 如果引用计数为零，需要销毁
- * @return false 如果引用计数不为零，不需要销毁
- */
 static bool decCompute(const Corona::Kernel::Utils::Storage<ComputePipelineWrap>::WriteHandle& write_handle) {
     if (--write_handle->refCount == 0) {
         delete write_handle->impl;
