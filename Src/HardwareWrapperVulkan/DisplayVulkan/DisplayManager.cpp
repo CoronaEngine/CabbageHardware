@@ -60,7 +60,7 @@ void DisplayManager::cleanupSyncObjects() {
     if (device == VK_NULL_HANDLE)
         return;
 
-    for (auto& fence : inFlightFences) {
+    /*for (auto& fence : inFlightFences) {
         if (fence != VK_NULL_HANDLE) {
             vkDestroyFence(device, fence, nullptr);
             fence = VK_NULL_HANDLE;
@@ -82,7 +82,7 @@ void DisplayManager::cleanupSyncObjects() {
             sem = VK_NULL_HANDLE;
         }
     }
-    renderFinishedSemaphores.clear();
+    renderFinishedSemaphores.clear();*/
 }
 
 void DisplayManager::cleanupSwapChainImages() {
@@ -147,7 +147,7 @@ bool DisplayManager::initDisplayManager(void* surface) {
 }
 
 void DisplayManager::createSyncObjects() {
-    const size_t imageCount = swapChainImages.size();
+    /*const size_t imageCount = swapChainImages.size();
     if (imageCount == 0) {
         throw std::runtime_error("Cannot create sync objects: no swapchain images");
     }
@@ -169,6 +169,35 @@ void DisplayManager::createSyncObjects() {
         coronaHardwareCheck(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]));
         coronaHardwareCheck(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]));
         coronaHardwareCheck(vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]));
+    }*/
+
+    // 创建必须用于vkAcquireNextImageKHR的二进制信号量
+    {
+        VkSemaphoreCreateInfo semaphoreInfo{};
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        VkDevice device = displayDevice->deviceManager.getLogicalDevice();
+        coronaHardwareCheck(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &binaryAcquireSemaphore));
+    }
+
+    // 创建可用于呈现的二进制信号量
+    {
+        VkSemaphoreCreateInfo semaphoreInfo{};
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        VkDevice device = displayDevice->deviceManager.getLogicalDevice();
+        coronaHardwareCheck(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &binaryPresentSemaphore));
+    }
+
+    // 创建时间线信号量
+    {
+        VkSemaphoreTypeCreateInfo timelineCreateInfo{};
+        timelineCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+        timelineCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+        timelineCreateInfo.initialValue = 0;
+        VkSemaphoreCreateInfo semaphoreInfo{};
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        semaphoreInfo.pNext = &timelineCreateInfo;
+        VkDevice device = displayDevice->deviceManager.getLogicalDevice();
+        coronaHardwareCheck(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &timelineSemaphore));
     }
 }
 
@@ -486,8 +515,8 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
 
         // 等待前一帧完成
         vkWaitForFences(displayDevice->deviceManager.getLogicalDevice(),
-                        1, 
-                        &inFlightFences[currentFrame], 
+                        1,
+                        &inFlightFences[currentFrame],
                         VK_TRUE, UINT64_MAX);
 
         // 获取下一个交换链图像
@@ -495,7 +524,7 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
         VkResult result = vkAcquireNextImageKHR(displayDevice->deviceManager.getLogicalDevice(), 
                                                 swapChain, 
                                                 UINT64_MAX,
-                                                imageAvailableSemaphores[currentFrame], 
+                                                imageAvailableSemaphores[currentFrame],
                                                 VK_NULL_HANDLE, 
                                                 &imageIndex);
 
