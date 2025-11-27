@@ -126,6 +126,7 @@ HardwareExecutor& HardwareExecutor::wait(HardwareExecutor& other) {
     }
     return *this;
 }
+
 HardwareExecutor& HardwareExecutor::commit() {
     auto handle = gExecutorStorage.acquire_write(*executorID);
     handle->impl->commit();
