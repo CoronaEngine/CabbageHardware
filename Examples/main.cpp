@@ -1,5 +1,6 @@
 ﻿#include <ktm/ktm.h>
 
+#include <csignal>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -81,26 +82,26 @@ std::vector<uint8_t> compressToBC1(const unsigned char* data, int width, int hei
 }
 
 void testCompressedTextures() {
-    std::cout << "\n=== 开始测试纹理压缩格式 ===" << std::endl;
+    CFW_LOG_DEBUG("=== Start testing texture compression formats ===");
 
     // 加载原始图像
     int width, height, channels;
     unsigned char* data = stbi_load(std::string(shaderPath + "/awesomeface.png").c_str(), &width, &height, &channels, 4);
     if (!data) {
-        std::cerr << "加载纹理失败: " << stbi_failure_reason() << std::endl;
+        CFW_LOG_ERROR("Failed to load texture: {}", stbi_failure_reason());
         return;
     }
 
-    std::cout << "原始纹理尺寸: " << width << "x" << height << ", 通道数: " << channels << std::endl;
+    CFW_LOG_DEBUG("Original texture size: {}x{}, channels: {}", width, height, channels);
 
     // 压缩为BC1格式
     auto compressedData = compressToBC1(data, width, height, 4);
-    std::cout << "BC1压缩数据大小: " << compressedData.size() << " 字节" << std::endl;
-    std::cout << "压缩比: " << (float)(width * height * 4) / compressedData.size() << ":1" << std::endl;
+    CFW_LOG_DEBUG("BC1 compressed size: {} bytes", compressedData.size());
+    CFW_LOG_DEBUG("Compression ratio: {}:1", (float)(width * height * 4) / compressedData.size());
 
     try {
         // 测试BC1_RGB_UNORM格式
-        std::cout << "\n测试 BC1_RGB_UNORM 格式..." << std::endl;
+        CFW_LOG_DEBUG("Testing BC1_RGB_UNORM format...");
         HardwareImageCreateInfo bc1UnormCreateInfo;
         bc1UnormCreateInfo.width = width;
         bc1UnormCreateInfo.height = height;
@@ -111,10 +112,10 @@ void testCompressedTextures() {
         bc1UnormCreateInfo.initialData = compressedData.data();
 
         HardwareImage textureBC1Unorm(bc1UnormCreateInfo);
-        std::cout << "✓ BC1_RGB_UNORM 纹理创建成功，描述符ID: " << textureBC1Unorm.storeDescriptor() << std::endl;
+        CFW_LOG_DEBUG("BC1_RGB_UNORM texture created success, descriptor ID: {}", textureBC1Unorm.storeDescriptor());
 
         // 测试BC1_RGB_SRGB格式
-        std::cout << "\n测试 BC1_RGB_SRGB 格式..." << std::endl;
+        CFW_LOG_DEBUG("Testing BC1_RGB_SRGB format...");
         HardwareImageCreateInfo bc1SrgbCreateInfo;
         bc1SrgbCreateInfo.width = width;
         bc1SrgbCreateInfo.height = height;
@@ -125,18 +126,54 @@ void testCompressedTextures() {
         bc1SrgbCreateInfo.initialData = compressedData.data();
 
         HardwareImage textureBC1Srgb(bc1SrgbCreateInfo);
-        std::cout << "✓ BC1_RGB_SRGB 纹理创建成功，描述符ID: " << textureBC1Srgb.storeDescriptor() << std::endl;
+        CFW_LOG_DEBUG("BC1_RGB_SRGB texture created success, descriptor ID: {}", textureBC1Srgb.storeDescriptor());
 
-        std::cout << "\n=== 所有压缩格式测试通过 ===" << std::endl;
+        CFW_LOG_DEBUG("=== All compressed format tests passed ===");
 
     } catch (const std::exception& e) {
-        std::cerr << "✗ 压缩纹理测试失败: " << e.what() << std::endl;
+        CFW_LOG_ERROR("Compress texture failed: {}", e.what());
     }
 
     stbi_image_free(data);
 }
 
+/* 系统信号处理 */
+void signal_segv_handler(int signum) {
+    std::cout << "Segmentation fault (signal " << signum << ")" << std::endl;
+    exit(signum);
+}
+void signal_arbt_handler(int signum) {
+    std::cout << "Abort signal (signal " << signum << ")" << std::endl;
+    exit(signum);
+}
+void signal_fpe_handler(int signum) {
+    std::cout << "Floating point exception (signal " << signum << ")" << std::endl;
+    exit(signum);
+}
+void signal_ill_handler(int signum) {
+    std::cout << "Illegal instruction (signal " << signum << ")" << std::endl;
+    exit(signum);
+}
+void signal_int_handler(int signum) {
+    std::cout << "Interrupt signal (signal " << signum << ")" << std::endl;
+    exit(signum);
+}
+void signal_term_handler(int signum) {
+    std::cout << "Termination signal (signal " << signum << ")" << std::endl;
+    exit(signum);
+}
+/* 系统信号处理 */
+
 int main() {
+    /* 捕获系统信号 */
+    signal(SIGSEGV, signal_segv_handler);
+    signal(SIGABRT, signal_arbt_handler);
+    signal(SIGFPE, signal_fpe_handler);
+    signal(SIGILL, signal_ill_handler);
+    signal(SIGINT, signal_int_handler);
+    signal(SIGTERM, signal_term_handler);
+    /* 捕获系统信号 */
+
     // 首先运行压缩纹理测试
     // testCompressedTextures();
     auto now = std::chrono::system_clock::now();
@@ -147,17 +184,14 @@ int main() {
     char time_buffer[64];
     std::strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d_%H-%M-%S", &now_tm);
 
-    auto const file_sink = Corona::Kernel::create_file_sink(std::string(time_buffer) + "_log.log");
-    Corona::Kernel::CoronaLogger::get_default()->add_sink(file_sink);
-    Corona::Kernel::CoronaLogger::get_default()->set_level(Corona::Kernel::LogLevel::debug);
-    Corona::Kernel::CoronaLogger::info("Starting main application...");
-
+    CFW_LOG_INFO("Starting main application...");
 
     if (glfwInit() >= 0) {
-        Corona::Kernel::CoronaLogger::info("Main thread started...");
+        CFW_LOG_INFO("Main thread started...");
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        std::vector<GLFWwindow*> windows(1);
+        constexpr std::size_t WINDOD_COUNT = 3;
+        std::vector<GLFWwindow*> windows(WINDOD_COUNT);
         for (size_t i = 0; i < windows.size(); i++) {
             windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
         }
@@ -186,7 +220,7 @@ int main() {
         int width, height, channels;
         unsigned char* data = stbi_load(std::string(shaderPath + "/awesomeface.png").c_str(), &width, &height, &channels, 0);
         if (!data) {
-            std::cerr << "stbi_load failed: " << stbi_failure_reason() << std::endl;
+            CFW_LOG_ERROR("stbi_load failed: {}", stbi_failure_reason());
         }
 
         // 创建BC1压缩纹理用于实际渲染测试
@@ -212,7 +246,7 @@ int main() {
 
         HardwareImage texture(textureCreateInfo);
 
-        std::cout << "\n使用BC1_RGB_SRGB压缩纹理进行渲染..." << std::endl;
+        CFW_LOG_INFO("Using BC1_RGB_SRGB compressed texture for rendering...");
 
         std::vector<std::vector<HardwareBuffer>> rasterizerUniformBuffers(windows.size());
         std::vector<HardwareBuffer> computeUniformBuffers(windows.size());
@@ -220,7 +254,7 @@ int main() {
         std::atomic_bool running = true;
 
         auto meshThread = [&](uint32_t threadIndex) {
-            Corona::Kernel::CoronaLogger::info("Mesh thread started...");
+            CFW_LOG_INFO("Mesh thread started...");
             ComputeUniformBufferObject computeUniformData(windows.size());
             computeUniformBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::UniformBuffer);
 
@@ -234,47 +268,66 @@ int main() {
             auto startTime = std::chrono::high_resolution_clock::now();
 
             while (running.load()) {
-                float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
+                try {
+                    float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
-                for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
-                    rasterizerUniformBufferObject[i].textureIndex = texture.storeDescriptor();
-                    rasterizerUniformBufferObject[i].model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
-                    rasterizerUniformBuffers[threadIndex][i].copyFromData(&(rasterizerUniformBufferObject[i]), sizeof(rasterizerUniformBufferObject[i]));
+                    for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
+                        rasterizerUniformBufferObject[i].textureIndex = texture.storeDescriptor();
+                        rasterizerUniformBufferObject[i].model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
+                        rasterizerUniformBuffers[threadIndex][i].copyFromData(&(rasterizerUniformBufferObject[i]), sizeof(rasterizerUniformBufferObject[i]));
+                    }
+
+                    computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
+                    computeUniformBuffers[threadIndex].copyFromData(&computeUniformData, sizeof(computeUniformData));
+                } catch (const std::exception& e) {
+                    CFW_LOG_ERROR("Mesh thread exception: {}", e.what());
+                } catch (...) {
+                    CFW_LOG_ERROR("Mesh thread unknown exception!");
                 }
-
-                computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
-                computeUniformBuffers[threadIndex].copyFromData(&computeUniformData, sizeof(computeUniformData));
             }
         };
 
         auto renderThread = [&](uint32_t threadIndex) {
-            Corona::Kernel::CoronaLogger::info("Render thread started...");
+            CFW_LOG_INFO("Render thread started...");
             RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
             ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
             while (running.load()) {
-                for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
-                    rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffers[threadIndex][i].storeDescriptor();
-                    rasterizer["inPosition"] = postionBuffer;
-                    rasterizer["inColor"] = colorBuffer;
-                    rasterizer["inTexCoord"] = uvBuffer;
-                    rasterizer["inNormal"] = normalBuffer;
-                    rasterizer["outColor"] = finalOutputImages[threadIndex];
+                try {
+                    for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
+                        rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffers[threadIndex][i].storeDescriptor();
+                        rasterizer["inPosition"] = postionBuffer;
+                        rasterizer["inColor"] = colorBuffer;
+                        rasterizer["inTexCoord"] = uvBuffer;
+                        rasterizer["inNormal"] = normalBuffer;
+                        rasterizer["outColor"] = finalOutputImages[threadIndex];
 
-                    executors[threadIndex] << rasterizer.record(indexBuffer);
+                        executors[threadIndex] << rasterizer.record(indexBuffer);
+                    }
+
+                    computer["pushConsts.uniformBufferIndex"] = computeUniformBuffers[threadIndex].storeDescriptor();
+
+                    executors[threadIndex] << rasterizer(1920, 1080)
+                                           << computer(1920 / 8, 1080 / 8, 1)
+                                           << executors[threadIndex].commit();
+                } catch (const std::exception& e) {
+                    CFW_LOG_ERROR("Render thread exception: {}", e.what());
+                } catch (...) {
+                    CFW_LOG_ERROR("Render thread unknown exception!");
                 }
-
-                computer["pushConsts.uniformBufferIndex"] = computeUniformBuffers[threadIndex].storeDescriptor();
-
-                executors[threadIndex] << rasterizer(1920, 1080)
-                                       << computer(1920 / 8, 1080 / 8, 1)
-                                       << executors[threadIndex].commit();
             }
         };
 
         auto displayThread = [&](uint32_t threadIndex) {
+            CFW_LOG_INFO("Display thread started...");
             HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
             while (running.load()) {
-                displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
+                try {
+                    displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
+                } catch (const std::exception& e) {
+                    CFW_LOG_ERROR("Display thread exception: {}", e.what());
+                } catch (...) {
+                    CFW_LOG_ERROR("Display thread unknown exception!");
+                }
             }
         };
 

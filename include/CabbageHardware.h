@@ -149,7 +149,7 @@ struct HardwareImage {
    public:
     HardwareImage();
     HardwareImage(const HardwareImage& other);
-    HardwareImage(const HardwareImageCreateInfo& createInfo);
+    explicit HardwareImage(const HardwareImageCreateInfo& createInfo);
 
     ~HardwareImage();
 

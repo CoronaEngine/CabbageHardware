@@ -39,9 +39,7 @@ HardwareContext::HardwareContext() {
 
     chooseMainDevice();
 
-#ifdef CABBAGE_ENGINE_DEBUG
-    std::cout << "Hardware Context initialized with " << hardwareUtils.size() << " device(s)\n";
-#endif
+    CFW_LOG_DEBUG("Hardware Context initialized with {} device(s)", hardwareUtils.size());
 }
 
 HardwareContext::~HardwareContext() {
@@ -175,7 +173,7 @@ void HardwareContext::createVkInstance(const CreateCallback& initInfo) {
                                                                                    });
 
                                                 if (!supported) {
-                                                    std::cerr << "Warning: Instance extension not supported: " << ext << "\n";
+                                                    CFW_LOG_WARNING("Warning: Instance extension not supported: {}", ext);
                                                 }
                                                 return !supported;
                                             }),
@@ -256,8 +254,6 @@ void HardwareContext::chooseMainDevice() {
                                        return getDeviceTypePriority(typeA) < getDeviceTypePriority(typeB);
                                    });
 
-#ifdef CABBAGE_ENGINE_DEBUG
-    const auto& props = mainDevice->deviceManager.getFeaturesUtils().supportedProperties.properties;
-    std::cout << "Selected main device: " << props.deviceName << "\n";
-#endif
+    CFW_LOG_DEBUG("Selected main device: {}",
+                  mainDevice->deviceManager.getFeaturesUtils().supportedProperties.properties.deviceName);
 }

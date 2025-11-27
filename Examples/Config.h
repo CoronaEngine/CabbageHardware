@@ -6,6 +6,7 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <vector>
 
 // 着色器路径解析
 inline std::string resolveShaderPath() {

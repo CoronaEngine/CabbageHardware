@@ -12,11 +12,17 @@ DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
 
         if (queue->queueMutex->try_lock()) {
             uint64_t timelineCounterValue = 0;
-            vkGetSemaphoreCounterValue(queue->deviceManager->logicalDevice, queue->timelineSemaphore, &timelineCounterValue);
-            if (timelineCounterValue >= queue->timelineValue->fetch_add(0)) {
-                break;
+            VkResult result = vkGetSemaphoreCounterValue(queue->deviceManager->logicalDevice, queue->timelineSemaphore, &timelineCounterValue);
+            if (result == VK_SUCCESS) {
+                if (timelineCounterValue >= queue->timelineValue->load(std::memory_order_acquire)) {
+                    break;
+                } else {
+                    queue->queueMutex->unlock();
+                }
             } else {
                 queue->queueMutex->unlock();
+                CFW_LOG_ERROR("Failed to get timeline semaphore counter value for queue index {}!", queueIndex);
+                return nullptr;
             }
         }
 
@@ -24,7 +30,6 @@ DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
     }
 
     commitCommand(queue);
-
     queue->queueMutex->unlock();
 
     return queue;
@@ -81,7 +86,7 @@ HardwareExecutorVulkan& HardwareExecutorVulkan::commit() {
             VkSemaphoreSubmitInfo timelineSignalSemaphoreSubmitInfo{};
             timelineSignalSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             timelineSignalSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
-            timelineSignalSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->fetch_add(0);
+            timelineSignalSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->load(std::memory_order_acquire);
             timelineSignalSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
             signalSemaphores.push_back(timelineSignalSemaphoreSubmitInfo);
 
@@ -122,6 +127,12 @@ HardwareExecutorVulkan& HardwareExecutorVulkan::commit() {
             case CommandRecordVulkan::ExecutorType::Transfer:
                 pickQueueAndCommit(hardwareContext->deviceManager.currentTransferQueueIndex, hardwareContext->deviceManager.transferQueues, commitToQueue);
                 break;
+            case CommandRecordVulkan::ExecutorType::Invalid:
+                CFW_LOG_ERROR("No valid command to commit in HardwareExecutorVulkan!");
+                break;
+            default:
+                CFW_LOG_ERROR("Unknown executor type in HardwareExecutorVulkan!");
+                break;
         }
 
         commandList.clear();
@@ -135,7 +146,7 @@ HardwareExecutorVulkan& HardwareExecutorVulkan::commit() {
         VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
         timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
         timelineWaitSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
-        timelineWaitSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->fetch_add(0);
+        timelineWaitSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->load(std::memory_order_acquire);
         timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);
     }
