@@ -53,7 +53,6 @@ struct HardwareExecutorVulkan {
         : hardwareContext(globalHardwareContext.getMainDevice()) {
     }
 
-    HardwareExecutorVulkan() = delete;
     ~HardwareExecutorVulkan() = default;
 
     HardwareExecutorVulkan& operator<<(CommandRecordVulkan* commandRecord) {
