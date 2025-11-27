@@ -1,7 +1,5 @@
 ﻿#include "HardwareExecutorVulkan.h"
 
-#include <format>
-
 DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomic_uint16_t& currentQueueIndex,
                                                                       std::vector<DeviceManager::QueueUtils>& currentQueues,
                                                                       std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand) {
@@ -23,7 +21,7 @@ DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
                 }
             } else {
                 queue->queueMutex->unlock();
-                Corona::Kernel::CoronaLogger::error(std::format("Failed to get timeline semaphore counter value for queue index {}!", queueIndex));
+                CFW_LOG_ERROR("Failed to get timeline semaphore counter value for queue index {}!", queueIndex);
                 return nullptr;
             }
         }
@@ -101,11 +99,6 @@ HardwareExecutorVulkan& HardwareExecutorVulkan::commit() {
             submitInfo.commandBufferInfoCount = 1;
             submitInfo.pCommandBufferInfos = &commandBufferSubmitInfo;
 
-            // Corona::Kernel::CoronaLogger::info(std::format("VKQueue address: {}, timeline wait value: {}, timeline signal value: {}",
-            //                                                reinterpret_cast<std::uintptr_t>(currentRecordQueue->vkQueue),
-            //                                                timelineWaitSemaphoreSubmitInfo.value,
-            //                                                timelineSignalSemaphoreSubmitInfo.value));
-
             VkResult result = vkQueueSubmit2(currentRecordQueue->vkQueue, 1, &submitInfo, waitFence);
             if (result != VK_SUCCESS) {
                 throw std::runtime_error("Failed to submit command buffer!");
@@ -135,10 +128,10 @@ HardwareExecutorVulkan& HardwareExecutorVulkan::commit() {
                 pickQueueAndCommit(hardwareContext->deviceManager.currentTransferQueueIndex, hardwareContext->deviceManager.transferQueues, commitToQueue);
                 break;
             case CommandRecordVulkan::ExecutorType::Invalid:
-                Corona::Kernel::CoronaLogger::error("No valid command to commit in HardwareExecutorVulkan!");
+                CFW_LOG_ERROR("No valid command to commit in HardwareExecutorVulkan!");
                 break;
             default:
-                Corona::Kernel::CoronaLogger::error("Unknown executor type in HardwareExecutorVulkan!");
+                CFW_LOG_ERROR("Unknown executor type in HardwareExecutorVulkan!");
                 break;
         }
 

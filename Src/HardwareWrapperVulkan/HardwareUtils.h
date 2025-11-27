@@ -2,8 +2,9 @@
 
 #include <corona/pal/cfw_platform.h>
 
-#include <iostream>
 #include <source_location>
+
+#include "corona/kernel/core/i_logger.h"
 
 #if defined(CFW_PLATFORM_WINDOWS)
 #include <Windows.h>
@@ -93,17 +94,19 @@ static inline void coronaHardwareCheck(VkResult result, const std::source_locati
 }
 
 inline void printDeviceInfo(const VkPhysicalDeviceProperties& properties) {
-    std::cout << "---------- GPU: " << properties.deviceName << " ----------" << std::endl;
+    CFW_LOG_INFO("---------- GPU: {} ----------", properties.deviceName);
 }
 
 inline void printExtensionWarning(const char* extensionName) {
-    std::cerr << "      Extensions Warning: Device does not support: " << extensionName << std::endl;
+    CFW_LOG_WARNING("      Extensions Warning: Device does not support: {}", extensionName);
 }
 
 inline VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
-    std::cerr << "---------- Vulkan Validation Layer ----------\n"
-              << pCallbackData->pMessage << "\n"
-              << "----------------------------------------------\n";
+    CFW_LOG_ERROR(
+        "---------- Vulkan Validation Layer ----------\n"
+        "{}\n"
+        "----------------------------------------------\n",
+        pCallbackData->pMessage);
     return VK_FALSE;
 }
 

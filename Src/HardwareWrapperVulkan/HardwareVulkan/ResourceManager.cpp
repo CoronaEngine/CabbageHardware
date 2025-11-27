@@ -116,11 +116,14 @@ void ResourceManager::createVmaAllocator() {
         return bytes / 1073741824.0;  // 1024^3
     };
 
-    std::cout << "[ResourceManager] VMA Allocator created successfully:\n"
-              << "  Device Memory:        " << std::fixed << std::setprecision(2)
-              << toGB(deviceMemorySize) << " GB\n"
-              << "  Host Shared Memory:   " << toGB(hostSharedMemorySize) << " GB\n"
-              << "  Multi-Instance Memory: " << toGB(multiInstanceMemorySize) << " GB\n";
+    CFW_LOG_DEBUG(
+        "[ResourceManager] VMA Allocator created successfully:\n"
+        "  Device Memory:        {:.2f} GB\n"
+        "  Host Shared Memory:   {:.2f} GB\n"
+        "  Multi-Instance Memory: {:.2f} GB",
+        toGB(deviceMemorySize),
+        toGB(hostSharedMemorySize),
+        toGB(multiInstanceMemorySize));
 #endif
 }
 
@@ -331,14 +334,16 @@ void ResourceManager::createExternalBufferMemoryPool() {
 
     coronaHardwareCheck(vmaCreatePool(vmaAllocator, &poolInfo, &exportBufferPool));
 
-#ifdef CABBAGE_ENGINE_DEBUG
-    std::cout << "[ResourceManager] External memory pool created:\n"
-              << "  Memory Type Index: " << memoryTypeIndex << "\n"
-              << "  Handle Type: 0x" << std::hex << EXTERNAL_MEMORY_HANDLE_TYPE << std::dec << "\n"
-              << "  Queue Sharing Mode: "
-              << (bufferInfo.sharingMode == VK_SHARING_MODE_CONCURRENT ? "CONCURRENT" : "EXCLUSIVE") << "\n"
-              << "  Queue Family Count: " << queueFamilyCount << std::endl;
-#endif
+    CFW_LOG_DEBUG(
+        "[ResourceManager] External memory pool created:\n"
+        "  Memory Type Index: {}\n"
+        "  Handle Type: 0x{:X}\n"
+        "  Queue Sharing Mode: {}\n"
+        "  Queue Family Count: {}",
+        memoryTypeIndex,
+        EXTERNAL_MEMORY_HANDLE_TYPE,
+        (bufferInfo.sharingMode == VK_SHARING_MODE_CONCURRENT ? "CONCURRENT" : "EXCLUSIVE"),
+        queueFamilyCount);
 }
 
 ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 imageSize,
@@ -428,15 +433,8 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
                                      mipLevels;
     deviceMemorySize += imageMemorySize;
 
-#ifdef CABBAGE_ENGINE_DEBUG
-    std::cout << "[ResourceManager] Image created: "
-              << imageSize.x << "x" << imageSize.y
-              << " Format: 0x" << std::hex << imageFormat << std::dec
-              << " Layers: " << arrayLayers
-              << " Mips: " << mipLevels
-              << " Size: " << (imageMemorySize / 1024.0 / 1024.0) << " MB"
-              << std::endl;
-#endif
+    CFW_LOG_DEBUG("Image created: {}x{} Format: 0x{:X} Layers: {} Mips: {} Size: {:.2f} MB",
+                  imageSize.x, imageSize.y, static_cast<uint32_t>(imageFormat), arrayLayers, mipLevels, (imageMemorySize / 1024.0 / 1024.0));
 
     return resultImage;
 }
@@ -463,7 +461,7 @@ VkImageView ResourceManager::createImageView(ImageHardwareWrap& image) {
 VkImageView ResourceManager::createImageViewForMipLevel(ImageHardwareWrap& image, uint32_t mipLevel) {
     // 验证 mipLevel 有效性
     if (mipLevel >= image.mipLevels) {
-        throw std::runtime_error("Invalid mip level: " + std::to_string(mipLevel) + 
+        throw std::runtime_error("Invalid mip level: " + std::to_string(mipLevel) +
                                  " (max: " + std::to_string(image.mipLevels - 1) + ")");
     }
 
@@ -482,11 +480,8 @@ VkImageView ResourceManager::createImageViewForMipLevel(ImageHardwareWrap& image
     VkImageView imageView;
     coronaHardwareCheck(vkCreateImageView(device->getLogicalDevice(), &viewInfo, nullptr, &imageView));
 
-#ifdef CABBAGE_ENGINE_DEBUG
-    std::cout << "[ResourceManager] Created ImageView for mip level " << mipLevel 
-              << " (size: " << (image.imageSize.x >> mipLevel) << "x" 
-              << (image.imageSize.y >> mipLevel) << ")" << std::endl;
-#endif
+    CFW_LOG_DEBUG("[ResourceManager] Created ImageView for mip level {} (size: {}x{})",
+                  mipLevel, (image.imageSize.x >> mipLevel), (image.imageSize.y >> mipLevel));
 
     return imageView;
 }
@@ -790,13 +785,13 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     // 覆盖 size 以便后续 copy 时使用逻辑大小
     importedBuffer.bufferAllocInfo.size = allocSize;
 
-#ifdef CABBAGE_ENGINE_DEBUG
-    std::cout << "[Import] External CUDA buffer imported. "
-              << "logicalSize=" << logicalSize
-              << " allocSize=" << allocSize
-              << " dedicatedOnly=" << dedicatedOnly
-              << " feats=0x" << std::hex << feats << std::dec << std::endl;
-#endif
+    CFW_LOG_DEBUG(
+        "[Import] External CUDA buffer imported. "
+        "logicalSize={} allocSize={} dedicatedOnly={} feats=0x{:X}",
+        logicalSize,
+        allocSize,
+        dedicatedOnly,
+        feats);
 
     return importedBuffer;
 }

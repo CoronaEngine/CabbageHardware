@@ -26,3 +26,10 @@ target_link_libraries(CabbageHardware PUBLIC
     Vulkan-Headers
     VulkanMemoryAllocator
 )
+
+# 忽略第三方库（VulkanMemoryAllocator）的 nullability 警告
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options(CabbageHardware PRIVATE
+        -Wno-nullability-completeness
+    )
+endif()
