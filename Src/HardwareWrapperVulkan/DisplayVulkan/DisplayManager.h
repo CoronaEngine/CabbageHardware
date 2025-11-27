@@ -4,7 +4,7 @@
 #include <numeric>
 
 #include "CabbageHardware.h"
-#include "HardwareWrapperVulkan/HardwareUtils.h"
+#include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 
 class DisplayManager {
@@ -38,9 +38,17 @@ class DisplayManager {
     ResourceManager::ImageHardwareWrap displayImage{};
 
     // 同步对象
-    std::vector<VkSemaphore> imageAvailableSemaphores;
-    std::vector<VkSemaphore> renderFinishedSemaphores;
-    std::vector<VkFence> inFlightFences;
+    //std::vector<VkSemaphore> imageAvailableSemaphores;
+    //std::vector<VkSemaphore> renderFinishedSemaphores;
+    //std::vector<VkFence> inFlightFences;
+
+    // 必须用于vkAcquireNextImageKHR
+    VkSemaphore binaryAcquireSemaphore;
+    // 可用于呈现
+    VkSemaphore binaryPresentSemaphore;
+    // 用于所有内部同步
+    VkSemaphore timelineSemaphore;  
+    uint64_t timelineValue = 0;
 
     // 队列和设备
     std::atomic_uint16_t currentQueueIndex{0};
