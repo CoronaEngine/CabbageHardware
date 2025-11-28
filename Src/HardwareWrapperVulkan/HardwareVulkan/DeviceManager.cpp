@@ -192,13 +192,11 @@ void DeviceManager::choosePresentQueueFamily() {
             const VkQueueFlags flags = queueFamilies[i].queueFlags;
             if (flags & VK_QUEUE_GRAPHICS_BIT) {
                 graphicsQueues.push_back(queueUtils);
-                break;
-            } 
-            //else if (flags & VK_QUEUE_COMPUTE_BIT) {
-            //    computeQueues.push_back(queueUtils);
-            //} else if (flags & VK_QUEUE_TRANSFER_BIT) {
-            //    transferQueues.push_back(queueUtils);
-            //}
+            } else if (flags & VK_QUEUE_COMPUTE_BIT) {
+                computeQueues.push_back(queueUtils);
+            } else if (flags & VK_QUEUE_TRANSFER_BIT) {
+                transferQueues.push_back(queueUtils);
+            }
         }
     }
 
