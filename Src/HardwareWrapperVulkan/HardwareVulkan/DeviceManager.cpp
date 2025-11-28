@@ -48,10 +48,6 @@ void DeviceManager::cleanUpDeviceManager() {
 
 void DeviceManager::destroyQueueResources(std::vector<QueueUtils>& queues) {
     for (auto& queue : queues) {
-
-        // TODO: 使用锁保护清理过程，虽然通常 cleanup 是单线程的
-        //std::lock_guard<std::mutex> lock(queue.queueMutex.);
-
         if (queue.commandBuffer != VK_NULL_HANDLE && queue.commandPool != VK_NULL_HANDLE) {
             vkFreeCommandBuffers(logicalDevice, queue.commandPool, 1, &queue.commandBuffer);
             queue.commandBuffer = VK_NULL_HANDLE;
@@ -68,7 +64,6 @@ void DeviceManager::destroyQueueResources(std::vector<QueueUtils>& queues) {
         }
 
         queue.vkQueue = VK_NULL_HANDLE;
-        // q.timelineValue.store(0);
         queue.queueFamilyIndex = static_cast<uint32_t>(-1);
         queue.queueMutex.reset();
         queue.deviceManager = nullptr;
@@ -180,7 +175,6 @@ void DeviceManager::choosePresentQueueFamily() {
         QueueUtils baseQueueUtils;
         baseQueueUtils.queueFamilyIndex = static_cast<uint32_t>(i);
         baseQueueUtils.deviceManager = this;
-        // tempQueueUtils.timelineValue.store(0);
 
         for (uint32_t queueIndex = 0; queueIndex < queueFamilies[i].queueCount; queueIndex++) {
             QueueUtils queueUtils = baseQueueUtils;
@@ -211,6 +205,8 @@ void DeviceManager::choosePresentQueueFamily() {
     } else {
         throw std::runtime_error("No graphics queues found!");
     }
+
+    // TODO: 变成一个队列，这里可以输出日志
 }
 
 bool DeviceManager::createCommandBuffers() {
