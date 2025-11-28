@@ -38,17 +38,11 @@ class DisplayManager {
     ResourceManager::ImageHardwareWrap displayImage{};
 
     // 同步对象
-    //std::vector<VkSemaphore> imageAvailableSemaphores;
-    //std::vector<VkSemaphore> renderFinishedSemaphores;
-    //std::vector<VkFence> inFlightFences;
-
-    // 必须用于vkAcquireNextImageKHR
-    VkSemaphore binaryAcquireSemaphore;
-    // 可用于呈现
-    VkSemaphore binaryPresentSemaphore;
-    // 用于所有内部同步
-    VkSemaphore timelineSemaphore;
-    uint64_t timelineValue = 0;
+    std::vector<VkSemaphore> binaryAcquireSemaphore; // 必须用于vkAcquireNextImageKHR
+    std::vector<VkSemaphore> binaryPresentSemaphore;
+    VkSemaphore timelineSemaphore = VK_NULL_HANDLE;
+    // std::vector<VkFence> inFlightFences;
+    uint64_t frameCounter = 0; // 全局帧计数器
 
     // 队列和设备
     std::atomic_uint16_t currentQueueIndex{0};
