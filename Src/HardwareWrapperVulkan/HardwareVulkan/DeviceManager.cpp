@@ -12,7 +12,7 @@ void DeviceManager::initDeviceManager(const CreateCallback& createCallback, cons
     this->physicalDevice = physicalDevice;
 
     createDevices(createCallback, vkInstance);
-    choosePresentQueueFamily();
+    createQueueUtils();
     //createCommandBuffers();
     // createTimelineSemaphore();
 
@@ -221,7 +221,7 @@ void DeviceManager::createDevices(const CreateCallback& initInfo, const VkInstan
     coronaHardwareCheck(vkCreateDevice(physicalDevice, &createInfo, nullptr, &logicalDevice));
 }
 
-void DeviceManager::choosePresentQueueFamily() {
+void DeviceManager::createQueueUtils() {
     auto createTimelineSemaphoreForQueue = [&](QueueUtils& queue) {
         VkExportSemaphoreCreateInfo exportInfo{};
         exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
