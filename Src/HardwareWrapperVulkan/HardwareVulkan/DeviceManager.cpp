@@ -13,7 +13,7 @@ void DeviceManager::initDeviceManager(const CreateCallback& createCallback, cons
 
     createDevices(createCallback, vkInstance);
     choosePresentQueueFamily();
-    createCommandBuffers();
+    //createCommandBuffers();
     // createTimelineSemaphore();
 
     for (auto& queue : graphicsQueues) {
