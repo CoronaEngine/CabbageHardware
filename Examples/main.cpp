@@ -238,7 +238,7 @@ int main() {
         HardwareImageCreateInfo textureCreateInfo;
         textureCreateInfo.width = width;
         textureCreateInfo.height = height;
-        textureCreateInfo.format = ImageFormat::BC1_RGB_SRGB;  // 使用BC1_RGB_SRGB进行渲染测试
+        textureCreateInfo.format = ImageFormat::BC1_RGB_SRGB; // 使用BC1_RGB_SRGB进行渲染测试
         textureCreateInfo.usage = ImageUsage::SampledImage;
         textureCreateInfo.arrayLayers = 1;
         textureCreateInfo.mipLevels = 1;
