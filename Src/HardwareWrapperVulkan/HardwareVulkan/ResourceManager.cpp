@@ -859,39 +859,6 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void* host
     return bufferWrap;
 }
 
-int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image) {
-    if (image->bindlessIndex < 0) {
-        image->bindlessIndex = globalImageStorages.seq_id(image);
-
-        VkDescriptorType descriptorType = (image->imageUsage & VK_IMAGE_USAGE_STORAGE_BIT) ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-
-        VkDescriptorImageInfo imageInfo{};
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-        imageInfo.imageView = image->imageView;
-        imageInfo.sampler = textureSampler;
-
-        VkWriteDescriptorSet write{};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.descriptorType = descriptorType;
-        write.descriptorCount = 1;
-        write.dstArrayElement = image->bindlessIndex;
-        write.pImageInfo = &imageInfo;
-
-        if (write.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
-            write.dstSet = bindlessDescriptors[textureBinding].descriptorSet;
-            write.dstBinding = 0;
-        }
-        if (write.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
-            write.dstSet = bindlessDescriptors[storageImageBinding].descriptorSet;
-            write.dstBinding = 0;
-        }
-
-        vkUpdateDescriptorSets(device->getLogicalDevice(), 1, &write, 0, nullptr);
-    }
-
-    return image->bindlessIndex;
-}
-
 int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image, uint32_t mipLevel) {
     if (mipLevel >= image->mipLevels) {
         return -1;
@@ -1020,30 +987,6 @@ ResourceManager& ResourceManager::copyImage(VkCommandBuffer& commandBuffer,
 
 ResourceManager& ResourceManager::copyBufferToImage(VkCommandBuffer& commandBuffer,
                                                     BufferHardwareWrap& buffer,
-                                                    ImageHardwareWrap& image) {
-    VkBufferImageCopy region{};
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = image.aspectMask;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = image.arrayLayers;
-    region.imageOffset = {0, 0, 0};
-    region.imageExtent = {image.imageSize.x, image.imageSize.y, 1};
-
-    vkCmdCopyBufferToImage(commandBuffer,
-                           buffer.bufferHandle,
-                           image.imageHandle,
-                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                           1,
-                           &region);
-
-    return *this;
-}
-
-ResourceManager& ResourceManager::copyBufferToImage(VkCommandBuffer& commandBuffer,
-                                                    BufferHardwareWrap& buffer,
                                                     ImageHardwareWrap& image,
                                                     uint32_t mipLevel) {
     if (mipLevel >= image.mipLevels) {
@@ -1059,7 +1002,7 @@ ResourceManager& ResourceManager::copyBufferToImage(VkCommandBuffer& commandBuff
     region.bufferRowLength = 0;
     region.bufferImageHeight = 0;
     region.imageSubresource.aspectMask = image.aspectMask;
-    region.imageSubresource.mipLevel = mipLevel;  // 指定 mip level
+    region.imageSubresource.mipLevel = mipLevel; // 指定 mip level
     region.imageSubresource.baseArrayLayer = 0;
     region.imageSubresource.layerCount = image.arrayLayers;
     region.imageOffset = {0, 0, 0};

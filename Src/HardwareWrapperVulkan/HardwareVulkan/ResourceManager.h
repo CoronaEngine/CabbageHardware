@@ -56,9 +56,7 @@ struct ResourceManager {
 
         int32_t bindlessIndex = -1;
 
-        // TODO: 创建图片时同时创建各个 mip level 的 image view，存储在这里以便快速访问
         std::vector<VkImageView> mipLevelViews;
-        // TODO: 去掉，绑定时动态计算
         std::vector<int32_t> mipLevelBindlessIndices;
 
         DeviceManager* device = nullptr;
@@ -107,16 +105,12 @@ struct ResourceManager {
     [[nodiscard]] BufferHardwareWrap importHostBuffer(void* hostPtr, uint64_t size);
 
     // Descriptor operations
-    // TODO: 合并重复代码
-    [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image);
-    [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image, uint32_t mipLevel);
+    [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image, uint32_t mipLevel = 0);
     [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& buffer);
 
     // Copy operations
     ResourceManager& copyBuffer(VkCommandBuffer& commandBuffer, BufferHardwareWrap& srcBuffer, BufferHardwareWrap& dstBuffer);
     ResourceManager& copyImage(VkCommandBuffer& commandBuffer, ImageHardwareWrap& source, ImageHardwareWrap& destination);
-    // TODO: 合并重复代码
-    ResourceManager& copyBufferToImage(VkCommandBuffer& commandBuffer, BufferHardwareWrap& buffer, ImageHardwareWrap& image);
     ResourceManager& copyBufferToImage(VkCommandBuffer& commandBuffer, BufferHardwareWrap& buffer, ImageHardwareWrap& image, uint32_t mipLevel = 0);
     ResourceManager& copyImageToBuffer(VkCommandBuffer& commandBuffer, ImageHardwareWrap& image, BufferHardwareWrap& buffer);
     ResourceManager& blitImage(VkCommandBuffer& commandBuffer, ImageHardwareWrap& srcImage, ImageHardwareWrap& dstImage);
