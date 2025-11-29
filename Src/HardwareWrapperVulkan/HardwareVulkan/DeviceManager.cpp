@@ -1,4 +1,5 @@
 ﻿#include "DeviceManager.h"
+
 #include <algorithm>
 
 DeviceManager::DeviceManager() = default;
@@ -13,7 +14,51 @@ void DeviceManager::initDeviceManager(const CreateCallback& createCallback, cons
     createDevices(createCallback, vkInstance);
     choosePresentQueueFamily();
     createCommandBuffers();
-    createTimelineSemaphore();
+    // createTimelineSemaphore();
+
+    for (auto& queue : graphicsQueues) {
+        CFW_LOG_INFO(
+            "Graphics Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
+            queue.queueFamilyIndex,
+            reinterpret_cast<std::uintptr_t>(&queue),
+            reinterpret_cast<std::uintptr_t>(queue.vkQueue),
+            reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
+            reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
+            reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
+            reinterpret_cast<std::uintptr_t>(queue.commandPool),
+            reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
+            reinterpret_cast<std::uintptr_t>(queue.deviceManager));
+    }
+    for (auto& queue : computeQueues) {
+        CFW_LOG_INFO(
+            "Compute Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
+            queue.queueFamilyIndex,
+            reinterpret_cast<std::uintptr_t>(&queue),
+            reinterpret_cast<std::uintptr_t>(queue.vkQueue),
+            reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
+            reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
+            reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
+            reinterpret_cast<std::uintptr_t>(queue.commandPool),
+            reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
+            reinterpret_cast<std::uintptr_t>(queue.deviceManager));
+    }
+    for (auto& queue : transferQueues) {
+        CFW_LOG_INFO(
+            "Transfer Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
+            queue.queueFamilyIndex,
+            reinterpret_cast<std::uintptr_t>(&queue),
+            reinterpret_cast<std::uintptr_t>(queue.vkQueue),
+            reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
+            reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
+            reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
+            reinterpret_cast<std::uintptr_t>(queue.commandPool),
+            reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
+            reinterpret_cast<std::uintptr_t>(queue.deviceManager));
+    }
+
+    CFW_LOG_INFO("Graphics Queue Count: {}", graphicsQueues.size());
+    CFW_LOG_INFO("Compute Queue Count: {}", computeQueues.size());
+    CFW_LOG_INFO("Transfer Queue Count: {}", transferQueues.size());
 }
 
 void DeviceManager::cleanUpDeviceManager() {
@@ -48,10 +93,6 @@ void DeviceManager::cleanUpDeviceManager() {
 
 void DeviceManager::destroyQueueResources(std::vector<QueueUtils>& queues) {
     for (auto& queue : queues) {
-
-        // TODO: 使用锁保护清理过程，虽然通常 cleanup 是单线程的
-        //std::lock_guard<std::mutex> lock(queue.queueMutex.);
-
         if (queue.commandBuffer != VK_NULL_HANDLE && queue.commandPool != VK_NULL_HANDLE) {
             vkFreeCommandBuffers(logicalDevice, queue.commandPool, 1, &queue.commandBuffer);
             queue.commandBuffer = VK_NULL_HANDLE;
@@ -68,7 +109,6 @@ void DeviceManager::destroyQueueResources(std::vector<QueueUtils>& queues) {
         }
 
         queue.vkQueue = VK_NULL_HANDLE;
-        // q.timelineValue.store(0);
         queue.queueFamilyIndex = static_cast<uint32_t>(-1);
         queue.queueMutex.reset();
         queue.deviceManager = nullptr;
@@ -98,9 +138,15 @@ void DeviceManager::createTimelineSemaphore() {
         coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &queue.timelineSemaphore));
     };
 
-    for (auto& queue : graphicsQueues) createTimelineSemaphoreForQueue(queue);
-    for (auto& queue : computeQueues) createTimelineSemaphoreForQueue(queue);
-    for (auto& queue : transferQueues) createTimelineSemaphoreForQueue(queue);
+    for (auto& queue : graphicsQueues) {
+        createTimelineSemaphoreForQueue(queue);
+    }
+    for (auto& queue : computeQueues) {
+        createTimelineSemaphoreForQueue(queue);
+    }
+    for (auto& queue : transferQueues) {
+        createTimelineSemaphoreForQueue(queue);
+    }
 }
 
 void DeviceManager::createDevices(const CreateCallback& initInfo, const VkInstance& vkInstance) {
@@ -176,15 +222,37 @@ void DeviceManager::createDevices(const CreateCallback& initInfo, const VkInstan
 }
 
 void DeviceManager::choosePresentQueueFamily() {
+    auto createTimelineSemaphoreForQueue = [&](QueueUtils& queue) {
+        VkExportSemaphoreCreateInfo exportInfo{};
+        exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
+        exportInfo.pNext = nullptr;
+#if _WIN32 || _WIN64
+        exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+#endif
+        VkSemaphoreTypeCreateInfo typeCreateInfo{};
+        typeCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO_KHR;
+        typeCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR;
+        typeCreateInfo.initialValue = 0;
+        typeCreateInfo.pNext = &exportInfo;
+
+        VkSemaphoreCreateInfo semaphoreInfo{};
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        semaphoreInfo.pNext = &typeCreateInfo;
+
+        coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &queue.timelineSemaphore));
+    };
+
+    int queue_count = 0;
+
     for (int i = 0; i < queueFamilies.size(); i++) {
         QueueUtils baseQueueUtils;
         baseQueueUtils.queueFamilyIndex = static_cast<uint32_t>(i);
         baseQueueUtils.deviceManager = this;
-        // tempQueueUtils.timelineValue.store(0);
 
         for (uint32_t queueIndex = 0; queueIndex < queueFamilies[i].queueCount; queueIndex++) {
             QueueUtils queueUtils = baseQueueUtils;
             queueUtils.queueMutex = std::make_shared<std::mutex>();
+
             queueUtils.timelineValue = std::make_shared<std::atomic_uint64_t>(0);
 
             vkGetDeviceQueue(logicalDevice, static_cast<uint32_t>(i), queueIndex, &queueUtils.vkQueue);
@@ -192,10 +260,22 @@ void DeviceManager::choosePresentQueueFamily() {
             const VkQueueFlags flags = queueFamilies[i].queueFlags;
             if (flags & VK_QUEUE_GRAPHICS_BIT) {
                 graphicsQueues.push_back(queueUtils);
-            } else if (flags & VK_QUEUE_COMPUTE_BIT) {
+                createTimelineSemaphoreForQueue(graphicsQueues.at(graphicsQueues.size() - 1));
+                ++queue_count;
+                if (queue_count > 1) {
+                    break;
+                }
+            } /*else if (flags & VK_QUEUE_COMPUTE_BIT) {
                 computeQueues.push_back(queueUtils);
+                createTimelineSemaphoreForQueue(computeQueues.at(computeQueues.size() - 1));
+                ++queue_count;
             } else if (flags & VK_QUEUE_TRANSFER_BIT) {
                 transferQueues.push_back(queueUtils);
+                createTimelineSemaphoreForQueue(transferQueues.at(transferQueues.size() - 1));
+                ++queue_count;
+            } */
+            else {
+                CFW_LOG_WARNING("Queue Family Index {} does not support graphics, compute, or transfer operations.", i);
             }
         }
     }
@@ -210,6 +290,8 @@ void DeviceManager::choosePresentQueueFamily() {
     } else {
         throw std::runtime_error("No graphics queues found!");
     }
+
+    // TODO: 变成一个队列，这里可以输出日志
 }
 
 bool DeviceManager::createCommandBuffers() {

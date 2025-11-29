@@ -149,6 +149,39 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
     }
 }
 
+HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage, int arrayLayers, void* imageData) {
+    const auto [vkFormat, pixelSize, isCompressed] = convertImageFormat(imageFormat);
+    const VkImageUsageFlags vkUsage = convertImageUsage(imageUsage, isCompressed);
+
+    imageID = std::make_shared<uintptr_t>(globalImageStorages.allocate());
+
+    {
+        const auto handle = globalImageStorages.acquire_write(*imageID);
+
+        *handle = globalHardwareContext.getMainDevice()->resourceManager.createImage(
+            ktm::uvec2(width, height),
+            vkFormat,
+            pixelSize,
+            vkUsage,
+            arrayLayers);
+        handle->refCount = 1;
+    }
+
+    if (imageData != nullptr) {
+        HardwareExecutorVulkan tempExecutor;
+
+        auto imageHandle = globalImageStorages.acquire_write(*imageID);
+        HardwareBuffer stagingBuffer(imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize,
+                                     BufferUsage::StorageBuffer,
+                                     imageData);
+
+        auto bufferHandle = globalBufferStorages.acquire_write(*stagingBuffer.bufferID);
+
+        CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, 0);
+        tempExecutor << &copyCmd << tempExecutor.commit();
+    }
+}
+
 HardwareImage::HardwareImage(const HardwareImage& other)
     : imageID(other.imageID) {
     if (*imageID > 0) {

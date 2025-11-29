@@ -149,7 +149,8 @@ struct HardwareImage {
    public:
     HardwareImage();
     HardwareImage(const HardwareImage& other);
-    explicit HardwareImage(const HardwareImageCreateInfo& createInfo);
+    HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage = ImageUsage::SampledImage, int arrayLayers = 1, void* imageData = nullptr);
+    HardwareImage(const HardwareImageCreateInfo& createInfo);
 
     ~HardwareImage();
 

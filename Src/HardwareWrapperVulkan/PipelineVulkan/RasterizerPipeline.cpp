@@ -756,7 +756,7 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExe
             vkCmdBindIndexBuffer(commandBuffer,
                                  handle->bufferHandle,
                                  0,
-                                 VK_INDEX_TYPE_UINT32);
+                                 VK_INDEX_TYPE_UINT16);
         }
 
         // 推送常量

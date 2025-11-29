@@ -99,9 +99,14 @@ HardwareExecutorVulkan& HardwareExecutorVulkan::commit() {
             submitInfo.commandBufferInfoCount = 1;
             submitInfo.pCommandBufferInfos = &commandBufferSubmitInfo;
 
-            VkResult result = vkQueueSubmit2(currentRecordQueue->vkQueue, 1, &submitInfo, waitFence);
-            if (result != VK_SUCCESS) {
-                throw std::runtime_error("Failed to submit command buffer!");
+            try {
+                VkResult result = vkQueueSubmit2(currentRecordQueue->vkQueue, 1, &submitInfo, waitFence);
+                if (result != VK_SUCCESS) {
+                    throw std::runtime_error("Failed to submit command buffer!");
+                }
+            } catch (const std::exception& e) {
+                CFW_LOG_ERROR("Failed to submit command buffer: {}", e.what());
+                return false;
             }
 
             return true;

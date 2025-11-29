@@ -190,7 +190,7 @@ int main() {
         CFW_LOG_INFO("Main thread started...");
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        constexpr std::size_t WINDOD_COUNT = 3;
+        constexpr std::size_t WINDOD_COUNT = 1;
         std::vector<GLFWwindow*> windows(WINDOD_COUNT);
         for (size_t i = 0; i < windows.size(); i++) {
             windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
@@ -238,7 +238,7 @@ int main() {
         HardwareImageCreateInfo textureCreateInfo;
         textureCreateInfo.width = width;
         textureCreateInfo.height = height;
-        textureCreateInfo.format = ImageFormat::BC1_RGB_SRGB;  // 使用BC1_RGB_SRGB进行渲染测试
+        textureCreateInfo.format = ImageFormat::BC1_RGB_SRGB; // 使用BC1_RGB_SRGB进行渲染测试
         textureCreateInfo.usage = ImageUsage::SampledImage;
         textureCreateInfo.arrayLayers = 1;
         textureCreateInfo.mipLevels = 1;
