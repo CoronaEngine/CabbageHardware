@@ -1,8 +1,6 @@
 ﻿#include "DeviceManager.h"
 
 #include <algorithm>
-#include <unordered_map>
-#include <unordered_set>
 
 DeviceManager::DeviceManager() = default;
 
@@ -16,7 +14,7 @@ void DeviceManager::initDeviceManager(const CreateCallback& createCallback, cons
     createDevices(createCallback, vkInstance);
     choosePresentQueueFamily();
     createCommandBuffers();
-    createTimelineSemaphore();
+    // createTimelineSemaphore();
 
     for (auto& queue : graphicsQueues) {
         CFW_LOG_INFO(
@@ -78,33 +76,6 @@ void DeviceManager::cleanUpDeviceManager() {
 
     vkDeviceWaitIdle(logicalDevice);
 
-    std::unordered_set<VkSemaphore> uniqueSemaphores;
-    auto collectSemaphores = [&](std::vector<QueueUtils>& queues) {
-        for (auto& queue : queues) {
-            if (queue.timelineSemaphore != VK_NULL_HANDLE) {
-                uniqueSemaphores.insert(queue.timelineSemaphore);
-            }
-        }
-    };
-
-    collectSemaphores(graphicsQueues);
-    collectSemaphores(computeQueues);
-    collectSemaphores(transferQueues);
-
-    for (auto semaphore : uniqueSemaphores) {
-        vkDestroySemaphore(logicalDevice, semaphore, nullptr);
-    }
-
-    auto clearSemaphores = [&](std::vector<QueueUtils>& queues) {
-        for (auto& queue : queues) {
-            queue.timelineSemaphore = VK_NULL_HANDLE;
-        }
-    };
-
-    clearSemaphores(graphicsQueues);
-    clearSemaphores(computeQueues);
-    clearSemaphores(transferQueues);
-
     destroyQueueResources(graphicsQueues);
     destroyQueueResources(computeQueues);
     destroyQueueResources(transferQueues);
@@ -147,14 +118,7 @@ void DeviceManager::destroyQueueResources(std::vector<QueueUtils>& queues) {
 }
 
 void DeviceManager::createTimelineSemaphore() {
-    std::unordered_map<VkQueue, VkSemaphore> queueSemaphoreMap;
-
     auto createTimelineSemaphoreForQueue = [&](QueueUtils& queue) {
-        if (queueSemaphoreMap.find(queue.vkQueue) != queueSemaphoreMap.end()) {
-            queue.timelineSemaphore = queueSemaphoreMap[queue.vkQueue];
-            return;
-        }
-
         VkExportSemaphoreCreateInfo exportInfo{};
         exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
         exportInfo.pNext = nullptr;
@@ -172,7 +136,6 @@ void DeviceManager::createTimelineSemaphore() {
         semaphoreInfo.pNext = &typeCreateInfo;
 
         coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &queue.timelineSemaphore));
-        queueSemaphoreMap[queue.vkQueue] = queue.timelineSemaphore;
     };
 
     for (auto& queue : graphicsQueues) {
@@ -259,6 +222,28 @@ void DeviceManager::createDevices(const CreateCallback& initInfo, const VkInstan
 }
 
 void DeviceManager::choosePresentQueueFamily() {
+    auto createTimelineSemaphoreForQueue = [&](QueueUtils& queue) {
+        VkExportSemaphoreCreateInfo exportInfo{};
+        exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
+        exportInfo.pNext = nullptr;
+#if _WIN32 || _WIN64
+        exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+#endif
+        VkSemaphoreTypeCreateInfo typeCreateInfo{};
+        typeCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO_KHR;
+        typeCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR;
+        typeCreateInfo.initialValue = 0;
+        typeCreateInfo.pNext = &exportInfo;
+
+        VkSemaphoreCreateInfo semaphoreInfo{};
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        semaphoreInfo.pNext = &typeCreateInfo;
+
+        coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &queue.timelineSemaphore));
+    };
+
+    int queue_count = 0;
+
     for (int i = 0; i < queueFamilies.size(); i++) {
         QueueUtils baseQueueUtils;
         baseQueueUtils.queueFamilyIndex = static_cast<uint32_t>(i);
@@ -275,10 +260,22 @@ void DeviceManager::choosePresentQueueFamily() {
             const VkQueueFlags flags = queueFamilies[i].queueFlags;
             if (flags & VK_QUEUE_GRAPHICS_BIT) {
                 graphicsQueues.push_back(queueUtils);
-            } else if (flags & VK_QUEUE_COMPUTE_BIT) {
+                createTimelineSemaphoreForQueue(graphicsQueues.at(graphicsQueues.size() - 1));
+                ++queue_count;
+                if (queue_count > 1) {
+                    break;
+                }
+            } /*else if (flags & VK_QUEUE_COMPUTE_BIT) {
                 computeQueues.push_back(queueUtils);
+                createTimelineSemaphoreForQueue(computeQueues.at(computeQueues.size() - 1));
+                ++queue_count;
             } else if (flags & VK_QUEUE_TRANSFER_BIT) {
                 transferQueues.push_back(queueUtils);
+                createTimelineSemaphoreForQueue(transferQueues.at(transferQueues.size() - 1));
+                ++queue_count;
+            } */
+            else {
+                CFW_LOG_WARNING("Queue Family Index {} does not support graphics, compute, or transfer operations.", i);
             }
         }
     }
