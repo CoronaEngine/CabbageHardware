@@ -66,8 +66,8 @@ class DeviceManager {
 
     void createDevices(const CreateCallback& createInfo, const VkInstance& vkInstance);
     void choosePresentQueueFamily();
-    bool createCommandBuffers();
-    void createTimelineSemaphore();
+    //bool createCommandBuffers();
+    //void createTimelineSemaphore();
 
     void destroyQueueResources(std::vector<QueueUtils>& queues);
 
