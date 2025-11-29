@@ -365,11 +365,6 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     if (mipLevels > 1) {
         resultImage.mipLevelViews.resize(mipLevels, VK_NULL_HANDLE);
         resultImage.mipLevelBindlessIndices.resize(mipLevels, -1);
-
-        for (int mipLevel = 0; mipLevel < mipLevels; ++mipLevel) {
-            // 创建 mip level 专用的 ImageView
-            resultImage.mipLevelViews[mipLevel] = createImageViewForMipLevel(resultImage, mipLevel);
-        }
     }
 
     if (imageUsage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) {
