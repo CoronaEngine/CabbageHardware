@@ -1,5 +1,8 @@
 ﻿#include "DeviceManager.h"
+
 #include <algorithm>
+#include <unordered_map>
+#include <unordered_set>
 
 DeviceManager::DeviceManager() = default;
 
@@ -14,6 +17,50 @@ void DeviceManager::initDeviceManager(const CreateCallback& createCallback, cons
     choosePresentQueueFamily();
     createCommandBuffers();
     createTimelineSemaphore();
+
+    for (auto& queue : graphicsQueues) {
+        CFW_LOG_INFO(
+            "Graphics Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
+            queue.queueFamilyIndex,
+            reinterpret_cast<std::uintptr_t>(&queue),
+            reinterpret_cast<std::uintptr_t>(queue.vkQueue),
+            reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
+            reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
+            reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
+            reinterpret_cast<std::uintptr_t>(queue.commandPool),
+            reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
+            reinterpret_cast<std::uintptr_t>(queue.deviceManager));
+    }
+    for (auto& queue : computeQueues) {
+        CFW_LOG_INFO(
+            "Compute Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
+            queue.queueFamilyIndex,
+            reinterpret_cast<std::uintptr_t>(&queue),
+            reinterpret_cast<std::uintptr_t>(queue.vkQueue),
+            reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
+            reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
+            reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
+            reinterpret_cast<std::uintptr_t>(queue.commandPool),
+            reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
+            reinterpret_cast<std::uintptr_t>(queue.deviceManager));
+    }
+    for (auto& queue : transferQueues) {
+        CFW_LOG_INFO(
+            "Transfer Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
+            queue.queueFamilyIndex,
+            reinterpret_cast<std::uintptr_t>(&queue),
+            reinterpret_cast<std::uintptr_t>(queue.vkQueue),
+            reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
+            reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
+            reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
+            reinterpret_cast<std::uintptr_t>(queue.commandPool),
+            reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
+            reinterpret_cast<std::uintptr_t>(queue.deviceManager));
+    }
+
+    CFW_LOG_INFO("Graphics Queue Count: {}", graphicsQueues.size());
+    CFW_LOG_INFO("Compute Queue Count: {}", computeQueues.size());
+    CFW_LOG_INFO("Transfer Queue Count: {}", transferQueues.size());
 }
 
 void DeviceManager::cleanUpDeviceManager() {
@@ -30,6 +77,33 @@ void DeviceManager::cleanUpDeviceManager() {
     }
 
     vkDeviceWaitIdle(logicalDevice);
+
+    std::unordered_set<VkSemaphore> uniqueSemaphores;
+    auto collectSemaphores = [&](std::vector<QueueUtils>& queues) {
+        for (auto& queue : queues) {
+            if (queue.timelineSemaphore != VK_NULL_HANDLE) {
+                uniqueSemaphores.insert(queue.timelineSemaphore);
+            }
+        }
+    };
+
+    collectSemaphores(graphicsQueues);
+    collectSemaphores(computeQueues);
+    collectSemaphores(transferQueues);
+
+    for (auto semaphore : uniqueSemaphores) {
+        vkDestroySemaphore(logicalDevice, semaphore, nullptr);
+    }
+
+    auto clearSemaphores = [&](std::vector<QueueUtils>& queues) {
+        for (auto& queue : queues) {
+            queue.timelineSemaphore = VK_NULL_HANDLE;
+        }
+    };
+
+    clearSemaphores(graphicsQueues);
+    clearSemaphores(computeQueues);
+    clearSemaphores(transferQueues);
 
     destroyQueueResources(graphicsQueues);
     destroyQueueResources(computeQueues);
@@ -73,7 +147,14 @@ void DeviceManager::destroyQueueResources(std::vector<QueueUtils>& queues) {
 }
 
 void DeviceManager::createTimelineSemaphore() {
+    std::unordered_map<VkQueue, VkSemaphore> queueSemaphoreMap;
+
     auto createTimelineSemaphoreForQueue = [&](QueueUtils& queue) {
+        if (queueSemaphoreMap.find(queue.vkQueue) != queueSemaphoreMap.end()) {
+            queue.timelineSemaphore = queueSemaphoreMap[queue.vkQueue];
+            return;
+        }
+
         VkExportSemaphoreCreateInfo exportInfo{};
         exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
         exportInfo.pNext = nullptr;
@@ -91,11 +172,18 @@ void DeviceManager::createTimelineSemaphore() {
         semaphoreInfo.pNext = &typeCreateInfo;
 
         coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &queue.timelineSemaphore));
+        queueSemaphoreMap[queue.vkQueue] = queue.timelineSemaphore;
     };
 
-    for (auto& queue : graphicsQueues) createTimelineSemaphoreForQueue(queue);
-    for (auto& queue : computeQueues) createTimelineSemaphoreForQueue(queue);
-    for (auto& queue : transferQueues) createTimelineSemaphoreForQueue(queue);
+    for (auto& queue : graphicsQueues) {
+        createTimelineSemaphoreForQueue(queue);
+    }
+    for (auto& queue : computeQueues) {
+        createTimelineSemaphoreForQueue(queue);
+    }
+    for (auto& queue : transferQueues) {
+        createTimelineSemaphoreForQueue(queue);
+    }
 }
 
 void DeviceManager::createDevices(const CreateCallback& initInfo, const VkInstance& vkInstance) {
@@ -179,6 +267,7 @@ void DeviceManager::choosePresentQueueFamily() {
         for (uint32_t queueIndex = 0; queueIndex < queueFamilies[i].queueCount; queueIndex++) {
             QueueUtils queueUtils = baseQueueUtils;
             queueUtils.queueMutex = std::make_shared<std::mutex>();
+
             queueUtils.timelineValue = std::make_shared<std::atomic_uint64_t>(0);
 
             vkGetDeviceQueue(logicalDevice, static_cast<uint32_t>(i), queueIndex, &queueUtils.vkQueue);
@@ -186,11 +275,10 @@ void DeviceManager::choosePresentQueueFamily() {
             const VkQueueFlags flags = queueFamilies[i].queueFlags;
             if (flags & VK_QUEUE_GRAPHICS_BIT) {
                 graphicsQueues.push_back(queueUtils);
-                break;
-            /*} else if (flags & VK_QUEUE_COMPUTE_BIT) {
+            } else if (flags & VK_QUEUE_COMPUTE_BIT) {
                 computeQueues.push_back(queueUtils);
             } else if (flags & VK_QUEUE_TRANSFER_BIT) {
-                transferQueues.push_back(queueUtils);*/
+                transferQueues.push_back(queueUtils);
             }
         }
     }

@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <vector>
+
 #include "HardwareWrapperVulkan/HardwareContext.h"
 
 struct HardwareExecutorVulkan;
@@ -79,7 +80,7 @@ struct HardwareExecutorVulkan {
             VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
             timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             timelineWaitSemaphoreSubmitInfo.semaphore = other.currentRecordQueue->timelineSemaphore;
-            timelineWaitSemaphoreSubmitInfo.value = other.currentRecordQueue->timelineValue->fetch_add(0);
+            timelineWaitSemaphoreSubmitInfo.value = other.currentRecordQueue->timelineValue->load(std::memory_order_acquire);
             timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
             waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);
         }

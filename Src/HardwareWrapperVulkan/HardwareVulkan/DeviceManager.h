@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <mutex>
+
 #include "FeaturesChain.h"
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 
