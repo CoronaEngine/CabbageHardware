@@ -222,7 +222,7 @@ void DeviceManager::createDevices(const CreateCallback& initInfo, const VkInstan
 }
 
 void DeviceManager::choosePresentQueueFamily() {
-    auto createTimelineSemaphoreForQueue = [&](QueueUtils& queue) {
+    auto createTimelineSemaphoreForQueue = [&](VkSemaphore& timelineSemaphore) {
         VkExportSemaphoreCreateInfo exportInfo{};
         exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
         exportInfo.pNext = nullptr;
@@ -239,41 +239,34 @@ void DeviceManager::choosePresentQueueFamily() {
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
         semaphoreInfo.pNext = &typeCreateInfo;
 
-        coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &queue.timelineSemaphore));
+        coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &timelineSemaphore));
     };
 
     int queue_count = 0;
 
     for (int i = 0; i < queueFamilies.size(); i++) {
-        QueueUtils baseQueueUtils;
-        baseQueueUtils.queueFamilyIndex = static_cast<uint32_t>(i);
-        baseQueueUtils.deviceManager = this;
-
         for (uint32_t queueIndex = 0; queueIndex < queueFamilies[i].queueCount; queueIndex++) {
-            QueueUtils queueUtils = baseQueueUtils;
+            QueueUtils queueUtils{};
+            queueUtils.queueFamilyIndex = static_cast<uint32_t>(i);
+            queueUtils.deviceManager = this;
             queueUtils.queueMutex = std::make_shared<std::mutex>();
-
             queueUtils.timelineValue = std::make_shared<std::atomic_uint64_t>(0);
+
+            createTimelineSemaphoreForQueue(queueUtils.timelineSemaphore);
 
             vkGetDeviceQueue(logicalDevice, static_cast<uint32_t>(i), queueIndex, &queueUtils.vkQueue);
 
             const VkQueueFlags flags = queueFamilies[i].queueFlags;
             if (flags & VK_QUEUE_GRAPHICS_BIT) {
                 graphicsQueues.push_back(queueUtils);
-                createTimelineSemaphoreForQueue(graphicsQueues.at(graphicsQueues.size() - 1));
                 ++queue_count;
-                if (queue_count > 1) {
-                    break;
-                }
-            } /*else if (flags & VK_QUEUE_COMPUTE_BIT) {
+            } else if (flags & VK_QUEUE_COMPUTE_BIT) {
                 computeQueues.push_back(queueUtils);
-                createTimelineSemaphoreForQueue(computeQueues.at(computeQueues.size() - 1));
                 ++queue_count;
             } else if (flags & VK_QUEUE_TRANSFER_BIT) {
                 transferQueues.push_back(queueUtils);
-                createTimelineSemaphoreForQueue(transferQueues.at(transferQueues.size() - 1));
                 ++queue_count;
-            } */
+            } 
             else {
                 CFW_LOG_WARNING("Queue Family Index {} does not support graphics, compute, or transfer operations.", i);
             }
