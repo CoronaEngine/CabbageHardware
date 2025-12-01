@@ -50,7 +50,9 @@ struct ResourceManager {
 
         VkImage imageHandle = VK_NULL_HANDLE;
         VkImageView imageView = VK_NULL_HANDLE;
-        std::unordered_map<std::uint32_t, VkImageView> mipImageViews;
+
+        bool isMipmap = false;
+        std::vector<ImageHardwareWrap> mipImages;
 
         VmaAllocation imageAlloc = VK_NULL_HANDLE;
         VmaAllocationInfo imageAllocInfo = {};
@@ -78,11 +80,11 @@ struct ResourceManager {
                                                 VkFormat imageFormat,
                                                 float pixelSize,
                                                 VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                                                int arrayLayers = 1,
-                                                int mipLevels = 1,
+                                                uint32_t arrayLayers = 1,
+                                                uint32_t mipLevels = 1,
                                                 VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
     [[nodiscard]] VkImageView createImageView(ImageHardwareWrap& image);
-    VkImageView createImageViewForMipLevel(ImageHardwareWrap& image, uint32_t mipLevel);
+    [[nodiscard]] std::vector<ImageHardwareWrap> generateImageHardwareWrapForEachMips(ImageHardwareWrap& image);
     void destroyImage(ImageHardwareWrap& image);
 
     // Buffer operations
@@ -156,6 +158,8 @@ struct ResourceManager {
     void createDedicatedBuffer(const VkBufferCreateInfo& bufferInfo, const VmaAllocationCreateInfo& allocInfo, BufferHardwareWrap& resultBuffer);
     void createPooledBuffer(const VkBufferCreateInfo& bufferInfo, const VmaAllocationCreateInfo& allocInfo, BufferHardwareWrap& resultBuffer);
     void createNonExportableBuffer(const VkBufferCreateInfo& bufferInfo, const VmaAllocationCreateInfo& allocInfo, BufferHardwareWrap& resultBuffer);
+
+    uint32_t getMipLevelsCount(uint32_t texWidth, uint32_t texHeight) const;
 
     VmaAllocator vmaAllocator = VK_NULL_HANDLE;
     VmaPool exportBufferPool = VK_NULL_HANDLE;
