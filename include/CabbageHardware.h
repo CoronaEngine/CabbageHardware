@@ -155,10 +155,10 @@ struct HardwareImage {
     ~HardwareImage();
 
     HardwareImage& operator=(const HardwareImage& other);
+    HardwareImage& operator[](const uint32_t mipLevel);
     explicit operator bool() const;
 
-    [[nodiscard]] uint32_t storeDescriptor(uint32_t mipLevel = 0);
-
+    [[nodiscard]] uint32_t storeDescriptor();
     [[nodiscard]] std::shared_ptr<uintptr_t> getImageID() const {
         return imageID;
     }

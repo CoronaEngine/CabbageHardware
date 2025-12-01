@@ -202,6 +202,12 @@ HardwareImage::~HardwareImage() {
     }
 }
 
+//HardwareImage& HardwareImage::operator[](const uint32_t mipLevel) {
+//    HardwareImage copy = *this;
+//    copy.selectedMipLevel = mipmapLevel;
+//    return copy;
+//}
+
 HardwareImage& HardwareImage::operator=(const HardwareImage& other) {
     if (this != &other) {
         {
@@ -232,18 +238,9 @@ HardwareImage::operator bool() const {
     }
 }
 
-uint32_t HardwareImage::storeDescriptor(uint32_t mipLevel) {
+uint32_t HardwareImage::storeDescriptor() {
     auto imageHandle = globalImageStorages.acquire_write(*imageID);
-
-    if (mipLevel >= imageHandle->mipLevels) {
-        mipLevel = 0;
-    }
-
-    if (mipLevel == 0 && imageHandle->mipLevels == 1) {
-        return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle);
-    } else {
-        return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle, mipLevel);
-    }
+    return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle);
 }
 
 uint32_t HardwareImage::getMipLevels() const {
