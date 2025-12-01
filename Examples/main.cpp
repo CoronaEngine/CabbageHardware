@@ -176,13 +176,6 @@ int main() {
 
     // 首先运行压缩纹理测试
     // testCompressedTextures();
-    auto now = std::chrono::system_clock::now();
-    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
-
-    std::tm now_tm;
-    localtime_s(&now_tm, &now_c);
-    char time_buffer[64];
-    std::strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d_%H-%M-%S", &now_tm);
 
     CFW_LOG_INFO("Starting main application...");
 
@@ -238,7 +231,7 @@ int main() {
         HardwareImageCreateInfo textureCreateInfo;
         textureCreateInfo.width = width;
         textureCreateInfo.height = height;
-        textureCreateInfo.format = ImageFormat::BC1_RGB_SRGB; // 使用BC1_RGB_SRGB进行渲染测试
+        textureCreateInfo.format = ImageFormat::BC1_RGB_SRGB;  // 使用BC1_RGB_SRGB进行渲染测试
         textureCreateInfo.usage = ImageUsage::SampledImage;
         textureCreateInfo.arrayLayers = 1;
         textureCreateInfo.mipLevels = 1;

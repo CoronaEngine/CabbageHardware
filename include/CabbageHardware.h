@@ -182,9 +182,8 @@ struct HardwarePushConstant {
     HardwarePushConstant(const HardwarePushConstant& other);
 
     template <typename T>
-    HardwarePushConstant(T data)
         requires(!std::is_same_v<std::remove_cvref_t<T>, HardwarePushConstant>)
-    {
+    HardwarePushConstant(T data) {
         copyFromRaw(&data, sizeof(T));
     }
 
