@@ -271,7 +271,7 @@ struct RasterizerPipeline {
 
     std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> operator[](const std::string& resourceName);
     RasterizerPipeline& operator()(uint16_t width, uint16_t height);
-    RasterizerPipeline& record(const HardwareBuffer& indexBuffer);
+    RasterizerPipeline& record(const HardwareBuffer& indexBuffer, const HardwareBuffer& vertexBuffer);
 
     [[nodiscard]] std::shared_ptr<uintptr_t> getRasterizerPipelineID() const {
         return rasterizerPipelineID;

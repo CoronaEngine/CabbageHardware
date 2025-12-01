@@ -210,10 +210,10 @@ int main() {
             finalOutputImages[i] = HardwareImage(createInfo);
         }
 
-        HardwareBuffer postionBuffer = HardwareBuffer(positions, BufferUsage::VertexBuffer);
-        HardwareBuffer normalBuffer = HardwareBuffer(normals, BufferUsage::VertexBuffer);
-        HardwareBuffer uvBuffer = HardwareBuffer(uvs, BufferUsage::VertexBuffer);
-        HardwareBuffer colorBuffer = HardwareBuffer(colors, BufferUsage::VertexBuffer);
+        HardwareBuffer vertexBuffer = HardwareBuffer(vertices, BufferUsage::VertexBuffer);
+        //HardwareBuffer normalBuffer = HardwareBuffer(normals, BufferUsage::VertexBuffer);
+        //HardwareBuffer uvBuffer = HardwareBuffer(uvs, BufferUsage::VertexBuffer);
+        //HardwareBuffer colorBuffer = HardwareBuffer(colors, BufferUsage::VertexBuffer);
 
         HardwareBuffer indexBuffer = HardwareBuffer(indices, BufferUsage::IndexBuffer);
 
@@ -295,13 +295,13 @@ int main() {
                 try {
                     for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
                         rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffers[threadIndex][i].storeDescriptor();
-                        rasterizer["inPosition"] = postionBuffer;
-                        rasterizer["inColor"] = colorBuffer;
-                        rasterizer["inTexCoord"] = uvBuffer;
-                        rasterizer["inNormal"] = normalBuffer;
+                        //rasterizer["inPosition"] = postionBuffer;
+                        //rasterizer["inColor"] = colorBuffer;
+                        //rasterizer["inTexCoord"] = uvBuffer;
+                        //rasterizer["inNormal"] = normalBuffer;
                         rasterizer["outColor"] = finalOutputImages[threadIndex];
 
-                        executors[threadIndex] << rasterizer.record(indexBuffer);
+                        executors[threadIndex] << rasterizer.record(indexBuffer, vertexBuffer);
                     }
 
                     computer["pushConsts.uniformBufferIndex"] = computeUniformBuffers[threadIndex].storeDescriptor();
