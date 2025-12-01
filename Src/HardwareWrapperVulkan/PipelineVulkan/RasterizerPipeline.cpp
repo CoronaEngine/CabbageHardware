@@ -272,31 +272,28 @@ void RasterizerPipelineVulkan::createGraphicsPipeline(EmbeddedShader::ShaderCode
     VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
     // 配置顶点输入
-    std::vector<VkVertexInputBindingDescription> bindingDescriptions(1);
     std::vector<VkVertexInputAttributeDescription> attributeDescriptions(vertexStageInputs.size());
-    //bindingDescriptions.reserve(vertexStageInputs.size());
-    //attributeDescriptions.reserve(vertexStageInputs.size());
-
     for (size_t i = 0; i < attributeDescriptions.size(); i++) {
-        //VkVertexInputAttributeDescription attributeDesc{};
         attributeDescriptions[i].binding = 0;
         attributeDescriptions[i].location = vertexStageInputs[i].location;
         attributeDescriptions[i].format = getVkFormatFromType(vertexStageInputs[i].typeName, vertexStageInputs[i].elementCount);
         attributeDescriptions[i].offset = 0;
-        //attributeDescriptions[i] = attributeDesc;
-
     }
 
     uint32_t strideSize = 0;
     for (size_t i = 0; i < attributeDescriptions.size(); i++) {
         strideSize += vertexStageInputs[i].typeSize;
+        for (size_t j = 0; j < attributeDescriptions.size(); j++) {
+            if (attributeDescriptions[j].location > attributeDescriptions[i].location) {
+                attributeDescriptions[j].offset += vertexStageInputs[i].typeSize;
+            }
+        }
     }
 
-    //VkVertexInputBindingDescription bindingDesc{};
+    std::vector<VkVertexInputBindingDescription> bindingDescriptions(1);
     bindingDescriptions[0].binding = 0;
     bindingDescriptions[0].stride = strideSize;
     bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    //bindingDescriptions[0].push_back(bindingDesc);
 
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
