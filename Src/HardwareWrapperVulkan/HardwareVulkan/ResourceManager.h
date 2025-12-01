@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <ktm/ktm.h>
+
 #include "DeviceManager.h"
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 #include "corona/kernel/utils/storage.h"
@@ -17,20 +18,20 @@ struct ResourceManager {
     };
 
     struct BufferHardwareWrap {
-        uint32_t elementCount = 0;
-        uint32_t elementSize = 0;
-        uint64_t refCount = 0;
+        uint32_t elementCount{0};
+        uint32_t elementSize{0};
+        uint64_t refCount{1};
 
-        VkBuffer bufferHandle = VK_NULL_HANDLE;
+        VkBuffer bufferHandle{VK_NULL_HANDLE};
         VkBufferUsageFlags bufferUsage = VK_BUFFER_USAGE_FLAG_BITS_MAX_ENUM;
 
-        VmaAllocation bufferAlloc = VK_NULL_HANDLE;
-        VmaAllocationInfo bufferAllocInfo = {};
+        VmaAllocation bufferAlloc{VK_NULL_HANDLE};
+        VmaAllocationInfo bufferAllocInfo{};
 
-        int32_t bindlessIndex = -1;
+        int32_t bindlessIndex{-1};
 
-        DeviceManager* device = nullptr;
-        ResourceManager* resourceManager = nullptr;
+        DeviceManager* device{nullptr};
+        ResourceManager* resourceManager{nullptr};
     };
 
     struct ImageHardwareWrap {
@@ -97,10 +98,10 @@ struct ResourceManager {
 
     // External memory operations
     [[nodiscard]] ExternalMemoryHandle exportBufferMemory(BufferHardwareWrap& sourceBuffer);
-    [[nodiscard]] BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle& memHandle, 
-                                                        uint32_t elementCount, 
-                                                        uint32_t elementSize, 
-                                                        uint32_t allocSize, 
+    [[nodiscard]] BufferHardwareWrap importBufferMemory(const ExternalMemoryHandle& memHandle,
+                                                        uint32_t elementCount,
+                                                        uint32_t elementSize,
+                                                        uint32_t allocSize,
                                                         VkBufferUsageFlags usage);
     [[nodiscard]] BufferHardwareWrap importHostBuffer(void* hostPtr, uint64_t size);
 
