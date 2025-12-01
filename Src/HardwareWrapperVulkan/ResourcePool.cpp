@@ -6,4 +6,4 @@ Corona::Kernel::Utils::Storage<RasterizerPipelineWrap> gRasterizerPipelineStorag
 Corona::Kernel::Utils::Storage<DisplayerHardwareWrap> globalDisplayerStorages;
 Corona::Kernel::Utils::Storage<ComputePipelineWrap> gComputePipelineStorage;
 Corona::Kernel::Utils::Storage<ExecutorWrap> gExecutorStorage;
-Corona::Kernel::Utils::Storage<PushConstantWrap> globalPushConstantStorages;
+Corona::Kernel::Utils::Storage<PushConstantWrap, 4, 2> globalPushConstantStorages;

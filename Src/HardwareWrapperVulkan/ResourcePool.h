@@ -39,10 +39,10 @@ struct ExecutorWrap {
 extern Corona::Kernel::Utils::Storage<ExecutorWrap> gExecutorStorage;
 
 struct PushConstantWrap {
-    uint8_t* data = nullptr;
-    uint64_t size = 0;
-    uint64_t refCount = 0;
-    bool isSub = false;
+    uint8_t* data{nullptr};
+    uint64_t size{0};
+    uint64_t refCount{1};
+    bool isSub{false};
 };
 
-extern Corona::Kernel::Utils::Storage<PushConstantWrap> globalPushConstantStorages;
+extern Corona::Kernel::Utils::Storage<PushConstantWrap, 4, 2> globalPushConstantStorages;
