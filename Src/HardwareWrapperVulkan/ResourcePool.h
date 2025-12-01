@@ -45,4 +45,4 @@ struct PushConstantWrap {
     bool isSub = false;
 };
 
-extern Corona::Kernel::Utils::Storage<PushConstantWrap> globalPushConstantStorages;
+extern Corona::Kernel::Utils::Storage<PushConstantWrap, 4096, 8> globalPushConstantStorages;

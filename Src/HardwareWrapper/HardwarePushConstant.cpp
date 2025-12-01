@@ -3,11 +3,11 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/utils/storage.h"
 
-static void incrementPushConstantRefCount(const Corona::Kernel::Utils::Storage<PushConstantWrap>::WriteHandle& handle) {
+static void incrementPushConstantRefCount(const Corona::Kernel::Utils::Storage<PushConstantWrap, 4096,8>::WriteHandle& handle) {
     ++handle->refCount;
 }
 
-static bool decrementPushConstantRefCount(const Corona::Kernel::Utils::Storage<PushConstantWrap>::WriteHandle& handle) {
+static bool decrementPushConstantRefCount(const Corona::Kernel::Utils::Storage<PushConstantWrap, 4096,8>::WriteHandle& handle) {
     if (--handle->refCount == 0) {
         if (handle->data != nullptr && !handle->isSub) {
             std::free(handle->data);
