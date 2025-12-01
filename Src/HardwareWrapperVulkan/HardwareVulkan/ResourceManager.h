@@ -43,21 +43,19 @@ struct ResourceManager {
         VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_FLAG_BITS_MAX_ENUM;
         VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_NONE;
 
-        int arrayLayers = 1;
-        int mipLevels = 1;
+        uint32_t arrayLayers = 1;
+        uint32_t mipLevels = 1;
 
         VkClearValue clearValue = {};
 
         VkImage imageHandle = VK_NULL_HANDLE;
         VkImageView imageView = VK_NULL_HANDLE;
+        std::unordered_map<std::uint32_t, VkImageView> mipImageViews;
 
         VmaAllocation imageAlloc = VK_NULL_HANDLE;
         VmaAllocationInfo imageAllocInfo = {};
 
         int32_t bindlessIndex = -1;
-
-        std::vector<VkImageView> mipLevelViews;
-        std::vector<int32_t> mipLevelBindlessIndices;
 
         DeviceManager* device = nullptr;
         ResourceManager* resourceManager = nullptr;
@@ -105,7 +103,7 @@ struct ResourceManager {
     [[nodiscard]] BufferHardwareWrap importHostBuffer(void* hostPtr, uint64_t size);
 
     // Descriptor operations
-    [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image, uint32_t mipLevel = 0);
+    [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image);
     [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& buffer);
 
     // Copy operations
