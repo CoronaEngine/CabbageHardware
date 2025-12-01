@@ -202,11 +202,15 @@ HardwareImage::~HardwareImage() {
     }
 }
 
-//HardwareImage& HardwareImage::operator[](const uint32_t mipLevel) {
-//    HardwareImage copy = *this;
-//    copy.selectedMipLevel = mipmapLevel;
-//    return copy;
-//}
+void HardwareImage::operator[](const uint32_t mipLevel) {
+    if (imageID && *imageID != 0) {
+        auto const imageHandle = globalImageStorages.acquire_write(*imageID);
+        
+        if (mipLevel < imageHandle->mipLevels) {
+            imageHandle->currentMipLevel = mipLevel;
+        }
+    }
+}
 
 HardwareImage& HardwareImage::operator=(const HardwareImage& other) {
     if (this != &other) {
@@ -243,28 +247,12 @@ uint32_t HardwareImage::storeDescriptor() {
     return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle);
 }
 
-uint32_t HardwareImage::getMipLevels() const {
+uint32_t HardwareImage::getNumMipLevels() const {
     if (imageID && *imageID != 0) {
         auto imageHandle = globalImageStorages.acquire_read(*imageID);
         return imageHandle->mipLevels;
     }
     return 0;
-}
-
-std::pair<uint32_t, uint32_t> HardwareImage::getMipLevelSize(uint32_t mipLevel) const {
-    if (imageID && *imageID != 0) {
-        auto imageHandle = globalImageStorages.acquire_read(*imageID);
-
-        if (mipLevel >= imageHandle->mipLevels) {
-            return {0, 0};
-        }
-
-        uint32_t width = std::max(1u, imageHandle->imageSize.x >> mipLevel);
-        uint32_t height = std::max(1u, imageHandle->imageSize.y >> mipLevel);
-
-        return {width, height};
-    }
-    return {0, 0};
 }
 
 HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor, uint32_t mipLevel) {

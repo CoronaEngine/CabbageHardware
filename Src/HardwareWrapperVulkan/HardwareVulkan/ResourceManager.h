@@ -51,13 +51,14 @@ struct ResourceManager {
         VkImage imageHandle = VK_NULL_HANDLE;
         VkImageView imageView = VK_NULL_HANDLE;
 
-        bool isMipmap = false;
-        std::vector<ImageHardwareWrap> mipImages;
-
         VmaAllocation imageAlloc = VK_NULL_HANDLE;
         VmaAllocationInfo imageAllocInfo = {};
 
         int32_t bindlessIndex = -1;
+
+        bool generateMips = false;
+        uint32_t currentMipLevel = 0;
+        std::vector<VkImageView> mipLevelImageViews;
 
         DeviceManager* device = nullptr;
         ResourceManager* resourceManager = nullptr;
@@ -84,7 +85,8 @@ struct ResourceManager {
                                                 uint32_t mipLevels = 1,
                                                 VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
     [[nodiscard]] VkImageView createImageView(ImageHardwareWrap& image);
-    [[nodiscard]] std::vector<ImageHardwareWrap> generateImageHardwareWrapForEachMips(ImageHardwareWrap& image);
+    [[nodiscard]] std::vector<VkImageView> generateViewForEachMips(ImageHardwareWrap& image);
+    void setCurrentMipLevel(ImageHardwareWrap& image, uint32_t mipLevel);
     void destroyImage(ImageHardwareWrap& image);
 
     // Buffer operations

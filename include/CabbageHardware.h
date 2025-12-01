@@ -155,7 +155,7 @@ struct HardwareImage {
     ~HardwareImage();
 
     HardwareImage& operator=(const HardwareImage& other);
-    HardwareImage& operator[](const uint32_t mipLevel);
+    void operator[](const uint32_t mipLevel);
     explicit operator bool() const;
 
     [[nodiscard]] uint32_t storeDescriptor();
@@ -163,8 +163,8 @@ struct HardwareImage {
         return imageID;
     }
 
-    [[nodiscard]] uint32_t getMipLevels() const;
-    [[nodiscard]] std::pair<uint32_t, uint32_t> getMipLevelSize(uint32_t mipLevel) const;
+    [[nodiscard]] uint32_t getNumMipLevels() const;
+    [[nodiscard]] uint32_t getArrayLayers() const;
 
     HardwareImage& copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor, uint32_t mipLevel = 0);
     HardwareImage& copyFromData(const void* inputData, HardwareExecutor* executor, uint32_t mipLevel = 0);
