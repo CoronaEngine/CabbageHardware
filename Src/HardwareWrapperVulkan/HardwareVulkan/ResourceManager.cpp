@@ -361,6 +361,7 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     resultImage.arrayLayers = arrayLayers;
     resultImage.mipLevels = mipLevels;
     resultImage.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    resultImage.isMipmap = false;
 
     if (imageUsage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) {
         // 深度模板图像
@@ -421,22 +422,14 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     resultImage.imageView = createImageView(resultImage);
 
     // 创建每个 mip level 专用的 ImageView
-    if (mipLevels > 1) {
-        for (uint32_t mipLevel = 0; mipLevel < mipLevels; ++mipLevel) {
-            // 创建 mip level 专用的 ImageView
-            resultImage.mipImageViews[mipLevel] = createImageViewForMipLevel(resultImage, mipLevel);
-        }
+    if (mipLevels > 1 && resultImage.isMipmap == false) {
+        resultImage.mipImages = generateImageHardwareWrapForEachMips(resultImage);
     }
 
-    const uint64_t imageMemorySize = static_cast<uint64_t>(imageSize.x) *
-                                     imageSize.y *
-                                     pixelSize *
-                                     arrayLayers *
-                                     mipLevels;
-    deviceMemorySize += imageMemorySize;
+    deviceMemorySize += resultImage.imageAllocInfo.size;
 
     CFW_LOG_DEBUG("Image created: {}x{} Format: 0x{:X} Layers: {} Mips: {} Size: {:.2f} MB",
-                  imageSize.x, imageSize.y, static_cast<uint32_t>(imageFormat), arrayLayers, mipLevels, (imageMemorySize / 1024.0 / 1024.0));
+                  imageSize.x, imageSize.y, static_cast<uint32_t>(imageFormat), arrayLayers, mipLevels, (resultImage.imageAllocInfo.size / 1024.0 / 1024.0));
 
     return resultImage;
 }
@@ -460,32 +453,49 @@ VkImageView ResourceManager::createImageView(ImageHardwareWrap& image) {
     return imageView;
 }
 
-VkImageView ResourceManager::createImageViewForMipLevel(ImageHardwareWrap& image, uint32_t mipLevel) {
-    // 验证 mipLevel 有效性
-    if (mipLevel >= image.mipLevels) {
-        throw std::runtime_error("Invalid mip level: " + std::to_string(mipLevel) +
-                                 " (max: " + std::to_string(image.mipLevels - 1) + ")");
+std::vector<ResourceManager::ImageHardwareWrap> ResourceManager::generateImageHardwareWrapForEachMips(ImageHardwareWrap& image) {
+    std::vector<ResourceManager::ImageHardwareWrap> output;
+    output.reserve(image.mipLevels);
+
+    for (uint32_t i = 0; i < image.mipLevels; ++i) {
+        ResourceManager::ImageHardwareWrap mipImage;
+        mipImage.device = image.device;
+        mipImage.resourceManager = image.resourceManager;
+        mipImage.imageSize.x = std::max(1u, image.imageSize.x >> i);
+        mipImage.imageSize.y = std::max(1u, image.imageSize.y >> i);
+        mipImage.imageFormat = image.imageFormat;
+        mipImage.pixelSize = image.pixelSize;
+        mipImage.arrayLayers = image.arrayLayers;
+        mipImage.mipLevels = 1;
+        mipImage.imageLayout = image.imageLayout;
+        mipImage.isMipmap = true;
+        mipImage.aspectMask = image.aspectMask;
+        mipImage.clearValue = image.clearValue;
+        mipImage.imageUsage = image.imageUsage;
+
+        mipImage.imageHandle = image.imageHandle;
+        mipImage.imageAlloc = image.imageAlloc;
+        mipImage.imageAllocInfo = image.imageAllocInfo;
+
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = image.imageHandle;
+        viewInfo.viewType = image.arrayLayers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = image.imageFormat;
+        viewInfo.subresourceRange.aspectMask = image.aspectMask;
+        viewInfo.subresourceRange.baseMipLevel = i;  // 指定特定的 mip level
+        viewInfo.subresourceRange.levelCount = 1;    // 只包含一个层级
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = image.arrayLayers;
+
+        coronaHardwareCheck(vkCreateImageView(device->getLogicalDevice(), &viewInfo, nullptr, &mipImage.imageView));
+        output.push_back(mipImage);
     }
+    return output;
+}
 
-    VkImageViewCreateInfo viewInfo{};
-    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = image.imageHandle;
-    viewInfo.viewType = image.arrayLayers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format = image.imageFormat;
-    viewInfo.subresourceRange.aspectMask = image.aspectMask;
-    viewInfo.subresourceRange.baseMipLevel = mipLevel;  // 指定特定的 mip level
-    viewInfo.subresourceRange.levelCount = 1;           // 只包含一个层级
-    viewInfo.subresourceRange.baseArrayLayer = 0;
-    viewInfo.subresourceRange.layerCount = image.arrayLayers;
-    viewInfo.flags = 0;
-
-    VkImageView imageView;
-    coronaHardwareCheck(vkCreateImageView(device->getLogicalDevice(), &viewInfo, nullptr, &imageView));
-
-    CFW_LOG_DEBUG("[ResourceManager] Created ImageView for mip level {} (size: {}x{})",
-                  mipLevel, (image.imageSize.x >> mipLevel), (image.imageSize.y >> mipLevel));
-
-    return imageView;
+uint32_t ResourceManager::getMipLevelsCount(uint32_t texWidth, uint32_t texHeight) const {
+    return static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
 }
 
 void ResourceManager::destroyImage(ImageHardwareWrap& image) {
@@ -495,25 +505,31 @@ void ResourceManager::destroyImage(ImageHardwareWrap& image) {
 
     VkDevice logicalDevice = device->getLogicalDevice();
 
-    // 清理 mip level views
-    for (auto& [mipLevel, mipView] : image.mipImageViews) {
-        if (mipView != VK_NULL_HANDLE) {
-            vkDestroyImageView(logicalDevice, mipView, nullptr);
+    if (image.isMipmap) {
+        // Mip 级别的图像视图由主图像管理
+        return;
+    } 
+    else {
+        if (image.imageView != VK_NULL_HANDLE) {
+            vkDestroyImageView(logicalDevice, image.imageView, nullptr);
+            image.imageView = VK_NULL_HANDLE;
         }
-    }
-    image.mipImageViews.clear();
 
-    // 清理主 ImageView
-    if (image.imageView != VK_NULL_HANDLE) {
-        vkDestroyImageView(logicalDevice, image.imageView, nullptr);
-        image.imageView = VK_NULL_HANDLE;
-    }
+        if (image.mipImages.size() > 0) {
+            for (auto& mipImage : image.mipImages) {
+                if (mipImage.imageView != VK_NULL_HANDLE) {
+                    vkDestroyImageView(logicalDevice, mipImage.imageView, nullptr);
+                    mipImage.imageView = VK_NULL_HANDLE;
+                }
+            }
+            image.mipImages.clear();
+        }
 
-    // 销毁图像
-    if (image.imageHandle != VK_NULL_HANDLE) {
-        vmaDestroyImage(vmaAllocator, image.imageHandle, image.imageAlloc);
-        image.imageHandle = VK_NULL_HANDLE;
-        image.imageAlloc = VK_NULL_HANDLE;
+        if (image.imageHandle != VK_NULL_HANDLE && image.imageAlloc != VK_NULL_HANDLE) {
+            vmaDestroyImage(vmaAllocator, image.imageHandle, image.imageAlloc);
+            image.imageHandle = VK_NULL_HANDLE;
+            image.imageAlloc = VK_NULL_HANDLE;
+        }
     }
 }
 
@@ -869,8 +885,7 @@ int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<Resource
 
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-        // TODO: 根据需要选择不同的 ImageView（例如 mip level）
-        //imageInfo.imageView = image->selectedImageView;
+        imageInfo.imageView = image->imageView;
         imageInfo.sampler = textureSampler;
 
         VkWriteDescriptorSet write{};
