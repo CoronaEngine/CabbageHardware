@@ -349,8 +349,8 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
                                                                 VkFormat imageFormat,
                                                                 float pixelSize,
                                                                 VkImageUsageFlags imageUsage,
-                                                                int arrayLayers,
-                                                                int mipLevels,
+                                                                uint32_t arrayLayers,
+                                                                uint32_t mipLevels,
                                                                 VkImageTiling tiling) {
     ImageHardwareWrap resultImage{};
     resultImage.device = device;
@@ -361,11 +361,6 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     resultImage.arrayLayers = arrayLayers;
     resultImage.mipLevels = mipLevels;
     resultImage.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-    if (mipLevels > 1) {
-        resultImage.mipLevelViews.resize(mipLevels, VK_NULL_HANDLE);
-        resultImage.mipLevelBindlessIndices.resize(mipLevels, -1);
-    }
 
     if (imageUsage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) {
         // 深度模板图像
@@ -424,6 +419,14 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
 
     // 创建图像视图
     resultImage.imageView = createImageView(resultImage);
+
+    // 创建每个 mip level 专用的 ImageView
+    if (mipLevels > 1) {
+        for (uint32_t mipLevel = 0; mipLevel < mipLevels; ++mipLevel) {
+            // 创建 mip level 专用的 ImageView
+            resultImage.mipImageViews[mipLevel] = createImageViewForMipLevel(resultImage, mipLevel);
+        }
+    }
 
     const uint64_t imageMemorySize = static_cast<uint64_t>(imageSize.x) *
                                      imageSize.y *
@@ -493,13 +496,12 @@ void ResourceManager::destroyImage(ImageHardwareWrap& image) {
     VkDevice logicalDevice = device->getLogicalDevice();
 
     // 清理 mip level views
-    for (auto& mipView : image.mipLevelViews) {
+    for (auto& [mipLevel, mipView] : image.mipImageViews) {
         if (mipView != VK_NULL_HANDLE) {
             vkDestroyImageView(logicalDevice, mipView, nullptr);
         }
     }
-    image.mipLevelViews.clear();
-    image.mipLevelBindlessIndices.clear();
+    image.mipImageViews.clear();
 
     // 清理主 ImageView
     if (image.imageView != VK_NULL_HANDLE) {
@@ -859,61 +861,38 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void* host
     return bufferWrap;
 }
 
-int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image, uint32_t mipLevel) {
-    if (mipLevel >= image->mipLevels) {
-        return -1;
+int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image) {
+    if (image->bindlessIndex < 0) {
+        image->bindlessIndex = globalImageStorages.seq_id(image);
+
+        VkDescriptorType descriptorType = (image->imageUsage & VK_IMAGE_USAGE_STORAGE_BIT) ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+        VkDescriptorImageInfo imageInfo{};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        // TODO: 根据需要选择不同的 ImageView（例如 mip level）
+        //imageInfo.imageView = image->selectedImageView;
+        imageInfo.sampler = textureSampler;
+
+        VkWriteDescriptorSet write{};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.descriptorType = descriptorType;
+        write.descriptorCount = 1;
+        write.dstArrayElement = image->bindlessIndex;
+        write.pImageInfo = &imageInfo;
+
+        if (write.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
+            write.dstSet = bindlessDescriptors[textureBinding].descriptorSet;
+            write.dstBinding = 0;
+        }
+        if (write.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
+            write.dstSet = bindlessDescriptors[storageImageBinding].descriptorSet;
+            write.dstBinding = 0;
+        }
+
+        vkUpdateDescriptorSets(device->getLogicalDevice(), 1, &write, 0, nullptr);
     }
 
-    // 确保 vectors 的大小
-    if (image->mipLevelViews.size() < image->mipLevels) {
-        image->mipLevelViews.resize(image->mipLevels, VK_NULL_HANDLE);
-        image->mipLevelBindlessIndices.resize(image->mipLevels, -1);
-    }
-
-    // 如果已经创建过，直接返回
-    if (image->mipLevelBindlessIndices[mipLevel] >= 0) {
-        return image->mipLevelBindlessIndices[mipLevel];
-    }
-
-    // 创建 mip level 专用的 ImageView
-    if (image->mipLevelViews[mipLevel] == VK_NULL_HANDLE) {
-        image->mipLevelViews[mipLevel] = createImageViewForMipLevel(*image, mipLevel);
-    }
-
-    // 生成 bindless index
-    int32_t bindlessIndex = globalImageStorages.seq_id(image) * image->mipLevels + mipLevel;
-
-    VkDescriptorType descriptorType = (image->imageUsage & VK_IMAGE_USAGE_STORAGE_BIT)
-                                          ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
-                                          : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-
-    VkDescriptorImageInfo imageInfo{};
-    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imageInfo.imageView = image->mipLevelViews[mipLevel];
-    imageInfo.sampler = textureSampler;
-
-    VkWriteDescriptorSet write{};
-    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    write.descriptorType = descriptorType;
-    write.descriptorCount = 1;
-    write.dstArrayElement = bindlessIndex;
-    write.pImageInfo = &imageInfo;
-
-    if (write.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) {
-        write.dstSet = bindlessDescriptors[textureBinding].descriptorSet;
-        write.dstBinding = 0;
-    }
-    if (write.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
-        write.dstSet = bindlessDescriptors[storageImageBinding].descriptorSet;
-        write.dstBinding = 0;
-    }
-
-    vkUpdateDescriptorSets(device->getLogicalDevice(), 1, &write, 0, nullptr);
-
-    // 保存 bindless index
-    image->mipLevelBindlessIndices[mipLevel] = bindlessIndex;
-
-    return bindlessIndex;
+    return image->bindlessIndex;
 }
 
 int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& buffer) {
