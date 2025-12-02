@@ -4,7 +4,7 @@
 - （BUG）多线程同步：display无法使用timeline，无法判断queue任务是否完成
 - （紧急）mipmap、layer支持
 - （紧急）多显卡同步（timeline）：VK_KHR_external_semaphore
-- （紧急）shader中不同的textureSampler
+- （紧急）shader中不同的textureSampler，分离的图像和采样器描述符
 - 自动判断image的layout
 - 解决命令行的Warning
 - BUG：VMA的buffer导入导出
