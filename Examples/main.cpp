@@ -232,7 +232,7 @@ int main() {
         textureCreateInfo.format = ImageFormat::RGBA8_SRGB;
         textureCreateInfo.usage = ImageUsage::SampledImage;
         textureCreateInfo.arrayLayers = 1;
-        textureCreateInfo.mipLevels = 1;
+        textureCreateInfo.mipLevels = 5;
         textureCreateInfo.initialData = data;
 
         //HardwareImageCreateInfo textureCreateInfo;

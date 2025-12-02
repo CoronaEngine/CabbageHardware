@@ -143,10 +143,10 @@ void ResourceManager::createTextureSampler() {
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
     samplerInfo.compareEnable = VK_FALSE;
     samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
     samplerInfo.mipLodBias = 0.0f;
     samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = static_cast<float>(1);
+    samplerInfo.maxLod = static_cast<float>(5.0);
 
     coronaHardwareCheck(vkCreateSampler(device->getLogicalDevice(), &samplerInfo, nullptr, &textureSampler));
 }
