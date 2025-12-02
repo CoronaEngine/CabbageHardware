@@ -220,6 +220,7 @@ HardwareImage::~HardwareImage() {
         if (destroy) {
             globalImageStorages.deallocate(self_image_id);
         }
+        imageID.store(0, std::memory_order_release);
     }
 }
 
@@ -273,7 +274,7 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other) {
     if (should_destroy_self) {
         globalImageStorages.deallocate(self_image_id);
     }
-
+    imageID.store(other_image_id, std::memory_order_release);
     return *this;
 }
 
@@ -299,7 +300,7 @@ uint32_t HardwareImage::storeDescriptor(uint32_t mipLevel) {
 
 uint32_t HardwareImage::getMipLevels() const {
     auto const self_image_id = imageID.load(std::memory_order_acquire);
-    return imageID > 0 ? globalImageStorages.acquire_read(self_image_id)->mipLevels : 0;
+    return self_image_id > 0 ? globalImageStorages.acquire_read(self_image_id)->mipLevels : 0;
 }
 
 std::pair<uint32_t, uint32_t> HardwareImage::getMipLevelSize(uint32_t mipLevel) const {

@@ -97,6 +97,7 @@ HardwareBuffer::~HardwareBuffer() {
         if (destroy) {
             globalBufferStorages.deallocate(self_buffer_id);
         }
+        bufferID.store(0, std::memory_order_release);
     }
 }
 
@@ -175,6 +176,7 @@ HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer& other) {
     if (should_destroy_self) {
         globalBufferStorages.deallocate(self_buffer_id);
     }
+    bufferID.store(other_buffer_id, std::memory_order_release);
     return *this;
 }
 
