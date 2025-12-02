@@ -171,6 +171,7 @@ struct HardwareImage {
 
    private:
     std::shared_ptr<uintptr_t> imageID;
+    std::unordered_map<uint32_t, HardwareImage> allMipHardwareImages;
 
     friend class HardwareDisplayer;
 };

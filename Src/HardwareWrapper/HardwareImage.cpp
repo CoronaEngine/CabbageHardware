@@ -203,15 +203,36 @@ HardwareImage::~HardwareImage() {
 }
 
 HardwareImage HardwareImage::operator[](const uint32_t mipLevel) {
-    HardwareImage tempImage;
     if (imageID && *imageID != 0) {
-        //auto const imageHandle = globalImageStorages.acquire_write(*imageID);
-        
-        if (mipLevel < imageHandle->mipLevels) {
-            //imageHandle->currentMipLevel = mipLevel;
+        if (this->allMipHardwareImages.contains(mipLevel)) {
+            return this->allMipHardwareImages[mipLevel];
+        } 
+        else {
+            HardwareImage mipImage;
+            mipImage.imageID = std::make_shared<uintptr_t>(globalImageStorages.allocate());
+            {
+                auto imageHandle = globalImageStorages.acquire_write(*imageID);
+                auto mipImageHandle = globalImageStorages.acquire_write(*mipImage.imageID);
+
+                mipImageHandle->imageLayout = imageHandle->imageLayout;
+                mipImageHandle->pixelSize = imageHandle->pixelSize;
+                mipImageHandle->imageSize = ktm::uvec2(
+                    std::max(1u, imageHandle->imageSize.x >> mipLevel),
+                    std::max(1u, imageHandle->imageSize.y >> mipLevel));
+                mipImageHandle->mipLevels = 1;
+                mipImageHandle->arrayLayers = imageHandle->arrayLayers;
+                mipImageHandle->imageUsage = imageHandle->imageUsage;
+                mipImageHandle->isMipImage = true;
+                mipImageHandle->imageHandle = imageHandle->imageHandle;
+                mipImageHandle->imageAlloc = imageHandle->imageAlloc;
+
+                mipImageHandle->imageView = globalHardwareContext.getMainDevice()->resourceManager.createImageView(*imageHandle, mipLevel);
+                mipImageHandle->refCount = 1;
+            }
+            this->allMipHardwareImages[mipLevel] = mipImage;
+            return mipImage;
         }
     }
-    return tempImage;
 }
 
 HardwareImage& HardwareImage::operator=(const HardwareImage& other) {
