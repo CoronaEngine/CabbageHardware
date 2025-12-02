@@ -55,6 +55,7 @@ struct ResourceManager {
         VmaAllocationInfo imageAllocInfo = {};
 
         int32_t bindlessIndex = -1;
+        //std::vector<int32_t> mipLevelBindlessIndices;
 
         bool generateMips = false;
         uint32_t currentMipLevel = 0;

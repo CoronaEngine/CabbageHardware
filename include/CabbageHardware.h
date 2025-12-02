@@ -155,7 +155,7 @@ struct HardwareImage {
     ~HardwareImage();
 
     HardwareImage& operator=(const HardwareImage& other);
-    void operator[](const uint32_t mipLevel);
+    HardwareImage& operator[](const uint32_t mipLevel);
     explicit operator bool() const;
 
     [[nodiscard]] uint32_t storeDescriptor();

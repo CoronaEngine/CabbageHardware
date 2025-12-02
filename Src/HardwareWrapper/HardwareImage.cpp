@@ -202,7 +202,7 @@ HardwareImage::~HardwareImage() {
     }
 }
 
-void HardwareImage::operator[](const uint32_t mipLevel) {
+HardwareImage& HardwareImage::operator[](const uint32_t mipLevel) {
     if (imageID && *imageID != 0) {
         auto const imageHandle = globalImageStorages.acquire_write(*imageID);
         
@@ -210,6 +210,7 @@ void HardwareImage::operator[](const uint32_t mipLevel) {
             imageHandle->currentMipLevel = mipLevel;
         }
     }
+    return *this;
 }
 
 HardwareImage& HardwareImage::operator=(const HardwareImage& other) {

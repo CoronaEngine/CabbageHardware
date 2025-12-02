@@ -875,7 +875,13 @@ int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<Resource
 
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-        imageInfo.imageView = image->imageView;
+        if (image->mipLevelImageViews.size() == 0) {
+            imageInfo.imageView = image->imageView;
+        } else 
+        {
+            imageInfo.imageView = image->mipLevelImageViews[2];
+        }
+        
         imageInfo.sampler = textureSampler;
 
         VkWriteDescriptorSet write{};
