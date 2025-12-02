@@ -2,7 +2,6 @@
 
 #include <memory>
 #include <type_traits>
-#include <variant>
 #include <vector>
 
 #include "Compiler/ShaderCodeCompiler.h"
@@ -152,18 +151,20 @@ struct HardwareImage {
    public:
     HardwareImage();
     HardwareImage(const HardwareImage& other);
+    HardwareImage(HardwareImage&& other) noexcept;
     HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage = ImageUsage::SampledImage, int arrayLayers = 1, void* imageData = nullptr);
-    HardwareImage(const HardwareImageCreateInfo& createInfo);
+    explicit HardwareImage(const HardwareImageCreateInfo& createInfo);
 
     ~HardwareImage();
 
     HardwareImage& operator=(const HardwareImage& other);
+    HardwareImage& operator=(HardwareImage&& other) noexcept;
     explicit operator bool() const;
 
     [[nodiscard]] uint32_t storeDescriptor(uint32_t mipLevel = 0);
 
-    [[nodiscard]] std::shared_ptr<uintptr_t> getImageID() const {
-        return imageID;
+    [[nodiscard]] uintptr_t getImageID() const {
+        return imageID.load(std::memory_order_acquire);
     }
 
     [[nodiscard]] uint32_t getMipLevels() const;
@@ -173,7 +174,7 @@ struct HardwareImage {
     HardwareImage& copyFromData(const void* inputData, HardwareExecutor* executor, uint32_t mipLevel = 0);
 
    private:
-    std::shared_ptr<uintptr_t> imageID;
+    std::atomic<std::uintptr_t> imageID;
 
     friend class HardwareDisplayer;
 };
@@ -210,6 +211,97 @@ struct HardwarePushConstant {
     std::shared_ptr<uintptr_t> pushConstantID;
 };
 
+// ================= 资源代理类：ResourceProxy =================
+// 支持透明读写访问 Pipeline 内部资源
+struct ResourceProxy {
+    enum class Type { kPushConstant,
+                      kBuffer,
+                      kImage };
+
+   private:
+    Type type_;
+    HardwarePushConstant push_constant_;
+    HardwareBuffer* buffer_ptr_ = nullptr;
+    HardwareImage* image_ptr_ = nullptr;
+
+   public:
+    // PushConstant - 直接存储值（已有写回机制）
+    explicit ResourceProxy(HardwarePushConstant push_constant)
+        : type_(Type::kPushConstant), push_constant_(std::move(push_constant)) {}
+
+    // Buffer - 存储指针
+    explicit ResourceProxy(HardwareBuffer* buffer)
+        : type_(Type::kBuffer), buffer_ptr_(buffer) {}
+
+    // Image - 存储指针
+    explicit ResourceProxy(HardwareImage* image)
+        : type_(Type::kImage), image_ptr_(image) {}
+
+    // ========== 赋值操作（写回内部） ==========
+
+    template <typename T>
+    ResourceProxy& operator=(const T& value) {
+        if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareImage>) {
+            if (type_ == Type::kImage && image_ptr_ != nullptr) {
+                *image_ptr_ = value;
+            }
+        } else if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareBuffer>) {
+            if (type_ == Type::kBuffer && buffer_ptr_ != nullptr) {
+                *buffer_ptr_ = value;
+            }
+        } else if constexpr (!std::is_same_v<std::remove_cvref_t<T>, ResourceProxy>) {
+            if (type_ == Type::kPushConstant) {
+                push_constant_ = value;
+            }
+        }
+        return *this;
+    }
+
+    // ========== 显式转换（读取） ==========
+
+    explicit operator HardwareImage() const {
+        return (image_ptr_ != nullptr) ? *image_ptr_ : HardwareImage();
+    }
+
+    explicit operator HardwareBuffer() const {
+        return (buffer_ptr_ != nullptr) ? *buffer_ptr_ : HardwareBuffer();
+    }
+
+    explicit operator HardwarePushConstant() const {
+        return push_constant_;
+    }
+
+    // ========== 类型查询 ==========
+
+    [[nodiscard]] Type getType() const { return type_; }
+    [[nodiscard]] bool isImage() const { return type_ == Type::kImage; }
+    [[nodiscard]] bool isBuffer() const { return type_ == Type::kBuffer; }
+    [[nodiscard]] bool isPushConstant() const { return type_ == Type::kPushConstant; }
+
+    // ========== 显式获取引用 ==========
+
+    [[nodiscard]] HardwareImage& asImage() {
+        if (type_ != Type::kImage || image_ptr_ == nullptr) {
+            throw std::runtime_error("Resource is not an Image");
+        }
+        return *image_ptr_;
+    }
+
+    [[nodiscard]] HardwareBuffer& asBuffer() {
+        if (type_ != Type::kBuffer || buffer_ptr_ == nullptr) {
+            throw std::runtime_error("Resource is not a Buffer");
+        }
+        return *buffer_ptr_;
+    }
+
+    [[nodiscard]] HardwarePushConstant& asPushConstant() {
+        if (type_ != Type::kPushConstant) {
+            throw std::runtime_error("Resource is not a PushConstant");
+        }
+        return push_constant_;
+    }
+};
+
 // ================= 对外封装：HardwareDisplayer =================
 struct HardwareDisplayer {
    public:
@@ -242,7 +334,7 @@ struct ComputePipeline {
 
     ComputePipeline& operator=(const ComputePipeline& other);
 
-    std::variant<HardwarePushConstant> operator[](const std::string& resourceName);
+    ResourceProxy operator[](const std::string& resourceName);
     ComputePipeline& operator()(uint16_t x, uint16_t y, uint16_t z);
 
     [[nodiscard]] std::shared_ptr<uintptr_t> getComputePipelineID() const {
@@ -271,7 +363,7 @@ struct RasterizerPipeline {
     void setDepthImage(HardwareImage& depthImage);
     [[nodiscard]] HardwareImage getDepthImage();
 
-    std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> operator[](const std::string& resourceName);
+    ResourceProxy operator[](const std::string& resourceName);
     RasterizerPipeline& operator()(uint16_t width, uint16_t height);
     RasterizerPipeline& record(const HardwareBuffer& indexBuffer, const HardwareBuffer& vertexBuffer);
 

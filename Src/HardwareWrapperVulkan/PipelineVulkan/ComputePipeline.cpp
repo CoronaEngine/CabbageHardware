@@ -1,4 +1,5 @@
 ﻿#include "ComputePipeline.h"
+
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 
 ComputePipelineVulkan::ComputePipelineVulkan() {
@@ -45,7 +46,7 @@ ComputePipelineVulkan::~ComputePipelineVulkan() {
     }
 }
 
-std::variant<HardwarePushConstant> ComputePipelineVulkan::operator[](const std::string& resourceName) {
+ResourceProxy ComputePipelineVulkan::operator[](const std::string& resourceName) {
     auto* resource = shaderResource.findShaderBindInfo(resourceName);
 
     if (resource == nullptr) {
@@ -56,7 +57,8 @@ std::variant<HardwarePushConstant> ComputePipelineVulkan::operator[](const std::
         throw std::runtime_error("Resource '" + resourceName + "' is not a push constant member");
     }
 
-    return HardwarePushConstant(resource->typeSize, resource->byteOffset, &pushConstant);
+    return ResourceProxy(
+        HardwarePushConstant(resource->typeSize, resource->byteOffset, &pushConstant));
 }
 
 ComputePipelineVulkan* ComputePipelineVulkan::operator()(uint16_t x, uint16_t y, uint16_t z) {

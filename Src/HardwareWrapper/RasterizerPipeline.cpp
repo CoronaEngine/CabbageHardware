@@ -87,11 +87,9 @@ HardwareImage RasterizerPipeline::getDepthImage() {
     return img;
 }
 
-std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> RasterizerPipeline::operator[](const std::string& resourceName) {
-    std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> r;
+ResourceProxy RasterizerPipeline::operator[](const std::string& resourceName) {
     auto handle = gRasterizerPipelineStorage.acquire_read(*rasterizerPipelineID);
-    r = (*handle->impl)[resourceName];
-    return r;
+    return (*handle->impl)[resourceName];
 }
 
 RasterizerPipeline& RasterizerPipeline::operator()(uint16_t width, uint16_t height) {

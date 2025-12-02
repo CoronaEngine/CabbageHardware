@@ -85,16 +85,6 @@ HardwareBuffer::HardwareBuffer(HardwareBuffer&& other) noexcept {
     bufferID.store(other_buffer_id, std::memory_order_release);
 }
 
-HardwareBuffer& HardwareBuffer::operator=(HardwareBuffer&& other) noexcept {
-    if (this == &other) {
-        return *this;
-    }
-    auto const other_buffer_id = other.bufferID.load(std::memory_order_acquire);
-    other.bufferID.store(0, std::memory_order_release);
-    bufferID.store(other_buffer_id, std::memory_order_release);
-    return *this;
-}
-
 HardwareBuffer::~HardwareBuffer() {
     // NOTE: 不要修改写法，避免死锁
     if (auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
@@ -108,6 +98,27 @@ HardwareBuffer::~HardwareBuffer() {
             globalBufferStorages.deallocate(self_buffer_id);
         }
     }
+}
+
+HardwareBuffer& HardwareBuffer::operator=(HardwareBuffer&& other) noexcept {
+    if (this == &other) {
+        return *this;
+    }
+    auto const other_buffer_id = other.bufferID.load(std::memory_order_acquire);
+    if (auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
+        self_buffer_id > 0) {
+        bool should_destroy_self = false;
+        if (auto const self_handle = globalBufferStorages.acquire_write(self_buffer_id);
+            decrementBufferRefCount(self_handle) == true) {
+            should_destroy_self = true;
+        }
+        if (should_destroy_self) {
+            globalBufferStorages.deallocate(self_buffer_id);
+        }
+    }
+    other.bufferID.store(0, std::memory_order_release);
+    bufferID.store(other_buffer_id, std::memory_order_release);
+    return *this;
 }
 
 HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer& other) {
@@ -179,19 +190,15 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer& inputBuffer, const Har
     }
     auto const input_buffer_id = inputBuffer.bufferID.load(std::memory_order_acquire);
     auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
+    auto const executor_id = *executor->getExecutorID();
 
-    if (*executor->getExecutorID() == 0) {
-        CFW_LOG_WARNING("Invalid HardwareExecutor provided for buffer copy.");
-        return false;
-    }
-
-    if (input_buffer_id == 0 || self_buffer_id == 0) {
+    if (input_buffer_id == 0 || self_buffer_id == 0 || executor_id == 0) {
         CFW_LOG_WARNING("Copy operation failed due to uninitialized HardwareBuffer.");
         return false;
     }
 
     if (input_buffer_id < self_buffer_id) {
-        auto const executor_handle = gExecutorStorage.acquire_write(*executor->getExecutorID());
+        auto const executor_handle = gExecutorStorage.acquire_write(executor_id);
         auto const srcBuffer = globalBufferStorages.acquire_write(input_buffer_id);
         auto const dstBuffer = globalBufferStorages.acquire_write(self_buffer_id);
         CopyBufferCommand copyCmd(*srcBuffer, *dstBuffer);
@@ -201,7 +208,7 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer& inputBuffer, const Har
         }
         *executor_handle->impl << &copyCmd;
     } else {
-        auto const executor_handle = gExecutorStorage.acquire_write(*executor->getExecutorID());
+        auto const executor_handle = gExecutorStorage.acquire_write(executor_id);
         auto const dstBuffer = globalBufferStorages.acquire_write(self_buffer_id);
         auto const srcBuffer = globalBufferStorages.acquire_write(input_buffer_id);
         CopyBufferCommand copyCmd(*srcBuffer, *dstBuffer);

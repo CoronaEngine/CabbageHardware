@@ -112,18 +112,18 @@ static bool decrementImageRefCount(const Corona::Kernel::Utils::Storage<Resource
 }
 
 HardwareImage::HardwareImage()
-    : imageID(std::make_shared<uintptr_t>(0)) {
+    : imageID(0) {
 }
 
 HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
     const auto [vkFormat, pixelSize, isCompressed] = convertImageFormat(createInfo.format);
     const VkImageUsageFlags vkUsage = convertImageUsage(createInfo.usage, isCompressed);
 
-    imageID = std::make_shared<uintptr_t>(globalImageStorages.allocate());
+    auto const self_image_id = globalImageStorages.allocate();
+    imageID.store(self_image_id, std::memory_order_release);
 
     {
-        const auto handle = globalImageStorages.acquire_write(*imageID);
-
+        const auto handle = globalImageStorages.acquire_write(self_image_id);
         *handle = globalHardwareContext.getMainDevice()->resourceManager.createImage(
             ktm::uvec2(createInfo.width, createInfo.height),
             vkFormat,
@@ -131,19 +131,15 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
             vkUsage,
             createInfo.arrayLayers,
             createInfo.mipLevels);
-        handle->refCount = 1;
     }
 
     if (createInfo.initialData != nullptr) {
         HardwareExecutorVulkan tempExecutor;
-
-        auto imageHandle = globalImageStorages.acquire_write(*imageID);
-        HardwareBuffer stagingBuffer(imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize,
-                                     BufferUsage::StorageBuffer,
-                                     createInfo.initialData);
-
-        auto bufferHandle = globalBufferStorages.acquire_write(stagingBuffer.bufferID.load(std::memory_order_acquire));
-
+        auto const imageHandle = globalImageStorages.acquire_write(self_image_id);
+        const HardwareBuffer stagingBuffer(imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize,
+                                           BufferUsage::StorageBuffer,
+                                           createInfo.initialData);
+        auto const bufferHandle = globalBufferStorages.acquire_write(stagingBuffer.bufferID.load(std::memory_order_acquire));
         CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, 0);
         tempExecutor << &copyCmd << tempExecutor.commit();
     }
@@ -153,87 +149,142 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
     const auto [vkFormat, pixelSize, isCompressed] = convertImageFormat(imageFormat);
     const VkImageUsageFlags vkUsage = convertImageUsage(imageUsage, isCompressed);
 
-    imageID = std::make_shared<uintptr_t>(globalImageStorages.allocate());
+    auto const self_image_id = globalImageStorages.allocate();
+    imageID.store(self_image_id, std::memory_order_release);
 
     {
-        const auto handle = globalImageStorages.acquire_write(*imageID);
-
+        const auto handle = globalImageStorages.acquire_write(self_image_id);
         *handle = globalHardwareContext.getMainDevice()->resourceManager.createImage(
             ktm::uvec2(width, height),
             vkFormat,
             pixelSize,
             vkUsage,
             arrayLayers);
-        handle->refCount = 1;
     }
 
     if (imageData != nullptr) {
         HardwareExecutorVulkan tempExecutor;
-
-        auto imageHandle = globalImageStorages.acquire_write(*imageID);
-        HardwareBuffer stagingBuffer(imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize,
-                                     BufferUsage::StorageBuffer,
-                                     imageData);
-
-        auto bufferHandle = globalBufferStorages.acquire_write(stagingBuffer.bufferID.load(std::memory_order_acquire));
-
+        auto const imageHandle = globalImageStorages.acquire_write(self_image_id);
+        const HardwareBuffer stagingBuffer(imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize,
+                                           BufferUsage::StorageBuffer,
+                                           imageData);
+        auto const bufferHandle = globalBufferStorages.acquire_write(stagingBuffer.bufferID.load(std::memory_order_acquire));
         CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, 0);
         tempExecutor << &copyCmd << tempExecutor.commit();
     }
 }
 
-HardwareImage::HardwareImage(const HardwareImage& other)
-    : imageID(other.imageID) {
-    if (*imageID > 0) {
-        auto const handle = globalImageStorages.acquire_write(*imageID);
+HardwareImage::HardwareImage(const HardwareImage& other) {
+    auto const other_image_id = other.imageID.load(std::memory_order_acquire);
+    imageID.store(other_image_id, std::memory_order_release);
+    if (other_image_id > 0) {
+        auto const handle = globalImageStorages.acquire_write(other_image_id);
         incrementImageRefCount(handle);
     }
 }
 
+HardwareImage::HardwareImage(HardwareImage&& other) noexcept {
+    auto const other_image_id = other.imageID.load(std::memory_order_acquire);
+    other.imageID.store(0, std::memory_order_release);
+    imageID.store(other_image_id, std::memory_order_release);
+}
+
+HardwareImage& HardwareImage::operator=(HardwareImage&& other) noexcept {
+    if (this == &other) {
+        return *this;
+    }
+    auto const other_image_id = other.imageID.load(std::memory_order_acquire);
+    if (auto const self_image_id = imageID.load(std::memory_order_acquire);
+        self_image_id > 0) {
+        auto const self_handle = globalImageStorages.acquire_write(self_image_id);
+        bool should_destroy_self = false;
+        if (decrementImageRefCount(self_handle) == true) {
+            should_destroy_self = true;
+        }
+        if (should_destroy_self) {
+            globalImageStorages.deallocate(self_image_id);
+        }
+    }
+    other.imageID.store(0, std::memory_order_release);
+    imageID.store(other_image_id, std::memory_order_release);
+    return *this;
+}
+
 HardwareImage::~HardwareImage() {
-    if (imageID && *imageID > 0) {
+    if (auto const self_image_id = imageID.load(std::memory_order_acquire);
+        self_image_id > 0) {
         bool destroy = false;
-        if (auto const handle = globalImageStorages.acquire_write(*imageID); decrementImageRefCount(handle)) {
+        if (auto const handle = globalImageStorages.acquire_write(self_image_id); decrementImageRefCount(handle)) {
             destroy = true;
         }
         if (destroy) {
-            globalImageStorages.deallocate(*imageID);
+            globalImageStorages.deallocate(self_image_id);
         }
     }
 }
 
 HardwareImage& HardwareImage::operator=(const HardwareImage& other) {
-    if (this != &other) {
-        {
-            auto const handle = globalImageStorages.acquire_write(*other.imageID);
-            incrementImageRefCount(handle);
-        }
-        {
-            if (imageID && *imageID > 0) {
-                bool destroy = false;
-                if (auto const handle = globalImageStorages.acquire_write(*imageID); decrementImageRefCount(handle)) {
-                    destroy = true;
-                }
-                if (destroy) {
-                    globalImageStorages.deallocate(*imageID);
-                }
-            }
-        }
-        *(this->imageID) = *(other.imageID);
+    if (this == &other) {
+        return *this;
     }
+    auto const self_image_id = imageID.load(std::memory_order_acquire);
+    auto const other_image_id = other.imageID.load(std::memory_order_acquire);
+    if (self_image_id == 0 && other_image_id == 0) {
+        return *this;
+    }
+    if (other_image_id == 0) {
+        // 释放自身资源
+        bool should_destroy_self = false;
+        if (auto const self_handle = globalImageStorages.acquire_write(self_image_id);
+            decrementImageRefCount(self_handle) == true) {
+            should_destroy_self = true;
+        }
+        if (should_destroy_self) {
+            globalImageStorages.deallocate(self_image_id);
+        }
+        imageID.store(0, std::memory_order_release);
+        CFW_LOG_WARNING("Copying from an uninitialized HardwareBuffer.");
+        return *this;
+    }
+    if (self_image_id == 0) {
+        // 直接拷贝
+        imageID.store(other_image_id, std::memory_order_release);
+        auto const other_handle = globalImageStorages.acquire_write(other_image_id);
+        incrementImageRefCount(other_handle);
+        return *this;
+    }
+
+    bool should_destroy_self = false;
+    if (self_image_id < other_image_id) {
+        auto const self_handle = globalImageStorages.acquire_write(self_image_id);
+        auto const other_handle = globalImageStorages.acquire_write(other_image_id);
+        incrementImageRefCount(other_handle);
+        if (decrementImageRefCount(self_handle) == true) {
+            should_destroy_self = true;
+        }
+    } else {
+        auto const other_handle = globalImageStorages.acquire_write(other_image_id);
+        auto const self_handle = globalImageStorages.acquire_write(self_image_id);
+        incrementImageRefCount(other_handle);
+        if (decrementImageRefCount(self_handle) == true) {
+            should_destroy_self = true;
+        }
+    }
+    if (should_destroy_self) {
+        globalImageStorages.deallocate(self_image_id);
+    }
+
     return *this;
 }
 
 HardwareImage::operator bool() const {
-    if (imageID && *imageID != 0) {
-        return globalImageStorages.acquire_read(*imageID)->imageHandle != VK_NULL_HANDLE;
-    } else {
-        return false;
-    }
+    auto const self_image_id = imageID.load(std::memory_order_acquire);
+    return self_image_id > 0 &&
+           globalImageStorages.acquire_read(self_image_id)->imageHandle != VK_NULL_HANDLE;
 }
 
 uint32_t HardwareImage::storeDescriptor(uint32_t mipLevel) {
-    auto imageHandle = globalImageStorages.acquire_write(*imageID);
+    auto imageHandle = globalImageStorages.acquire_write(imageID.load(std::memory_order_acquire));
 
     if (mipLevel >= imageHandle->mipLevels) {
         mipLevel = 0;
@@ -247,24 +298,19 @@ uint32_t HardwareImage::storeDescriptor(uint32_t mipLevel) {
 }
 
 uint32_t HardwareImage::getMipLevels() const {
-    if (imageID && *imageID != 0) {
-        auto imageHandle = globalImageStorages.acquire_read(*imageID);
-        return imageHandle->mipLevels;
-    }
-    return 0;
+    auto const self_image_id = imageID.load(std::memory_order_acquire);
+    return imageID > 0 ? globalImageStorages.acquire_read(self_image_id)->mipLevels : 0;
 }
 
 std::pair<uint32_t, uint32_t> HardwareImage::getMipLevelSize(uint32_t mipLevel) const {
-    if (imageID && *imageID != 0) {
-        auto imageHandle = globalImageStorages.acquire_read(*imageID);
-
+    if (auto const self_image_id = imageID.load(std::memory_order_acquire);
+        self_image_id > 0) {
+        auto const imageHandle = globalImageStorages.acquire_read(self_image_id);
         if (mipLevel >= imageHandle->mipLevels) {
             return {0, 0};
         }
-
         uint32_t width = std::max(1u, imageHandle->imageSize.x >> mipLevel);
         uint32_t height = std::max(1u, imageHandle->imageSize.y >> mipLevel);
-
         return {width, height};
     }
     return {0, 0};
@@ -274,44 +320,43 @@ HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, Hardw
     if (!executor || !executor->getExecutorID() || *executor->getExecutorID() == 0) {
         return *this;  // 必须提供有效的 executor
     }
-
-    auto imageHandle = globalImageStorages.acquire_write(*imageID);
+    auto const self_image_id = imageID.load(std::memory_order_acquire);
+    auto const buffer_id = buffer.bufferID.load(std::memory_order_acquire);
+    auto const executor_id = *executor->getExecutorID();
+    if (self_image_id == 0 || buffer_id == 0 || executor_id == 0) {
+        CFW_LOG_WARNING("Copy operation failed due to uninitialized HardwareImage.");
+        return *this;
+    }
+    auto const executor_handle = gExecutorStorage.acquire_write(executor_id);
+    auto const bufferHandle = globalBufferStorages.acquire_write(buffer_id);
+    auto const imageHandle = globalImageStorages.acquire_write(self_image_id);
     if (mipLevel >= imageHandle->mipLevels) {
         return *this;
     }
-
-    auto bufferHandle = globalBufferStorages.acquire_write(buffer.bufferID.load(std::memory_order_acquire));
-
-    {
-        auto const executor_handle = gExecutorStorage.acquire_read(*executor->getExecutorID());
-        if (!executor_handle->impl) {
-            return *this;
-        }
-
-        CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, mipLevel);
-        *executor_handle->impl << &copyCmd;
+    if (!executor_handle->impl) {
+        return *this;
     }
-
+    CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, mipLevel);
+    *executor_handle->impl << &copyCmd;
     return *this;
 }
 
 HardwareImage& HardwareImage::copyFromData(const void* inputData, HardwareExecutor* executor, uint32_t mipLevel) {
-    if (inputData != nullptr) {
-        uint64_t bufferSize = 0;
-        {
-            auto imageHandle = globalImageStorages.acquire_read(*imageID);
-
-            if (mipLevel >= imageHandle->mipLevels) {
-                return *this;
-            }
-
-            uint32_t width = std::max(1u, imageHandle->imageSize.x >> mipLevel);
-            uint32_t height = std::max(1u, imageHandle->imageSize.y >> mipLevel);
-            bufferSize = width * height * imageHandle->pixelSize;
-        }
-
-        HardwareBuffer stagingBuffer(bufferSize, BufferUsage::StorageBuffer, inputData);
-        copyFromBuffer(stagingBuffer, executor, mipLevel);
+    if (inputData == nullptr) {
+        return *this;
     }
-    return *this;
+    uint64_t bufferSize = 0;
+    {
+        auto const imageHandle = globalImageStorages.acquire_read(imageID.load(std::memory_order_acquire));
+        if (mipLevel >= imageHandle->mipLevels) {
+            return *this;
+        }
+        const uint32_t width = std::max(1u, imageHandle->imageSize.x >> mipLevel);
+        const uint32_t height = std::max(1u, imageHandle->imageSize.y >> mipLevel);
+        bufferSize = width * height * imageHandle->pixelSize;
+    }
+
+    return copyFromBuffer(HardwareBuffer(bufferSize, BufferUsage::StorageBuffer, inputData),
+                          executor,
+                          mipLevel);
 }

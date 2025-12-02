@@ -77,10 +77,9 @@ ComputePipeline& ComputePipeline::operator=(const ComputePipeline& other) {
     return *this;
 }
 
-std::variant<HardwarePushConstant> ComputePipeline::operator[](const std::string& resourceName) {
+ResourceProxy ComputePipeline::operator[](const std::string& resourceName) {
     auto const handle = gComputePipelineStorage.acquire_read(*computePipelineID);
-    std::variant<HardwarePushConstant> result = (*handle->impl)[resourceName];
-    return result;
+    return (*handle->impl)[resourceName];
 }
 
 ComputePipeline& ComputePipeline::operator()(uint16_t x, uint16_t y, uint16_t z) {
