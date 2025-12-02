@@ -142,7 +142,7 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
                                      BufferUsage::StorageBuffer,
                                      createInfo.initialData);
 
-        auto bufferHandle = globalBufferStorages.acquire_write(*stagingBuffer.bufferID);
+        auto bufferHandle = globalBufferStorages.acquire_write(stagingBuffer.bufferID.load(std::memory_order_acquire));
 
         CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, 0);
         tempExecutor << &copyCmd << tempExecutor.commit();
@@ -175,7 +175,7 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
                                      BufferUsage::StorageBuffer,
                                      imageData);
 
-        auto bufferHandle = globalBufferStorages.acquire_write(*stagingBuffer.bufferID);
+        auto bufferHandle = globalBufferStorages.acquire_write(stagingBuffer.bufferID.load(std::memory_order_acquire));
 
         CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, 0);
         tempExecutor << &copyCmd << tempExecutor.commit();
@@ -288,7 +288,7 @@ HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, Hardw
         return *this;
     }
 
-    auto bufferHandle = globalBufferStorages.acquire_write(*buffer.bufferID);
+    auto bufferHandle = globalBufferStorages.acquire_write(buffer.bufferID.load(std::memory_order_acquire));
 
     {
         auto const executor_handle = gExecutorStorage.acquire_read(*executor->getExecutorID());

@@ -100,8 +100,8 @@ RasterizerPipeline& RasterizerPipeline::operator()(uint16_t width, uint16_t heig
     return *this;
 }
 
-RasterizerPipeline& RasterizerPipeline::record(const HardwareBuffer& indexBuffer) {
+RasterizerPipeline& RasterizerPipeline::record(const HardwareBuffer& indexBuffer, const HardwareBuffer& vertexBuffer) {
     auto handle = gRasterizerPipelineStorage.acquire_read(*rasterizerPipelineID);
-    handle->impl->record(indexBuffer);
+    handle->impl->record(indexBuffer, vertexBuffer);
     return *this;
 }

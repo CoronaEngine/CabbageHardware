@@ -31,7 +31,7 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan {
 
     RasterizerPipelineVulkan* operator()(uint16_t width, uint16_t height);
 
-    CommandRecordVulkan* record(const HardwareBuffer& indexBuffer);
+    CommandRecordVulkan* record(const HardwareBuffer& indexBuffer, const HardwareBuffer& vertexBuffer);
 
     ExecutorType getExecutorType() override {
         return CommandRecordVulkan::ExecutorType::Graphics;
@@ -41,11 +41,15 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan {
     RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutorVulkan) override;
 
    private:
+
     struct TriangleGeomMesh {
         HardwareBuffer indexBuffer;
-        std::vector<HardwareBuffer> vertexBuffers;
+        HardwareBuffer vertexBuffer;
+        VkDeviceSize vertexOffset;
+
         HardwarePushConstant pushConstant;
     };
+    std::vector<TriangleGeomMesh> geomMeshesRecord;
 
     void createRenderPass(int multiviewCount = 1);
     void createGraphicsPipeline(EmbeddedShader::ShaderCodeModule& vertShaderCode,
@@ -69,11 +73,9 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan {
     EmbeddedShader::ShaderCodeModule vertShaderCode;
     EmbeddedShader::ShaderCodeModule fragShaderCode;
 
-    std::vector<TriangleGeomMesh> geomMeshesRecord;
-
     CommandRecordVulkan dumpCommandRecordVulkan;
     HardwarePushConstant tempPushConstant;
-    std::vector<HardwareBuffer> tempVertexBuffers;
+    //std::vector<HardwareBuffer> tempVertexBuffers;
 
     std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> vertexStageInputs;
     std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> vertexStageOutputs;
