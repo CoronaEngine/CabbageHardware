@@ -100,7 +100,7 @@ struct HardwareBuffer {
     ~HardwareBuffer();
 
     HardwareBuffer& operator=(const HardwareBuffer& other);
-    HardwareBuffer& operator=(HardwareBuffer&& other);
+    HardwareBuffer& operator=(HardwareBuffer&& other) noexcept;
 
     explicit operator bool() const;
 

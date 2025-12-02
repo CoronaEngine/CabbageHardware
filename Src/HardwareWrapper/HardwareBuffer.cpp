@@ -66,7 +66,7 @@ HardwareBuffer::HardwareBuffer(HardwareBuffer&& other) noexcept {
     bufferID.store(other_buffer_id, std::memory_order_release);
 }
 
-HardwareBuffer& HardwareBuffer::operator=(HardwareBuffer&& other) {
+HardwareBuffer& HardwareBuffer::operator=(HardwareBuffer&& other) noexcept {
     if (this == &other) {
         return *this;
     }
