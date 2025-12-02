@@ -201,14 +201,14 @@ struct HardwarePushConstant {
     // NOTE: must in the same thread
     [[nodiscard]] uint8_t* getData() const;
     [[nodiscard]] uint64_t getSize() const;
-    [[nodiscard]] std::shared_ptr<uintptr_t> getPushConstantID() const {
-        return pushConstantID;
+    [[nodiscard]] uintptr_t getPushConstantID() const {
+        return pushConstantID.load(std::memory_order_acquire);
     }
 
    private:
     void copyFromRaw(const void* src, uint64_t size);
 
-    std::shared_ptr<uintptr_t> pushConstantID;
+    std::atomic<std::uintptr_t> pushConstantID;
 };
 
 // ================= 资源代理类：ResourceProxy =================
