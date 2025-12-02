@@ -1,8 +1,9 @@
 # TODO（按优先级排序）
 - （紧急）多线程内存泄漏、多线程死锁、多线程crash
-- （紧急）多显卡同步（timeline）：VK_KHR_external_semaphore
+- （紧急）重构外层封装：使用HardwareExecutor执行各种命令
 - （BUG）多线程同步：display无法使用timeline，无法判断queue任务是否完成
 - （紧急）mipmap、layer支持
+- （紧急）多显卡同步（timeline）：VK_KHR_external_semaphore
 - 自动判断image的layout
 - 解决命令行的Warning
 - BUG：VMA的buffer导入导出
