@@ -605,7 +605,7 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
 
         VkBufferMemoryBarrier2 indexBarrier = bufferBarrierTemplate;
         {
-            auto handle = globalBufferStorages.acquire_read(*mesh.indexBuffer.getBufferID());
+            auto handle = globalBufferStorages.acquire_read(mesh.indexBuffer.getBufferID());
             indexBarrier.buffer = handle->bufferHandle;
         }
         indexBarrier.dstStageMask = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
@@ -617,7 +617,7 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
         {
             VkBufferMemoryBarrier2 vertexBarrier = bufferBarrierTemplate;
             {
-                auto handle = globalBufferStorages.acquire_read(*mesh.vertexBuffer.getBufferID());
+                auto handle = globalBufferStorages.acquire_read(mesh.vertexBuffer.getBufferID());
                 vertexBarrier.buffer = handle->bufferHandle;
             }
             vertexBarrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
@@ -748,7 +748,7 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExe
 
         // 绑定顶点缓冲区
         {
-            auto vertexBufferHandle = globalBufferStorages.acquire_read(*mesh.vertexBuffer.getBufferID());
+            auto vertexBufferHandle = globalBufferStorages.acquire_read(mesh.vertexBuffer.getBufferID());
             VkBuffer vertexBuffers[] = {vertexBufferHandle->bufferHandle};
             VkDeviceSize offsets[] = {mesh.vertexOffset};
             vkCmdBindVertexBuffers(commandBuffer,
@@ -759,7 +759,7 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExe
         }
         // 绑定索引缓冲区
         {
-            auto handle = globalBufferStorages.acquire_read(*mesh.indexBuffer.getBufferID());
+            auto handle = globalBufferStorages.acquire_read(mesh.indexBuffer.getBufferID());
             vkCmdBindIndexBuffer(commandBuffer,
                                  handle->bufferHandle,
                                  0,
@@ -777,7 +777,7 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExe
         }
 
         {
-            auto handle = globalBufferStorages.acquire_read(*mesh.indexBuffer.getBufferID());
+            auto handle = globalBufferStorages.acquire_read(mesh.indexBuffer.getBufferID());
             // 绘制
             vkCmdDrawIndexed(commandBuffer, handle->elementCount, 1, 0, 0, 0);
         }

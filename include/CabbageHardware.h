@@ -83,6 +83,7 @@ struct HardwareBuffer {
    public:
     HardwareBuffer();
     HardwareBuffer(const HardwareBuffer& other);
+    HardwareBuffer(HardwareBuffer&& other) noexcept;
     HardwareBuffer(uint32_t bufferSize, uint32_t elementSize, BufferUsage usage, const void* data = nullptr);
 
     HardwareBuffer(uint32_t size, BufferUsage usage, const void* data = nullptr)
@@ -99,6 +100,8 @@ struct HardwareBuffer {
     ~HardwareBuffer();
 
     HardwareBuffer& operator=(const HardwareBuffer& other);
+    HardwareBuffer& operator=(HardwareBuffer&& other) noexcept;
+
     explicit operator bool() const;
 
     ExternalHandle exportBufferMemory();
@@ -119,12 +122,12 @@ struct HardwareBuffer {
     [[nodiscard]] uint64_t getElementSize() const;
     [[nodiscard]] uint64_t getElementCount() const;
 
-    [[nodiscard]] std::shared_ptr<uintptr_t> getBufferID() const {
-        return bufferID;
+    [[nodiscard]] uintptr_t getBufferID() const {
+        return bufferID.load(std::memory_order_acquire);
     }
 
    private:
-    std::shared_ptr<uintptr_t> bufferID;
+    std::atomic<std::uintptr_t> bufferID;
 
     friend class HardwareImage;
 };

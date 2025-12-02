@@ -204,9 +204,9 @@ int main() {
         }
 
         HardwareBuffer vertexBuffer = HardwareBuffer(vertices, BufferUsage::VertexBuffer);
-        //HardwareBuffer normalBuffer = HardwareBuffer(normals, BufferUsage::VertexBuffer);
-        //HardwareBuffer uvBuffer = HardwareBuffer(uvs, BufferUsage::VertexBuffer);
-        //HardwareBuffer colorBuffer = HardwareBuffer(colors, BufferUsage::VertexBuffer);
+        // HardwareBuffer normalBuffer = HardwareBuffer(normals, BufferUsage::VertexBuffer);
+        // HardwareBuffer uvBuffer = HardwareBuffer(uvs, BufferUsage::VertexBuffer);
+        // HardwareBuffer colorBuffer = HardwareBuffer(colors, BufferUsage::VertexBuffer);
 
         HardwareBuffer indexBuffer = HardwareBuffer(indices, BufferUsage::IndexBuffer);
 
@@ -261,22 +261,16 @@ int main() {
             auto startTime = std::chrono::high_resolution_clock::now();
 
             while (running.load()) {
-                try {
-                    float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
+                float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
-                    for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
-                        rasterizerUniformBufferObject[i].textureIndex = texture.storeDescriptor();
-                        rasterizerUniformBufferObject[i].model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
-                        rasterizerUniformBuffers[threadIndex][i].copyFromData(&(rasterizerUniformBufferObject[i]), sizeof(rasterizerUniformBufferObject[i]));
-                    }
-
-                    computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
-                    computeUniformBuffers[threadIndex].copyFromData(&computeUniformData, sizeof(computeUniformData));
-                } catch (const std::exception& e) {
-                    CFW_LOG_ERROR("Mesh thread exception: {}", e.what());
-                } catch (...) {
-                    CFW_LOG_ERROR("Mesh thread unknown exception!");
+                for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
+                    rasterizerUniformBufferObject[i].textureIndex = texture.storeDescriptor();
+                    rasterizerUniformBufferObject[i].model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
+                    rasterizerUniformBuffers[threadIndex][i].copyFromData(&(rasterizerUniformBufferObject[i]), sizeof(rasterizerUniformBufferObject[i]));
                 }
+
+                computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
+                computeUniformBuffers[threadIndex].copyFromData(&computeUniformData, sizeof(computeUniformData));
             }
         };
 
@@ -285,28 +279,22 @@ int main() {
             RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
             ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
             while (running.load()) {
-                try {
-                    for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
-                        rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffers[threadIndex][i].storeDescriptor();
-                        //rasterizer["inPosition"] = postionBuffer;
-                        //rasterizer["inColor"] = colorBuffer;
-                        //rasterizer["inTexCoord"] = uvBuffer;
-                        //rasterizer["inNormal"] = normalBuffer;
-                        rasterizer["outColor"] = finalOutputImages[threadIndex];
+                for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
+                    rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffers[threadIndex][i].storeDescriptor();
+                    // rasterizer["inPosition"] = postionBuffer;
+                    // rasterizer["inColor"] = colorBuffer;
+                    // rasterizer["inTexCoord"] = uvBuffer;
+                    // rasterizer["inNormal"] = normalBuffer;
+                    rasterizer["outColor"] = finalOutputImages[threadIndex];
 
-                        executors[threadIndex] << rasterizer.record(indexBuffer, vertexBuffer);
-                    }
-
-                    computer["pushConsts.uniformBufferIndex"] = computeUniformBuffers[threadIndex].storeDescriptor();
-
-                    executors[threadIndex] << rasterizer(1920, 1080)
-                                           << computer(1920 / 8, 1080 / 8, 1)
-                                           << executors[threadIndex].commit();
-                } catch (const std::exception& e) {
-                    CFW_LOG_ERROR("Render thread exception: {}", e.what());
-                } catch (...) {
-                    CFW_LOG_ERROR("Render thread unknown exception!");
+                    executors[threadIndex] << rasterizer.record(indexBuffer, vertexBuffer);
                 }
+
+                computer["pushConsts.uniformBufferIndex"] = computeUniformBuffers[threadIndex].storeDescriptor();
+
+                executors[threadIndex] << rasterizer(1920, 1080)
+                                       << computer(1920 / 8, 1080 / 8, 1)
+                                       << executors[threadIndex].commit();
             }
         };
 
@@ -314,13 +302,7 @@ int main() {
             CFW_LOG_INFO("Display thread started...");
             HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
             while (running.load()) {
-                try {
-                    displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
-                } catch (const std::exception& e) {
-                    CFW_LOG_ERROR("Display thread exception: {}", e.what());
-                } catch (...) {
-                    CFW_LOG_ERROR("Display thread unknown exception!");
-                }
+                displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
             }
         };
 
