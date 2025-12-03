@@ -18,51 +18,114 @@ static bool decrementDisplayerRefCount(const Corona::Kernel::Utils::Storage<Disp
     return false;
 }
 
-HardwareDisplayer::HardwareDisplayer(void* surface) {
-    auto id = globalDisplayerStorages.allocate();
-    auto const handle = globalDisplayerStorages.acquire_write(id);
-    handle->displaySurface = surface;
-    handle->displayManager = std::make_shared<DisplayManager>();
-    handle->refCount = 1;
-
-    displaySurfaceID = std::make_shared<uintptr_t>(id);
+HardwareDisplayer::HardwareDisplayer(void* surface)
+    : displaySurfaceID(globalDisplayerStorages.allocate()) {
+    auto const self_handle = globalDisplayerStorages.acquire_write(displaySurfaceID.load(std::memory_order_acquire));
+    self_handle->displaySurface = surface;
+    self_handle->displayManager = std::make_shared<DisplayManager>();
 }
 
 HardwareDisplayer::HardwareDisplayer(const HardwareDisplayer& other)
-    : displaySurfaceID(other.displaySurfaceID) {
-    if (*displaySurfaceID > 0) {
-        auto const handle = globalDisplayerStorages.acquire_write(*displaySurfaceID);
-        incrementDisplayerRefCount(handle);
+    : displaySurfaceID(other.displaySurfaceID.load(std::memory_order_acquire)) {
+    if (displaySurfaceID.load(std::memory_order_acquire) > 0) {
+        auto const self_handle = globalDisplayerStorages.acquire_write(displaySurfaceID.load(std::memory_order_acquire));
+        incrementDisplayerRefCount(self_handle);
     }
 }
 
+HardwareDisplayer::HardwareDisplayer(HardwareDisplayer&& other) noexcept
+    : displaySurfaceID(other.displaySurfaceID.load(std::memory_order_acquire)) {
+    other.displaySurfaceID.store(0, std::memory_order_release);
+}
+
 HardwareDisplayer::~HardwareDisplayer() {
-    if (displaySurfaceID && *displaySurfaceID > 0) {
+    if (auto const self_id = displaySurfaceID.load(std::memory_order_acquire);
+        self_id > 0) {
         bool destroy = false;
-        if (auto const handle = globalDisplayerStorages.acquire_write(*displaySurfaceID); decrementDisplayerRefCount(handle)) {
+        if (auto const self_handle = globalDisplayerStorages.acquire_write(self_id);
+            decrementDisplayerRefCount(self_handle)) {
             destroy = true;
         }
         if (destroy) {
-            globalDisplayerStorages.deallocate(*displaySurfaceID);
+            globalDisplayerStorages.deallocate(self_id);
         }
     }
 }
 
 HardwareDisplayer& HardwareDisplayer::operator=(const HardwareDisplayer& other) {
-    if (this != &other) {
-        {
-            auto const handle = globalDisplayerStorages.acquire_write(*other.displaySurfaceID);
-            incrementDisplayerRefCount(handle);
-        }
-        bool destroy = false;
-        if (auto const handle = globalDisplayerStorages.acquire_write(*displaySurfaceID); decrementDisplayerRefCount(handle)) {
-            destroy = true;
-        }
-        if (destroy) {
-            globalDisplayerStorages.deallocate(*displaySurfaceID);
-        }
-        displaySurfaceID = other.displaySurfaceID;
+    if (this == &other) {
+        return *this;
     }
+    auto const self_id = displaySurfaceID.load(std::memory_order_acquire);
+    auto const other_id = other.displaySurfaceID.load(std::memory_order_acquire);
+    if (self_id == 0 && other_id == 0) {
+        // 都未初始化，直接返回
+        return *this;
+    }
+    if (self_id == other_id) {
+        // 已经指向同一个资源，无需操作
+        return *this;
+    }
+    bool should_destroy_self = false;
+    if (other_id == 0) {
+        // 释放自身资源
+        if (auto const self_handle = globalDisplayerStorages.acquire_write(self_id);
+            decrementDisplayerRefCount(self_handle)) {
+            should_destroy_self = true;
+        }
+        if (should_destroy_self) {
+            globalDisplayerStorages.deallocate(self_id);
+        }
+        displaySurfaceID.store(0, std::memory_order_release);
+        return *this;
+    }
+    if (self_id == 0) {
+        // 直接拷贝
+        displaySurfaceID.store(other_id, std::memory_order_release);
+        auto const other_handle = globalDisplayerStorages.acquire_write(other_id);
+        incrementDisplayerRefCount(other_handle);
+        return *this;
+    }
+    if (self_id < other_id) {
+        auto const self_handle = globalDisplayerStorages.acquire_write(self_id);
+        auto const other_handle = globalDisplayerStorages.acquire_write(other_id);
+        incrementDisplayerRefCount(other_handle);
+        if (decrementDisplayerRefCount(self_handle)) {
+            should_destroy_self = true;
+        }
+    } else {
+        auto const other_handle = globalDisplayerStorages.acquire_write(other_id);
+        auto const self_handle = globalDisplayerStorages.acquire_write(self_id);
+        incrementDisplayerRefCount(other_handle);
+        if (decrementDisplayerRefCount(self_handle)) {
+            should_destroy_self = true;
+        }
+    }
+    if (should_destroy_self) {
+        globalDisplayerStorages.deallocate(self_id);
+    }
+    displaySurfaceID.store(other_id, std::memory_order_release);
+    return *this;
+}
+
+HardwareDisplayer& HardwareDisplayer::operator=(HardwareDisplayer&& other) noexcept {
+    if (this == &other) {
+        return *this;
+    }
+    auto const other_id = other.displaySurfaceID.load(std::memory_order_acquire);
+    if (auto const self_id = displaySurfaceID.load(std::memory_order_acquire);
+        self_id > 0) {
+        bool should_destroy_self = false;
+        if (auto const self_handle = globalDisplayerStorages.acquire_write(self_id);
+            decrementDisplayerRefCount(self_handle)) {
+            should_destroy_self = true;
+        }
+        if (should_destroy_self) {
+            globalDisplayerStorages.deallocate(self_id);
+        }
+    }
+    displaySurfaceID.store(other_id, std::memory_order_release);
+    other.displaySurfaceID.store(0, std::memory_order_release);
     return *this;
 }
 
@@ -71,7 +134,7 @@ HardwareDisplayer& HardwareDisplayer::wait(const HardwareExecutor& executor) {
     if (executor.getExecutorID()) {
         if (auto const executor_handle = gExecutorStorage.acquire_read(*executor.getExecutorID());
             executor_handle->impl) {
-            if (auto const display_handle = globalDisplayerStorages.acquire_write(*displaySurfaceID);
+            if (auto const display_handle = globalDisplayerStorages.acquire_write(displaySurfaceID.load(std::memory_order_acquire));
                 display_handle->displayManager) {
                 display_handle->displayManager->waitExecutor(*executor_handle->impl);
             }
@@ -82,7 +145,7 @@ HardwareDisplayer& HardwareDisplayer::wait(const HardwareExecutor& executor) {
 }
 
 HardwareDisplayer& HardwareDisplayer::operator<<(const HardwareImage& image) {
-    if (auto const handle = globalDisplayerStorages.acquire_read(*displaySurfaceID);
+    if (auto const handle = globalDisplayerStorages.acquire_read(displaySurfaceID.load(std::memory_order_acquire));
         handle->displayManager && handle->displaySurface) {
         handle->displayManager->displayFrame(handle->displaySurface, image);
     }

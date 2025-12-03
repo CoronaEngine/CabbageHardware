@@ -24,9 +24,9 @@ struct ComputePipelineWrap {
 extern Corona::Kernel::Utils::Storage<ComputePipelineWrap> gComputePipelineStorage;
 
 struct DisplayerHardwareWrap {
-    void* displaySurface = nullptr;
-    std::shared_ptr<DisplayManager> displayManager;
-    uint64_t refCount = 0;
+    void* displaySurface{nullptr};
+    std::shared_ptr<DisplayManager> displayManager{nullptr};
+    uint64_t refCount{1};
 };
 
 extern Corona::Kernel::Utils::Storage<DisplayerHardwareWrap> globalDisplayerStorages;

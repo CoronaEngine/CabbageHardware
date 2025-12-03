@@ -344,19 +344,21 @@ struct HardwareDisplayer {
    public:
     explicit HardwareDisplayer(void* surface = nullptr);
     HardwareDisplayer(const HardwareDisplayer& other);
+    HardwareDisplayer(HardwareDisplayer&& other) noexcept;
     ~HardwareDisplayer();
 
     HardwareDisplayer& operator=(const HardwareDisplayer& other);
+    HardwareDisplayer& operator=(HardwareDisplayer&& other) noexcept;
     HardwareDisplayer& operator<<(const HardwareImage& image);
 
     HardwareDisplayer& wait(const HardwareExecutor& executor);
 
-    [[nodiscard]] std::shared_ptr<uintptr_t> getDisplayerID() const {
-        return displaySurfaceID;
+    [[nodiscard]] uintptr_t getDisplayerID() const {
+        return displaySurfaceID.load(std::memory_order_acquire);
     }
 
    private:
-    std::shared_ptr<uintptr_t> displaySurfaceID;
+    std::atomic<uintptr_t> displaySurfaceID;
 };
 
 // ================= 对外封装：ComputePipeline =================

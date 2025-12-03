@@ -73,14 +73,14 @@ ComputePipeline& ComputePipeline::operator=(const ComputePipeline& other) {
         // 已经指向同一个资源，无需操作
         return *this;
     }
+    bool should_destroy_self = false;
     if (other_id == 0) {
         // 释放自身资源
-        bool destroy = false;
         if (auto const self_handle = gComputePipelineStorage.acquire_write(self_id);
             decCompute(self_handle)) {
-            destroy = true;
+            should_destroy_self = true;
         }
-        if (destroy) {
+        if (should_destroy_self) {
             gComputePipelineStorage.deallocate(self_id);
         }
         computePipelineID.store(0, std::memory_order_release);
@@ -93,7 +93,6 @@ ComputePipeline& ComputePipeline::operator=(const ComputePipeline& other) {
         incCompute(other_handle);
         return *this;
     }
-    bool should_destroy_self = false;
     if (self_id < other_id) {
         auto const self_handle = gComputePipelineStorage.acquire_write(self_id);
         auto const other_handle = gComputePipelineStorage.acquire_write(other_id);
@@ -123,12 +122,12 @@ ComputePipeline& ComputePipeline::operator=(ComputePipeline&& other) noexcept {
     auto const other_id = other.computePipelineID.load(std::memory_order_acquire);
     if (auto const self_id = computePipelineID.load(std::memory_order_acquire);
         self_id > 0) {
-        bool destroy = false;
+        bool should_destroy_self = false;
         if (auto const self_handle = gComputePipelineStorage.acquire_write(self_id);
             decCompute(self_handle)) {
-            destroy = true;
+            should_destroy_self = true;
         }
-        if (destroy) {
+        if (should_destroy_self) {
             gComputePipelineStorage.deallocate(self_id);
         }
     }
