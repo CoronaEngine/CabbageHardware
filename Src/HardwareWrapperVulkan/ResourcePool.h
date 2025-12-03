@@ -17,8 +17,8 @@ struct RasterizerPipelineWrap {
 extern Corona::Kernel::Utils::Storage<RasterizerPipelineWrap> gRasterizerPipelineStorage;
 
 struct ComputePipelineWrap {
-    ComputePipelineVulkan* impl = nullptr;
-    uint64_t refCount = 0;
+    ComputePipelineVulkan* impl{nullptr};
+    uint64_t refCount{1};
 };
 
 extern Corona::Kernel::Utils::Storage<ComputePipelineWrap> gComputePipelineStorage;

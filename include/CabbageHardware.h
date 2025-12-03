@@ -363,23 +363,25 @@ struct HardwareDisplayer {
 struct ComputePipeline {
    public:
     ComputePipeline();
-    ComputePipeline(const std::string& shaderCode,
-                    EmbeddedShader::ShaderLanguage language = EmbeddedShader::ShaderLanguage::GLSL,
-                    const std::source_location& sourceLocation = std::source_location::current());
+    explicit ComputePipeline(const std::string& shaderCode,
+                             EmbeddedShader::ShaderLanguage language = EmbeddedShader::ShaderLanguage::GLSL,
+                             const std::source_location& sourceLocation = std::source_location::current());
     ComputePipeline(const ComputePipeline& other);
+    ComputePipeline(ComputePipeline&& other) noexcept;
     ~ComputePipeline();
 
     ComputePipeline& operator=(const ComputePipeline& other);
+    ComputePipeline& operator=(ComputePipeline&& other) noexcept;
 
     ResourceProxy operator[](const std::string& resourceName);
     ComputePipeline& operator()(uint16_t x, uint16_t y, uint16_t z);
 
-    [[nodiscard]] std::shared_ptr<uintptr_t> getComputePipelineID() const {
-        return computePipelineID;
+    [[nodiscard]] uintptr_t getComputePipelineID() const {
+        return computePipelineID.load(std::memory_order_acquire);
     }
 
    private:
-    std::shared_ptr<uintptr_t> computePipelineID;
+    std::atomic<uintptr_t> computePipelineID;
 };
 
 // ================= 对外封装：RasterizerPipeline =================
