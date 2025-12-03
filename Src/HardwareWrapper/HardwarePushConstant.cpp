@@ -50,6 +50,11 @@ HardwarePushConstant::HardwarePushConstant(const HardwarePushConstant& other)
     }
 }
 
+HardwarePushConstant::HardwarePushConstant(HardwarePushConstant&& other) noexcept
+    : pushConstantID(other.pushConstantID.load(std::memory_order_acquire)) {
+    other.pushConstantID.store(0, std::memory_order_release);
+}
+
 HardwarePushConstant::~HardwarePushConstant() {
     if (auto const self_id = pushConstantID.load(std::memory_order_acquire);
         self_id > 0) {
@@ -132,6 +137,26 @@ HardwarePushConstant& HardwarePushConstant::operator=(const HardwarePushConstant
         globalPushConstantStorages.deallocate(self_id);
     }
     pushConstantID.store(other_id, std::memory_order_release);
+    return *this;
+}
+
+HardwarePushConstant& HardwarePushConstant::operator=(HardwarePushConstant&& other) noexcept {
+    if (this == &other) {
+        return *this;
+    }
+    bool should_destroy_self = false;
+    if (auto const self_id = pushConstantID.load(std::memory_order_acquire);
+        self_id > 0) {
+        if (auto const self_handle = globalPushConstantStorages.acquire_write(self_id);
+            decrementPushConstantRefCount(self_handle)) {
+            should_destroy_self = true;
+        }
+        if (should_destroy_self) {
+            globalPushConstantStorages.deallocate(self_id);
+        }
+    }
+    pushConstantID.store(other.pushConstantID.load(std::memory_order_acquire), std::memory_order_release);
+    other.pushConstantID.store(0, std::memory_order_release);
     return *this;
 }
 

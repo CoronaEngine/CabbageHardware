@@ -184,10 +184,11 @@ struct HardwarePushConstant {
    public:
     HardwarePushConstant();
     HardwarePushConstant(const HardwarePushConstant& other);
+    HardwarePushConstant(HardwarePushConstant&& other) noexcept;
 
     template <typename T>
         requires(!std::is_same_v<std::remove_cvref_t<T>, HardwarePushConstant>)
-    HardwarePushConstant(T data) {
+    explicit HardwarePushConstant(T data) {
         copyFromRaw(&data, sizeof(T));
     }
 
@@ -197,6 +198,21 @@ struct HardwarePushConstant {
     ~HardwarePushConstant();
 
     HardwarePushConstant& operator=(const HardwarePushConstant& other);
+    HardwarePushConstant& operator=(HardwarePushConstant&& other) noexcept;
+
+    template <typename T>
+        requires(!std::is_same_v<std::remove_cvref_t<T>, HardwarePushConstant>)
+    HardwarePushConstant& operator=(const T& data) {
+        copyFromRaw(&data, sizeof(T));
+        return *this;
+    }
+
+    template <typename T>
+        requires(!std::is_same_v<std::remove_cvref_t<T>, HardwarePushConstant>)
+    HardwarePushConstant& operator=(T&& data) {
+        copyFromRaw(&data, sizeof(T));
+        return *this;
+    }
 
     // NOTE: must in the same thread
     [[nodiscard]] uint8_t* getData() const;
@@ -252,6 +268,24 @@ struct ResourceProxy {
         } else if constexpr (!std::is_same_v<std::remove_cvref_t<T>, ResourceProxy>) {
             if (type_ == Type::kPushConstant) {
                 push_constant_ = value;
+            }
+        }
+        return *this;
+    }
+
+    template <typename T>
+    ResourceProxy& operator=(T&& value) {
+        if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareImage>) {
+            if (type_ == Type::kImage && image_ptr_ != nullptr) {
+                *image_ptr_ = std::move(value);
+            }
+        } else if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareBuffer>) {
+            if (type_ == Type::kBuffer && buffer_ptr_ != nullptr) {
+                *buffer_ptr_ = std::move(value);
+            }
+        } else if constexpr (!std::is_same_v<std::remove_cvref_t<T>, ResourceProxy>) {
+            if (type_ == Type::kPushConstant) {
+                push_constant_ = std::move(value);
             }
         }
         return *this;
