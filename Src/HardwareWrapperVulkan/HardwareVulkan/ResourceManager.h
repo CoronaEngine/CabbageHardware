@@ -34,6 +34,12 @@ struct ResourceManager {
         ResourceManager* resourceManager{nullptr};
     };
 
+    enum struct ViewType : uint8_t {
+        Original = 1u,
+        MipMap = 2u,
+        ArrayLayer = 3u
+    };
+
     struct ImageHardwareWrap {
         VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         float pixelSize = 0;
@@ -50,14 +56,14 @@ struct ResourceManager {
         VkClearValue clearValue = {};
 
         VkImage imageHandle = VK_NULL_HANDLE;
+
+        ViewType viewType = ViewType::Original;
         VkImageView imageView = VK_NULL_HANDLE;
+        std::unordered_map<uint32_t, VkImageView> allSubViews{};
 
         VmaAllocation imageAlloc = VK_NULL_HANDLE;
         VmaAllocationInfo imageAllocInfo = {};
 
-        bool isMipImage = false;
-        std::unordered_map<uint32_t, VkImageView> allMipImageViews;
-        
         int32_t bindlessIndex = -1;
 
         DeviceManager* device = nullptr;
@@ -84,7 +90,9 @@ struct ResourceManager {
                                                 uint32_t arrayLayers = 1,
                                                 uint32_t mipLevels = 1,
                                                 VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
-    [[nodiscard]] VkImageView createImageView(ImageHardwareWrap& image, int32_t mipLevel = -1);
+    [[nodiscard]] VkImageView createImageView(ImageHardwareWrap& image);
+    void createViewForEachMips(ImageHardwareWrap& image);
+    void createViewForEachArrayLayers(ImageHardwareWrap& image);
     void destroyImage(ImageHardwareWrap& image);
 
     // Buffer operations

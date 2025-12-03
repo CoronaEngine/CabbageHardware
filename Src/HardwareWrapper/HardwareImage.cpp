@@ -202,35 +202,47 @@ HardwareImage::~HardwareImage() {
     }
 }
 
-HardwareImage HardwareImage::operator[](const uint32_t mipLevel) {
+HardwareImage HardwareImage::operator[](const uint32_t subViewIndex) {
     if (imageID && *imageID != 0) {
-        if (this->allMipHardwareImages.contains(mipLevel)) {
-            return this->allMipHardwareImages[mipLevel];
+        if (this->allSubHardwareImages.contains(subViewIndex)) {
+            return this->allSubHardwareImages[subViewIndex];
         } 
         else {
-            HardwareImage mipImage;
-            mipImage.imageID = std::make_shared<uintptr_t>(globalImageStorages.allocate());
+            HardwareImage subImage;
+            subImage.imageID = std::make_shared<uintptr_t>(globalImageStorages.allocate());
+
             {
                 auto imageHandle = globalImageStorages.acquire_write(*imageID);
-                auto mipImageHandle = globalImageStorages.acquire_write(*mipImage.imageID);
+                auto subImageHandle = globalImageStorages.acquire_write(*subImage.imageID);
 
-                mipImageHandle->imageLayout = imageHandle->imageLayout;
-                mipImageHandle->pixelSize = imageHandle->pixelSize;
-                mipImageHandle->imageSize = ktm::uvec2(
-                    std::max(1u, imageHandle->imageSize.x >> mipLevel),
-                    std::max(1u, imageHandle->imageSize.y >> mipLevel));
-                mipImageHandle->mipLevels = 1;
-                mipImageHandle->arrayLayers = imageHandle->arrayLayers;
-                mipImageHandle->imageUsage = imageHandle->imageUsage;
-                mipImageHandle->isMipImage = true;
-                mipImageHandle->imageHandle = imageHandle->imageHandle;
-                mipImageHandle->imageAlloc = imageHandle->imageAlloc;
-
-                mipImageHandle->imageView = globalHardwareContext.getMainDevice()->resourceManager.createImageView(*imageHandle, mipLevel);
-                mipImageHandle->refCount = 1;
+                subImageHandle->device = imageHandle->device;
+                subImageHandle->resourceManager = imageHandle->resourceManager;
+                subImageHandle->imageSize = ktm::uvec2(std::max(1u, imageHandle->imageSize.x >> subViewIndex),
+                                                       std::max(1u, imageHandle->imageSize.y >> subViewIndex));
+                subImageHandle->imageFormat = imageHandle->imageFormat;
+                subImageHandle->pixelSize = imageHandle->pixelSize;
+                subImageHandle->arrayLayers = 1;
+                subImageHandle->mipLevels = 1;
+                subImageHandle->imageLayout = imageHandle->imageLayout;
+                if (imageHandle->arrayLayers > 1) {
+                    subImageHandle->viewType = ResourceManager::ViewType::ArrayLayer;
+                }
+                else {
+                    subImageHandle->viewType = ResourceManager::ViewType::MipMap;
+                }
+                subImageHandle->aspectMask = imageHandle->aspectMask;
+                subImageHandle->clearValue = imageHandle->clearValue;
+                subImageHandle->imageUsage = imageHandle->imageUsage;
+                subImageHandle->imageHandle = imageHandle->imageHandle;
+                subImageHandle->imageAlloc = imageHandle->imageAlloc;
+                subImageHandle->imageAllocInfo = imageHandle->imageAllocInfo;
+                subImageHandle->bindlessIndex = -1;
+                subImageHandle->imageView = imageHandle->allSubViews[subViewIndex];
+                subImageHandle->refCount = 1;
             }
-            this->allMipHardwareImages[mipLevel] = mipImage;
-            return mipImage;
+
+            this->allSubHardwareImages[subViewIndex] = subImage;
+            return subImage;
         }
     }
 }

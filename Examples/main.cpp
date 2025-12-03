@@ -271,7 +271,7 @@ int main() {
                 float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
                 for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
-                    rasterizerUniformBufferObject[i].textureIndex = texture.storeDescriptor();
+                    rasterizerUniformBufferObject[i].textureIndex = texture[0].storeDescriptor();
                     rasterizerUniformBufferObject[i].model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
                     rasterizerUniformBuffers[threadIndex][i].copyFromData(&(rasterizerUniformBufferObject[i]), sizeof(rasterizerUniformBufferObject[i]));
                 }
