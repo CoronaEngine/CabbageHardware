@@ -34,12 +34,6 @@ struct ResourceManager {
         ResourceManager* resourceManager{nullptr};
     };
 
-    enum struct ViewType : uint8_t {
-        Original = 1u,
-        MipMap = 2u,
-        ArrayLayer = 3u
-    };
-
     struct ImageHardwareWrap {
         VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         float pixelSize = 0;
@@ -57,12 +51,11 @@ struct ResourceManager {
 
         VkImage imageHandle = VK_NULL_HANDLE;
 
-        ViewType viewType = ViewType::Original;
-        VkImageView imageView = VK_NULL_HANDLE;
-        std::unordered_map<uint32_t, VkImageView> allSubViews{};
+        VkImageView imageView{VK_NULL_HANDLE};
+        std::unordered_map<uint64_t, VkImageView> allSubViews{};
 
         VmaAllocation imageAlloc = VK_NULL_HANDLE;
-        VmaAllocationInfo imageAllocInfo = {};
+        VmaAllocationInfo imageAllocInfo{};
 
         int32_t bindlessIndex = -1;
 
@@ -71,9 +64,9 @@ struct ResourceManager {
     };
 
     struct BindlessDescriptorSet {
-        VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
-        VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
-        VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+        VkDescriptorPool descriptorPool{VK_NULL_HANDLE};
+        VkDescriptorSetLayout descriptorSetLayout{VK_NULL_HANDLE};
+        VkDescriptorSet descriptorSet{VK_NULL_HANDLE};
     };
 
     ResourceManager();
@@ -90,9 +83,7 @@ struct ResourceManager {
                                                 uint32_t arrayLayers = 1,
                                                 uint32_t mipLevels = 1,
                                                 VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
-    [[nodiscard]] VkImageView createImageView(ImageHardwareWrap& image);
-    void createViewForEachMips(ImageHardwareWrap& image);
-    void createViewForEachArrayLayers(ImageHardwareWrap& image);
+    [[nodiscard]] VkImageView createImageView(ImageHardwareWrap& image, uint32_t layer = -1, uint32_t mipLevel = -1);
     void destroyImage(ImageHardwareWrap& image);
 
     // Buffer operations
@@ -119,7 +110,7 @@ struct ResourceManager {
     // Copy operations
     ResourceManager& copyBuffer(VkCommandBuffer& commandBuffer, BufferHardwareWrap& srcBuffer, BufferHardwareWrap& dstBuffer);
     ResourceManager& copyImage(VkCommandBuffer& commandBuffer, ImageHardwareWrap& source, ImageHardwareWrap& destination);
-    ResourceManager& copyBufferToImage(VkCommandBuffer& commandBuffer, BufferHardwareWrap& buffer, ImageHardwareWrap& image, uint32_t mipLevel = 0);
+    ResourceManager& copyBufferToImage(VkCommandBuffer& commandBuffer, BufferHardwareWrap& buffer, ImageHardwareWrap& image, uint32_t mipLevel = 0, uint32_t layerCount = 1);
     ResourceManager& copyImageToBuffer(VkCommandBuffer& commandBuffer, ImageHardwareWrap& image, BufferHardwareWrap& buffer);
     ResourceManager& blitImage(VkCommandBuffer& commandBuffer, ImageHardwareWrap& srcImage, ImageHardwareWrap& dstImage);
 
