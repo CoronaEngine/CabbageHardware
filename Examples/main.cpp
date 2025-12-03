@@ -176,6 +176,13 @@ int main() {
 
     // 首先运行压缩纹理测试
     // testCompressedTextures();
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+
+    std::tm now_tm;
+    localtime_s(&now_tm, &now_c);
+    char time_buffer[64];
+    std::strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d_%H-%M-%S", &now_tm);
 
     CFW_LOG_INFO("Starting main application...");
 
@@ -197,7 +204,7 @@ int main() {
             createInfo.height = 1080;
             createInfo.format = ImageFormat::RGBA16_FLOAT;
             createInfo.usage = ImageUsage::StorageImage;
-            createInfo.arrayLayers = 1;
+            createInfo.arrayLayers = 5;
             createInfo.mipLevels = 1;
 
             finalOutputImages[i] = HardwareImage(createInfo);
@@ -217,25 +224,25 @@ int main() {
         }
 
         // 创建BC1压缩纹理用于实际渲染测试
-        auto compressedData = compressToBC1(data, width, height, channels);
+        //auto compressedData = compressToBC1(data, width, height, channels);
 
-        /*HardwareImageCreateInfo textureCreateInfo;
+        HardwareImageCreateInfo textureCreateInfo;
         textureCreateInfo.width = width;
         textureCreateInfo.height = height;
         textureCreateInfo.format = ImageFormat::RGBA8_SRGB;
         textureCreateInfo.usage = ImageUsage::SampledImage;
         textureCreateInfo.arrayLayers = 1;
-        textureCreateInfo.mipLevels = 1;
-        textureCreateInfo.initialData = data;*/
+        textureCreateInfo.mipLevels = 5;
+        textureCreateInfo.initialData = data;
 
-        HardwareImageCreateInfo textureCreateInfo;
-        textureCreateInfo.width = width;
-        textureCreateInfo.height = height;
-        textureCreateInfo.format = ImageFormat::BC1_RGB_SRGB;  // 使用BC1_RGB_SRGB进行渲染测试
-        textureCreateInfo.usage = ImageUsage::SampledImage;
-        textureCreateInfo.arrayLayers = 1;
-        textureCreateInfo.mipLevels = 1;
-        textureCreateInfo.initialData = compressedData.data();
+        //HardwareImageCreateInfo textureCreateInfo;
+        //textureCreateInfo.width = width;
+        //textureCreateInfo.height = height;
+        //textureCreateInfo.format = ImageFormat::BC1_RGB_SRGB; // 使用BC1_RGB_SRGB进行渲染测试
+        //textureCreateInfo.usage = ImageUsage::SampledImage;
+        //textureCreateInfo.arrayLayers = 1;
+        //textureCreateInfo.mipLevels = 1;
+        //textureCreateInfo.initialData = compressedData.data();
 
         HardwareImage texture(textureCreateInfo);
 
@@ -264,7 +271,7 @@ int main() {
                 float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
                 for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
-                    rasterizerUniformBufferObject[i].textureIndex = texture.storeDescriptor();
+                    rasterizerUniformBufferObject[i].textureIndex = texture[0].storeDescriptor();
                     rasterizerUniformBufferObject[i].model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
                     rasterizerUniformBuffers[threadIndex][i].copyFromData(&(rasterizerUniformBufferObject[i]), sizeof(rasterizerUniformBufferObject[i]));
                 }

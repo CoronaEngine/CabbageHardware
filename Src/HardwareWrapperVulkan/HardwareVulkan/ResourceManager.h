@@ -34,6 +34,12 @@ struct ResourceManager {
         ResourceManager* resourceManager{nullptr};
     };
 
+    enum struct ViewType : uint8_t {
+        Original = 1u,
+        MipMap = 2u,
+        ArrayLayer = 3u
+    };
+
     struct ImageHardwareWrap {
         VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         float pixelSize = 0;
@@ -44,21 +50,21 @@ struct ResourceManager {
         VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_FLAG_BITS_MAX_ENUM;
         VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_NONE;
 
-        int arrayLayers = 1;
-        int mipLevels = 1;
+        uint32_t arrayLayers = 1;
+        uint32_t mipLevels = 1;
 
         VkClearValue clearValue = {};
 
         VkImage imageHandle = VK_NULL_HANDLE;
+
+        ViewType viewType = ViewType::Original;
         VkImageView imageView = VK_NULL_HANDLE;
+        std::unordered_map<uint32_t, VkImageView> allSubViews{};
 
         VmaAllocation imageAlloc = VK_NULL_HANDLE;
         VmaAllocationInfo imageAllocInfo = {};
 
         int32_t bindlessIndex = -1;
-
-        std::vector<VkImageView> mipLevelViews;
-        std::vector<int32_t> mipLevelBindlessIndices;
 
         DeviceManager* device = nullptr;
         ResourceManager* resourceManager = nullptr;
@@ -81,11 +87,12 @@ struct ResourceManager {
                                                 VkFormat imageFormat,
                                                 float pixelSize,
                                                 VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                                                int arrayLayers = 1,
-                                                int mipLevels = 1,
+                                                uint32_t arrayLayers = 1,
+                                                uint32_t mipLevels = 1,
                                                 VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
     [[nodiscard]] VkImageView createImageView(ImageHardwareWrap& image);
-    VkImageView createImageViewForMipLevel(ImageHardwareWrap& image, uint32_t mipLevel);
+    void createViewForEachMips(ImageHardwareWrap& image);
+    void createViewForEachArrayLayers(ImageHardwareWrap& image);
     void destroyImage(ImageHardwareWrap& image);
 
     // Buffer operations
@@ -106,7 +113,7 @@ struct ResourceManager {
     [[nodiscard]] BufferHardwareWrap importHostBuffer(void* hostPtr, uint64_t size);
 
     // Descriptor operations
-    [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image, uint32_t mipLevel = 0);
+    [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& image);
     [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& buffer);
 
     // Copy operations
@@ -159,6 +166,8 @@ struct ResourceManager {
     void createDedicatedBuffer(const VkBufferCreateInfo& bufferInfo, const VmaAllocationCreateInfo& allocInfo, BufferHardwareWrap& resultBuffer);
     void createPooledBuffer(const VkBufferCreateInfo& bufferInfo, const VmaAllocationCreateInfo& allocInfo, BufferHardwareWrap& resultBuffer);
     void createNonExportableBuffer(const VkBufferCreateInfo& bufferInfo, const VmaAllocationCreateInfo& allocInfo, BufferHardwareWrap& resultBuffer);
+
+    //uint32_t getMipLevelsCount(uint32_t texWidth, uint32_t texHeight) const;
 
     VmaAllocator vmaAllocator = VK_NULL_HANDLE;
     VmaPool exportBufferPool = VK_NULL_HANDLE;

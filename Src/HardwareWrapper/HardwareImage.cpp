@@ -202,6 +202,51 @@ HardwareImage::~HardwareImage() {
     }
 }
 
+HardwareImage HardwareImage::operator[](const uint32_t subViewIndex) {
+    if (imageID && *imageID != 0) {
+        if (this->allSubHardwareImages.contains(subViewIndex)) {
+            return this->allSubHardwareImages[subViewIndex];
+        } 
+        else {
+            HardwareImage subImage;
+            subImage.imageID = std::make_shared<uintptr_t>(globalImageStorages.allocate());
+
+            {
+                auto imageHandle = globalImageStorages.acquire_write(*imageID);
+                auto subImageHandle = globalImageStorages.acquire_write(*subImage.imageID);
+
+                subImageHandle->device = imageHandle->device;
+                subImageHandle->resourceManager = imageHandle->resourceManager;
+                subImageHandle->imageSize = ktm::uvec2(std::max(1u, imageHandle->imageSize.x >> subViewIndex),
+                                                       std::max(1u, imageHandle->imageSize.y >> subViewIndex));
+                subImageHandle->imageFormat = imageHandle->imageFormat;
+                subImageHandle->pixelSize = imageHandle->pixelSize;
+                subImageHandle->arrayLayers = 1;
+                subImageHandle->mipLevels = 1;
+                subImageHandle->imageLayout = imageHandle->imageLayout;
+                if (imageHandle->arrayLayers > 1) {
+                    subImageHandle->viewType = ResourceManager::ViewType::ArrayLayer;
+                }
+                else {
+                    subImageHandle->viewType = ResourceManager::ViewType::MipMap;
+                }
+                subImageHandle->aspectMask = imageHandle->aspectMask;
+                subImageHandle->clearValue = imageHandle->clearValue;
+                subImageHandle->imageUsage = imageHandle->imageUsage;
+                subImageHandle->imageHandle = imageHandle->imageHandle;
+                subImageHandle->imageAlloc = imageHandle->imageAlloc;
+                subImageHandle->imageAllocInfo = imageHandle->imageAllocInfo;
+                subImageHandle->bindlessIndex = -1;
+                subImageHandle->imageView = imageHandle->allSubViews[subViewIndex];
+                subImageHandle->refCount = 1;
+            }
+
+            this->allSubHardwareImages[subViewIndex] = subImage;
+            return subImage;
+        }
+    }
+}
+
 HardwareImage& HardwareImage::operator=(const HardwareImage& other) {
     if (this != &other) {
         {
@@ -232,42 +277,17 @@ HardwareImage::operator bool() const {
     }
 }
 
-uint32_t HardwareImage::storeDescriptor(uint32_t mipLevel) {
+uint32_t HardwareImage::storeDescriptor() {
     auto imageHandle = globalImageStorages.acquire_write(*imageID);
-
-    if (mipLevel >= imageHandle->mipLevels) {
-        mipLevel = 0;
-    }
-
-    if (mipLevel == 0 && imageHandle->mipLevels == 1) {
-        return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle);
-    } else {
-        return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle, mipLevel);
-    }
+    return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle);
 }
 
-uint32_t HardwareImage::getMipLevels() const {
+uint32_t HardwareImage::getNumMipLevels() const {
     if (imageID && *imageID != 0) {
         auto imageHandle = globalImageStorages.acquire_read(*imageID);
         return imageHandle->mipLevels;
     }
     return 0;
-}
-
-std::pair<uint32_t, uint32_t> HardwareImage::getMipLevelSize(uint32_t mipLevel) const {
-    if (imageID && *imageID != 0) {
-        auto imageHandle = globalImageStorages.acquire_read(*imageID);
-
-        if (mipLevel >= imageHandle->mipLevels) {
-            return {0, 0};
-        }
-
-        uint32_t width = std::max(1u, imageHandle->imageSize.x >> mipLevel);
-        uint32_t height = std::max(1u, imageHandle->imageSize.y >> mipLevel);
-
-        return {width, height};
-    }
-    return {0, 0};
 }
 
 HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor, uint32_t mipLevel) {

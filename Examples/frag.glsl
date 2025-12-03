@@ -126,6 +126,6 @@ vec3 calculateColor(vec3 WorldPos, vec3 Normal, vec3 albedo, float metallic, flo
 
 void main()
 {
-    vec4 color = vec4(texture(textures[uniformBufferObjects[pushConsts.uniformBufferIndex].textureIndex], fragTexCoord));
-    outColor = vec4(calculateColor(inPosition, inNormal, (color.x+color.y+color.z) > 0.01 ? color.xyz : inColor, 0.5, 0.5),1.0);
+    vec4 color = vec4(textureLod(textures[uniformBufferObjects[pushConsts.uniformBufferIndex].textureIndex], fragTexCoord, 0.0));
+    outColor = vec4(calculateColor(inPosition, inNormal, color.w > 0.01 ? color.xyz : inColor, 0.5, 0.5),1.0);
 }
