@@ -167,7 +167,7 @@ struct ResourceManager {
     void createPooledBuffer(const VkBufferCreateInfo& bufferInfo, const VmaAllocationCreateInfo& allocInfo, BufferHardwareWrap& resultBuffer);
     void createNonExportableBuffer(const VkBufferCreateInfo& bufferInfo, const VmaAllocationCreateInfo& allocInfo, BufferHardwareWrap& resultBuffer);
 
-    uint32_t getMipLevelsCount(uint32_t texWidth, uint32_t texHeight) const;
+    //uint32_t getMipLevelsCount(uint32_t texWidth, uint32_t texHeight) const;
 
     VmaAllocator vmaAllocator = VK_NULL_HANDLE;
     VmaPool exportBufferPool = VK_NULL_HANDLE;

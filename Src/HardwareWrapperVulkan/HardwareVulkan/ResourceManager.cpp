@@ -497,9 +497,9 @@ void ResourceManager::createViewForEachArrayLayers(ImageHardwareWrap& image) {
     }
 }
 
-uint32_t ResourceManager::getMipLevelsCount(uint32_t texWidth, uint32_t texHeight) const {
-    return static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
-}
+//uint32_t ResourceManager::getMipLevelsCount(uint32_t texWidth, uint32_t texHeight) const {
+//    return static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
+//}
 
 void ResourceManager::destroyImage(ImageHardwareWrap& image) {
     if (vmaAllocator == VK_NULL_HANDLE) {
