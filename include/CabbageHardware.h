@@ -273,7 +273,10 @@ struct ResourceProxy {
         return *this;
     }
 
+    // ========== 移动赋值操作 ==========
+
     template <typename T>
+        requires(!std::is_lvalue_reference_v<T>)  // 约束必须为右值，防止自动推导为引用类型
     ResourceProxy& operator=(T&& value) {
         if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareImage>) {
             if (type_ == Type::kImage && image_ptr_ != nullptr) {

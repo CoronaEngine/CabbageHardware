@@ -113,6 +113,9 @@ static bool decrementImageRefCount(const Corona::Kernel::Utils::Storage<Resource
 
 HardwareImage::HardwareImage()
     : imageID(0) {
+    CFW_LOG_DEBUG("HardwareImage@{}: {} created.",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  imageID.load(std::memory_order_acquire));
 }
 
 HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
@@ -143,6 +146,9 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
         CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, 0);
         tempExecutor << &copyCmd << tempExecutor.commit();
     }
+    CFW_LOG_DEBUG("HardwareImage@{}: {} created.",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  self_image_id);
 }
 
 HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage, int arrayLayers, void* imageData) {
@@ -172,6 +178,9 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
         CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, 0);
         tempExecutor << &copyCmd << tempExecutor.commit();
     }
+    CFW_LOG_DEBUG("HardwareImage@{}: {} created.",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  self_image_id);
 }
 
 HardwareImage::HardwareImage(const HardwareImage& other) {
@@ -181,10 +190,18 @@ HardwareImage::HardwareImage(const HardwareImage& other) {
         auto const handle = globalImageStorages.acquire_write(other_image_id);
         incrementImageRefCount(handle);
     }
+    CFW_LOG_DEBUG("HardwareImage@{} copied construct from HardwareImage@{}: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  other_image_id);
 }
 
 HardwareImage::HardwareImage(HardwareImage&& other) noexcept {
     auto const other_image_id = other.imageID.load(std::memory_order_acquire);
+    CFW_LOG_DEBUG("HardwareImage@{} moved construct from HardwareImage@{}: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  other_image_id);
     other.imageID.store(0, std::memory_order_release);
     imageID.store(other_image_id, std::memory_order_release);
 }
@@ -205,6 +222,10 @@ HardwareImage& HardwareImage::operator=(HardwareImage&& other) noexcept {
             globalImageStorages.deallocate(self_image_id);
         }
     }
+    CFW_LOG_DEBUG("HardwareImage@{} moved assigned from HardwareImage@{}: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  other_image_id);
     other.imageID.store(0, std::memory_order_release);
     imageID.store(other_image_id, std::memory_order_release);
     return *this;
@@ -219,6 +240,9 @@ HardwareImage::~HardwareImage() {
         }
         if (destroy) {
             globalImageStorages.deallocate(self_image_id);
+            CFW_LOG_DEBUG("HardwareImage@{}: {} destroyed.",
+                          reinterpret_cast<std::uintptr_t>(this),
+                          self_image_id);
         }
         imageID.store(0, std::memory_order_release);
     }
@@ -230,9 +254,18 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other) {
     }
     auto const self_image_id = imageID.load(std::memory_order_acquire);
     auto const other_image_id = other.imageID.load(std::memory_order_acquire);
+
     if (self_image_id == 0 && other_image_id == 0) {
+        // 都未初始化，直接返回
+        CFW_LOG_WARNING("Copying from an uninitialized HardwareImage to an uninitialized HardwareImage.");
         return *this;
     }
+
+    if (self_image_id == other_image_id) {
+        // 已经指向同一个资源，无需操作
+        return *this;
+    }
+
     if (other_image_id == 0) {
         // 释放自身资源
         bool should_destroy_self = false;
@@ -249,6 +282,11 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other) {
     }
     if (self_image_id == 0) {
         // 直接拷贝
+        CFW_LOG_DEBUG("HardwareImage@{}: {} assigned from HardwareImage@{}: {}",
+                      reinterpret_cast<std::uintptr_t>(this),
+                      self_image_id,
+                      reinterpret_cast<std::uintptr_t>(&other),
+                      other_image_id);
         imageID.store(other_image_id, std::memory_order_release);
         auto const other_handle = globalImageStorages.acquire_write(other_image_id);
         incrementImageRefCount(other_handle);
@@ -275,6 +313,11 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other) {
         globalImageStorages.deallocate(self_image_id);
     }
     imageID.store(other_image_id, std::memory_order_release);
+    CFW_LOG_DEBUG("HardwareImage@{}: {} assigned from HardwareImage@{}: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  self_image_id,
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  other_image_id);
     return *this;
 }
 

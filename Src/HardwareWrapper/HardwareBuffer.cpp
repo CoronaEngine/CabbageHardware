@@ -131,6 +131,12 @@ HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer& other) {
 
     if (self_buffer_id == 0 && other_buffer_id == 0) {
         // 都未初始化，直接返回
+        CFW_LOG_WARNING("Copying from an uninitialized HardwareBuffer to an uninitialized HardwareBuffer.");
+        return *this;
+    }
+
+    if (self_buffer_id == other_buffer_id) {
+        // 已经指向同一个资源，无需操作
         return *this;
     }
 

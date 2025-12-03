@@ -20,7 +20,7 @@ class DisplayManager {
 
     bool initDisplayManager(void* surface);
     bool waitExecutor(HardwareExecutorVulkan& executor);
-    bool displayFrame(void* surface, HardwareImage displayImage);
+    bool displayFrame(void* surface, const HardwareImage& displayImage);
 
    private:
     // Vulkan 核心资源

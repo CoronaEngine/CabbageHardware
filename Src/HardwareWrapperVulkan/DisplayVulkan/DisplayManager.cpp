@@ -437,7 +437,7 @@ bool DisplayManager::waitExecutor(HardwareExecutorVulkan& executor) {
     return true;
 }
 
-bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
+bool DisplayManager::displayFrame(void* surface, const HardwareImage& displayImage) {
     if (surface == nullptr) {
         return false;
     }
