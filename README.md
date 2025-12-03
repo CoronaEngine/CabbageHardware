@@ -3,7 +3,7 @@
 - （紧急）重构外层封装：使用HardwareExecutor执行各种命令
 - （紧急）shader中不同的textureSampler，分离的图像和采样器描述符
 - （紧急）多线程同步BUG：display无法使用timeline，无法判断queue任务是否完成
-- （紧急）多显卡：同步（timeline）：VK_KHR_external_semaphore
+- （紧急）多显卡：同步VK_KHR_external_semaphore
 - （紧急）多显卡：import mem崩溃
 - 自动判断image的layout
 - 解决命令行的Warning
