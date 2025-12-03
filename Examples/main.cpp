@@ -226,25 +226,51 @@ int main() {
         // 创建BC1压缩纹理用于实际渲染测试
         //auto compressedData = compressToBC1(data, width, height, channels);
 
+        std::vector<unsigned char> layerData;
+        if (data) {
+            size_t layerSize = width * height * 4;
+            layerData.resize(layerSize * 2);
+            memcpy(layerData.data(), data, layerSize);              // Layer 0
+            memcpy(layerData.data() + layerSize, data, layerSize);  // Layer 1
+        }
+
         HardwareImageCreateInfo textureCreateInfo;
         textureCreateInfo.width = width;
         textureCreateInfo.height = height;
         textureCreateInfo.format = ImageFormat::RGBA8_SRGB;
         textureCreateInfo.usage = ImageUsage::SampledImage;
-        textureCreateInfo.arrayLayers = 1;
+        textureCreateInfo.arrayLayers = 2;
         textureCreateInfo.mipLevels = 5;
-        textureCreateInfo.initialData = data;
+        textureCreateInfo.initialData = layerData.empty() ? nullptr : layerData.data();  // 使用扩充后的数据
+        //textureCreateInfo.initialData = data;
 
-        //HardwareImageCreateInfo textureCreateInfo;
-        //textureCreateInfo.width = width;
-        //textureCreateInfo.height = height;
-        //textureCreateInfo.format = ImageFormat::BC1_RGB_SRGB; // 使用BC1_RGB_SRGB进行渲染测试
-        //textureCreateInfo.usage = ImageUsage::SampledImage;
-        //textureCreateInfo.arrayLayers = 1;
-        //textureCreateInfo.mipLevels = 1;
-        //textureCreateInfo.initialData = compressedData.data();
+        ////HardwareImageCreateInfo textureCreateInfo;
+        ////textureCreateInfo.width = width;
+        ////textureCreateInfo.height = height;
+        ////textureCreateInfo.format = ImageFormat::BC1_RGB_SRGB; // 使用BC1_RGB_SRGB进行渲染测试
+        ////textureCreateInfo.usage = ImageUsage::SampledImage;
+        ////textureCreateInfo.arrayLayers = 1;
+        ////textureCreateInfo.mipLevels = 1;
+        ////textureCreateInfo.initialData = compressedData.data();
 
         HardwareImage texture(textureCreateInfo);
+
+        auto textureView = texture[1][0];
+        uint32_t textureID = textureView.storeDescriptor();
+
+
+        // 简化测试示例
+        /*HardwareImageCreateInfo simpleTextureInfo;
+        simpleTextureInfo.width = width;
+        simpleTextureInfo.height = height;
+        simpleTextureInfo.format = ImageFormat::RGBA8_SRGB;
+        simpleTextureInfo.usage = ImageUsage::SampledImage;
+        simpleTextureInfo.arrayLayers = 1;
+        simpleTextureInfo.mipLevels = 1;
+        simpleTextureInfo.initialData = data;
+
+        HardwareImage simpleTexture(simpleTextureInfo);
+        uint32_t textureID = simpleTexture.storeDescriptor();*/
 
         CFW_LOG_INFO("Using BC1_RGB_SRGB compressed texture for rendering...");
 
@@ -271,7 +297,8 @@ int main() {
                 float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
                 for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
-                    rasterizerUniformBufferObject[i].textureIndex = texture[0].storeDescriptor();
+                    //rasterizerUniformBufferObject[i].textureIndex = texture[0][0].storeDescriptor();
+                    rasterizerUniformBufferObject[i].textureIndex = textureID;
                     rasterizerUniformBufferObject[i].model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
                     rasterizerUniformBuffers[threadIndex][i].copyFromData(&(rasterizerUniformBufferObject[i]), sizeof(rasterizerUniformBufferObject[i]));
                 }
