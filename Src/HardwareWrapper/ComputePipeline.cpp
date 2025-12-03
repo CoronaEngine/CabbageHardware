@@ -119,7 +119,6 @@ ComputePipeline& ComputePipeline::operator=(ComputePipeline&& other) noexcept {
     if (this == &other) {
         return *this;
     }
-    auto const other_id = other.computePipelineID.load(std::memory_order_acquire);
     if (auto const self_id = computePipelineID.load(std::memory_order_acquire);
         self_id > 0) {
         bool should_destroy_self = false;
@@ -132,7 +131,7 @@ ComputePipeline& ComputePipeline::operator=(ComputePipeline&& other) noexcept {
         }
     }
     other.computePipelineID.store(0, std::memory_order_release);
-    computePipelineID.store(other_id, std::memory_order_release);
+    computePipelineID.store(other.computePipelineID.load(std::memory_order_acquire), std::memory_order_release);
     return *this;
 }
 

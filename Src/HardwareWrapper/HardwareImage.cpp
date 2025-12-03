@@ -361,12 +361,12 @@ std::pair<uint32_t, uint32_t> HardwareImage::getMipLevelSize(uint32_t mipLevel) 
 }
 
 HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor, uint32_t mipLevel) {
-    if (!executor || !executor->getExecutorID() || *executor->getExecutorID() == 0) {
+    if (!executor) {
         return *this;  // 必须提供有效的 executor
     }
     auto const self_image_id = imageID.load(std::memory_order_acquire);
     auto const buffer_id = buffer.bufferID.load(std::memory_order_acquire);
-    auto const executor_id = *executor->getExecutorID();
+    auto const executor_id = executor->getExecutorID();
     if (self_image_id == 0 || buffer_id == 0 || executor_id == 0) {
         CFW_LOG_WARNING("Copy operation failed due to uninitialized HardwareImage.");
         return *this;

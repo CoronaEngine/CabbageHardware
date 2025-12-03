@@ -18,68 +18,118 @@ static bool decExec(const Corona::Kernel::Utils::Storage<ExecutorWrap>::WriteHan
     return false;
 }
 
-HardwareExecutor::HardwareExecutor() {
-    auto id = gExecutorStorage.allocate();
-    auto handle = gExecutorStorage.acquire_write(id);
+HardwareExecutor::HardwareExecutor() : executorID(gExecutorStorage.allocate()) {
+    auto handle = gExecutorStorage.acquire_write(executorID.load(std::memory_order_acquire));
     handle->impl = new HardwareExecutorVulkan();
-    handle->refCount = 1;
-    executorID = std::make_shared<uintptr_t>(id);
 }
 
 HardwareExecutor::HardwareExecutor(const HardwareExecutor& other)
-    : executorID(other.executorID) {
-    if (*executorID > 0) {
-        auto const handle = gExecutorStorage.acquire_write(*executorID);
+    : executorID(other.executorID.load(std::memory_order_acquire)) {
+    if (executorID.load(std::memory_order_acquire) > 0) {
+        auto const handle = gExecutorStorage.acquire_write(executorID.load(std::memory_order_acquire));
         incExec(handle);
     }
 }
 
+HardwareExecutor::HardwareExecutor(HardwareExecutor&& other) noexcept
+    : executorID(other.executorID.load(std::memory_order_acquire)) {
+    other.executorID.store(0, std::memory_order_release);
+}
+
 HardwareExecutor::~HardwareExecutor() {
-    if (executorID && *executorID > 0) {
-        bool destroy = false;
-        if (auto const handle = gExecutorStorage.acquire_write(*executorID); decExec(handle)) {
-            destroy = true;
+    if (auto const self_id = executorID.load(std::memory_order_acquire);
+        self_id > 0) {
+        bool should_destroy_self = false;
+        if (auto const handle = gExecutorStorage.acquire_write(self_id);
+            decExec(handle)) {
+            should_destroy_self = true;
         }
-        if (destroy) {
-            gExecutorStorage.deallocate(*executorID);
+        if (should_destroy_self) {
+            gExecutorStorage.deallocate(self_id);
         }
+        executorID.store(0, std::memory_order_release);
     }
 }
 
 HardwareExecutor& HardwareExecutor::operator=(const HardwareExecutor& other) {
-    if (this != &other) {
-        if (executorID && *executorID > 0) {
-            if (*executorID < *other.executorID) {
-                auto const handle = gExecutorStorage.acquire_write(*executorID);
-                auto const other_handle = gExecutorStorage.acquire_write(*other.executorID);
-                incExec(other_handle);
-                bool destroy = false;
-                if (decExec(handle)) {
-                    destroy = true;
-                }
-                if (destroy) {
-                    gExecutorStorage.deallocate(*executorID);
-                }
-            } else {
-                auto const other_handle = gExecutorStorage.acquire_write(*other.executorID);
-                auto const handle = gExecutorStorage.acquire_write(*executorID);
-                incExec(other_handle);
-                bool destroy = false;
-                if (decExec(handle)) {
-                    destroy = true;
-                }
-                if (destroy) {
-                    gExecutorStorage.deallocate(*executorID);
-                }
-            }
-        }
-        executorID = other.executorID;
+    if (this == &other) {
+        return *this;
     }
+    auto const self_id = executorID.load(std::memory_order_acquire);
+    auto const other_id = other.executorID.load(std::memory_order_acquire);
+    if (self_id == 0 && other_id == 0) {
+        // 都未初始化，直接返回
+        return *this;
+    }
+    if (self_id == other_id) {
+        // 已经指向同一个资源，无需操作
+        return *this;
+    }
+    bool should_destroy_self = false;
+    if (other_id == 0) {
+        // 释放自身资源
+        if (auto const self_handle = gExecutorStorage.acquire_write(self_id);
+            decExec(self_handle)) {
+            gExecutorStorage.deallocate(self_id);
+            should_destroy_self = true;
+        }
+        if (should_destroy_self) {
+            gExecutorStorage.deallocate(self_id);
+        }
+        executorID.store(0, std::memory_order_acquire);
+        return *this;
+    }
+    if (self_id == 0) {
+        // 直接拷贝
+        executorID.store(other_id, std::memory_order_release);
+        auto const other_handle = gExecutorStorage.acquire_write(other_id);
+        incExec(other_handle);
+        return *this;
+    }
+    if (self_id < other_id) {
+        auto const self_handle = gExecutorStorage.acquire_write(self_id);
+        auto const other_handle = gExecutorStorage.acquire_write(other_id);
+        incExec(other_handle);
+        if (decExec(self_handle)) {
+            should_destroy_self = true;
+        }
+    } else {
+        auto const other_handle = gExecutorStorage.acquire_write(other_id);
+        auto const self_handle = gExecutorStorage.acquire_write(self_id);
+        incExec(other_handle);
+        if (decExec(self_handle)) {
+            should_destroy_self = true;
+        }
+    }
+    if (should_destroy_self) {
+        gExecutorStorage.deallocate(self_id);
+    }
+    executorID.store(other_id, std::memory_order_release);
+    return *this;
+}
+
+HardwareExecutor& HardwareExecutor::operator=(HardwareExecutor&& other) noexcept {
+    if (this == &other) {
+        return *this;
+    }
+    bool should_destroy_self = false;
+    if (auto const self_id = executorID.load(std::memory_order_acquire);
+        self_id > 0) {
+        if (auto const self_handle = gExecutorStorage.acquire_write(self_id);
+            decExec(self_handle)) {
+            should_destroy_self = true;
+        }
+        if (should_destroy_self) {
+            gExecutorStorage.deallocate(self_id);
+        }
+    }
+    executorID.store(other.executorID.load(std::memory_order_acquire), std::memory_order_release);
+    other.executorID.store(0, std::memory_order_release);
     return *this;
 }
 
 HardwareExecutor& HardwareExecutor::operator<<(ComputePipeline& computePipeline) {
-    if (auto const executor_handle = gExecutorStorage.acquire_write(*executorID);
+    if (auto const executor_handle = gExecutorStorage.acquire_write(executorID.load(std::memory_order_acquire));
         computePipeline.getComputePipelineID()) {
         if (auto const pipeline_handle = gComputePipelineStorage.acquire_read(computePipeline.getComputePipelineID());
             pipeline_handle.valid()) {
@@ -90,7 +140,7 @@ HardwareExecutor& HardwareExecutor::operator<<(ComputePipeline& computePipeline)
 }
 
 HardwareExecutor& HardwareExecutor::operator<<(RasterizerPipeline& rasterizerPipeline) {
-    if (auto const executor_handle = gExecutorStorage.acquire_write(*executorID);
+    if (auto const executor_handle = gExecutorStorage.acquire_write(executorID.load(std::memory_order_acquire));
         rasterizerPipeline.getRasterizerPipelineID()) {
         if (auto const raster_handle = gRasterizerPipelineStorage.acquire_read(*rasterizerPipeline.getRasterizerPipelineID());
             raster_handle->impl) {
@@ -106,29 +156,38 @@ HardwareExecutor& HardwareExecutor::operator<<(HardwareExecutor& other) {
 
 HardwareExecutor& HardwareExecutor::wait(HardwareExecutor& other) {
     // ��ͬһ��������������в��������⾺̬����
-    std::uintptr_t selfID = *executorID;
-    std::uintptr_t otherID = *other.executorID;
+    auto const self_id = executorID.load(std::memory_order_acquire);
+    auto const other_id = other.executorID.load(std::memory_order_acquire);
+    if (self_id == 0 || other_id == 0) {
+        CFW_LOG_WARNING("HardwareExecutor@{} or HardwareExecutor@{} is uninitialized, cannot wait.",
+                        reinterpret_cast<std::uintptr_t>(this),
+                        reinterpret_cast<std::uintptr_t>(&other));
+        return *this;
+    }
+    if (self_id == other_id) {
+        CFW_LOG_WARNING("HardwareExecutor@{} cannot wait self.", reinterpret_cast<std::uintptr_t>(this));
+        return *this;
+    }
+
     // 按id排序加锁，避免死锁
-    if (selfID < otherID) {
-        auto const handle = gExecutorStorage.acquire_write(*executorID);
-        auto const other_handle = gExecutorStorage.acquire_read(*other.executorID);
-        if (other_handle->impl && handle->impl) {
-            handle->impl->wait(*other_handle->impl);
+    if (self_id < other_id) {
+        auto const self_handle = gExecutorStorage.acquire_write(self_id);
+        auto const other_handle = gExecutorStorage.acquire_read(other_id);
+        if (other_handle->impl && self_handle->impl) {
+            self_handle->impl->wait(*other_handle->impl);
         }
-        return *this;
     } else {
-        auto const other_handle = gExecutorStorage.acquire_read(*other.executorID);
-        auto const handle = gExecutorStorage.acquire_write(*executorID);
-        if (other_handle->impl && handle->impl) {
-            handle->impl->wait(*other_handle->impl);
+        auto const other_handle = gExecutorStorage.acquire_read(other_id);
+        auto const self_handle = gExecutorStorage.acquire_write(self_id);
+        if (other_handle->impl && self_handle->impl) {
+            self_handle->impl->wait(*other_handle->impl);
         }
-        return *this;
     }
     return *this;
 }
 
 HardwareExecutor& HardwareExecutor::commit() {
-    auto handle = gExecutorStorage.acquire_write(*executorID);
+    auto handle = gExecutorStorage.acquire_write(executorID.load(std::memory_order_acquire));
     handle->impl->commit();
     return *this;
 }

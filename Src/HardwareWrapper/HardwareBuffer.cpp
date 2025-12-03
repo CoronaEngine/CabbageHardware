@@ -193,12 +193,12 @@ HardwareBuffer::operator bool() const {
 }
 
 bool HardwareBuffer::copyFromBuffer(const HardwareBuffer& inputBuffer, const HardwareExecutor* executor) const {
-    if (!executor || !executor->getExecutorID() || *executor->getExecutorID() == 0) {
+    if (!executor || !executor->getExecutorID() || executor->getExecutorID() == 0) {
         return false;  // 必须提供有效的 executor
     }
     auto const input_buffer_id = inputBuffer.bufferID.load(std::memory_order_acquire);
     auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
-    auto const executor_id = *executor->getExecutorID();
+    auto const executor_id = executor->getExecutorID();
 
     if (input_buffer_id == 0 || self_buffer_id == 0 || executor_id == 0) {
         CFW_LOG_WARNING("Copy operation failed due to uninitialized HardwareBuffer.");

@@ -421,9 +421,12 @@ struct HardwareExecutor {
    public:
     HardwareExecutor();
     HardwareExecutor(const HardwareExecutor& other);
+    HardwareExecutor(HardwareExecutor&& other) noexcept;
     ~HardwareExecutor();
 
     HardwareExecutor& operator=(const HardwareExecutor& other);
+    HardwareExecutor& operator=(HardwareExecutor&& other) noexcept;
+
     HardwareExecutor& operator<<(ComputePipeline& computePipeline);
     HardwareExecutor& operator<<(RasterizerPipeline& rasterizerPipeline);
     HardwareExecutor& operator<<(HardwareExecutor& other);
@@ -431,10 +434,10 @@ struct HardwareExecutor {
     HardwareExecutor& wait(HardwareExecutor& other);
     HardwareExecutor& commit();
 
-    [[nodiscard]] std::shared_ptr<uintptr_t> getExecutorID() const {
-        return executorID;
+    [[nodiscard]] uintptr_t getExecutorID() const {
+        return executorID.load(std::memory_order_acquire);
     }
 
    private:
-    std::shared_ptr<uintptr_t> executorID;
+    std::atomic<uintptr_t> executorID;
 };

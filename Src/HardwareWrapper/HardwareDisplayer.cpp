@@ -131,14 +131,17 @@ HardwareDisplayer& HardwareDisplayer::operator=(HardwareDisplayer&& other) noexc
 
 HardwareDisplayer& HardwareDisplayer::wait(const HardwareExecutor& executor) {
     // 确保在锁内完成所有操作
-    if (executor.getExecutorID()) {
-        if (auto const executor_handle = gExecutorStorage.acquire_read(*executor.getExecutorID());
+    if (executor.getExecutorID() > 0) {
+        if (auto const executor_handle = gExecutorStorage.acquire_read(executor.getExecutorID());
             executor_handle->impl) {
             if (auto const display_handle = globalDisplayerStorages.acquire_write(displaySurfaceID.load(std::memory_order_acquire));
                 display_handle->displayManager) {
                 display_handle->displayManager->waitExecutor(*executor_handle->impl);
             }
         }
+    } else {
+        CFW_LOG_WARNING("HardwareDisplayer@{} wait invalid HardwareExecutor.",
+                        reinterpret_cast<std::uintptr_t>(this));
     }
 
     return *this;
