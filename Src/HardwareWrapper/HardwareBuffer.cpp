@@ -42,6 +42,9 @@ static bool decrementBufferRefCount(const Corona::Kernel::Utils::Storage<Resourc
 
 HardwareBuffer::HardwareBuffer()
     : bufferID(0) {
+    CFW_LOG_TRACE("HardwareBuffer@{} default constructed, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  bufferID.load(std::memory_order_acquire));
 }
 
 HardwareBuffer::HardwareBuffer(const uint32_t bufferSize, const uint32_t elementSize, const BufferUsage usage, const void* data) {
@@ -53,6 +56,9 @@ HardwareBuffer::HardwareBuffer(const uint32_t bufferSize, const uint32_t element
     if (data != nullptr && handle->bufferAllocInfo.pMappedData != nullptr) {
         std::memcpy(handle->bufferAllocInfo.pMappedData, data, static_cast<size_t>(bufferSize) * elementSize);
     }
+    CFW_LOG_TRACE("HardwareBuffer@{} constructed with size, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  buffer_id);
 }
 
 HardwareBuffer::HardwareBuffer(const ExternalHandle& memHandle, const uint32_t bufferSize, const uint32_t elementSize, const uint32_t allocSize, const BufferUsage usage) {
@@ -68,6 +74,9 @@ HardwareBuffer::HardwareBuffer(const ExternalHandle& memHandle, const uint32_t b
     bufferID.store(buffer_id, std::memory_order_release);
     auto const bufferHandle = globalBufferStorages.acquire_write(buffer_id);
     *bufferHandle = globalHardwareContext.getMainDevice()->resourceManager.importBufferMemory(memory_handle, bufferSize, elementSize, allocSize, vkUsage);
+    CFW_LOG_TRACE("HardwareBuffer@{} constructed with external handle, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  buffer_id);
 }
 
 HardwareBuffer::HardwareBuffer(const HardwareBuffer& other) {
@@ -77,24 +86,38 @@ HardwareBuffer::HardwareBuffer(const HardwareBuffer& other) {
         auto const handle = globalBufferStorages.acquire_write(bufferID.load(std::memory_order_acquire));
         incrementBufferRefCount(handle);
     }
+    CFW_LOG_TRACE("HardwareBuffer@{} copy constructed from @{}, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  other_buffer_id);
 }
 
 HardwareBuffer::HardwareBuffer(HardwareBuffer&& other) noexcept {
     auto const other_buffer_id = other.bufferID.load(std::memory_order_relaxed);
+    CFW_LOG_TRACE("HardwareBuffer@{} move constructed from @{}, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  other_buffer_id);
     other.bufferID.store(0, std::memory_order_release);
     bufferID.store(other_buffer_id, std::memory_order_release);
 }
 
 HardwareBuffer::~HardwareBuffer() {
     // NOTE: 不要修改写法，避免死锁
-    if (auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
-        self_buffer_id > 0) {
+    auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
+    CFW_LOG_TRACE("HardwareBuffer@{} destructor called, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  self_buffer_id);
+    if (self_buffer_id > 0) {
         bool destroy = false;
         if (auto const handle = globalBufferStorages.acquire_write(self_buffer_id);
             decrementBufferRefCount(handle)) {
             destroy = true;
         }
         if (destroy) {
+            CFW_LOG_TRACE("HardwareBuffer@{} destroying, ID: {}",
+                          reinterpret_cast<std::uintptr_t>(this),
+                          self_buffer_id);
             globalBufferStorages.deallocate(self_buffer_id);
         }
         bufferID.store(0, std::memory_order_release);
@@ -105,6 +128,11 @@ HardwareBuffer& HardwareBuffer::operator=(HardwareBuffer&& other) noexcept {
     if (this == &other) {
         return *this;
     }
+    CFW_LOG_TRACE("HardwareBuffer@{} move assigned from @{}, ID: {} -> {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  bufferID.load(std::memory_order_acquire),
+                  other.bufferID.load(std::memory_order_acquire));
     if (auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
         self_buffer_id > 0) {
         bool should_destroy_self = false;
@@ -113,6 +141,9 @@ HardwareBuffer& HardwareBuffer::operator=(HardwareBuffer&& other) noexcept {
             should_destroy_self = true;
         }
         if (should_destroy_self) {
+            CFW_LOG_TRACE("HardwareBuffer@{} destroying in move assignment, ID: {}",
+                          reinterpret_cast<std::uintptr_t>(this),
+                          self_buffer_id);
             globalBufferStorages.deallocate(self_buffer_id);
         }
     }
@@ -127,6 +158,10 @@ HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer& other) {
     }
     auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
     auto const other_buffer_id = other.bufferID.load(std::memory_order_acquire);
+    CFW_LOG_TRACE("HardwareBuffer@{} copy assigned from @{}, ID: {} -> {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  self_buffer_id, other_buffer_id);
 
     if (self_buffer_id == 0 && other_buffer_id == 0) {
         // 都未初始化，直接返回
@@ -147,6 +182,9 @@ HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer& other) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {
+            CFW_LOG_TRACE("HardwareBuffer@{} destroying in copy assignment, ID: {}",
+                          reinterpret_cast<std::uintptr_t>(this),
+                          self_buffer_id);
             globalBufferStorages.deallocate(self_buffer_id);
         }
         bufferID.store(0, std::memory_order_release);
@@ -179,6 +217,9 @@ HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer& other) {
         }
     }
     if (should_destroy_self) {
+        CFW_LOG_TRACE("HardwareBuffer@{} destroying in copy assignment, ID: {}",
+                      reinterpret_cast<std::uintptr_t>(this),
+                      self_buffer_id);
         globalBufferStorages.deallocate(self_buffer_id);
     }
     bufferID.store(other_buffer_id, std::memory_order_release);

@@ -21,6 +21,9 @@ static bool decExec(const Corona::Kernel::Utils::Storage<ExecutorWrap>::WriteHan
 HardwareExecutor::HardwareExecutor() : executorID(gExecutorStorage.allocate()) {
     auto handle = gExecutorStorage.acquire_write(executorID.load(std::memory_order_acquire));
     handle->impl = new HardwareExecutorVulkan();
+    CFW_LOG_TRACE("HardwareExecutor@{} default constructed, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  executorID.load(std::memory_order_acquire));
 }
 
 HardwareExecutor::HardwareExecutor(const HardwareExecutor& other)
@@ -29,22 +32,36 @@ HardwareExecutor::HardwareExecutor(const HardwareExecutor& other)
         auto const handle = gExecutorStorage.acquire_write(executorID.load(std::memory_order_acquire));
         incExec(handle);
     }
+    CFW_LOG_TRACE("HardwareExecutor@{} copy constructed from @{}, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  executorID.load(std::memory_order_acquire));
 }
 
 HardwareExecutor::HardwareExecutor(HardwareExecutor&& other) noexcept
     : executorID(other.executorID.load(std::memory_order_acquire)) {
+    CFW_LOG_TRACE("HardwareExecutor@{} move constructed from @{}, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  executorID.load(std::memory_order_acquire));
     other.executorID.store(0, std::memory_order_release);
 }
 
 HardwareExecutor::~HardwareExecutor() {
-    if (auto const self_id = executorID.load(std::memory_order_acquire);
-        self_id > 0) {
+    auto const self_id = executorID.load(std::memory_order_acquire);
+    CFW_LOG_TRACE("HardwareExecutor@{} destructor called, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  self_id);
+    if (self_id > 0) {
         bool should_destroy_self = false;
         if (auto const handle = gExecutorStorage.acquire_write(self_id);
             decExec(handle)) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {
+            CFW_LOG_TRACE("HardwareExecutor@{} destroying, ID: {}",
+                          reinterpret_cast<std::uintptr_t>(this),
+                          self_id);
             gExecutorStorage.deallocate(self_id);
         }
         executorID.store(0, std::memory_order_release);
@@ -57,6 +74,10 @@ HardwareExecutor& HardwareExecutor::operator=(const HardwareExecutor& other) {
     }
     auto const self_id = executorID.load(std::memory_order_acquire);
     auto const other_id = other.executorID.load(std::memory_order_acquire);
+    CFW_LOG_TRACE("HardwareExecutor@{} copy assigned from @{}, ID: {} -> {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  self_id, other_id);
     if (self_id == 0 && other_id == 0) {
         // 都未初始化，直接返回
         return *this;
@@ -70,6 +91,9 @@ HardwareExecutor& HardwareExecutor::operator=(const HardwareExecutor& other) {
         // 释放自身资源
         if (auto const self_handle = gExecutorStorage.acquire_write(self_id);
             decExec(self_handle)) {
+            CFW_LOG_TRACE("HardwareExecutor@{} destroying in copy assignment, ID: {}",
+                          reinterpret_cast<std::uintptr_t>(this),
+                          self_id);
             gExecutorStorage.deallocate(self_id);
             should_destroy_self = true;
         }
@@ -102,6 +126,9 @@ HardwareExecutor& HardwareExecutor::operator=(const HardwareExecutor& other) {
         }
     }
     if (should_destroy_self) {
+        CFW_LOG_TRACE("HardwareExecutor@{} destroying in copy assignment, ID: {}",
+                      reinterpret_cast<std::uintptr_t>(this),
+                      self_id);
         gExecutorStorage.deallocate(self_id);
     }
     executorID.store(other_id, std::memory_order_release);
@@ -112,6 +139,11 @@ HardwareExecutor& HardwareExecutor::operator=(HardwareExecutor&& other) noexcept
     if (this == &other) {
         return *this;
     }
+    CFW_LOG_TRACE("HardwareExecutor@{} move assigned from @{}, ID: {} -> {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  executorID.load(std::memory_order_acquire),
+                  other.executorID.load(std::memory_order_acquire));
     if (auto const self_id = executorID.load(std::memory_order_acquire);
         self_id > 0) {
         bool should_destroy_self = false;
@@ -120,6 +152,9 @@ HardwareExecutor& HardwareExecutor::operator=(HardwareExecutor&& other) noexcept
             should_destroy_self = true;
         }
         if (should_destroy_self) {
+            CFW_LOG_TRACE("HardwareExecutor@{} destroying in move assignment, ID: {}",
+                          reinterpret_cast<std::uintptr_t>(this),
+                          self_id);
             gExecutorStorage.deallocate(self_id);
         }
     }

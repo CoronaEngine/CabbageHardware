@@ -20,6 +20,9 @@ static bool decrementPushConstantRefCount(const Corona::Kernel::Utils::Storage<P
 
 HardwarePushConstant::HardwarePushConstant()
     : pushConstantID(globalPushConstantStorages.allocate()) {
+    CFW_LOG_TRACE("HardwarePushConstant@{} default constructed, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  pushConstantID.load(std::memory_order_acquire));
 }
 
 HardwarePushConstant::HardwarePushConstant(uint64_t size, uint64_t offset, HardwarePushConstant* whole)
@@ -39,6 +42,9 @@ HardwarePushConstant::HardwarePushConstant(uint64_t size, uint64_t offset, Hardw
     if (!pushConstantHandle->isSub) {
         pushConstantHandle->data = static_cast<uint8_t*>(std::malloc(size));
     }
+    CFW_LOG_TRACE("HardwarePushConstant@{} constructed with size, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  pushConstantID.load(std::memory_order_acquire));
 }
 
 HardwarePushConstant::HardwarePushConstant(const HardwarePushConstant& other)
@@ -48,24 +54,37 @@ HardwarePushConstant::HardwarePushConstant(const HardwarePushConstant& other)
         auto const self_handle = globalPushConstantStorages.acquire_write(self_id);
         incrementPushConstantRefCount(self_handle);
     }
+    CFW_LOG_TRACE("HardwarePushConstant@{} copy constructed from @{}, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  self_id);
 }
 
 HardwarePushConstant::HardwarePushConstant(HardwarePushConstant&& other) noexcept
     : pushConstantID(other.pushConstantID.load(std::memory_order_acquire)) {
+    CFW_LOG_TRACE("HardwarePushConstant@{} move constructed from @{}, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  pushConstantID.load(std::memory_order_acquire));
     other.pushConstantID.store(0, std::memory_order_release);
 }
 
 HardwarePushConstant::~HardwarePushConstant() {
-    if (auto const self_id = pushConstantID.load(std::memory_order_acquire);
-        self_id > 0) {
+    auto const self_id = pushConstantID.load(std::memory_order_acquire);
+    CFW_LOG_TRACE("HardwarePushConstant@{} destructor called, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  self_id);
+    if (self_id > 0) {
         bool should_destroy_self = false;
         if (auto const self_handle = globalPushConstantStorages.acquire_write(self_id);
             decrementPushConstantRefCount(self_handle)) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {
+            CFW_LOG_TRACE("HardwarePushConstant@{} destroying, ID: {}",
+                          reinterpret_cast<std::uintptr_t>(this),
+                          self_id);
             globalPushConstantStorages.deallocate(self_id);
-            // CFW_LOG_DEBUG("Deallocated HardwarePushConstant with ID: {}", *pushConstantID);
         }
         pushConstantID.store(0, std::memory_order_release);
     }
@@ -78,6 +97,10 @@ HardwarePushConstant& HardwarePushConstant::operator=(const HardwarePushConstant
     bool should_destroy_self = false;
     auto const self_id = pushConstantID.load(std::memory_order_acquire);
     auto const other_id = other.pushConstantID.load(std::memory_order_acquire);
+    CFW_LOG_TRACE("HardwarePushConstant@{} copy assigned from @{}, ID: {} -> {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  self_id, other_id);
     if (self_id == 0 && other_id == 0) {
         return *this;
     }
@@ -87,6 +110,9 @@ HardwarePushConstant& HardwarePushConstant::operator=(const HardwarePushConstant
             should_destroy_self = true;
         }
         if (should_destroy_self) {
+            CFW_LOG_TRACE("HardwarePushConstant@{} destroying in copy assignment, ID: {}",
+                          reinterpret_cast<std::uintptr_t>(this),
+                          self_id);
             globalPushConstantStorages.deallocate(self_id);
         }
         pushConstantID.store(0, std::memory_order_release);
@@ -134,6 +160,9 @@ HardwarePushConstant& HardwarePushConstant::operator=(const HardwarePushConstant
     }
 
     if (should_destroy_self) {
+        CFW_LOG_TRACE("HardwarePushConstant@{} destroying in copy assignment, ID: {}",
+                      reinterpret_cast<std::uintptr_t>(this),
+                      self_id);
         globalPushConstantStorages.deallocate(self_id);
     }
     pushConstantID.store(other_id, std::memory_order_release);
@@ -144,14 +173,22 @@ HardwarePushConstant& HardwarePushConstant::operator=(HardwarePushConstant&& oth
     if (this == &other) {
         return *this;
     }
-    bool should_destroy_self = false;
+    CFW_LOG_TRACE("HardwarePushConstant@{} move assigned from @{}, ID: {} -> {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  pushConstantID.load(std::memory_order_acquire),
+                  other.pushConstantID.load(std::memory_order_acquire));
     if (auto const self_id = pushConstantID.load(std::memory_order_acquire);
         self_id > 0) {
+        bool should_destroy_self = false;
         if (auto const self_handle = globalPushConstantStorages.acquire_write(self_id);
             decrementPushConstantRefCount(self_handle)) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {
+            CFW_LOG_TRACE("HardwarePushConstant@{} destroying in move assignment, ID: {}",
+                          reinterpret_cast<std::uintptr_t>(this),
+                          self_id);
             globalPushConstantStorages.deallocate(self_id);
         }
     }

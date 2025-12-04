@@ -113,7 +113,7 @@ static bool decrementImageRefCount(const Corona::Kernel::Utils::Storage<Resource
 
 HardwareImage::HardwareImage()
     : imageID(0) {
-    CFW_LOG_DEBUG("HardwareImage@{}: {} created.",
+    CFW_LOG_TRACE("HardwareImage@{} default constructed, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   imageID.load(std::memory_order_acquire));
 }
@@ -146,7 +146,7 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
         CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, 0);
         tempExecutor << &copyCmd << tempExecutor.commit();
     }
-    CFW_LOG_DEBUG("HardwareImage@{}: {} created.",
+    CFW_LOG_TRACE("HardwareImage@{} constructed with createInfo, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   self_image_id);
 }
@@ -178,7 +178,7 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
         CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, 0);
         tempExecutor << &copyCmd << tempExecutor.commit();
     }
-    CFW_LOG_DEBUG("HardwareImage@{}: {} created.",
+    CFW_LOG_TRACE("HardwareImage@{} constructed with params, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   self_image_id);
 }
@@ -190,7 +190,7 @@ HardwareImage::HardwareImage(const HardwareImage& other) {
         auto const handle = globalImageStorages.acquire_write(other_image_id);
         incrementImageRefCount(handle);
     }
-    CFW_LOG_DEBUG("HardwareImage@{} copied construct from HardwareImage@{}: {}",
+    CFW_LOG_TRACE("HardwareImage@{} copy constructed from @{}, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   reinterpret_cast<std::uintptr_t>(&other),
                   other_image_id);
@@ -198,7 +198,7 @@ HardwareImage::HardwareImage(const HardwareImage& other) {
 
 HardwareImage::HardwareImage(HardwareImage&& other) noexcept {
     auto const other_image_id = other.imageID.load(std::memory_order_acquire);
-    CFW_LOG_DEBUG("HardwareImage@{} moved construct from HardwareImage@{}: {}",
+    CFW_LOG_TRACE("HardwareImage@{} move constructed from @{}, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   reinterpret_cast<std::uintptr_t>(&other),
                   other_image_id);
@@ -207,17 +207,20 @@ HardwareImage::HardwareImage(HardwareImage&& other) noexcept {
 }
 
 HardwareImage::~HardwareImage() {
-    if (auto const self_image_id = imageID.load(std::memory_order_acquire);
-        self_image_id > 0) {
+    auto const self_image_id = imageID.load(std::memory_order_acquire);
+    CFW_LOG_TRACE("HardwareImage@{} destructor called, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  self_image_id);
+    if (self_image_id > 0) {
         bool destroy = false;
         if (auto const handle = globalImageStorages.acquire_write(self_image_id); decrementImageRefCount(handle)) {
             destroy = true;
         }
         if (destroy) {
-            globalImageStorages.deallocate(self_image_id);
-            CFW_LOG_DEBUG("HardwareImage@{}: {} destroyed.",
+            CFW_LOG_TRACE("HardwareImage@{} destroying, ID: {}",
                           reinterpret_cast<std::uintptr_t>(this),
                           self_image_id);
+            globalImageStorages.deallocate(self_image_id);
         }
         imageID.store(0, std::memory_order_release);
     }
@@ -229,6 +232,10 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other) {
     }
     auto const self_image_id = imageID.load(std::memory_order_acquire);
     auto const other_image_id = other.imageID.load(std::memory_order_acquire);
+    CFW_LOG_TRACE("HardwareImage@{} copy assigned from @{}, ID: {} -> {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  self_image_id, other_image_id);
 
     if (self_image_id == 0 && other_image_id == 0) {
         // 都未初始化，直接返回
@@ -249,6 +256,9 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {
+            CFW_LOG_TRACE("HardwareImage@{} destroying in copy assignment, ID: {}",
+                          reinterpret_cast<std::uintptr_t>(this),
+                          self_image_id);
             globalImageStorages.deallocate(self_image_id);
         }
         imageID.store(0, std::memory_order_release);
@@ -285,6 +295,9 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other) {
         }
     }
     if (should_destroy_self) {
+        CFW_LOG_TRACE("HardwareImage@{} destroying in copy assignment, ID: {}",
+                      reinterpret_cast<std::uintptr_t>(this),
+                      self_image_id);
         globalImageStorages.deallocate(self_image_id);
     }
     imageID.store(other_image_id, std::memory_order_release);
@@ -295,6 +308,11 @@ HardwareImage& HardwareImage::operator=(HardwareImage&& other) noexcept {
     if (this == &other) {
         return *this;
     }
+    CFW_LOG_TRACE("HardwareImage@{} move assigned from @{}, ID: {} -> {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  imageID.load(std::memory_order_acquire),
+                  other.imageID.load(std::memory_order_acquire));
     if (auto const self_image_id = imageID.load(std::memory_order_acquire);
         self_image_id > 0) {
         auto const self_handle = globalImageStorages.acquire_write(self_image_id);
@@ -303,6 +321,9 @@ HardwareImage& HardwareImage::operator=(HardwareImage&& other) noexcept {
             should_destroy_self = true;
         }
         if (should_destroy_self) {
+            CFW_LOG_TRACE("HardwareImage@{} destroying in move assignment, ID: {}",
+                          reinterpret_cast<std::uintptr_t>(this),
+                          self_image_id);
             globalImageStorages.deallocate(self_image_id);
         }
     }
