@@ -10,6 +10,7 @@ struct ImageFormatInfo {
     bool isCompressed;
 };
 
+// TODO: 图片的字节或者比特大小要校对
 ImageFormatInfo convertImageFormat(ImageFormat format) {
     switch (format) {
         // Uncompressed formats
@@ -118,40 +119,6 @@ HardwareImage::HardwareImage()
                   imageID.load(std::memory_order_acquire));
 }
 
-//HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
-//    const auto [vkFormat, pixelSize, isCompressed] = convertImageFormat(createInfo.format);
-//    const VkImageUsageFlags vkUsage = convertImageUsage(createInfo.usage, isCompressed);
-//
-//    imageID = std::make_shared<uintptr_t>(globalImageStorages.allocate());
-//
-//    {
-//        const auto handle = globalImageStorages.acquire_write(*imageID);
-//
-//        *handle = globalHardwareContext.getMainDevice()->resourceManager.createImage(
-//            ktm::uvec2(createInfo.width, createInfo.height),
-//            vkFormat,
-//            pixelSize,
-//            vkUsage,
-//            createInfo.arrayLayers,
-//            createInfo.mipLevels);
-//        handle->refCount = 1;
-//    }
-//
-//    if (createInfo.initialData != nullptr) {
-//        HardwareExecutorVulkan tempExecutor;
-//
-//        auto imageHandle = globalImageStorages.acquire_write(*imageID);
-//        HardwareBuffer stagingBuffer(imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize,
-//                                     BufferUsage::StorageBuffer,
-//                                     createInfo.initialData);
-//
-//        auto bufferHandle = globalBufferStorages.acquire_write(stagingBuffer.bufferID.load(std::memory_order_acquire));
-//
-//        CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, 0);
-//        tempExecutor << &copyCmd << tempExecutor.commit();
-//    }
-//}
-
 HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
     const auto [vkFormat, pixelSize, isCompressed] = convertImageFormat(createInfo.format);
     const VkImageUsageFlags vkUsage = convertImageUsage(createInfo.usage, isCompressed);
@@ -173,7 +140,8 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
     if (createInfo.initialData != nullptr) {
         HardwareExecutorVulkan tempExecutor;
         auto const imageHandle = globalImageStorages.acquire_write(self_image_id);
-        const HardwareBuffer stagingBuffer(imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize,
+        const HardwareBuffer stagingBuffer(imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize * imageHandle->arrayLayers,
+                                           1,
                                            BufferUsage::StorageBuffer,
                                            createInfo.initialData);
         auto const bufferHandle = globalBufferStorages.acquire_write(stagingBuffer.bufferID.load(std::memory_order_acquire));
@@ -205,7 +173,8 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
     if (imageData != nullptr) {
         HardwareExecutorVulkan tempExecutor;
         auto const imageHandle = globalImageStorages.acquire_write(self_image_id);
-        const HardwareBuffer stagingBuffer(imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize,
+        const HardwareBuffer stagingBuffer(imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize * imageHandle->arrayLayers,
+                                           1,
                                            BufferUsage::StorageBuffer,
                                            imageData);
         auto const bufferHandle = globalBufferStorages.acquire_write(stagingBuffer.bufferID.load(std::memory_order_acquire));
@@ -260,56 +229,16 @@ HardwareImage::~HardwareImage() {
     }
 }
 
-//HardwareImage::HardwareImage(std::shared_ptr<uintptr_t> parentImageID, uint32_t layer, uint32_t mipLevel) {
-//    imageID = std::make_shared<uintptr_t>(globalImageStorages.allocate());
-//    auto subImageHandle = globalImageStorages.acquire_write(*imageID);
-//    auto imageHandle = globalImageStorages.acquire_write(*parentImageID);
-//
-//    // 基础属性复制
-//    subImageHandle->device = imageHandle->device;
-//    subImageHandle->resourceManager = imageHandle->resourceManager;
-//    subImageHandle->imageFormat = imageHandle->imageFormat;
-//    subImageHandle->pixelSize = imageHandle->pixelSize;
-//    subImageHandle->imageLayout = imageHandle->imageLayout;
-//    subImageHandle->aspectMask = imageHandle->aspectMask;
-//    subImageHandle->clearValue = imageHandle->clearValue;
-//    subImageHandle->imageUsage = imageHandle->imageUsage;
-//    subImageHandle->imageHandle = imageHandle->imageHandle;  // 共享同一个 VkImage
-//    subImageHandle->imageAlloc = imageHandle->imageAlloc;
-//    subImageHandle->imageAllocInfo = imageHandle->imageAllocInfo;
-//    subImageHandle->bindlessIndex = -1;
-//    subImageHandle->refCount = 1;
-//
-//    subImageHandle->imageView = globalHardwareContext.getMainDevice()->resourceManager.createImageView(*imageHandle, layer, mipLevel);
-//    subImageHandle->imageSize = ktm::uvec2(std::max(1u, imageHandle->imageSize.x >> mipLevel),
-//                                           std::max(1u, imageHandle->imageSize.y >> mipLevel));
-//    subImageHandle->arrayLayers = 1;
-//    subImageHandle->mipLevels = 1;
-//}
-//
-//HardwareImage HardwareImage::operator[](const uint32_t index) {
-//    if (imageID && *imageID != 0) {
-//        auto imageHandle = globalImageStorages.acquire_read(*imageID);
-//        if (imageHandle->arrayLayers > 1) {
-//            // 这是一个多层图像，索引选择一个层
-//            return HardwareImage(imageID, index, static_cast<uint32_t>(-1));
-//        } else {
-//            // 这是一个单层图像（或已经是层视图），索引选择一个 mipmap
-//            uint32_t baseLayer = 0;  // 假设基础层为0
-//            return HardwareImage(imageID, baseLayer, index);
-//        }
-//    }
-//    return HardwareImage();
-//}
-
 HardwareImage HardwareImage::operator[](const uint32_t index) {
-    if (imageID && *imageID != 0) {
+    auto const selfImageId = imageID.load(std::memory_order_acquire);
+    if (selfImageId > 0) {
         HardwareImage subImage;
-        subImage.imageID = std::make_shared<uintptr_t>(globalImageStorages.allocate());
+        auto const subImageId = globalImageStorages.allocate();
+        subImage.imageID.store(subImageId, std::memory_order_release);
 
         {
-            auto imageHandle = globalImageStorages.acquire_write(*imageID);
-            auto subImageHandle = globalImageStorages.acquire_write(*subImage.imageID);
+            auto const imageHandle = globalImageStorages.acquire_write(selfImageId);
+            auto const subImageHandle = globalImageStorages.acquire_write(subImageId);
 
             // 基础属性复制
             subImageHandle->device = imageHandle->device;
@@ -461,38 +390,29 @@ HardwareImage::operator bool() const {
            globalImageStorages.acquire_read(self_image_id)->imageHandle != VK_NULL_HANDLE;
 }
 
-uint32_t HardwareImage::storeDescriptor(uint32_t mipLevel) {
+uint32_t HardwareImage::storeDescriptor() {
     auto imageHandle = globalImageStorages.acquire_write(imageID.load(std::memory_order_acquire));
-
-    if (mipLevel >= imageHandle->mipLevels) {
-        mipLevel = 0;
-    }
-
-    if (mipLevel == 0 && imageHandle->mipLevels == 1) {
-        return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle);
-    } else {
-        return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle, mipLevel);
-    }
+    return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle);
 }
 
-uint32_t HardwareImage::getMipLevels() const {
-    auto const self_image_id = imageID.load(std::memory_order_acquire);
-    return self_image_id > 0 ? globalImageStorages.acquire_read(self_image_id)->mipLevels : 0;
-}
-
-std::pair<uint32_t, uint32_t> HardwareImage::getMipLevelSize(uint32_t mipLevel) const {
-    if (auto const self_image_id = imageID.load(std::memory_order_acquire);
-        self_image_id > 0) {
-        auto const imageHandle = globalImageStorages.acquire_read(self_image_id);
-        if (mipLevel >= imageHandle->mipLevels) {
-            return {0, 0};
-        }
-        uint32_t width = std::max(1u, imageHandle->imageSize.x >> mipLevel);
-        uint32_t height = std::max(1u, imageHandle->imageSize.y >> mipLevel);
-        return {width, height};
-    }
-    return {0, 0};
-}
+//uint32_t HardwareImage::getMipLevels() const {
+//    auto const self_image_id = imageID.load(std::memory_order_acquire);
+//    return self_image_id > 0 ? globalImageStorages.acquire_read(self_image_id)->mipLevels : 0;
+//}
+//
+//std::pair<uint32_t, uint32_t> HardwareImage::getMipLevelSize(uint32_t mipLevel) const {
+//    if (auto const self_image_id = imageID.load(std::memory_order_acquire);
+//        self_image_id > 0) {
+//        auto const imageHandle = globalImageStorages.acquire_read(self_image_id);
+//        if (mipLevel >= imageHandle->mipLevels) {
+//            return {0, 0};
+//        }
+//        uint32_t width = std::max(1u, imageHandle->imageSize.x >> mipLevel);
+//        uint32_t height = std::max(1u, imageHandle->imageSize.y >> mipLevel);
+//        return {width, height};
+//    }
+//    return {0, 0};
+//}
 
 HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor, uint32_t mipLevel) {
     if (!executor) {

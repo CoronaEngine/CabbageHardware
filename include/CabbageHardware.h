@@ -159,10 +159,11 @@ struct HardwareImage {
 
     HardwareImage& operator=(const HardwareImage& other);
     HardwareImage& operator=(HardwareImage&& other) noexcept;
+    // image[layer][mip]
+    HardwareImage operator[](const uint32_t index);
     explicit operator bool() const;
 
-    [[nodiscard]] uint32_t storeDescriptor(uint32_t mipLevel = 0);
-
+    [[nodiscard]] uint32_t storeDescriptor();
     [[nodiscard]] uintptr_t getImageID() const {
         return imageID.load(std::memory_order_acquire);
     }

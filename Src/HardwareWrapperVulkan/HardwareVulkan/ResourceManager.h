@@ -35,7 +35,7 @@ struct ResourceManager {
     };
 
     struct ImageHardwareWrap {
-        VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        VkImageLayout imageLayout{VK_IMAGE_LAYOUT_UNDEFINED};
         float pixelSize{0};
         ktm::uvec2 imageSize{0, 0};
         uint64_t refCount{1};
@@ -51,14 +51,12 @@ struct ResourceManager {
 
         VkImage imageHandle{VK_NULL_HANDLE};
         VkImageView imageView{VK_NULL_HANDLE};
+        std::unordered_map<uint64_t, VkImageView> allSubViews{};
 
         VmaAllocation imageAlloc{VK_NULL_HANDLE};
         VmaAllocationInfo imageAllocInfo{};
 
         int32_t bindlessIndex{-1};
-
-        std::vector<VkImageView> mipLevelViews{};
-        std::vector<int32_t> mipLevelBindlessIndices{};
 
         DeviceManager* device{nullptr};
         ResourceManager* resourceManager{nullptr};
@@ -159,20 +157,18 @@ struct ResourceManager {
     void createPooledBuffer(const VkBufferCreateInfo& bufferInfo, const VmaAllocationCreateInfo& allocInfo, BufferHardwareWrap& resultBuffer);
     void createNonExportableBuffer(const VkBufferCreateInfo& bufferInfo, const VmaAllocationCreateInfo& allocInfo, BufferHardwareWrap& resultBuffer);
 
-    //uint32_t getMipLevelsCount(uint32_t texWidth, uint32_t texHeight) const;
+    VmaAllocator vmaAllocator{VK_NULL_HANDLE};
+    VmaPool exportBufferPool{VK_NULL_HANDLE};
+    VkSampler textureSampler{VK_NULL_HANDLE};
 
-    VmaAllocator vmaAllocator = VK_NULL_HANDLE;
-    VmaPool exportBufferPool = VK_NULL_HANDLE;
-    VkSampler textureSampler = VK_NULL_HANDLE;
+    const uint32_t uniformBinding{0};
+    const uint32_t textureBinding{1};
+    const uint32_t storageBufferBinding{2};
+    const uint32_t storageImageBinding{3};
 
-    const uint32_t uniformBinding = 0;
-    const uint32_t textureBinding = 1;
-    const uint32_t storageBufferBinding = 2;
-    const uint32_t storageImageBinding = 3;
+    uint64_t deviceMemorySize{0};
+    uint64_t hostSharedMemorySize{0};
+    uint64_t multiInstanceMemorySize{0};
 
-    uint64_t deviceMemorySize = 0;
-    uint64_t hostSharedMemorySize = 0;
-    uint64_t multiInstanceMemorySize = 0;
-
-    DeviceManager* device = nullptr;
+    DeviceManager* device{nullptr};
 };
