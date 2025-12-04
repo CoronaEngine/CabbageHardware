@@ -206,31 +206,6 @@ HardwareImage::HardwareImage(HardwareImage&& other) noexcept {
     imageID.store(other_image_id, std::memory_order_release);
 }
 
-HardwareImage& HardwareImage::operator=(HardwareImage&& other) noexcept {
-    if (this == &other) {
-        return *this;
-    }
-    auto const other_image_id = other.imageID.load(std::memory_order_acquire);
-    if (auto const self_image_id = imageID.load(std::memory_order_acquire);
-        self_image_id > 0) {
-        auto const self_handle = globalImageStorages.acquire_write(self_image_id);
-        bool should_destroy_self = false;
-        if (decrementImageRefCount(self_handle) == true) {
-            should_destroy_self = true;
-        }
-        if (should_destroy_self) {
-            globalImageStorages.deallocate(self_image_id);
-        }
-    }
-    CFW_LOG_DEBUG("HardwareImage@{} moved assigned from HardwareImage@{}: {}",
-                  reinterpret_cast<std::uintptr_t>(this),
-                  reinterpret_cast<std::uintptr_t>(&other),
-                  other_image_id);
-    other.imageID.store(0, std::memory_order_release);
-    imageID.store(other_image_id, std::memory_order_release);
-    return *this;
-}
-
 HardwareImage::~HardwareImage() {
     if (auto const self_image_id = imageID.load(std::memory_order_acquire);
         self_image_id > 0) {
@@ -313,11 +288,26 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other) {
         globalImageStorages.deallocate(self_image_id);
     }
     imageID.store(other_image_id, std::memory_order_release);
-    CFW_LOG_DEBUG("HardwareImage@{}: {} assigned from HardwareImage@{}: {}",
-                  reinterpret_cast<std::uintptr_t>(this),
-                  self_image_id,
-                  reinterpret_cast<std::uintptr_t>(&other),
-                  other_image_id);
+    return *this;
+}
+
+HardwareImage& HardwareImage::operator=(HardwareImage&& other) noexcept {
+    if (this == &other) {
+        return *this;
+    }
+    if (auto const self_image_id = imageID.load(std::memory_order_acquire);
+        self_image_id > 0) {
+        auto const self_handle = globalImageStorages.acquire_write(self_image_id);
+        bool should_destroy_self = false;
+        if (decrementImageRefCount(self_handle) == true) {
+            should_destroy_self = true;
+        }
+        if (should_destroy_self) {
+            globalImageStorages.deallocate(self_image_id);
+        }
+    }
+    imageID.store(other.imageID.load(std::memory_order_acquire), std::memory_order_release);
+    other.imageID.store(0, std::memory_order_release);
     return *this;
 }
 

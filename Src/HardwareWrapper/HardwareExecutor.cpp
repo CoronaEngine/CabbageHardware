@@ -112,9 +112,9 @@ HardwareExecutor& HardwareExecutor::operator=(HardwareExecutor&& other) noexcept
     if (this == &other) {
         return *this;
     }
-    bool should_destroy_self = false;
     if (auto const self_id = executorID.load(std::memory_order_acquire);
         self_id > 0) {
+        bool should_destroy_self = false;
         if (auto const self_handle = gExecutorStorage.acquire_write(self_id);
             decExec(self_handle)) {
             should_destroy_self = true;
@@ -142,7 +142,7 @@ HardwareExecutor& HardwareExecutor::operator<<(ComputePipeline& computePipeline)
 HardwareExecutor& HardwareExecutor::operator<<(RasterizerPipeline& rasterizerPipeline) {
     if (auto const executor_handle = gExecutorStorage.acquire_write(executorID.load(std::memory_order_acquire));
         rasterizerPipeline.getRasterizerPipelineID()) {
-        if (auto const raster_handle = gRasterizerPipelineStorage.acquire_read(*rasterizerPipeline.getRasterizerPipelineID());
+        if (auto const raster_handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipeline.getRasterizerPipelineID());
             raster_handle->impl) {
             *executor_handle->impl << static_cast<CommandRecordVulkan*>(raster_handle->impl);
         }

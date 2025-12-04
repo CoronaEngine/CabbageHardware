@@ -105,7 +105,6 @@ HardwareBuffer& HardwareBuffer::operator=(HardwareBuffer&& other) noexcept {
     if (this == &other) {
         return *this;
     }
-    auto const other_buffer_id = other.bufferID.load(std::memory_order_acquire);
     if (auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
         self_buffer_id > 0) {
         bool should_destroy_self = false;
@@ -117,8 +116,8 @@ HardwareBuffer& HardwareBuffer::operator=(HardwareBuffer&& other) noexcept {
             globalBufferStorages.deallocate(self_buffer_id);
         }
     }
+    bufferID.store(other.bufferID.load(std::memory_order_acquire), std::memory_order_release);
     other.bufferID.store(0, std::memory_order_release);
-    bufferID.store(other_buffer_id, std::memory_order_release);
     return *this;
 }
 

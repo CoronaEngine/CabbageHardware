@@ -130,8 +130,8 @@ ComputePipeline& ComputePipeline::operator=(ComputePipeline&& other) noexcept {
             gComputePipelineStorage.deallocate(self_id);
         }
     }
-    other.computePipelineID.store(0, std::memory_order_release);
     computePipelineID.store(other.computePipelineID.load(std::memory_order_acquire), std::memory_order_release);
+    other.computePipelineID.store(0, std::memory_order_release);
     return *this;
 }
 

@@ -397,9 +397,11 @@ struct RasterizerPipeline {
                        EmbeddedShader::ShaderLanguage fragmentShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
                        const std::source_location& sourceLocation = std::source_location::current());
     RasterizerPipeline(const RasterizerPipeline& other);
+    RasterizerPipeline(RasterizerPipeline&& other) noexcept;
     ~RasterizerPipeline();
 
     RasterizerPipeline& operator=(const RasterizerPipeline& other);
+    RasterizerPipeline& operator=(RasterizerPipeline&& other) noexcept;
 
     void setDepthImage(HardwareImage& depthImage);
     [[nodiscard]] HardwareImage getDepthImage();
@@ -408,12 +410,12 @@ struct RasterizerPipeline {
     RasterizerPipeline& operator()(uint16_t width, uint16_t height);
     RasterizerPipeline& record(const HardwareBuffer& indexBuffer, const HardwareBuffer& vertexBuffer);
 
-    [[nodiscard]] std::shared_ptr<uintptr_t> getRasterizerPipelineID() const {
+    [[nodiscard]] uintptr_t getRasterizerPipelineID() const {
         return rasterizerPipelineID;
     }
 
    private:
-    std::shared_ptr<uintptr_t> rasterizerPipelineID;
+    std::atomic<uintptr_t> rasterizerPipelineID;
 };
 
 // ================= 对外封装：HardwareExecutor =================

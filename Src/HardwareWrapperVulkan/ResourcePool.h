@@ -10,8 +10,8 @@ extern Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap> globa
 extern Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageStorages;
 
 struct RasterizerPipelineWrap {
-    RasterizerPipelineVulkan* impl = nullptr;
-    uint64_t refCount = 0;
+    RasterizerPipelineVulkan* impl{nullptr};
+    uint64_t refCount = {1};
 };
 
 extern Corona::Kernel::Utils::Storage<RasterizerPipelineWrap> gRasterizerPipelineStorage;

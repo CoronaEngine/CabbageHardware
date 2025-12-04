@@ -112,7 +112,6 @@ HardwareDisplayer& HardwareDisplayer::operator=(HardwareDisplayer&& other) noexc
     if (this == &other) {
         return *this;
     }
-    auto const other_id = other.displaySurfaceID.load(std::memory_order_acquire);
     if (auto const self_id = displaySurfaceID.load(std::memory_order_acquire);
         self_id > 0) {
         bool should_destroy_self = false;
@@ -124,7 +123,7 @@ HardwareDisplayer& HardwareDisplayer::operator=(HardwareDisplayer&& other) noexc
             globalDisplayerStorages.deallocate(self_id);
         }
     }
-    displaySurfaceID.store(other_id, std::memory_order_release);
+    displaySurfaceID.store(other.displaySurfaceID.load(std::memory_order_acquire), std::memory_order_release);
     other.displaySurfaceID.store(0, std::memory_order_release);
     return *this;
 }
