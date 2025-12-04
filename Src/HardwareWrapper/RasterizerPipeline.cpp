@@ -19,40 +19,44 @@ static bool decRaster(const Corona::Kernel::Utils::Storage<RasterizerPipelineWra
 
 RasterizerPipeline::RasterizerPipeline()
     : rasterizerPipelineID(gRasterizerPipelineStorage.allocate()) {
-    auto handle = gRasterizerPipelineStorage.acquire_write(rasterizerPipelineID.load(std::memory_order_acquire));
+    auto const self_id = rasterizerPipelineID.load(std::memory_order_acquire);
+    auto handle = gRasterizerPipelineStorage.acquire_write(self_id);
     handle->impl = new RasterizerPipelineVulkan();
     CFW_LOG_TRACE("RasterizerPipeline@{} default constructed, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
-                  rasterizerPipelineID.load(std::memory_order_acquire));
+                  self_id);
 }
 
 RasterizerPipeline::RasterizerPipeline(std::string vs, std::string fs, uint32_t multiviewCount, EmbeddedShader::ShaderLanguage vlang, EmbeddedShader::ShaderLanguage flang, const std::source_location& src)
     : rasterizerPipelineID(gRasterizerPipelineStorage.allocate()) {
-    auto handle = gRasterizerPipelineStorage.acquire_write(rasterizerPipelineID.load(std::memory_order_acquire));
+    auto const self_id = rasterizerPipelineID.load(std::memory_order_acquire);
+    auto handle = gRasterizerPipelineStorage.acquire_write(self_id);
     handle->impl = new RasterizerPipelineVulkan(vs, fs, multiviewCount, vlang, flang, src);
     CFW_LOG_TRACE("RasterizerPipeline@{} constructed with shader, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
-                  rasterizerPipelineID.load(std::memory_order_acquire));
+                  self_id);
 }
 
 RasterizerPipeline::RasterizerPipeline(const RasterizerPipeline& other)
     : rasterizerPipelineID(other.rasterizerPipelineID.load(std::memory_order_acquire)) {
-    if (rasterizerPipelineID.load(std::memory_order_acquire) > 0) {
-        auto const handle = gRasterizerPipelineStorage.acquire_write(rasterizerPipelineID.load(std::memory_order_acquire));
+    auto const self_id = rasterizerPipelineID.load(std::memory_order_acquire);
+    if (self_id > 0) {
+        auto const handle = gRasterizerPipelineStorage.acquire_write(self_id);
         incRaster(handle);
     }
     CFW_LOG_TRACE("RasterizerPipeline@{} copy constructed from @{}, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   reinterpret_cast<std::uintptr_t>(&other),
-                  rasterizerPipelineID.load(std::memory_order_acquire));
+                  self_id);
 }
 
 RasterizerPipeline::RasterizerPipeline(RasterizerPipeline&& other) noexcept
     : rasterizerPipelineID(other.rasterizerPipelineID.load(std::memory_order_acquire)) {
+    auto const self_id = rasterizerPipelineID.load(std::memory_order_acquire);
     CFW_LOG_TRACE("RasterizerPipeline@{} move constructed from @{}, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   reinterpret_cast<std::uintptr_t>(&other),
-                  rasterizerPipelineID.load(std::memory_order_acquire));
+                  self_id);
     other.rasterizerPipelineID.store(0, std::memory_order_release);
 }
 
@@ -176,30 +180,35 @@ RasterizerPipeline& RasterizerPipeline::operator=(RasterizerPipeline&& other) no
 }
 
 void RasterizerPipeline::setDepthImage(HardwareImage& depthImage) {
-    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
+    auto const self_id = rasterizerPipelineID.load(std::memory_order_acquire);
+    auto handle = gRasterizerPipelineStorage.acquire_read(self_id);
     handle->impl->setDepthImage(depthImage);
 }
 
 HardwareImage RasterizerPipeline::getDepthImage() {
     HardwareImage img;
-    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
+    auto const self_id = rasterizerPipelineID.load(std::memory_order_acquire);
+    auto handle = gRasterizerPipelineStorage.acquire_read(self_id);
     img = handle->impl->getDepthImage();
     return img;
 }
 
 ResourceProxy RasterizerPipeline::operator[](const std::string& resourceName) {
-    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
+    auto const self_id = rasterizerPipelineID.load(std::memory_order_acquire);
+    auto handle = gRasterizerPipelineStorage.acquire_read(self_id);
     return (*handle->impl)[resourceName];
 }
 
 RasterizerPipeline& RasterizerPipeline::operator()(uint16_t width, uint16_t height) {
-    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
+    auto const self_id = rasterizerPipelineID.load(std::memory_order_acquire);
+    auto handle = gRasterizerPipelineStorage.acquire_read(self_id);
     (*handle->impl)(width, height);
     return *this;
 }
 
 RasterizerPipeline& RasterizerPipeline::record(const HardwareBuffer& indexBuffer, const HardwareBuffer& vertexBuffer) {
-    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
+    auto const self_id = rasterizerPipelineID.load(std::memory_order_acquire);
+    auto handle = gRasterizerPipelineStorage.acquire_read(self_id);
     handle->impl->record(indexBuffer, vertexBuffer);
     return *this;
 }

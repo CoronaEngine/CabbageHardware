@@ -20,40 +20,44 @@ static bool decCompute(const Corona::Kernel::Utils::Storage<ComputePipelineWrap>
 
 ComputePipeline::ComputePipeline()
     : computePipelineID(gComputePipelineStorage.allocate()) {
-    auto const self_handle = gComputePipelineStorage.acquire_write(computePipelineID.load(std::memory_order_acquire));
+    auto const self_id = computePipelineID.load(std::memory_order_acquire);
+    auto const self_handle = gComputePipelineStorage.acquire_write(self_id);
     self_handle->impl = new ComputePipelineVulkan();
     CFW_LOG_TRACE("ComputePipeline@{} default constructed, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
-                  computePipelineID.load(std::memory_order_acquire));
+                  self_id);
 }
 
 ComputePipeline::ComputePipeline(const std::string& shaderCode, EmbeddedShader::ShaderLanguage language, const std::source_location& src)
     : computePipelineID(gComputePipelineStorage.allocate()) {
-    auto const handle = gComputePipelineStorage.acquire_write(computePipelineID.load(std::memory_order_acquire));
+    auto const self_id = computePipelineID.load(std::memory_order_acquire);
+    auto const handle = gComputePipelineStorage.acquire_write(self_id);
     handle->impl = new ComputePipelineVulkan(shaderCode, language, src);
     CFW_LOG_TRACE("ComputePipeline@{} constructed with shader, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
-                  computePipelineID.load(std::memory_order_acquire));
+                  self_id);
 }
 
 ComputePipeline::ComputePipeline(const ComputePipeline& other)
     : computePipelineID(other.computePipelineID.load(std::memory_order_acquire)) {
-    if (computePipelineID.load(std::memory_order_acquire) > 0) {
-        auto const write_handle = gComputePipelineStorage.acquire_write(computePipelineID.load(std::memory_order_acquire));
+    auto const self_id = computePipelineID.load(std::memory_order_acquire);
+    if (self_id > 0) {
+        auto const write_handle = gComputePipelineStorage.acquire_write(self_id);
         incCompute(write_handle);
     }
     CFW_LOG_TRACE("ComputePipeline@{} copy constructed from @{}, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   reinterpret_cast<std::uintptr_t>(&other),
-                  computePipelineID.load(std::memory_order_acquire));
+                  self_id);
 }
 
 ComputePipeline::ComputePipeline(ComputePipeline&& other) noexcept
     : computePipelineID(other.computePipelineID.load(std::memory_order_acquire)) {
+    auto const self_id = computePipelineID.load(std::memory_order_acquire);
     CFW_LOG_TRACE("ComputePipeline@{} move constructed from @{}, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   reinterpret_cast<std::uintptr_t>(&other),
-                  computePipelineID.load(std::memory_order_acquire));
+                  self_id);
     other.computePipelineID.store(0, std::memory_order_release);
 }
 
@@ -174,12 +178,14 @@ ComputePipeline& ComputePipeline::operator=(ComputePipeline&& other) noexcept {
 }
 
 ResourceProxy ComputePipeline::operator[](const std::string& resourceName) {
-    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
+    auto const self_id = computePipelineID.load(std::memory_order_acquire);
+    auto const handle = gComputePipelineStorage.acquire_read(self_id);
     return (*handle->impl)[resourceName];
 }
 
 ComputePipeline& ComputePipeline::operator()(uint16_t x, uint16_t y, uint16_t z) {
-    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
+    auto const self_id = computePipelineID.load(std::memory_order_acquire);
+    auto const handle = gComputePipelineStorage.acquire_read(self_id);
     (*handle->impl)(x, y, z);
     return *this;
 }
