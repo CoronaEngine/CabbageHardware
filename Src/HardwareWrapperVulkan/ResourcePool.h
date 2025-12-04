@@ -10,30 +10,30 @@ extern Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap> globa
 extern Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageStorages;
 
 struct RasterizerPipelineWrap {
-    RasterizerPipelineVulkan* impl = nullptr;
-    uint64_t refCount = 0;
+    RasterizerPipelineVulkan* impl{nullptr};
+    uint64_t refCount = {1};
 };
 
 extern Corona::Kernel::Utils::Storage<RasterizerPipelineWrap> gRasterizerPipelineStorage;
 
 struct ComputePipelineWrap {
-    ComputePipelineVulkan* impl = nullptr;
-    uint64_t refCount = 0;
+    ComputePipelineVulkan* impl{nullptr};
+    uint64_t refCount{1};
 };
 
 extern Corona::Kernel::Utils::Storage<ComputePipelineWrap> gComputePipelineStorage;
 
 struct DisplayerHardwareWrap {
-    void* displaySurface = nullptr;
-    std::shared_ptr<DisplayManager> displayManager;
-    uint64_t refCount = 0;
+    void* displaySurface{nullptr};
+    std::shared_ptr<DisplayManager> displayManager{nullptr};
+    uint64_t refCount{1};
 };
 
 extern Corona::Kernel::Utils::Storage<DisplayerHardwareWrap> globalDisplayerStorages;
 
 struct ExecutorWrap {
-    HardwareExecutorVulkan* impl = nullptr;
-    uint64_t refCount = 0;
+    HardwareExecutorVulkan* impl{};
+    uint64_t refCount{1};
 };
 
 extern Corona::Kernel::Utils::Storage<ExecutorWrap> gExecutorStorage;

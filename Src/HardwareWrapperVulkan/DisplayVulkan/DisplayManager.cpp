@@ -437,14 +437,14 @@ bool DisplayManager::waitExecutor(HardwareExecutorVulkan& executor) {
     return true;
 }
 
-bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
+bool DisplayManager::displayFrame(void* surface, const HardwareImage& displayImage) {
     if (surface == nullptr) {
         return false;
     }
 
     try {
         // 检查是否需要重新初始化
-        if (auto const handle = globalImageStorages.acquire_read(*displayImage.getImageID());
+        if (auto const handle = globalImageStorages.acquire_read(displayImage.getImageID());
             this->displaySurface != surface) {
             this->displaySurface = surface;
 
@@ -508,11 +508,11 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
         }
 
         uint32_t imageIndex;
-        /*VkResult result = vkAcquireNextImageKHR(displayDevice->deviceManager.getLogicalDevice(), 
-                                                swapChain, 
+        /*VkResult result = vkAcquireNextImageKHR(displayDevice->deviceManager.getLogicalDevice(),
+                                                swapChain,
                                                 UINT64_MAX,
                                                 imageAvailableSemaphores[currentFrame],
-                                                VK_NULL_HANDLE, 
+                                                VK_NULL_HANDLE,
                                                 &imageIndex);*/
 
         // 使用单一的二进制信号量 binaryAcquireSemaphore
@@ -531,7 +531,7 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
         }
 
         // 跨设备传输（如果需要）
-        if (auto const handle = globalImageStorages.acquire_write(*displayImage.getImageID());
+        if (auto const handle = globalImageStorages.acquire_write(displayImage.getImageID());
             globalHardwareContext.getMainDevice() != displayDevice)
         // if (true)
         {
@@ -575,9 +575,9 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
 
         // 执行 Blit 和转换布局
         BlitImageCommand blitCmd(this->displayImage, swapChainImages[imageIndex]);
-        TransitionImageLayoutCommand transitionCmd(swapChainImages[imageIndex], 
+        TransitionImageLayoutCommand transitionCmd(swapChainImages[imageIndex],
                                                    VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-                                                   VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, 
+                                                   VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
                                                    VK_ACCESS_2_NONE);
 
         *displayDeviceExecutor << &blitCmd << &transitionCmd

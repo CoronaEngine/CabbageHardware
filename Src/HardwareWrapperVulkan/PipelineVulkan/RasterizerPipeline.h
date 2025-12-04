@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <vector>
+
 #include "CabbageHardware.h"
 #include "Compiler/ShaderCodeCompiler.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/DeviceManager.h"
@@ -27,7 +28,7 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan {
         return depthImage;
     }
 
-    std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> operator[](const std::string& resourceName);
+    ResourceProxy operator[](const std::string& resourceName);
 
     RasterizerPipelineVulkan* operator()(uint16_t width, uint16_t height);
 
@@ -41,7 +42,6 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan {
     RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutorVulkan) override;
 
    private:
-
     struct TriangleGeomMesh {
         HardwareBuffer indexBuffer;
         HardwareBuffer vertexBuffer;
@@ -75,7 +75,7 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan {
 
     CommandRecordVulkan dumpCommandRecordVulkan;
     HardwarePushConstant tempPushConstant;
-    //std::vector<HardwareBuffer> tempVertexBuffers;
+    // std::vector<HardwareBuffer> tempVertexBuffers;
 
     std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> vertexStageInputs;
     std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> vertexStageOutputs;

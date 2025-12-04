@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <ktm/ktm.h>
+
 #include "CabbageHardware.h"
 #include "Compiler/ShaderCodeCompiler.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/DeviceManager.h"
@@ -14,7 +15,7 @@ struct ComputePipelineVulkan : public CommandRecordVulkan {
 
     ComputePipelineVulkan(std::string shaderCode, EmbeddedShader::ShaderLanguage language = EmbeddedShader::ShaderLanguage::GLSL, const std::source_location& sourceLocation = std::source_location::current());
 
-    std::variant<HardwarePushConstant> operator[](const std::string& resourceName);
+    ResourceProxy operator[](const std::string& resourceName);
 
     ComputePipelineVulkan* operator()(uint16_t x, uint16_t y, uint16_t z);
 

@@ -18,73 +18,168 @@ static bool decCompute(const Corona::Kernel::Utils::Storage<ComputePipelineWrap>
     return false;
 }
 
-ComputePipeline::ComputePipeline() {
-    auto const id = gComputePipelineStorage.allocate();
-    auto const handle = gComputePipelineStorage.acquire_write(id);
-    handle->impl = new ComputePipelineVulkan();
-    handle->refCount = 1;
-    computePipelineID = std::make_shared<uintptr_t>(id);
+ComputePipeline::ComputePipeline()
+    : computePipelineID(gComputePipelineStorage.allocate()) {
+    auto const self_handle = gComputePipelineStorage.acquire_write(computePipelineID.load(std::memory_order_acquire));
+    self_handle->impl = new ComputePipelineVulkan();
+    CFW_LOG_TRACE("ComputePipeline@{} default constructed, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  computePipelineID.load(std::memory_order_acquire));
 }
 
-ComputePipeline::ComputePipeline(const std::string& shaderCode, EmbeddedShader::ShaderLanguage language, const std::source_location& src) {
-    auto const id = gComputePipelineStorage.allocate();
-    auto const handle = gComputePipelineStorage.acquire_write(id);
+ComputePipeline::ComputePipeline(const std::string& shaderCode, EmbeddedShader::ShaderLanguage language, const std::source_location& src)
+    : computePipelineID(gComputePipelineStorage.allocate()) {
+    auto const handle = gComputePipelineStorage.acquire_write(computePipelineID.load(std::memory_order_acquire));
     handle->impl = new ComputePipelineVulkan(shaderCode, language, src);
-    handle->refCount = 1;
-    computePipelineID = std::make_shared<uintptr_t>(id);
+    CFW_LOG_TRACE("ComputePipeline@{} constructed with shader, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  computePipelineID.load(std::memory_order_acquire));
 }
 
 ComputePipeline::ComputePipeline(const ComputePipeline& other)
-    : computePipelineID(other.computePipelineID) {
-    if (*computePipelineID > 0) {
-        auto const write_handle = gComputePipelineStorage.acquire_write(*computePipelineID);
+    : computePipelineID(other.computePipelineID.load(std::memory_order_acquire)) {
+    if (computePipelineID.load(std::memory_order_acquire) > 0) {
+        auto const write_handle = gComputePipelineStorage.acquire_write(computePipelineID.load(std::memory_order_acquire));
         incCompute(write_handle);
     }
+    CFW_LOG_TRACE("ComputePipeline@{} copy constructed from @{}, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  computePipelineID.load(std::memory_order_acquire));
+}
+
+ComputePipeline::ComputePipeline(ComputePipeline&& other) noexcept
+    : computePipelineID(other.computePipelineID.load(std::memory_order_acquire)) {
+    CFW_LOG_TRACE("ComputePipeline@{} move constructed from @{}, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  computePipelineID.load(std::memory_order_acquire));
+    other.computePipelineID.store(0, std::memory_order_release);
 }
 
 ComputePipeline::~ComputePipeline() {
-    if (computePipelineID && *computePipelineID > 0) {
+    auto const self_id = computePipelineID.load(std::memory_order_acquire);
+    CFW_LOG_TRACE("ComputePipeline@{} destructor called, ID: {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  self_id);
+    if (self_id > 0) {
         // NOTE: 不要修改写法，避免死锁
         bool destroy = false;
-        if (auto const write_handle = gComputePipelineStorage.acquire_write(*computePipelineID); decCompute(write_handle)) {
+        if (auto const write_handle = gComputePipelineStorage.acquire_write(self_id);
+            decCompute(write_handle)) {
             destroy = true;
         }
         if (destroy) {
-            gComputePipelineStorage.deallocate(*computePipelineID);
+            CFW_LOG_TRACE("ComputePipeline@{} destroying, ID: {}",
+                          reinterpret_cast<std::uintptr_t>(this),
+                          self_id);
+            gComputePipelineStorage.deallocate(self_id);
         }
+        computePipelineID.store(0, std::memory_order_release);
     }
 }
 
 ComputePipeline& ComputePipeline::operator=(const ComputePipeline& other) {
-    if (this != &other) {
-        {
-            auto const other_write_handle = gComputePipelineStorage.acquire_write(*other.computePipelineID);
-            incCompute(other_write_handle);
-        }
-        {  // Note: 不要修改写法 避免死锁
-            if (computePipelineID && *computePipelineID > 0) {
-                bool destroy = false;
-                if (auto const write_handle = gComputePipelineStorage.acquire_write(*computePipelineID); decCompute(write_handle)) {
-                    destroy = true;
-                }
-                if (destroy) {
-                    gComputePipelineStorage.deallocate(*computePipelineID);
-                }
-            }
-        }
-        *computePipelineID = *other.computePipelineID;
+    if (this == &other) {
+        return *this;
     }
+    auto const self_id = computePipelineID.load(std::memory_order_acquire);
+    auto const other_id = other.computePipelineID.load(std::memory_order_acquire);
+    CFW_LOG_TRACE("ComputePipeline@{} copy assigned from @{}, ID: {} -> {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  self_id, other_id);
+    if (self_id == 0 && other_id == 0) {
+        // 都未初始化，直接返回
+        return *this;
+    }
+    if (self_id == other_id) {
+        // 已经指向同一个资源，无需操作
+        return *this;
+    }
+    bool should_destroy_self = false;
+    if (other_id == 0) {
+        // 释放自身资源
+        if (auto const self_handle = gComputePipelineStorage.acquire_write(self_id);
+            decCompute(self_handle)) {
+            should_destroy_self = true;
+        }
+        if (should_destroy_self) {
+            CFW_LOG_TRACE("ComputePipeline@{} destroying in copy assignment, ID: {}",
+                          reinterpret_cast<std::uintptr_t>(this),
+                          self_id);
+            gComputePipelineStorage.deallocate(self_id);
+        }
+        computePipelineID.store(0, std::memory_order_release);
+        return *this;
+    }
+    if (self_id == 0) {
+        // 直接拷贝
+        computePipelineID.store(other_id, std::memory_order_release);
+        auto const other_handle = gComputePipelineStorage.acquire_write(other_id);
+        incCompute(other_handle);
+        return *this;
+    }
+    if (self_id < other_id) {
+        auto const self_handle = gComputePipelineStorage.acquire_write(self_id);
+        auto const other_handle = gComputePipelineStorage.acquire_write(other_id);
+        incCompute(other_handle);
+        if (decCompute(self_handle)) {
+            should_destroy_self = true;
+        }
+    } else {
+        auto const other_handle = gComputePipelineStorage.acquire_write(other_id);
+        auto const self_handle = gComputePipelineStorage.acquire_write(self_id);
+        incCompute(other_handle);
+        if (decCompute(self_handle)) {
+            should_destroy_self = true;
+        }
+    }
+    if (should_destroy_self) {
+        CFW_LOG_TRACE("ComputePipeline@{} destroying in copy assignment, ID: {}",
+                      reinterpret_cast<std::uintptr_t>(this),
+                      self_id);
+        gComputePipelineStorage.deallocate(self_id);
+    }
+    computePipelineID.store(other_id, std::memory_order_release);
     return *this;
 }
 
-std::variant<HardwarePushConstant> ComputePipeline::operator[](const std::string& resourceName) {
-    auto const handle = gComputePipelineStorage.acquire_read(*computePipelineID);
-    std::variant<HardwarePushConstant> result = (*handle->impl)[resourceName];
-    return result;
+ComputePipeline& ComputePipeline::operator=(ComputePipeline&& other) noexcept {
+    if (this == &other) {
+        return *this;
+    }
+    CFW_LOG_TRACE("ComputePipeline@{} move assigned from @{}, ID: {} -> {}",
+                  reinterpret_cast<std::uintptr_t>(this),
+                  reinterpret_cast<std::uintptr_t>(&other),
+                  computePipelineID.load(std::memory_order_acquire),
+                  other.computePipelineID.load(std::memory_order_acquire));
+    if (auto const self_id = computePipelineID.load(std::memory_order_acquire);
+        self_id > 0) {
+        bool should_destroy_self = false;
+        if (auto const self_handle = gComputePipelineStorage.acquire_write(self_id);
+            decCompute(self_handle)) {
+            should_destroy_self = true;
+        }
+        if (should_destroy_self) {
+            CFW_LOG_TRACE("ComputePipeline@{} destroying in move assignment, ID: {}",
+                          reinterpret_cast<std::uintptr_t>(this),
+                          self_id);
+            gComputePipelineStorage.deallocate(self_id);
+        }
+    }
+    computePipelineID.store(other.computePipelineID.load(std::memory_order_acquire), std::memory_order_release);
+    other.computePipelineID.store(0, std::memory_order_release);
+    return *this;
+}
+
+ResourceProxy ComputePipeline::operator[](const std::string& resourceName) {
+    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
+    return (*handle->impl)[resourceName];
 }
 
 ComputePipeline& ComputePipeline::operator()(uint16_t x, uint16_t y, uint16_t z) {
-    auto const handle = gComputePipelineStorage.acquire_read(*computePipelineID);
+    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
     (*handle->impl)(x, y, z);
     return *this;
 }

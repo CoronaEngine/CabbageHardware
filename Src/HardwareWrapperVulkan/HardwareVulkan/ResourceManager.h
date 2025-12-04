@@ -36,31 +36,32 @@ struct ResourceManager {
 
     struct ImageHardwareWrap {
         VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        float pixelSize = 0;
-        ktm::uvec2 imageSize = {0, 0};
-        uint64_t refCount = 0;
+        float pixelSize{0};
+        ktm::uvec2 imageSize{0, 0};
+        uint64_t refCount{1};
 
-        VkFormat imageFormat = VK_FORMAT_MAX_ENUM;
-        VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_FLAG_BITS_MAX_ENUM;
-        VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_NONE;
+        VkFormat imageFormat{VK_FORMAT_MAX_ENUM};
+        VkImageUsageFlags imageUsage{VK_IMAGE_USAGE_FLAG_BITS_MAX_ENUM};
+        VkImageAspectFlags aspectMask{VK_IMAGE_ASPECT_NONE};
 
-        uint32_t arrayLayers = 1;
-        uint32_t mipLevels = 1;
+        int arrayLayers{1};
+        int mipLevels{1};
 
-        VkClearValue clearValue = {};
+        VkClearValue clearValue{};
 
-        VkImage imageHandle = VK_NULL_HANDLE;
-
+        VkImage imageHandle{VK_NULL_HANDLE};
         VkImageView imageView{VK_NULL_HANDLE};
-        std::unordered_map<uint64_t, VkImageView> allSubViews{};
 
-        VmaAllocation imageAlloc = VK_NULL_HANDLE;
+        VmaAllocation imageAlloc{VK_NULL_HANDLE};
         VmaAllocationInfo imageAllocInfo{};
 
-        int32_t bindlessIndex = -1;
+        int32_t bindlessIndex{-1};
 
-        DeviceManager* device = nullptr;
-        ResourceManager* resourceManager = nullptr;
+        std::vector<VkImageView> mipLevelViews{};
+        std::vector<int32_t> mipLevelBindlessIndices{};
+
+        DeviceManager* device{nullptr};
+        ResourceManager* resourceManager{nullptr};
     };
 
     struct BindlessDescriptorSet {

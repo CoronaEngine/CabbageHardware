@@ -27,6 +27,7 @@ DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
         }
 
         // std::this_thread::yield();
+        std::this_thread::sleep_for(std::chrono::microseconds(1000));
     }
 
     commitCommand(queue);
@@ -102,6 +103,7 @@ HardwareExecutorVulkan& HardwareExecutorVulkan::commit() {
             /*try {
                 VkResult result = vkQueueSubmit2(currentRecordQueue->vkQueue, 1, &submitInfo, waitFence);
                 if (result != VK_SUCCESS) {
+                    CFW_LOG_ERROR("Failed to submit command buffer: result = {}", static_cast<std::int32_t>(result));
                     throw std::runtime_error("Failed to submit command buffer!");
                 }
             } catch (const std::exception& e) {
