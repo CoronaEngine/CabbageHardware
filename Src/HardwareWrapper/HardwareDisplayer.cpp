@@ -20,32 +20,35 @@ static bool decrementDisplayerRefCount(const Corona::Kernel::Utils::Storage<Disp
 
 HardwareDisplayer::HardwareDisplayer(void* surface)
     : displaySurfaceID(globalDisplayerStorages.allocate()) {
-    auto const self_handle = globalDisplayerStorages.acquire_write(displaySurfaceID.load(std::memory_order_acquire));
+    auto const self_id = displaySurfaceID.load(std::memory_order_acquire);
+    auto const self_handle = globalDisplayerStorages.acquire_write(self_id);
     self_handle->displaySurface = surface;
     self_handle->displayManager = std::make_shared<DisplayManager>();
     CFW_LOG_TRACE("HardwareDisplayer@{} constructed with surface, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
-                  displaySurfaceID.load(std::memory_order_acquire));
+                  self_id);
 }
 
 HardwareDisplayer::HardwareDisplayer(const HardwareDisplayer& other)
     : displaySurfaceID(other.displaySurfaceID.load(std::memory_order_acquire)) {
-    if (displaySurfaceID.load(std::memory_order_acquire) > 0) {
-        auto const self_handle = globalDisplayerStorages.acquire_write(displaySurfaceID.load(std::memory_order_acquire));
+    auto const self_id = displaySurfaceID.load(std::memory_order_acquire);
+    if (self_id > 0) {
+        auto const self_handle = globalDisplayerStorages.acquire_write(self_id);
         incrementDisplayerRefCount(self_handle);
     }
     CFW_LOG_TRACE("HardwareDisplayer@{} copy constructed from @{}, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   reinterpret_cast<std::uintptr_t>(&other),
-                  displaySurfaceID.load(std::memory_order_acquire));
+                  self_id);
 }
 
 HardwareDisplayer::HardwareDisplayer(HardwareDisplayer&& other) noexcept
     : displaySurfaceID(other.displaySurfaceID.load(std::memory_order_acquire)) {
+    auto const self_id = displaySurfaceID.load(std::memory_order_acquire);
     CFW_LOG_TRACE("HardwareDisplayer@{} move constructed from @{}, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   reinterpret_cast<std::uintptr_t>(&other),
-                  displaySurfaceID.load(std::memory_order_acquire));
+                  self_id);
     other.displaySurfaceID.store(0, std::memory_order_release);
 }
 
@@ -165,10 +168,11 @@ HardwareDisplayer& HardwareDisplayer::operator=(HardwareDisplayer&& other) noexc
 
 HardwareDisplayer& HardwareDisplayer::wait(const HardwareExecutor& executor) {
     // 确保在锁内完成所有操作
+    auto const self_id = displaySurfaceID.load(std::memory_order_acquire);
     if (executor.getExecutorID() > 0) {
         if (auto const executor_handle = gExecutorStorage.acquire_read(executor.getExecutorID());
             executor_handle->impl) {
-            if (auto const display_handle = globalDisplayerStorages.acquire_write(displaySurfaceID.load(std::memory_order_acquire));
+            if (auto const display_handle = globalDisplayerStorages.acquire_write(self_id);
                 display_handle->displayManager) {
                 display_handle->displayManager->waitExecutor(*executor_handle->impl);
             }
@@ -182,7 +186,8 @@ HardwareDisplayer& HardwareDisplayer::wait(const HardwareExecutor& executor) {
 }
 
 HardwareDisplayer& HardwareDisplayer::operator<<(const HardwareImage& image) {
-    if (auto const handle = globalDisplayerStorages.acquire_read(displaySurfaceID.load(std::memory_order_acquire));
+    auto const self_id = displaySurfaceID.load(std::memory_order_acquire);
+    if (auto const handle = globalDisplayerStorages.acquire_read(self_id);
         handle->displayManager && handle->displaySurface) {
         handle->displayManager->displayFrame(handle->displaySurface, image);
     }
