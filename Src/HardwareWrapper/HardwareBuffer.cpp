@@ -83,7 +83,7 @@ HardwareBuffer::HardwareBuffer(const HardwareBuffer& other) {
     auto const other_buffer_id = other.bufferID.load(std::memory_order_acquire);
     bufferID.store(other_buffer_id, std::memory_order_release);
     if (other_buffer_id > 0) {
-        auto const handle = globalBufferStorages.acquire_write(bufferID.load(std::memory_order_acquire));
+        auto const handle = globalBufferStorages.acquire_write(other_buffer_id);
         incrementBufferRefCount(handle);
     }
     CFW_LOG_TRACE("HardwareBuffer@{} copy constructed from @{}, ID: {}",
@@ -128,13 +128,13 @@ HardwareBuffer& HardwareBuffer::operator=(HardwareBuffer&& other) noexcept {
     if (this == &other) {
         return *this;
     }
+    auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
+    auto const other_buffer_id = other.bufferID.load(std::memory_order_acquire);
     CFW_LOG_TRACE("HardwareBuffer@{} move assigned from @{}, ID: {} -> {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   reinterpret_cast<std::uintptr_t>(&other),
-                  bufferID.load(std::memory_order_acquire),
-                  other.bufferID.load(std::memory_order_acquire));
-    if (auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
-        self_buffer_id > 0) {
+                  self_buffer_id, other_buffer_id);
+    if (self_buffer_id > 0) {
         bool should_destroy_self = false;
         if (auto const self_handle = globalBufferStorages.acquire_write(self_buffer_id);
             decrementBufferRefCount(self_handle) == true) {
@@ -147,7 +147,7 @@ HardwareBuffer& HardwareBuffer::operator=(HardwareBuffer&& other) noexcept {
             globalBufferStorages.deallocate(self_buffer_id);
         }
     }
-    bufferID.store(other.bufferID.load(std::memory_order_acquire), std::memory_order_release);
+    bufferID.store(other_buffer_id, std::memory_order_release);
     other.bufferID.store(0, std::memory_order_release);
     return *this;
 }
@@ -271,7 +271,7 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer& inputBuffer, const Har
 }
 
 uint32_t HardwareBuffer::storeDescriptor() const {
-    auto bufferHandle = globalBufferStorages.acquire_write(bufferID);
+    auto bufferHandle = globalBufferStorages.acquire_write(bufferID.load(std::memory_order_acquire));
     return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(bufferHandle);
 }
 

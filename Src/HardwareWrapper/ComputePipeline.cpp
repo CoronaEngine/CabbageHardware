@@ -153,13 +153,13 @@ ComputePipeline& ComputePipeline::operator=(ComputePipeline&& other) noexcept {
     if (this == &other) {
         return *this;
     }
+    auto const self_id = computePipelineID.load(std::memory_order_acquire);
+    auto const other_id = other.computePipelineID.load(std::memory_order_acquire);
     CFW_LOG_TRACE("ComputePipeline@{} move assigned from @{}, ID: {} -> {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   reinterpret_cast<std::uintptr_t>(&other),
-                  computePipelineID.load(std::memory_order_acquire),
-                  other.computePipelineID.load(std::memory_order_acquire));
-    if (auto const self_id = computePipelineID.load(std::memory_order_acquire);
-        self_id > 0) {
+                  self_id, other_id);
+    if (self_id > 0) {
         bool should_destroy_self = false;
         if (auto const self_handle = gComputePipelineStorage.acquire_write(self_id);
             decCompute(self_handle)) {
@@ -172,7 +172,7 @@ ComputePipeline& ComputePipeline::operator=(ComputePipeline&& other) noexcept {
             gComputePipelineStorage.deallocate(self_id);
         }
     }
-    computePipelineID.store(other.computePipelineID.load(std::memory_order_acquire), std::memory_order_release);
+    computePipelineID.store(other_id, std::memory_order_release);
     other.computePipelineID.store(0, std::memory_order_release);
     return *this;
 }

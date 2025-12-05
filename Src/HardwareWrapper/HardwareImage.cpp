@@ -234,6 +234,9 @@ HardwareImage HardwareImage::operator[](const uint32_t index) {
     if (selfImageId > 0) {
         HardwareImage subImage;
         auto const subImageId = globalImageStorages.allocate();
+        CFW_LOG_TRACE("HardwareImage@{} operator[] creating sub-image, parent ID: {}, sub ID: {}, index: {}",
+                      reinterpret_cast<std::uintptr_t>(this),
+                      selfImageId, subImageId, index);
         subImage.imageID.store(subImageId, std::memory_order_release);
 
         {
@@ -360,16 +363,16 @@ HardwareImage& HardwareImage::operator=(HardwareImage&& other) noexcept {
     if (this == &other) {
         return *this;
     }
+    auto const self_image_id = imageID.load(std::memory_order_acquire);
+    auto const other_image_id = other.imageID.load(std::memory_order_acquire);
     CFW_LOG_TRACE("HardwareImage@{} move assigned from @{}, ID: {} -> {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   reinterpret_cast<std::uintptr_t>(&other),
-                  imageID.load(std::memory_order_acquire),
-                  other.imageID.load(std::memory_order_acquire));
-    if (auto const self_image_id = imageID.load(std::memory_order_acquire);
-        self_image_id > 0) {
-        auto const self_handle = globalImageStorages.acquire_write(self_image_id);
+                  self_image_id, other_image_id);
+    if (self_image_id > 0) {
         bool should_destroy_self = false;
-        if (decrementImageRefCount(self_handle) == true) {
+        if (auto const self_handle = globalImageStorages.acquire_write(self_image_id);
+            decrementImageRefCount(self_handle)) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {
@@ -379,7 +382,7 @@ HardwareImage& HardwareImage::operator=(HardwareImage&& other) noexcept {
             globalImageStorages.deallocate(self_image_id);
         }
     }
-    imageID.store(other.imageID.load(std::memory_order_acquire), std::memory_order_release);
+    imageID.store(other_image_id, std::memory_order_release);
     other.imageID.store(0, std::memory_order_release);
     return *this;
 }
@@ -395,24 +398,24 @@ uint32_t HardwareImage::storeDescriptor() {
     return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle);
 }
 
-//uint32_t HardwareImage::getMipLevels() const {
-//    auto const self_image_id = imageID.load(std::memory_order_acquire);
-//    return self_image_id > 0 ? globalImageStorages.acquire_read(self_image_id)->mipLevels : 0;
-//}
+// uint32_t HardwareImage::getMipLevels() const {
+//     auto const self_image_id = imageID.load(std::memory_order_acquire);
+//     return self_image_id > 0 ? globalImageStorages.acquire_read(self_image_id)->mipLevels : 0;
+// }
 //
-//std::pair<uint32_t, uint32_t> HardwareImage::getMipLevelSize(uint32_t mipLevel) const {
-//    if (auto const self_image_id = imageID.load(std::memory_order_acquire);
-//        self_image_id > 0) {
-//        auto const imageHandle = globalImageStorages.acquire_read(self_image_id);
-//        if (mipLevel >= imageHandle->mipLevels) {
-//            return {0, 0};
-//        }
-//        uint32_t width = std::max(1u, imageHandle->imageSize.x >> mipLevel);
-//        uint32_t height = std::max(1u, imageHandle->imageSize.y >> mipLevel);
-//        return {width, height};
-//    }
-//    return {0, 0};
-//}
+// std::pair<uint32_t, uint32_t> HardwareImage::getMipLevelSize(uint32_t mipLevel) const {
+//     if (auto const self_image_id = imageID.load(std::memory_order_acquire);
+//         self_image_id > 0) {
+//         auto const imageHandle = globalImageStorages.acquire_read(self_image_id);
+//         if (mipLevel >= imageHandle->mipLevels) {
+//             return {0, 0};
+//         }
+//         uint32_t width = std::max(1u, imageHandle->imageSize.x >> mipLevel);
+//         uint32_t height = std::max(1u, imageHandle->imageSize.y >> mipLevel);
+//         return {width, height};
+//     }
+//     return {0, 0};
+// }
 
 HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor, uint32_t mipLevel) {
     if (!executor) {
@@ -422,7 +425,8 @@ HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, Hardw
     auto const buffer_id = buffer.bufferID.load(std::memory_order_acquire);
     auto const executor_id = executor->getExecutorID();
     if (self_image_id == 0 || buffer_id == 0 || executor_id == 0) {
-        CFW_LOG_WARNING("Copy operation failed due to uninitialized HardwareImage.");
+        CFW_LOG_WARNING("Copy operation failed due to uninitialized HardwareImage@{}.",
+                        reinterpret_cast<std::uintptr_t>(this));
         return *this;
     }
     auto const executor_handle = gExecutorStorage.acquire_write(executor_id);

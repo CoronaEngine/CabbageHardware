@@ -19,31 +19,34 @@ static bool decExec(const Corona::Kernel::Utils::Storage<ExecutorWrap>::WriteHan
 }
 
 HardwareExecutor::HardwareExecutor() : executorID(gExecutorStorage.allocate()) {
-    auto handle = gExecutorStorage.acquire_write(executorID.load(std::memory_order_acquire));
+    auto const self_id = executorID.load(std::memory_order_acquire);
+    auto handle = gExecutorStorage.acquire_write(self_id);
     handle->impl = new HardwareExecutorVulkan();
     CFW_LOG_TRACE("HardwareExecutor@{} default constructed, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
-                  executorID.load(std::memory_order_acquire));
+                  self_id);
 }
 
 HardwareExecutor::HardwareExecutor(const HardwareExecutor& other)
     : executorID(other.executorID.load(std::memory_order_acquire)) {
-    if (executorID.load(std::memory_order_acquire) > 0) {
-        auto const handle = gExecutorStorage.acquire_write(executorID.load(std::memory_order_acquire));
+    auto const self_id = executorID.load(std::memory_order_acquire);
+    if (self_id > 0) {
+        auto const handle = gExecutorStorage.acquire_write(self_id);
         incExec(handle);
     }
     CFW_LOG_TRACE("HardwareExecutor@{} copy constructed from @{}, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   reinterpret_cast<std::uintptr_t>(&other),
-                  executorID.load(std::memory_order_acquire));
+                  self_id);
 }
 
 HardwareExecutor::HardwareExecutor(HardwareExecutor&& other) noexcept
     : executorID(other.executorID.load(std::memory_order_acquire)) {
+    auto const self_id = executorID.load(std::memory_order_acquire);
     CFW_LOG_TRACE("HardwareExecutor@{} move constructed from @{}, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   reinterpret_cast<std::uintptr_t>(&other),
-                  executorID.load(std::memory_order_acquire));
+                  self_id);
     other.executorID.store(0, std::memory_order_release);
 }
 
@@ -91,16 +94,15 @@ HardwareExecutor& HardwareExecutor::operator=(const HardwareExecutor& other) {
         // 释放自身资源
         if (auto const self_handle = gExecutorStorage.acquire_write(self_id);
             decExec(self_handle)) {
+            should_destroy_self = true;
+        }
+        if (should_destroy_self) {
             CFW_LOG_TRACE("HardwareExecutor@{} destroying in copy assignment, ID: {}",
                           reinterpret_cast<std::uintptr_t>(this),
                           self_id);
             gExecutorStorage.deallocate(self_id);
-            should_destroy_self = true;
         }
-        if (should_destroy_self) {
-            gExecutorStorage.deallocate(self_id);
-        }
-        executorID.store(0, std::memory_order_acquire);
+        executorID.store(0, std::memory_order_release);
         return *this;
     }
     if (self_id == 0) {
@@ -139,13 +141,13 @@ HardwareExecutor& HardwareExecutor::operator=(HardwareExecutor&& other) noexcept
     if (this == &other) {
         return *this;
     }
+    auto const self_id = executorID.load(std::memory_order_acquire);
+    auto const other_id = other.executorID.load(std::memory_order_acquire);
     CFW_LOG_TRACE("HardwareExecutor@{} move assigned from @{}, ID: {} -> {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   reinterpret_cast<std::uintptr_t>(&other),
-                  executorID.load(std::memory_order_acquire),
-                  other.executorID.load(std::memory_order_acquire));
-    if (auto const self_id = executorID.load(std::memory_order_acquire);
-        self_id > 0) {
+                  self_id, other_id);
+    if (self_id > 0) {
         bool should_destroy_self = false;
         if (auto const self_handle = gExecutorStorage.acquire_write(self_id);
             decExec(self_handle)) {
@@ -158,7 +160,7 @@ HardwareExecutor& HardwareExecutor::operator=(HardwareExecutor&& other) noexcept
             gExecutorStorage.deallocate(self_id);
         }
     }
-    executorID.store(other.executorID.load(std::memory_order_acquire), std::memory_order_release);
+    executorID.store(other_id, std::memory_order_release);
     other.executorID.store(0, std::memory_order_release);
     return *this;
 }

@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "Compiler/ShaderCodeCompiler.h"
+#include "corona/kernel/core/i_logger.h"  // For CFW_LOG_TRACE
 
 // Forward declare platform-specific types instead of including platform headers
 #if defined(_WIN32)
@@ -237,9 +238,9 @@ struct ResourceProxy {
 
    private:
     Type type_;
-    HardwarePushConstant push_constant_;
-    HardwareBuffer* buffer_ptr_ = nullptr;
-    HardwareImage* image_ptr_ = nullptr;
+    HardwarePushConstant push_constant_{nullptr};
+    HardwareBuffer* buffer_ptr_{nullptr};
+    HardwareImage* image_ptr_{nullptr};
 
    public:
     // PushConstant - 直接存储值（已有写回机制）

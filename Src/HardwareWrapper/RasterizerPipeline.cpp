@@ -103,16 +103,16 @@ RasterizerPipeline& RasterizerPipeline::operator=(const RasterizerPipeline& othe
         // 释放自身资源
         if (auto const self_handle = gRasterizerPipelineStorage.acquire_write(self_id);
             decRaster(self_handle)) {
+            should_destroy_self = true;
+        }
+        if (should_destroy_self) {
             CFW_LOG_TRACE("RasterizerPipeline@{} destroying in copy assignment, ID: {}",
                           reinterpret_cast<std::uintptr_t>(this),
                           self_id);
             gRasterizerPipelineStorage.deallocate(self_id);
-            should_destroy_self = true;
-        }
-        if (should_destroy_self) {
-            gRasterizerPipelineStorage.deallocate(self_id);
         }
         rasterizerPipelineID.store(0, std::memory_order_release);
+        return *this;
     }
     if (self_id == 0) {
         // 直接拷贝
@@ -121,6 +121,7 @@ RasterizerPipeline& RasterizerPipeline::operator=(const RasterizerPipeline& othe
             incRaster(other_handle);
         }
         rasterizerPipelineID.store(other_id, std::memory_order_release);
+        return *this;
     }
     if (self_id < other_id) {
         auto const self_handle = gRasterizerPipelineStorage.acquire_write(self_id);
@@ -155,13 +156,13 @@ RasterizerPipeline& RasterizerPipeline::operator=(RasterizerPipeline&& other) no
     if (this == &other) {
         return *this;
     }
+    auto const self_id = rasterizerPipelineID.load(std::memory_order_acquire);
+    auto const other_id = other.rasterizerPipelineID.load(std::memory_order_acquire);
     CFW_LOG_TRACE("RasterizerPipeline@{} move assigned from @{}, ID: {} -> {}",
                   reinterpret_cast<std::uintptr_t>(this),
                   reinterpret_cast<std::uintptr_t>(&other),
-                  rasterizerPipelineID.load(std::memory_order_acquire),
-                  other.rasterizerPipelineID.load(std::memory_order_acquire));
-    if (auto const self_id = rasterizerPipelineID.load(std::memory_order_acquire);
-        self_id > 0) {
+                  self_id, other_id);
+    if (self_id > 0) {
         bool should_destroy_self = false;
         if (auto const self_handle = gRasterizerPipelineStorage.acquire_write(self_id);
             decRaster(self_handle)) {
@@ -174,7 +175,7 @@ RasterizerPipeline& RasterizerPipeline::operator=(RasterizerPipeline&& other) no
             gRasterizerPipelineStorage.deallocate(self_id);
         }
     }
-    rasterizerPipelineID.store(other.rasterizerPipelineID.load(std::memory_order_acquire), std::memory_order_release);
+    rasterizerPipelineID.store(other_id, std::memory_order_release);
     other.rasterizerPipelineID.store(0, std::memory_order_release);
     return *this;
 }
