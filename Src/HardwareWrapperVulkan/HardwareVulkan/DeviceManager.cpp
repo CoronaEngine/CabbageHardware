@@ -14,7 +14,7 @@ void DeviceManager::initDeviceManager(const CreateCallback& createCallback, cons
     createDevices(createCallback, vkInstance);
     createQueueUtils();
     //createCommandBuffers();
-    // createTimelineSemaphore();
+    //createTimelineSemaphore();
 
     for (auto& queue : graphicsQueues) {
         CFW_LOG_INFO(

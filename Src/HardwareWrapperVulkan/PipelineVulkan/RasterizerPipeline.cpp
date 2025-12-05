@@ -558,6 +558,9 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
             imageBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
                                          VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
             imageBarrier.subresourceRange.aspectMask = handle->aspectMask;
+            // TODO: 注意，这里要根据图片的layer和mipmap进行修改
+            imageBarrier.subresourceRange.baseArrayLayer = 0;
+            imageBarrier.subresourceRange.layerCount = handle->arrayLayers;
             requiredBarriers.imageBarriers.push_back(imageBarrier);
         }
 

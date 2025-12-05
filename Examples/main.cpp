@@ -50,8 +50,8 @@ int main() {
     CFW_LOG_INFO("Main thread started...");
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-    constexpr std::size_t WINDOD_COUNT = 1;
-    std::vector<GLFWwindow*> windows(WINDOD_COUNT);
+    constexpr std::size_t WINDOW_COUNT = 1;
+    std::vector<GLFWwindow*> windows(WINDOW_COUNT);
     for (size_t i = 0; i < windows.size(); i++) {
         windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
     }
@@ -64,7 +64,7 @@ int main() {
         createInfo.height = 1080;
         createInfo.format = ImageFormat::RGBA16_FLOAT;
         createInfo.usage = ImageUsage::StorageImage;
-        createInfo.arrayLayers = 5;
+        createInfo.arrayLayers = 1;
         createInfo.mipLevels = 1;
 
         finalOutputImages[i] = HardwareImage(createInfo);
@@ -78,13 +78,13 @@ int main() {
 
     // 纹理加载 - 选择以下任一方式
     // 方式1: 加载普通纹理
-    // auto textureResult = loadTexture(shaderPath + "/awesomeface.png");
+    auto textureResult = loadTexture(shaderPath + "/awesomeface.png");
 
     // 方式2: 加载BC1压缩纹理
     // auto textureResult = loadCompressedTexture(shaderPath + "/awesomeface.png", true);
 
     // 方式3: 加载带有 mipmap 和 array layers 的纹理
-    auto textureResult = loadTextureWithMipmapAndLayers(shaderPath + "/awesomeface.png", 2, 5, 1, 0);
+    //auto textureResult = loadTextureWithMipmapAndLayers(shaderPath + "/awesomeface.png", 2, 5, 1, 0);
 
     if (!textureResult.success) {
         CFW_LOG_ERROR("Failed to load texture, exiting...");
@@ -101,7 +101,7 @@ int main() {
     std::atomic_bool running = true;
 
     auto meshThread = [&](uint32_t threadIndex) {
-        CFW_LOG_INFO("Mesh thread started...");
+        CFW_LOG_INFO("Mesh thread {} started...", threadIndex);
         ComputeUniformBufferObject computeUniformData(windows.size());
         computeUniformBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::UniformBuffer);
 
@@ -113,9 +113,11 @@ int main() {
             }
 
         auto startTime = std::chrono::high_resolution_clock::now();
+        uint64_t frameCount = 0;
 
         while (running.load()) {
             float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
+            //CFW_LOG_INFO("Mesh thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
 
             for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
                     //rasterizerUniformBufferObject[i].textureIndex = texture[0][0].storeDescriptor();
@@ -126,14 +128,24 @@ int main() {
 
                 computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
                 computeUniformBuffers[threadIndex].copyFromData(&computeUniformData, sizeof(computeUniformData));
+
+                ++frameCount;
         }
+        CFW_LOG_INFO("Mesh thread {} ended.", threadIndex);
     };
 
     auto renderThread = [&](uint32_t threadIndex) {
-        CFW_LOG_INFO("Render thread started...");
+        CFW_LOG_INFO("Render thread {} started...", threadIndex);
         RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
         ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
+
+        auto startTime = std::chrono::high_resolution_clock::now();
+        uint64_t frameCount = 0;
+
         while (running.load()) {
+            float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
+            CFW_LOG_INFO("Render thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
+
             for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
                 rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffers[threadIndex][i].storeDescriptor();
                 // rasterizer["inPosition"] = postionBuffer;
@@ -143,22 +155,33 @@ int main() {
                 rasterizer["outColor"] = finalOutputImages[threadIndex];
 
                 executors[threadIndex] << rasterizer.record(indexBuffer, vertexBuffer);
-                }
+            }
 
-                computer["pushConsts.uniformBufferIndex"] = computeUniformBuffers[threadIndex].storeDescriptor();
+            computer["pushConsts.uniformBufferIndex"] = computeUniformBuffers[threadIndex].storeDescriptor();
 
-                executors[threadIndex] << rasterizer(1920, 1080)
-                                       << computer(1920 / 8, 1080 / 8, 1)
-                                       << executors[threadIndex].submit();
+            executors[threadIndex] << rasterizer(1920, 1080)
+                                   << computer(1920 / 8, 1080 / 8, 1)
+                                   << executors[threadIndex].submit();
+            ++frameCount;
         }
+        CFW_LOG_INFO("Render thread {} ended.", threadIndex);
     };
 
     auto displayThread = [&](uint32_t threadIndex) {
-        CFW_LOG_INFO("Display thread started...");
+        CFW_LOG_INFO("Display thread {} started...", threadIndex);
         HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
+
+        auto startTime = std::chrono::high_resolution_clock::now();
+        uint64_t frameCount = 0;
+
         while (running.load()) {
+            float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
+            //CFW_LOG_INFO("Display thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
+
             displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
+            ++frameCount;
         }
+        CFW_LOG_INFO("Display thread {} ended.", threadIndex);
     };
 
     for (size_t i = 0; i < windows.size(); i++) {

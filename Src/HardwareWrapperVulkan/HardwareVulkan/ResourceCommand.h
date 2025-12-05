@@ -1,4 +1,4 @@
-#include "HardwareExecutorVulkan.h"
+﻿#include "HardwareExecutorVulkan.h"
 
 struct CopyBufferCommand : public CommandRecordVulkan {
     ResourceManager::BufferHardwareWrap& srcBuffer;
@@ -357,6 +357,7 @@ struct BlitImageCommand : public CommandRecordVulkan {
             srcImageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_BLIT_BIT;
             srcImageBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
             srcImageBarrier.oldLayout = srcImage.imageLayout;
+            //srcImageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             srcImageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             srcImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             srcImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
