@@ -146,7 +146,7 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
                                            createInfo.initialData);
         auto const bufferHandle = globalBufferStorages.acquire_write(stagingBuffer.bufferID.load(std::memory_order_acquire));
         CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, 0);
-        tempExecutor << &copyCmd << tempExecutor.commit();
+        tempExecutor << &copyCmd << tempExecutor.submit();
     }
     CFW_LOG_TRACE("HardwareImage@{} constructed with createInfo, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),
@@ -179,7 +179,7 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
                                            imageData);
         auto const bufferHandle = globalBufferStorages.acquire_write(stagingBuffer.bufferID.load(std::memory_order_acquire));
         CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, 0);
-        tempExecutor << &copyCmd << tempExecutor.commit();
+        tempExecutor << &copyCmd << tempExecutor.submit();
     }
     CFW_LOG_TRACE("HardwareImage@{} constructed with params, ID: {}",
                   reinterpret_cast<std::uintptr_t>(this),

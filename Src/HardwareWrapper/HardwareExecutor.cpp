@@ -1,4 +1,4 @@
-#include "CabbageHardware.h"
+﻿#include "CabbageHardware.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 #include "HardwareWrapperVulkan/PipelineVulkan/ComputePipeline.h"
 #include "HardwareWrapperVulkan/PipelineVulkan/RasterizerPipeline.h"
@@ -186,11 +186,10 @@ HardwareExecutor& HardwareExecutor::operator<<(RasterizerPipeline& rasterizerPip
 }
 
 HardwareExecutor& HardwareExecutor::operator<<(HardwareExecutor& other) {
-    return other;  // ͸��
+    return other;
 }
 
 HardwareExecutor& HardwareExecutor::wait(HardwareExecutor& other) {
-    // ��ͬһ��������������в��������⾺̬����
     auto const self_id = executorID.load(std::memory_order_acquire);
     auto const other_id = other.executorID.load(std::memory_order_acquire);
     if (self_id == 0 || other_id == 0) {
@@ -221,8 +220,8 @@ HardwareExecutor& HardwareExecutor::wait(HardwareExecutor& other) {
     return *this;
 }
 
-HardwareExecutor& HardwareExecutor::commit() {
+HardwareExecutor& HardwareExecutor::submit() {
     auto handle = gExecutorStorage.acquire_write(executorID.load(std::memory_order_acquire));
-    handle->impl->commit();
+    handle->impl->submit();
     return *this;
 }

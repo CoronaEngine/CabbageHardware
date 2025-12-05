@@ -435,7 +435,7 @@ struct HardwareExecutor {
     HardwareExecutor& operator<<(HardwareExecutor& other);
 
     HardwareExecutor& wait(HardwareExecutor& other);
-    HardwareExecutor& commit();
+    HardwareExecutor& submit();
 
     [[nodiscard]] uintptr_t getExecutorID() const {
         return executorID.load(std::memory_order_acquire);

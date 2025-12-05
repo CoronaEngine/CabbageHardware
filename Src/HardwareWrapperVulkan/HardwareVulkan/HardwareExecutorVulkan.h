@@ -91,9 +91,15 @@ struct HardwareExecutorVulkan {
         return (!commandList.empty()) && (currentRecordQueue != nullptr);
     }
 
-    HardwareExecutorVulkan& commit();
+    HardwareExecutorVulkan& submit();
 
-    static DeviceManager::QueueUtils* pickQueueAndCommit(std::atomic_uint16_t& queueIndex,
+    // TODO: 增加几个后面需要的接口
+    //void waitUntilSubmitIsComplete();
+    //void waitUntilAllSubmitsAreComplete();
+    //void disposeWhenSubmitCompletes(std::shared_ptr<Buffer> buffer);
+    //void disposeWhenSubmitCompletes(std::function<void()>&& deallocator);
+
+    static DeviceManager::QueueUtils* pickQueueAndSubmit(std::atomic_uint16_t& queueIndex,
                                                          std::vector<DeviceManager::QueueUtils>& queues,
                                                          std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand);
 

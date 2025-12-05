@@ -536,7 +536,7 @@ bool DisplayManager::displayFrame(void* surface, const HardwareImage& displayIma
         // if (true)
         {
             CopyImageToBufferCommand copyCmd(*handle, srcStaging);
-            (*mainDeviceExecutor) << &copyCmd << mainDeviceExecutor->commit();
+            (*mainDeviceExecutor) << &copyCmd << mainDeviceExecutor->submit();
 
             // std::vector<uint8_t> zeroData(dstStaging.bufferAllocInfo.size, 0);
             // displayDevice->resourceManager.copyBufferToHost(dstStaging, zeroData.data(), dstStaging.bufferAllocInfo.size);
@@ -582,7 +582,7 @@ bool DisplayManager::displayFrame(void* surface, const HardwareImage& displayIma
 
         *displayDeviceExecutor << &blitCmd << &transitionCmd
                                << displayDeviceExecutor->wait(waitSemaphoreInfos, signalSemaphoreInfos, VK_NULL_HANDLE)
-                               << displayDeviceExecutor->commit();
+                               << displayDeviceExecutor->submit();
 
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -597,7 +597,7 @@ bool DisplayManager::displayFrame(void* surface, const HardwareImage& displayIma
             return (queueResult == VK_SUCCESS || queueResult == VK_SUBOPTIMAL_KHR);
         };
 
-        HardwareExecutorVulkan::pickQueueAndCommit(currentQueueIndex, presentQueues, commitToQueue);
+        HardwareExecutorVulkan::pickQueueAndSubmit(currentQueueIndex, presentQueues, commitToQueue);
 
         frameCounter++;
         currentFrame = flightIndex;

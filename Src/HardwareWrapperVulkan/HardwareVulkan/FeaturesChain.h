@@ -1,9 +1,9 @@
 ﻿#pragma once
 
+#include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 #include <functional>
 #include <set>
 #include <stdexcept>
-#include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 
 struct DeviceFeaturesChain {
    public:

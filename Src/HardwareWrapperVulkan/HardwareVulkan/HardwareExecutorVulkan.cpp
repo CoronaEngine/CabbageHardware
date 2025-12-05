@@ -1,6 +1,6 @@
 ﻿#include "HardwareExecutorVulkan.h"
 
-DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomic_uint16_t& currentQueueIndex,
+DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndSubmit(std::atomic_uint16_t& currentQueueIndex,
                                                                       std::vector<DeviceManager::QueueUtils>& currentQueues,
                                                                       std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand) {
     DeviceManager::QueueUtils* queue;
@@ -36,7 +36,7 @@ DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
     return queue;
 }
 
-HardwareExecutorVulkan& HardwareExecutorVulkan::commit() {
+HardwareExecutorVulkan& HardwareExecutorVulkan::submit() {
     if (commandList.size() > 0) {
         auto commitToQueue = [&](DeviceManager::QueueUtils* currentRecordQueue) -> bool {
             this->currentRecordQueue = currentRecordQueue;
@@ -126,13 +126,13 @@ HardwareExecutorVulkan& HardwareExecutorVulkan::commit() {
 
         switch (queueType) {
             case CommandRecordVulkan::ExecutorType::Graphics:
-                pickQueueAndCommit(hardwareContext->deviceManager.currentGraphicsQueueIndex, hardwareContext->deviceManager.graphicsQueues, commitToQueue);
+                pickQueueAndSubmit(hardwareContext->deviceManager.currentGraphicsQueueIndex, hardwareContext->deviceManager.graphicsQueues, commitToQueue);
                 break;
             case CommandRecordVulkan::ExecutorType::Compute:
-                pickQueueAndCommit(hardwareContext->deviceManager.currentComputeQueueIndex, hardwareContext->deviceManager.computeQueues, commitToQueue);
+                pickQueueAndSubmit(hardwareContext->deviceManager.currentComputeQueueIndex, hardwareContext->deviceManager.computeQueues, commitToQueue);
                 break;
             case CommandRecordVulkan::ExecutorType::Transfer:
-                pickQueueAndCommit(hardwareContext->deviceManager.currentTransferQueueIndex, hardwareContext->deviceManager.transferQueues, commitToQueue);
+                pickQueueAndSubmit(hardwareContext->deviceManager.currentTransferQueueIndex, hardwareContext->deviceManager.transferQueues, commitToQueue);
                 break;
             case CommandRecordVulkan::ExecutorType::Invalid:
                 CFW_LOG_ERROR("No valid command to commit in HardwareExecutorVulkan!");
