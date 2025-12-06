@@ -158,7 +158,8 @@ struct HardwareImage {
     ~HardwareImage();
 
     HardwareImage& operator=(const HardwareImage& other);
-    HardwareImage operator[](const uint32_t subViewIndex);
+    // image[layer][mip]
+    HardwareImage operator[](const uint32_t index);
     explicit operator bool() const;
 
     [[nodiscard]] uint32_t storeDescriptor();
@@ -166,15 +167,15 @@ struct HardwareImage {
         return imageID;
     }
 
-    [[nodiscard]] uint32_t getNumMipLevels() const;
+    //[[nodiscard]] uint32_t getNumMipLevels() const;
     //[[nodiscard]] uint32_t getArrayLayers() const;
 
     HardwareImage& copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor, uint32_t mipLevel = 0);
     HardwareImage& copyFromData(const void* inputData, HardwareExecutor* executor, uint32_t mipLevel = 0);
 
    private:
+    HardwareImage(std::shared_ptr<uintptr_t> parentImageID, uint32_t layer, uint32_t mipLevel);
     std::shared_ptr<uintptr_t> imageID;
-    std::unordered_map<uint32_t, HardwareImage> allSubHardwareImages;
 
     friend class HardwareDisplayer;
 };

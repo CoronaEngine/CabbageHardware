@@ -361,7 +361,6 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     resultImage.arrayLayers = arrayLayers;
     resultImage.mipLevels = mipLevels;
     resultImage.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    resultImage.viewType = ViewType::Original;
 
     if (imageUsage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) {
         // 深度模板图像
@@ -421,14 +420,6 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     // 创建图像视图
     resultImage.imageView = createImageView(resultImage);
 
-    if (mipLevels > 1 && arrayLayers == 1) {
-        createViewForEachMips(resultImage);
-    }
-
-    if (arrayLayers > 1 && mipLevels == 1) {
-        createViewForEachArrayLayers(resultImage);
-    }
-
     deviceMemorySize += resultImage.imageAllocInfo.size;
     CFW_LOG_DEBUG("Image created: {}x{} Format: 0x{:X} Layers: {} Mips: {} Size: {:.2f} MB",
                   imageSize.x, imageSize.y, static_cast<uint32_t>(imageFormat), arrayLayers, mipLevels, (resultImage.imageAllocInfo.size / 1024.0 / 1024.0));
@@ -436,70 +427,118 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     return resultImage;
 }
 
-VkImageView ResourceManager::createImageView(ImageHardwareWrap& image) {
+//VkImageView ResourceManager::createImageView(ImageHardwareWrap& image, uint32_t layer, uint32_t mipLevel) {
+//    VkImageViewCreateInfo viewInfo{};
+//    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+//    viewInfo.image = image.imageHandle;
+//    viewInfo.viewType = image.arrayLayers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+//    viewInfo.format = image.imageFormat;
+//    viewInfo.subresourceRange.aspectMask = image.aspectMask;
+//    viewInfo.flags = 0;
+//
+//    VkImageView imageView = VK_NULL_HANDLE;
+//
+//    // 返回完整的图像视图（所有 layers 和 mip levels）
+//    if (layer == static_cast<uint32_t>(-1) && mipLevel == static_cast<uint32_t>(-1)) {
+//        viewInfo.subresourceRange.baseMipLevel = 0;
+//        viewInfo.subresourceRange.levelCount = image.mipLevels;
+//        viewInfo.subresourceRange.baseArrayLayer = 0;
+//        viewInfo.subresourceRange.layerCount = image.arrayLayers;
+//
+//        coronaHardwareCheck(vkCreateImageView(device->getLogicalDevice(), &viewInfo, nullptr, &imageView));
+//        return imageView;
+//    }
+//
+//    // 返回指定 layer 的所有 mipmap
+//    if (layer != static_cast<uint32_t>(-1) && mipLevel == static_cast<uint32_t>(-1)) {
+//        
+//        uint64_t cacheKey = (static_cast<uint64_t>(layer) << 32) | 0xFFFFFFFFULL;
+//
+//        if (image.allSubViews.contains(cacheKey)) {
+//            return image.allSubViews[cacheKey];
+//        }
+//        else {
+//            viewInfo.subresourceRange.baseMipLevel = 0;
+//            viewInfo.subresourceRange.levelCount = image.mipLevels;
+//            viewInfo.subresourceRange.baseArrayLayer = layer;
+//            viewInfo.subresourceRange.layerCount = 1;
+//            coronaHardwareCheck(vkCreateImageView(device->getLogicalDevice(), &viewInfo, nullptr, &imageView));
+//            image.allSubViews[cacheKey] = imageView;
+//            return imageView;
+//        }
+//    }
+//
+//    // 返回指定 layer 的指定 mipLevel
+//    if (layer != static_cast<uint32_t>(-1) && mipLevel != static_cast<uint32_t>(-1)) {
+//        // 先查询
+//        uint64_t cacheKey = (static_cast<uint64_t>(layer) << 32) | static_cast<uint64_t>(mipLevel);
+//
+//        if (image.allSubViews.contains(cacheKey)) {
+//            return image.allSubViews[cacheKey];
+//        }
+//
+//        viewInfo.subresourceRange.baseMipLevel = mipLevel;
+//        viewInfo.subresourceRange.levelCount = 1;
+//        viewInfo.subresourceRange.baseArrayLayer = layer;
+//        viewInfo.subresourceRange.layerCount = 1;
+//        coronaHardwareCheck(vkCreateImageView(device->getLogicalDevice(), &viewInfo, nullptr, &imageView));
+//        image.allSubViews[cacheKey] = imageView;
+//        return imageView;
+//    }
+//
+//    return VK_NULL_HANDLE;
+//}
+
+VkImageView ResourceManager::createImageView(ImageHardwareWrap& image, uint32_t layer, uint32_t mipLevel) {
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = image.imageHandle;
     viewInfo.viewType = image.arrayLayers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.format = image.imageFormat;
     viewInfo.subresourceRange.aspectMask = image.aspectMask;
-    viewInfo.subresourceRange.baseMipLevel = 0;
-    viewInfo.subresourceRange.levelCount = image.mipLevels;
-    viewInfo.subresourceRange.baseArrayLayer = 0;
-    viewInfo.subresourceRange.layerCount = image.arrayLayers;
     viewInfo.flags = 0;
 
-    VkImageView imageView;
-    coronaHardwareCheck(vkCreateImageView(device->getLogicalDevice(), &viewInfo, nullptr, &imageView));
-    return imageView;
-}
+    VkImageView imageView = VK_NULL_HANDLE;
 
-void ResourceManager::createViewForEachMips(ImageHardwareWrap& image) {
-    image.allSubViews.reserve(image.mipLevels);
-    for (uint32_t i = 0; i < image.mipLevels; i++) {
-        VkImageViewCreateInfo viewInfo{};
-        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        viewInfo.image = image.imageHandle;
-        viewInfo.viewType = image.arrayLayers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = image.imageFormat;
-        viewInfo.subresourceRange.aspectMask = image.aspectMask;
-        viewInfo.subresourceRange.baseMipLevel = i;  // 指定特定的 mip level
-        viewInfo.subresourceRange.levelCount = 1;    // 只包含一个层级
-        viewInfo.subresourceRange.baseArrayLayer = 0;
-        viewInfo.subresourceRange.layerCount = image.arrayLayers;
+    // layer 和 mipLevel 都为-1，表示完整的图像视图
+    bool is_full_view = (layer == static_cast<uint32_t>(-1) && mipLevel == static_cast<uint32_t>(-1));
+    // layer 有效，mipLevel 为-1，表示指定 layer 的所有 mipmap
+    bool is_layer_view = (layer != static_cast<uint32_t>(-1) && mipLevel == static_cast<uint32_t>(-1));
+    // layer 和 mipLevel 都有效，表示指定 layer 的指定 mipLevel
+    bool is_layer_mip_view = (layer != static_cast<uint32_t>(-1) && mipLevel != static_cast<uint32_t>(-1));
 
-        VkImageView imageView;
-        coronaHardwareCheck(vkCreateImageView(device->getLogicalDevice(), &viewInfo, nullptr, &imageView));
-        image.allSubViews[i] = imageView;
-        CFW_LOG_DEBUG("[ResourceManager] Created ImageView for mip level {} (size: {}x{})",
-                      i, (image.imageSize.x >> i), (image.imageSize.y >> i));
+    uint64_t cacheKey = (static_cast<uint64_t>(layer + 1) << 32) | static_cast<uint64_t>(mipLevel + 1);
+
+    if (image.allSubViews.contains(cacheKey)) {
+        return image.allSubViews[cacheKey];
     }
-}
 
-void ResourceManager::createViewForEachArrayLayers(ImageHardwareWrap& image) {
-    image.allSubViews.reserve(image.arrayLayers);
-    for (uint32_t i = 0; i < image.arrayLayers; i++) {
-        VkImageViewCreateInfo viewInfo{};
-        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        viewInfo.image = image.imageHandle;
-        viewInfo.viewType = image.arrayLayers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = image.imageFormat;
-        viewInfo.subresourceRange.aspectMask = image.aspectMask;
+    if (is_full_view) {
         viewInfo.subresourceRange.baseMipLevel = 0;
         viewInfo.subresourceRange.levelCount = image.mipLevels;
-        viewInfo.subresourceRange.baseArrayLayer = i;  // 指定特定的数组层
-        viewInfo.subresourceRange.layerCount = 1;      // 只包含一个层
-
-        VkImageView imageView;
-        coronaHardwareCheck(vkCreateImageView(device->getLogicalDevice(), &viewInfo, nullptr, &imageView));
-        image.allSubViews[i] = imageView;
-        CFW_LOG_DEBUG("[ResourceManager] Created ImageView for array layer {} ", i);
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = image.arrayLayers;
+    } else if (is_layer_view) {
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = image.mipLevels;
+        viewInfo.subresourceRange.baseArrayLayer = layer;
+        viewInfo.subresourceRange.layerCount = 1;
+    } else if (is_layer_mip_view) {
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.subresourceRange.baseMipLevel = mipLevel;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = layer;
+        viewInfo.subresourceRange.layerCount = 1;
+    } else {
+        // 无效组合
+        return VK_NULL_HANDLE;
     }
-}
 
-//uint32_t ResourceManager::getMipLevelsCount(uint32_t texWidth, uint32_t texHeight) const {
-//    return static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
-//}
+    coronaHardwareCheck(vkCreateImageView(device->getLogicalDevice(), &viewInfo, nullptr, &imageView));
+    image.allSubViews[cacheKey] = imageView;
+    return imageView;
+}
 
 void ResourceManager::destroyImage(ImageHardwareWrap& image) {
     if (vmaAllocator == VK_NULL_HANDLE) {
@@ -978,10 +1017,44 @@ ResourceManager& ResourceManager::copyImage(VkCommandBuffer& commandBuffer,
     return *this;
 }
 
+//ResourceManager& ResourceManager::copyBufferToImage(VkCommandBuffer& commandBuffer,
+//                                                    BufferHardwareWrap& buffer,
+//                                                    ImageHardwareWrap& image,
+//                                                    uint32_t mipLevel) {
+//    if (mipLevel >= image.mipLevels) {
+//        return *this;  // Invalid mip level
+//    }
+//
+//    // 计算指定 mip level 的尺寸
+//    uint32_t mipWidth = std::max(1u, image.imageSize.x >> mipLevel);
+//    uint32_t mipHeight = std::max(1u, image.imageSize.y >> mipLevel);
+//
+//    VkBufferImageCopy region{};
+//    region.bufferOffset = 0;
+//    region.bufferRowLength = 0;
+//    region.bufferImageHeight = 0;
+//    region.imageSubresource.aspectMask = image.aspectMask;
+//    region.imageSubresource.mipLevel = mipLevel; // 指定 mip level
+//    region.imageSubresource.baseArrayLayer = 0;
+//    region.imageSubresource.layerCount = image.arrayLayers;
+//    region.imageOffset = {0, 0, 0};
+//    region.imageExtent = {mipWidth, mipHeight, 1};
+//
+//    vkCmdCopyBufferToImage(commandBuffer,
+//                           buffer.bufferHandle,
+//                           image.imageHandle,
+//                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+//                           1,
+//                           &region);
+//
+//    return *this;
+//}
+
 ResourceManager& ResourceManager::copyBufferToImage(VkCommandBuffer& commandBuffer,
                                                     BufferHardwareWrap& buffer,
                                                     ImageHardwareWrap& image,
-                                                    uint32_t mipLevel) {
+                                                    uint32_t mipLevel,
+                                                    uint32_t layerCount) {
     if (mipLevel >= image.mipLevels) {
         return *this;  // Invalid mip level
     }
@@ -995,9 +1068,9 @@ ResourceManager& ResourceManager::copyBufferToImage(VkCommandBuffer& commandBuff
     region.bufferRowLength = 0;
     region.bufferImageHeight = 0;
     region.imageSubresource.aspectMask = image.aspectMask;
-    region.imageSubresource.mipLevel = mipLevel; // 指定 mip level
+    region.imageSubresource.mipLevel = mipLevel;  // 指定 mip level
     region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = image.arrayLayers;
+    region.imageSubresource.layerCount = layerCount;
     region.imageOffset = {0, 0, 0};
     region.imageExtent = {mipWidth, mipHeight, 1};
 
