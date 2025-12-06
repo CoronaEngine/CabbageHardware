@@ -76,17 +76,20 @@ HardwareExecutorVulkan& HardwareExecutorVulkan::commit() {
             commandBufferSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
             commandBufferSubmitInfo.commandBuffer = currentRecordQueue->commandBuffer;
 
+            uint64_t previousValue = currentRecordQueue->timelineValue->fetch_add(1);
+            uint64_t newSignalValue = previousValue + 1;
+
             VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
             timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             timelineWaitSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
-            timelineWaitSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->fetch_add(1);
+            timelineWaitSemaphoreSubmitInfo.value = previousValue;
             timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
             waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);
 
             VkSemaphoreSubmitInfo timelineSignalSemaphoreSubmitInfo{};
             timelineSignalSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             timelineSignalSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
-            timelineSignalSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->load(std::memory_order_acquire);
+            timelineSignalSemaphoreSubmitInfo.value = newSignalValue;
             timelineSignalSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
             signalSemaphores.push_back(timelineSignalSemaphoreSubmitInfo);
 
