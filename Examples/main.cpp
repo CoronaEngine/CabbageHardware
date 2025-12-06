@@ -190,7 +190,7 @@ int main() {
         CFW_LOG_INFO("Main thread started...");
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        constexpr std::size_t WINDOD_COUNT = 1;
+        constexpr std::size_t WINDOD_COUNT = 8;
         std::vector<GLFWwindow*> windows(WINDOD_COUNT);
         for (size_t i = 0; i < windows.size(); i++) {
             windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
