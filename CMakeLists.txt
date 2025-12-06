@@ -46,6 +46,7 @@ FetchContent_Declare(CoronaFramework
 )
 FetchContent_MakeAvailable(CoronaFramework)
 
+set(VOLK_PULL_IN_VULKAN OFF) # We will provide Vulkan-Headers ourselves
 FetchContent_Declare(
     volk
     GIT_REPOSITORY https://github.com/zeux/volk.git
