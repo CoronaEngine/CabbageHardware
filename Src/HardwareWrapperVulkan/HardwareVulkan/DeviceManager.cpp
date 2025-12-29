@@ -14,7 +14,7 @@ void DeviceManager::initDeviceManager(const CreateCallback& createCallback, cons
     createDevices(createCallback, vkInstance);
     createQueueUtils();
     //createCommandBuffers();
-    // createTimelineSemaphore();
+    //createTimelineSemaphore();
 
     for (auto& queue : graphicsQueues) {
         CFW_LOG_INFO(
@@ -268,6 +268,7 @@ void DeviceManager::createQueueUtils() {
             queueUtils.deviceManager = this;
             queueUtils.queueMutex = std::make_shared<std::mutex>();
             queueUtils.timelineValue = std::make_shared<std::atomic_uint64_t>(0);
+            queueUtils.isPresent = std::make_shared<std::atomic_bool>(false);
 
             createTimelineSemaphoreForQueue(queueUtils);
             createCommandBufferForQueue(queueUtils);
@@ -301,8 +302,6 @@ void DeviceManager::createQueueUtils() {
     } else {
         throw std::runtime_error("No graphics queues found!");
     }
-
-    // TODO: 变成一个队列，这里可以输出日志
 }
 
 //bool DeviceManager::createCommandBuffers() {

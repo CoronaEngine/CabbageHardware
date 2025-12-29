@@ -23,7 +23,7 @@ struct ResourceManager {
         uint64_t refCount{1};
 
         VkBuffer bufferHandle{VK_NULL_HANDLE};
-        VkBufferUsageFlags bufferUsage = VK_BUFFER_USAGE_FLAG_BITS_MAX_ENUM;
+        VkBufferUsageFlags bufferUsage{VK_BUFFER_USAGE_FLAG_BITS_MAX_ENUM};
 
         VmaAllocation bufferAlloc{VK_NULL_HANDLE};
         VmaAllocationInfo bufferAllocInfo{};
@@ -35,32 +35,32 @@ struct ResourceManager {
     };
 
     struct ImageHardwareWrap {
-        VkImageLayout imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        float pixelSize = 0;
-        ktm::uvec2 imageSize = {0, 0};
-        uint64_t refCount = 0;
+        VkImageLayout imageLayout{VK_IMAGE_LAYOUT_UNDEFINED};
+        float pixelSize{0};
+        ktm::uvec2 imageSize{0, 0};
+        uint64_t refCount{0};
 
-        VkFormat imageFormat = VK_FORMAT_MAX_ENUM;
-        VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_FLAG_BITS_MAX_ENUM;
-        VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_NONE;
+        VkFormat imageFormat{VK_FORMAT_MAX_ENUM};
+        VkImageUsageFlags imageUsage{VK_IMAGE_USAGE_FLAG_BITS_MAX_ENUM};
+        VkImageAspectFlags aspectMask{VK_IMAGE_ASPECT_NONE};
 
-        uint32_t arrayLayers = 1;
-        uint32_t mipLevels = 1;
+        uint32_t arrayLayers{1};
+        uint32_t mipLevels{1};
 
-        VkClearValue clearValue = {};
+        VkClearValue clearValue{};
 
-        VkImage imageHandle = VK_NULL_HANDLE;
+        VkImage imageHandle{VK_NULL_HANDLE};
 
         VkImageView imageView{VK_NULL_HANDLE};
         std::unordered_map<uint64_t, VkImageView> allSubViews{};
 
-        VmaAllocation imageAlloc = VK_NULL_HANDLE;
+        VmaAllocation imageAlloc{VK_NULL_HANDLE};
         VmaAllocationInfo imageAllocInfo{};
 
-        int32_t bindlessIndex = -1;
+        int32_t bindlessIndex{-1};
 
-        DeviceManager* device = nullptr;
-        ResourceManager* resourceManager = nullptr;
+        DeviceManager* device{nullptr};
+        ResourceManager* resourceManager{nullptr};
     };
 
     struct BindlessDescriptorSet {
@@ -158,20 +158,20 @@ struct ResourceManager {
     void createPooledBuffer(const VkBufferCreateInfo& bufferInfo, const VmaAllocationCreateInfo& allocInfo, BufferHardwareWrap& resultBuffer);
     void createNonExportableBuffer(const VkBufferCreateInfo& bufferInfo, const VmaAllocationCreateInfo& allocInfo, BufferHardwareWrap& resultBuffer);
 
-    //uint32_t getMipLevelsCount(uint32_t texWidth, uint32_t texHeight) const;
+    // uint32_t getMipLevelsCount(uint32_t texWidth, uint32_t texHeight) const;
 
-    VmaAllocator vmaAllocator = VK_NULL_HANDLE;
-    VmaPool exportBufferPool = VK_NULL_HANDLE;
-    VkSampler textureSampler = VK_NULL_HANDLE;
+    VmaAllocator vmaAllocator{VK_NULL_HANDLE};
+    VmaPool exportBufferPool{VK_NULL_HANDLE};
+    VkSampler textureSampler{VK_NULL_HANDLE};
 
-    const uint32_t uniformBinding = 0;
-    const uint32_t textureBinding = 1;
-    const uint32_t storageBufferBinding = 2;
-    const uint32_t storageImageBinding = 3;
+    const uint32_t uniformBinding{0};
+    const uint32_t textureBinding{1};
+    const uint32_t storageBufferBinding{2};
+    const uint32_t storageImageBinding{3};
 
-    uint64_t deviceMemorySize = 0;
-    uint64_t hostSharedMemorySize = 0;
-    uint64_t multiInstanceMemorySize = 0;
+    uint64_t deviceMemorySize{0};
+    uint64_t hostSharedMemorySize{0};
+    uint64_t multiInstanceMemorySize{0};
 
-    DeviceManager* device = nullptr;
+    DeviceManager* device{nullptr};
 };

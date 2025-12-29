@@ -38,8 +38,8 @@ struct HardwareContext {
     void setupDebugMessenger();
     void cleanupDebugMessenger();
 
-    VkInstance vkInstance = VK_NULL_HANDLE;
-    VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
+    VkInstance vkInstance{VK_NULL_HANDLE};
+    VkDebugUtilsMessengerEXT debugMessenger{VK_NULL_HANDLE};
 
     CreateCallback hardwareCreateInfos{};
     std::vector<std::shared_ptr<HardwareUtils>> hardwareUtils;

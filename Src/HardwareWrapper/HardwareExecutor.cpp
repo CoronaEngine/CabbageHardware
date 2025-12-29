@@ -1,4 +1,4 @@
-#include "CabbageHardware.h"
+﻿#include "CabbageHardware.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 #include "HardwareWrapperVulkan/PipelineVulkan/ComputePipeline.h"
 #include "HardwareWrapperVulkan/PipelineVulkan/RasterizerPipeline.h"
@@ -101,11 +101,10 @@ HardwareExecutor& HardwareExecutor::operator<<(RasterizerPipeline& rasterizerPip
 }
 
 HardwareExecutor& HardwareExecutor::operator<<(HardwareExecutor& other) {
-    return other;  // ͸��
+    return other;
 }
 
 HardwareExecutor& HardwareExecutor::wait(HardwareExecutor& other) {
-    // ��ͬһ��������������в��������⾺̬����
     std::uintptr_t selfID = *executorID;
     std::uintptr_t otherID = *other.executorID;
     // 按id排序加锁，避免死锁

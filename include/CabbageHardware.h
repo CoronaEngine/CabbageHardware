@@ -134,13 +134,13 @@ struct HardwareBuffer {
 
 // ================= HardwareImage 参数结构体 =================
 struct HardwareImageCreateInfo {
-    uint32_t width = 0;
-    uint32_t height = 0;
+    uint32_t width{0};
+    uint32_t height{0};
     ImageFormat format = ImageFormat::RGBA8_SRGB;
     ImageUsage usage = ImageUsage::SampledImage;
-    int arrayLayers = 1;
-    int mipLevels = 1;
-    void* initialData = nullptr;
+    int arrayLayers{1};
+    int mipLevels{1};
+    void* initialData{nullptr};
 
     HardwareImageCreateInfo() = default;
     HardwareImageCreateInfo(uint32_t w, uint32_t h, ImageFormat fmt = ImageFormat::RGBA8_SRGB)

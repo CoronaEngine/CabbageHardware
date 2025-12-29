@@ -59,13 +59,13 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan {
     [[nodiscard]] VkFormat getVkFormatFromType(const std::string& typeName, uint32_t elementCount) const;
 
     ktm::uvec2 imageSize = {0, 0};
-    uint32_t pushConstantSize = 0;
-    int multiviewCount = 1;
+    uint32_t pushConstantSize{0};
+    int multiviewCount{1};
 
-    VkRenderPass renderPass = VK_NULL_HANDLE;
-    VkPipeline graphicsPipeline = VK_NULL_HANDLE;
-    VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-    VkFramebuffer frameBuffers = VK_NULL_HANDLE;
+    VkRenderPass renderPass{VK_NULL_HANDLE};
+    VkPipeline graphicsPipeline{VK_NULL_HANDLE};
+    VkPipelineLayout pipelineLayout{VK_NULL_HANDLE};
+    VkFramebuffer frameBuffers{VK_NULL_HANDLE};
 
     HardwareImage depthImage;
     std::vector<HardwareImage> renderTargets;

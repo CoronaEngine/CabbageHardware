@@ -21,6 +21,7 @@ struct DeviceFeaturesChain {
     DeviceFeaturesChain operator&(const VkPhysicalDeviceAccelerationStructureFeaturesKHR& features) const;
     DeviceFeaturesChain operator&(const VkPhysicalDeviceRayTracingPipelineFeaturesKHR& features) const;
     DeviceFeaturesChain operator&(const VkPhysicalDeviceRayQueryFeaturesKHR& features) const;
+    DeviceFeaturesChain operator&(const VkPhysicalDeviceSwapchainMaintenance1FeaturesEXT& features) const;
 
     DeviceFeaturesChain operator|(const DeviceFeaturesChain& features) const;
     DeviceFeaturesChain operator|(const VkPhysicalDeviceFeatures& features) const;
@@ -32,6 +33,7 @@ struct DeviceFeaturesChain {
     DeviceFeaturesChain operator|(const VkPhysicalDeviceAccelerationStructureFeaturesKHR& features) const;
     DeviceFeaturesChain operator|(const VkPhysicalDeviceRayTracingPipelineFeaturesKHR& features) const;
     DeviceFeaturesChain operator|(const VkPhysicalDeviceRayQueryFeaturesKHR& features) const;
+    DeviceFeaturesChain operator|(const VkPhysicalDeviceSwapchainMaintenance1FeaturesEXT& features) const;
 
    private:
     void initializeChain();
@@ -42,6 +44,7 @@ struct DeviceFeaturesChain {
     VkPhysicalDeviceVulkan13Features deviceFeatures13{};
     VkPhysicalDeviceVulkan14Features deviceFeatures14{};
 
+    VkPhysicalDeviceSwapchainMaintenance1FeaturesEXT swapchainMaintenance1Features{};
     VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures{};
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipelineFeatures{};
     VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures{};

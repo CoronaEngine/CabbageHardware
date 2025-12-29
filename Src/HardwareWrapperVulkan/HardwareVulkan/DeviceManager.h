@@ -1,7 +1,6 @@
 ﻿#pragma once
 
 #include <mutex>
-
 #include "FeaturesChain.h"
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 
@@ -18,12 +17,13 @@ class DeviceManager {
     struct QueueUtils {
         std::shared_ptr<std::mutex> queueMutex;
         std::shared_ptr<std::atomic_uint64_t> timelineValue;
-        VkSemaphore timelineSemaphore = VK_NULL_HANDLE;
+        std::shared_ptr<std::atomic_bool> isPresent;
+        VkSemaphore timelineSemaphore{VK_NULL_HANDLE};
         uint32_t queueFamilyIndex = -1;
-        VkQueue vkQueue = VK_NULL_HANDLE;
-        VkCommandPool commandPool = VK_NULL_HANDLE;
-        VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
-        DeviceManager* deviceManager = nullptr;
+        VkQueue vkQueue{VK_NULL_HANDLE};
+        VkCommandPool commandPool{VK_NULL_HANDLE};
+        VkCommandBuffer commandBuffer{VK_NULL_HANDLE};
+        DeviceManager* deviceManager{nullptr};
     };
 
     struct FeaturesUtils {
@@ -71,8 +71,8 @@ class DeviceManager {
 
     void destroyQueueResources(std::vector<QueueUtils>& queues);
 
-    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-    VkDevice logicalDevice = VK_NULL_HANDLE;
+    VkPhysicalDevice physicalDevice{VK_NULL_HANDLE};
+    VkDevice logicalDevice{VK_NULL_HANDLE};
     FeaturesUtils deviceFeaturesUtils;
 
     std::atomic_uint16_t currentGraphicsQueueIndex{0};

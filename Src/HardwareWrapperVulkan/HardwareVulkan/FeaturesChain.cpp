@@ -25,8 +25,11 @@ void DeviceFeaturesChain::initializeChain() {
     // accelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
     // accelerationStructureFeatures.pNext = &rayTracingPipelineFeatures;
 
+    swapchainMaintenance1Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_EXT;
+    swapchainMaintenance1Features.pNext = nullptr;
+
     deviceFeatures14.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
-    deviceFeatures14.pNext = nullptr;
+    deviceFeatures14.pNext = &swapchainMaintenance1Features;
 
     deviceFeatures13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
     deviceFeatures13.pNext = &deviceFeatures14;
@@ -45,8 +48,12 @@ VkPhysicalDeviceFeatures2* DeviceFeaturesChain::getChainHead() {
     return &deviceFeatures2;
 }
 
+//DeviceFeaturesChain DeviceFeaturesChain::operator&(const DeviceFeaturesChain& features) const {
+//    return (*this & features.deviceFeatures2.features & features.deviceFeatures11 & features.deviceFeatures12 & features.deviceFeatures13 & features.deviceFeatures14);
+//}
+
 DeviceFeaturesChain DeviceFeaturesChain::operator&(const DeviceFeaturesChain& features) const {
-    return (*this & features.deviceFeatures2.features & features.deviceFeatures11 & features.deviceFeatures12 & features.deviceFeatures13 & features.deviceFeatures14);
+    return (*this & features.deviceFeatures2.features & features.deviceFeatures11 & features.deviceFeatures12 & features.deviceFeatures13 & features.deviceFeatures14 & features.swapchainMaintenance1Features);
 }
 
 DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceFeatures2& features) const {
@@ -275,9 +282,20 @@ DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceRayQuer
     return result;
 }
 
-DeviceFeaturesChain DeviceFeaturesChain::operator|(const DeviceFeaturesChain& features) const {
-    return (*this | features.deviceFeatures2.features | features.deviceFeatures11 | features.deviceFeatures12 | features.deviceFeatures13 | features.deviceFeatures14);
+DeviceFeaturesChain DeviceFeaturesChain::operator&(const VkPhysicalDeviceSwapchainMaintenance1FeaturesEXT& features) const {
+    DeviceFeaturesChain result = *this;
+    auto& dst = result.swapchainMaintenance1Features;
+    CORONA_AND_FEATURES(dst, swapchainMaintenance1);
+    return result;
 }
+
+DeviceFeaturesChain DeviceFeaturesChain::operator|(const DeviceFeaturesChain& features) const {
+    return (*this | features.deviceFeatures2.features | features.deviceFeatures11 | features.deviceFeatures12 | features.deviceFeatures13 | features.deviceFeatures14 | features.swapchainMaintenance1Features);
+}
+
+//DeviceFeaturesChain DeviceFeaturesChain::operator|(const DeviceFeaturesChain& features) const {
+//    return (*this | features.deviceFeatures2.features | features.deviceFeatures11 | features.deviceFeatures12 | features.deviceFeatures13 | features.deviceFeatures14);
+//}
 
 DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceFeatures2& features) const {
     return (*this | features.features);
@@ -502,6 +520,13 @@ DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceRayTrac
 DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceRayQueryFeaturesKHR& features) const {
     DeviceFeaturesChain result = *this;
     CORONA_OR_FEATURES(result.rayQueryFeatures, rayQuery);
+    return result;
+}
+
+DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceSwapchainMaintenance1FeaturesEXT& features) const {
+    DeviceFeaturesChain result = *this;
+    auto& dst = result.swapchainMaintenance1Features;
+    CORONA_OR_FEATURES(dst, swapchainMaintenance1);
     return result;
 }
 

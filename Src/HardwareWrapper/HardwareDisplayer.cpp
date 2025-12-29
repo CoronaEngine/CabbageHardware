@@ -69,21 +69,17 @@ HardwareDisplayer& HardwareDisplayer::operator=(const HardwareDisplayer& other) 
 HardwareDisplayer& HardwareDisplayer::wait(const HardwareExecutor& executor) {
     // 确保在锁内完成所有操作
     if (executor.getExecutorID()) {
-        if (auto const executor_handle = gExecutorStorage.acquire_read(*executor.getExecutorID());
-            executor_handle->impl) {
-            if (auto const display_handle = globalDisplayerStorages.acquire_write(*displaySurfaceID);
-                display_handle->displayManager) {
+        if (auto const executor_handle = gExecutorStorage.acquire_read(*executor.getExecutorID()); executor_handle->impl) {
+            if (auto const display_handle = globalDisplayerStorages.acquire_write(*displaySurfaceID); display_handle->displayManager) {
                 display_handle->displayManager->waitExecutor(*executor_handle->impl);
             }
         }
     }
-
     return *this;
 }
 
 HardwareDisplayer& HardwareDisplayer::operator<<(const HardwareImage& image) {
-    if (auto const handle = globalDisplayerStorages.acquire_read(*displaySurfaceID);
-        handle->displayManager && handle->displaySurface) {
+    if (auto const handle = globalDisplayerStorages.acquire_read(*displaySurfaceID); handle->displayManager && handle->displaySurface) {
         handle->displayManager->displayFrame(handle->displaySurface, image);
     }
     return *this;

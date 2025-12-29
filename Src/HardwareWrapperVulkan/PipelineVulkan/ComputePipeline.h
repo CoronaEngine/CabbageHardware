@@ -28,8 +28,8 @@ struct ComputePipelineVulkan : public CommandRecordVulkan {
    private:
     void createComputePipeline();
 
-    VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-    VkPipeline pipeline = VK_NULL_HANDLE;
+    VkPipelineLayout pipelineLayout{VK_NULL_HANDLE};
+    VkPipeline pipeline{VK_NULL_HANDLE};
 
     HardwarePushConstant pushConstant;
     EmbeddedShader::ShaderCodeModule::ShaderResources shaderResource;
