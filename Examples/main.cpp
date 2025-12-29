@@ -84,7 +84,7 @@ int main() {
     //    glfwSwapBuffers(window);
     //}
 
-    constexpr std::size_t WINDOW_COUNT = 4;
+    constexpr std::size_t WINDOW_COUNT = 1;
     std::vector<GLFWwindow*> windows(WINDOW_COUNT);
     for (size_t i = 0; i < windows.size(); i++) {
         windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
