@@ -175,7 +175,8 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
         HardwareBuffer stagingBuffer(static_cast<uint32_t>(imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize * imageHandle->arrayLayers),
                                      1,
                                      BufferUsage::StorageBuffer,
-                                     createInfo.initialData);
+                                     createInfo.initialData,
+                                     false);
 
         auto bufferHandle = globalBufferStorages.acquire_write(stagingBuffer.getBufferID());
 

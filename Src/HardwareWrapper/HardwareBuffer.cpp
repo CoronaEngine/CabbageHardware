@@ -44,11 +44,11 @@ HardwareBuffer::HardwareBuffer()
     : bufferID(0) {
 }
 
-HardwareBuffer::HardwareBuffer(const uint32_t bufferSize, const uint32_t elementSize, const BufferUsage usage, const void* data) {
+HardwareBuffer::HardwareBuffer(const uint32_t bufferSize, const uint32_t elementSize, const BufferUsage usage, const void* data, bool useDedicated) {
     auto const buffer_id = globalBufferStorages.allocate();
     bufferID.store(buffer_id, std::memory_order_release);
     auto const handle = globalBufferStorages.acquire_write(buffer_id);
-    *handle = globalHardwareContext.getMainDevice()->resourceManager.createBuffer(bufferSize, elementSize, convertBufferUsage(usage), true, true);
+    *handle = globalHardwareContext.getMainDevice()->resourceManager.createBuffer(bufferSize, elementSize, convertBufferUsage(usage), true, useDedicated);
 
     if (data != nullptr && handle->bufferAllocInfo.pMappedData != nullptr) {
         std::memcpy(handle->bufferAllocInfo.pMappedData, data, static_cast<size_t>(bufferSize) * elementSize);

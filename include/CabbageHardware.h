@@ -84,15 +84,15 @@ struct HardwareBuffer {
     HardwareBuffer();
     HardwareBuffer(const HardwareBuffer& other);
     HardwareBuffer(HardwareBuffer&& other) noexcept;
-    HardwareBuffer(uint32_t bufferSize, uint32_t elementSize, BufferUsage usage, const void* data = nullptr);
+    HardwareBuffer(uint32_t bufferSize, uint32_t elementSize, BufferUsage usage, const void* data = nullptr, bool useDedicated = true);
 
-    HardwareBuffer(uint32_t size, BufferUsage usage, const void* data = nullptr)
-        : HardwareBuffer(1, size, usage, data) {
+    HardwareBuffer(uint32_t size, BufferUsage usage, const void* data = nullptr, bool useDedicated = true)
+        : HardwareBuffer(1, size, usage, data, useDedicated) {
     }
 
     template <IsContainer Container>
-    HardwareBuffer(const Container& input, BufferUsage usage)
-        : HardwareBuffer(input.size(), sizeof(input[0]), usage, input.data()) {
+    HardwareBuffer(const Container& input, BufferUsage usage, bool useDedicated = true)
+        : HardwareBuffer(input.size(), sizeof(input[0]), usage, input.data(), useDedicated) {
     }
 
     HardwareBuffer(const ExternalHandle& memHandle, uint32_t bufferSize, uint32_t elementSize, uint32_t allocSize, BufferUsage usage);
