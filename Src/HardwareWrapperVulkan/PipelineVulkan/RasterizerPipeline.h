@@ -27,7 +27,7 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan {
         return depthImage;
     }
 
-    std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> operator[](const std::string& resourceName);
+    std::variant<HardwarePushConstant, HardwareBuffer*, HardwareImage*> operator[](const std::string& resourceName);
 
     RasterizerPipelineVulkan* operator()(uint16_t width, uint16_t height);
 

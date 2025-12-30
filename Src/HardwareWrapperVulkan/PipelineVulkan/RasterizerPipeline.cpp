@@ -164,7 +164,7 @@ void RasterizerPipelineVulkan::createRenderPass(int multiviewCount) {
     for (const auto& renderTarget : renderTargets) {
         VkAttachmentDescription attachment{};
         {
-            auto const handle = globalImageStorages.acquire_read(*renderTarget.getImageID());
+            auto const handle = globalImageStorages.acquire_read(renderTarget.getImageID());
             attachment.format = handle->imageFormat;
         }
         attachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -431,11 +431,11 @@ void RasterizerPipelineVulkan::createFramebuffers(ktm::uvec2 imageSize) {
     attachments.reserve(renderTargets.size() + 1);
 
     for (const auto& renderTarget : renderTargets) {
-        auto const handle = globalImageStorages.acquire_read(*renderTarget.getImageID());
+        auto const handle = globalImageStorages.acquire_read(renderTarget.getImageID());
         attachments.push_back(handle->imageView);
     }
     {
-        auto const depthHandle = globalImageStorages.acquire_read(*depthImage.getImageID());
+        auto const depthHandle = globalImageStorages.acquire_read(depthImage.getImageID());
         attachments.push_back(depthHandle->imageView);
     }
 
@@ -455,7 +455,7 @@ void RasterizerPipelineVulkan::createFramebuffers(ktm::uvec2 imageSize) {
                                             &frameBuffers));
 }
 
-std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> RasterizerPipelineVulkan::operator[](const std::string& resourceName) {
+std::variant<HardwarePushConstant, HardwareBuffer*, HardwareImage*> RasterizerPipelineVulkan::operator[](const std::string& resourceName) {
     using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
 
     // 在顶点着色器资源中查找
@@ -479,7 +479,7 @@ std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> RasterizerPipe
                 return HardwarePushConstant(fragmentRes->typeSize, fragmentRes->byteOffset, &tempPushConstant);
 
             case BindType::stageOutputs:
-                return renderTargets[fragmentRes->location];
+                return &renderTargets[fragmentRes->location];
 
             default:
                 break;
@@ -547,7 +547,7 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
     // 颜色附件屏障
     for (auto& renderTarget : renderTargets) {
         {
-            auto const handle = globalImageStorages.acquire_read(*renderTarget.getImageID());
+            auto const handle = globalImageStorages.acquire_read(renderTarget.getImageID());
             VkImageMemoryBarrier2 imageBarrier = imageBarrierTemplate;
             imageBarrier.image = handle->imageHandle;
             imageBarrier.oldLayout = handle->imageLayout;
@@ -561,7 +561,7 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
 
         // 更新图像布局
         {
-            auto handle = globalImageStorages.acquire_write(*renderTarget.getImageID());
+            auto handle = globalImageStorages.acquire_write(renderTarget.getImageID());
             handle->imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         }
     }
@@ -569,7 +569,7 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
     // 深度附件屏障
     if (depthImage) {
         {
-            auto const handle = globalImageStorages.acquire_read(*depthImage.getImageID());
+            auto const handle = globalImageStorages.acquire_read(depthImage.getImageID());
             VkImageMemoryBarrier2 imageBarrier = imageBarrierTemplate;
             imageBarrier.image = handle->imageHandle;
             imageBarrier.oldLayout = handle->imageLayout;
@@ -584,7 +584,7 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
 
         // 更新图像布局
         {
-            auto handle = globalImageStorages.acquire_write(*depthImage.getImageID());
+            auto handle = globalImageStorages.acquire_write(depthImage.getImageID());
             handle->imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         }
     }
@@ -654,7 +654,7 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExe
 
         // 转换深度图像布局
         {
-            auto const handle = globalImageStorages.acquire_write(*depthImage.getImageID());
+            auto const handle = globalImageStorages.acquire_write(depthImage.getImageID());
             mainDevice->resourceManager.transitionImageLayout(hardwareExecutor.currentRecordQueue->commandBuffer,
                                                               *handle,
                                                               VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
@@ -673,17 +673,17 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExe
     clearValues.reserve(renderTargets.size() + 1);
 
     for (const auto& renderTarget : renderTargets) {
-        auto const handle = globalImageStorages.acquire_read(*renderTarget.getImageID());
+        auto const handle = globalImageStorages.acquire_read(renderTarget.getImageID());
         clearValues.push_back(handle->clearValue);
     }
 
     {
-        auto const handle = globalImageStorages.acquire_read(*depthImage.getImageID());
+        auto const handle = globalImageStorages.acquire_read(depthImage.getImageID());
         clearValues.push_back(handle->clearValue);
     }
 
     {
-        auto const handle = globalImageStorages.acquire_read(*depthImage.getImageID());
+        auto const handle = globalImageStorages.acquire_read(depthImage.getImageID());
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderPassInfo.renderPass = renderPass;

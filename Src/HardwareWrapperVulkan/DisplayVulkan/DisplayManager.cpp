@@ -450,7 +450,7 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
 
     try {
         // 检查是否需要重新初始化
-        if (auto const handle = globalImageStorages.acquire_read(*displayImage.getImageID());
+        if (auto const handle = globalImageStorages.acquire_read(displayImage.getImageID());
             this->displaySurface != surface) {
             this->displaySurface = surface;
 
@@ -519,7 +519,7 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
         //vkResetFences(displayDevice->deviceManager.getLogicalDevice(), 1, &copyFences[currentFrame]);
 
         // 跨设备传输（如果需要）
-        if (auto const handle = globalImageStorages.acquire_write(*displayImage.getImageID());
+        if (auto const handle = globalImageStorages.acquire_write(displayImage.getImageID());
             globalHardwareContext.getMainDevice() != displayDevice)
         // if (true)
         {
