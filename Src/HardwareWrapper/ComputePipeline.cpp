@@ -33,6 +33,7 @@ ComputePipeline::ComputePipeline(const std::string& shaderCode, EmbeddedShader::
 }
 
 ComputePipeline::ComputePipeline(const ComputePipeline& other) {
+    std::lock_guard<std::mutex> lock(other.computePipelineMutex);
     auto const other_id = other.computePipelineID.load(std::memory_order_acquire);
     computePipelineID.store(other_id, std::memory_order_release);
     if (other_id > 0) {
@@ -42,6 +43,7 @@ ComputePipeline::ComputePipeline(const ComputePipeline& other) {
 }
 
 ComputePipeline::ComputePipeline(ComputePipeline&& other) noexcept {
+    std::lock_guard<std::mutex> lock(other.computePipelineMutex);
     auto const other_id = other.computePipelineID.load(std::memory_order_acquire);
     computePipelineID.store(other_id, std::memory_order_release);
     other.computePipelineID.store(0, std::memory_order_release);
@@ -65,6 +67,7 @@ ComputePipeline& ComputePipeline::operator=(const ComputePipeline& other) {
     if (this == &other) {
         return *this;
     }
+    std::scoped_lock lock(computePipelineMutex, other.computePipelineMutex);
     auto const self_id = computePipelineID.load(std::memory_order_acquire);
     auto const other_id = other.computePipelineID.load(std::memory_order_acquire);
 
@@ -122,6 +125,7 @@ ComputePipeline& ComputePipeline::operator=(ComputePipeline&& other) noexcept {
     if (this == &other) {
         return *this;
     }
+    std::scoped_lock lock(computePipelineMutex, other.computePipelineMutex);
     auto const self_id = computePipelineID.load(std::memory_order_acquire);
     auto const other_id = other.computePipelineID.load(std::memory_order_acquire);
 
@@ -141,6 +145,7 @@ ComputePipeline& ComputePipeline::operator=(ComputePipeline&& other) noexcept {
 }
 
 ResourceProxy ComputePipeline::operator[](const std::string& resourceName) {
+    std::lock_guard<std::mutex> lock(computePipelineMutex);
     auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
     auto variant_result = (*handle->impl)[resourceName];
     if (std::holds_alternative<HardwarePushConstant>(variant_result)) {
@@ -150,6 +155,7 @@ ResourceProxy ComputePipeline::operator[](const std::string& resourceName) {
 }
 
 ComputePipeline& ComputePipeline::operator()(uint16_t x, uint16_t y, uint16_t z) {
+    std::lock_guard<std::mutex> lock(computePipelineMutex);
     auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
     (*handle->impl)(x, y, z);
     return *this;

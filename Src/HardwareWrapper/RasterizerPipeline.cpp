@@ -32,6 +32,7 @@ RasterizerPipeline::RasterizerPipeline(std::string vs, std::string fs, uint32_t 
 }
 
 RasterizerPipeline::RasterizerPipeline(const RasterizerPipeline& other) {
+    std::lock_guard<std::mutex> lock(other.rasterizerPipelineMutex);
     auto const other_id = other.rasterizerPipelineID.load(std::memory_order_acquire);
     rasterizerPipelineID.store(other_id, std::memory_order_release);
     if (other_id > 0) {
@@ -41,6 +42,7 @@ RasterizerPipeline::RasterizerPipeline(const RasterizerPipeline& other) {
 }
 
 RasterizerPipeline::RasterizerPipeline(RasterizerPipeline&& other) noexcept {
+    std::lock_guard<std::mutex> lock(other.rasterizerPipelineMutex);
     auto const other_id = other.rasterizerPipelineID.load(std::memory_order_acquire);
     rasterizerPipelineID.store(other_id, std::memory_order_release);
     other.rasterizerPipelineID.store(0, std::memory_order_release);
@@ -64,6 +66,7 @@ RasterizerPipeline& RasterizerPipeline::operator=(const RasterizerPipeline& othe
     if (this == &other) {
         return *this;
     }
+    std::scoped_lock lock(rasterizerPipelineMutex, other.rasterizerPipelineMutex);
     auto const self_id = rasterizerPipelineID.load(std::memory_order_acquire);
     auto const other_id = other.rasterizerPipelineID.load(std::memory_order_acquire);
 
@@ -121,6 +124,7 @@ RasterizerPipeline& RasterizerPipeline::operator=(RasterizerPipeline&& other) no
     if (this == &other) {
         return *this;
     }
+    std::scoped_lock lock(rasterizerPipelineMutex, other.rasterizerPipelineMutex);
     auto const self_id = rasterizerPipelineID.load(std::memory_order_acquire);
     auto const other_id = other.rasterizerPipelineID.load(std::memory_order_acquire);
 
@@ -140,11 +144,13 @@ RasterizerPipeline& RasterizerPipeline::operator=(RasterizerPipeline&& other) no
 }
 
 void RasterizerPipeline::setDepthImage(HardwareImage& depthImage) {
+    std::lock_guard<std::mutex> lock(rasterizerPipelineMutex);
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
     handle->impl->setDepthImage(depthImage);
 }
 
 HardwareImage RasterizerPipeline::getDepthImage() {
+    std::lock_guard<std::mutex> lock(rasterizerPipelineMutex);
     HardwareImage img;
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
     img = handle->impl->getDepthImage();
@@ -152,9 +158,10 @@ HardwareImage RasterizerPipeline::getDepthImage() {
 }
 
 ResourceProxy RasterizerPipeline::operator[](const std::string& resourceName) {
+    std::lock_guard<std::mutex> lock(rasterizerPipelineMutex);
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
     auto variant_result = (*handle->impl)[resourceName];
-    
+
     if (std::holds_alternative<HardwarePushConstant>(variant_result)) {
         return ResourceProxy(std::get<HardwarePushConstant>(variant_result));
     } else if (std::holds_alternative<HardwareBuffer*>(variant_result)) {
@@ -162,17 +169,19 @@ ResourceProxy RasterizerPipeline::operator[](const std::string& resourceName) {
     } else if (std::holds_alternative<HardwareImage*>(variant_result)) {
         return ResourceProxy(std::get<HardwareImage*>(variant_result));
     }
-    
+
     throw std::runtime_error("Unknown resource type in RasterizerPipeline");
 }
 
 RasterizerPipeline& RasterizerPipeline::operator()(uint16_t width, uint16_t height) {
+    std::lock_guard<std::mutex> lock(rasterizerPipelineMutex);
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
     (*handle->impl)(width, height);
     return *this;
 }
 
 RasterizerPipeline& RasterizerPipeline::record(const HardwareBuffer& indexBuffer, const HardwareBuffer& vertexBuffer) {
+    std::lock_guard<std::mutex> lock(rasterizerPipelineMutex);
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
     handle->impl->record(indexBuffer, vertexBuffer);
     return *this;

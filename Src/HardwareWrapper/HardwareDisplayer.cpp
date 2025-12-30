@@ -27,6 +27,7 @@ HardwareDisplayer::HardwareDisplayer(void* surface) {
 }
 
 HardwareDisplayer::HardwareDisplayer(const HardwareDisplayer& other) {
+    std::lock_guard<std::mutex> lock(other.displayerMutex);
     auto const other_id = other.displaySurfaceID.load(std::memory_order_acquire);
     displaySurfaceID.store(other_id, std::memory_order_release);
     if (other_id > 0) {
@@ -36,6 +37,7 @@ HardwareDisplayer::HardwareDisplayer(const HardwareDisplayer& other) {
 }
 
 HardwareDisplayer::HardwareDisplayer(HardwareDisplayer&& other) noexcept {
+    std::lock_guard<std::mutex> lock(other.displayerMutex);
     auto const other_id = other.displaySurfaceID.load(std::memory_order_acquire);
     displaySurfaceID.store(other_id, std::memory_order_release);
     other.displaySurfaceID.store(0, std::memory_order_release);
@@ -59,6 +61,7 @@ HardwareDisplayer& HardwareDisplayer::operator=(const HardwareDisplayer& other) 
     if (this == &other) {
         return *this;
     }
+    std::scoped_lock lock(displayerMutex, other.displayerMutex);
     auto const self_id = displaySurfaceID.load(std::memory_order_acquire);
     auto const other_id = other.displaySurfaceID.load(std::memory_order_acquire);
 
@@ -116,6 +119,7 @@ HardwareDisplayer& HardwareDisplayer::operator=(HardwareDisplayer&& other) noexc
     if (this == &other) {
         return *this;
     }
+    std::scoped_lock lock(displayerMutex, other.displayerMutex);
     auto const self_id = displaySurfaceID.load(std::memory_order_acquire);
     auto const other_id = other.displaySurfaceID.load(std::memory_order_acquire);
 
@@ -135,6 +139,7 @@ HardwareDisplayer& HardwareDisplayer::operator=(HardwareDisplayer&& other) noexc
 }
 
 HardwareDisplayer& HardwareDisplayer::wait(const HardwareExecutor& executor) {
+    std::lock_guard<std::mutex> lock(displayerMutex);
     auto const executor_id = executor.getExecutorID();
     auto const self_id = displaySurfaceID.load(std::memory_order_acquire);
     if (executor_id > 0 && self_id > 0) {
@@ -148,6 +153,7 @@ HardwareDisplayer& HardwareDisplayer::wait(const HardwareExecutor& executor) {
 }
 
 HardwareDisplayer& HardwareDisplayer::operator<<(const HardwareImage& image) {
+    std::lock_guard<std::mutex> lock(displayerMutex);
     auto const self_id = displaySurfaceID.load(std::memory_order_acquire);
     if (self_id > 0) {
         if (auto const handle = globalDisplayerStorages.acquire_read(self_id); handle->displayManager && handle->displaySurface) {

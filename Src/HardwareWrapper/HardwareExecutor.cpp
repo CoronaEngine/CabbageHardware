@@ -24,8 +24,9 @@ HardwareExecutor::HardwareExecutor() : executorID(gExecutorStorage.allocate()) {
     handle->impl = new HardwareExecutorVulkan();
 }
 
-HardwareExecutor::HardwareExecutor(const HardwareExecutor& other)
-    : executorID(other.executorID.load(std::memory_order_acquire)) {
+HardwareExecutor::HardwareExecutor(const HardwareExecutor& other) {
+    std::lock_guard<std::mutex> lock(other.executorMutex);
+    executorID.store(other.executorID.load(std::memory_order_acquire), std::memory_order_release);
     auto const self_id = executorID.load(std::memory_order_acquire);
     if (self_id > 0) {
         auto const handle = gExecutorStorage.acquire_write(self_id);
@@ -33,8 +34,9 @@ HardwareExecutor::HardwareExecutor(const HardwareExecutor& other)
     }
 }
 
-HardwareExecutor::HardwareExecutor(HardwareExecutor&& other) noexcept
-    : executorID(other.executorID.load(std::memory_order_acquire)) {
+HardwareExecutor::HardwareExecutor(HardwareExecutor&& other) noexcept {
+    std::lock_guard<std::mutex> lock(other.executorMutex);
+    executorID.store(other.executorID.load(std::memory_order_acquire), std::memory_order_release);
     other.executorID.store(0, std::memory_order_release);
 }
 
@@ -57,6 +59,7 @@ HardwareExecutor& HardwareExecutor::operator=(const HardwareExecutor& other) {
     if (this == &other) {
         return *this;
     }
+    std::scoped_lock lock(executorMutex, other.executorMutex);
     auto const self_id = executorID.load(std::memory_order_acquire);
     auto const other_id = other.executorID.load(std::memory_order_acquire);
 
@@ -114,6 +117,7 @@ HardwareExecutor& HardwareExecutor::operator=(HardwareExecutor&& other) noexcept
     if (this == &other) {
         return *this;
     }
+    std::scoped_lock lock(executorMutex, other.executorMutex);
     auto const self_id = executorID.load(std::memory_order_acquire);
     auto const other_id = other.executorID.load(std::memory_order_acquire);
 
@@ -133,6 +137,7 @@ HardwareExecutor& HardwareExecutor::operator=(HardwareExecutor&& other) noexcept
 }
 
 HardwareExecutor& HardwareExecutor::operator<<(ComputePipeline& computePipeline) {
+    std::lock_guard<std::mutex> lock(executorMutex);
     if (auto const executor_handle = gExecutorStorage.acquire_write(executorID.load(std::memory_order_acquire));
         computePipeline.getComputePipelineID()) {
         if (auto const pipeline_handle = gComputePipelineStorage.acquire_read(computePipeline.getComputePipelineID());
@@ -144,6 +149,7 @@ HardwareExecutor& HardwareExecutor::operator<<(ComputePipeline& computePipeline)
 }
 
 HardwareExecutor& HardwareExecutor::operator<<(RasterizerPipeline& rasterizerPipeline) {
+    std::lock_guard<std::mutex> lock(executorMutex);
     if (auto const executor_handle = gExecutorStorage.acquire_write(executorID.load(std::memory_order_acquire));
         rasterizerPipeline.getRasterizerPipelineID()) {
         if (auto const raster_handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipeline.getRasterizerPipelineID());
@@ -159,6 +165,7 @@ HardwareExecutor& HardwareExecutor::operator<<(HardwareExecutor& other) {
 }
 
 HardwareExecutor& HardwareExecutor::wait(HardwareExecutor& other) {
+    std::scoped_lock lock(executorMutex, other.executorMutex);
     auto const self_id = executorID.load(std::memory_order_acquire);
     auto const other_id = other.executorID.load(std::memory_order_acquire);
     if (self_id == 0 || other_id == 0) {
@@ -185,6 +192,7 @@ HardwareExecutor& HardwareExecutor::wait(HardwareExecutor& other) {
 }
 
 HardwareExecutor& HardwareExecutor::commit() {
+    std::lock_guard<std::mutex> lock(executorMutex);
     auto handle = gExecutorStorage.acquire_write(executorID.load(std::memory_order_acquire));
     handle->impl->commit();
     return *this;

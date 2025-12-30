@@ -1,8 +1,9 @@
 ﻿#pragma once
 
-#include <memory>
-#include <type_traits>
 #include <atomic>
+#include <memory>
+#include <mutex>
+#include <type_traits>
 #include <vector>
 
 #include "Compiler/ShaderCodeCompiler.h"
@@ -128,6 +129,7 @@ struct HardwareBuffer {
 
    private:
     std::atomic<std::uintptr_t> bufferID;
+    mutable std::mutex bufferMutex;
 
     friend class HardwareImage;
 };
@@ -177,6 +179,7 @@ struct HardwareImage {
 
    private:
     std::atomic<std::uintptr_t> imageID;
+    mutable std::mutex imageMutex;
 
     friend class HardwareDisplayer;
 };
@@ -227,6 +230,7 @@ struct HardwarePushConstant {
     void copyFromRaw(const void* src, uint64_t size);
 
     std::atomic<std::uintptr_t> pushConstantID;
+    mutable std::mutex pushConstantMutex;
 };
 
 // ================= 资源代理类：ResourceProxy =================
@@ -361,6 +365,7 @@ struct HardwareDisplayer {
 
    private:
     std::atomic<std::uintptr_t> displaySurfaceID;
+    mutable std::mutex displayerMutex;
 };
 
 // ================= 对外封装：ComputePipeline =================
@@ -385,6 +390,7 @@ struct ComputePipeline {
     }
 
    private:
+    mutable std::mutex computePipelineMutex;
     std::atomic<std::uintptr_t> computePipelineID;
 };
 
@@ -417,6 +423,7 @@ struct RasterizerPipeline {
     }
 
    private:
+    mutable std::mutex rasterizerPipelineMutex;
     std::atomic<std::uintptr_t> rasterizerPipelineID;
 };
 
@@ -443,5 +450,6 @@ struct HardwareExecutor {
     }
 
    private:
+    mutable std::mutex executorMutex;
     std::atomic<std::uintptr_t> executorID;
 };

@@ -43,6 +43,7 @@ HardwarePushConstant::HardwarePushConstant(uint64_t size, uint64_t offset, Hardw
 }
 
 HardwarePushConstant::HardwarePushConstant(const HardwarePushConstant& other) {
+    std::lock_guard<std::mutex> lock(other.pushConstantMutex);
     auto const other_id = other.pushConstantID.load(std::memory_order_acquire);
     pushConstantID.store(other_id, std::memory_order_release);
     if (other_id > 0) {
@@ -52,6 +53,7 @@ HardwarePushConstant::HardwarePushConstant(const HardwarePushConstant& other) {
 }
 
 HardwarePushConstant::HardwarePushConstant(HardwarePushConstant&& other) noexcept {
+    std::lock_guard<std::mutex> lock(other.pushConstantMutex);
     auto const other_id = other.pushConstantID.load(std::memory_order_acquire);
     pushConstantID.store(other_id, std::memory_order_release);
     other.pushConstantID.store(0, std::memory_order_release);
@@ -75,6 +77,7 @@ HardwarePushConstant& HardwarePushConstant::operator=(const HardwarePushConstant
     if (this == &other) {
         return *this;
     }
+    std::scoped_lock lock(pushConstantMutex, other.pushConstantMutex);
     auto const self_id = pushConstantID.load(std::memory_order_acquire);
     auto const other_id = other.pushConstantID.load(std::memory_order_acquire);
 
@@ -144,6 +147,7 @@ HardwarePushConstant& HardwarePushConstant::operator=(HardwarePushConstant&& oth
     if (this == &other) {
         return *this;
     }
+    std::scoped_lock lock(pushConstantMutex, other.pushConstantMutex);
     auto const self_id = pushConstantID.load(std::memory_order_acquire);
     auto const other_id = other.pushConstantID.load(std::memory_order_acquire);
 
@@ -163,6 +167,7 @@ HardwarePushConstant& HardwarePushConstant::operator=(HardwarePushConstant&& oth
 }
 
 uint8_t* HardwarePushConstant::getData() const {
+    std::lock_guard<std::mutex> lock(pushConstantMutex);
     auto const self_id = pushConstantID.load(std::memory_order_acquire);
     if (self_id > 0) {
         return globalPushConstantStorages.acquire_write(self_id)->data;
@@ -171,6 +176,7 @@ uint8_t* HardwarePushConstant::getData() const {
 }
 
 uint64_t HardwarePushConstant::getSize() const {
+    std::lock_guard<std::mutex> lock(pushConstantMutex);
     auto const self_id = pushConstantID.load(std::memory_order_acquire);
     if (self_id > 0) {
         return globalPushConstantStorages.acquire_read(self_id)->size;
@@ -180,6 +186,7 @@ uint64_t HardwarePushConstant::getSize() const {
 
 void HardwarePushConstant::copyFromRaw(const void* src, uint64_t size) {
     if (src != nullptr || size != 0) {
+        std::lock_guard<std::mutex> lock(pushConstantMutex);
         auto const self_id = pushConstantID.load(std::memory_order_acquire);
         if (self_id > 0) {
             bool destroy = false;
@@ -190,7 +197,7 @@ void HardwarePushConstant::copyFromRaw(const void* src, uint64_t size) {
                 globalPushConstantStorages.deallocate(self_id);
             }
         }
-        
+
         auto const new_id = globalPushConstantStorages.allocate();
         pushConstantID.store(new_id, std::memory_order_release);
 
