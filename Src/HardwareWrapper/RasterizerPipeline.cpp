@@ -4,14 +4,18 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/utils/storage.h"
 
-static void incRaster(const Corona::Kernel::Utils::Storage<RasterizerPipelineWrap>::WriteHandle& handle) {
+static void incRaster(uint32_t id, const Corona::Kernel::Utils::Storage<RasterizerPipelineWrap>::WriteHandle& handle) {
     ++handle->refCount;
+    CFW_LOG_TRACE("RasterizerPipeline ref++: id={}, count={}", id, handle->refCount);
 }
 
-static bool decRaster(const Corona::Kernel::Utils::Storage<RasterizerPipelineWrap>::WriteHandle& handle) {
-    if (--handle->refCount == 0) {
+static bool decRaster(uint32_t id, const Corona::Kernel::Utils::Storage<RasterizerPipelineWrap>::WriteHandle& handle) {
+    int count = --handle->refCount;
+    CFW_LOG_TRACE("RasterizerPipeline ref--: id={}, count={}", id, count);
+    if (count == 0) {
         delete handle->impl;
         handle->impl = nullptr;
+        CFW_LOG_TRACE("RasterizerPipeline destroyed: id={}", id);
         return true;
     }
     return false;
@@ -22,6 +26,7 @@ RasterizerPipeline::RasterizerPipeline() {
     rasterizerPipelineID.store(id, std::memory_order_release);
     auto handle = gRasterizerPipelineStorage.acquire_write(id);
     handle->impl = new RasterizerPipelineVulkan();
+    CFW_LOG_TRACE("RasterizerPipeline created: id={}", id);
 }
 
 RasterizerPipeline::RasterizerPipeline(std::string vs, std::string fs, uint32_t multiviewCount, EmbeddedShader::ShaderLanguage vlang, EmbeddedShader::ShaderLanguage flang, const std::source_location& src) {
@@ -29,6 +34,7 @@ RasterizerPipeline::RasterizerPipeline(std::string vs, std::string fs, uint32_t 
     rasterizerPipelineID.store(id, std::memory_order_release);
     auto handle = gRasterizerPipelineStorage.acquire_write(id);
     handle->impl = new RasterizerPipelineVulkan(vs, fs, multiviewCount, vlang, flang, src);
+    CFW_LOG_TRACE("RasterizerPipeline created: id={}", id);
 }
 
 RasterizerPipeline::RasterizerPipeline(const RasterizerPipeline& other) {
@@ -37,7 +43,7 @@ RasterizerPipeline::RasterizerPipeline(const RasterizerPipeline& other) {
     rasterizerPipelineID.store(other_id, std::memory_order_release);
     if (other_id > 0) {
         auto const handle = gRasterizerPipelineStorage.acquire_write(other_id);
-        incRaster(handle);
+        incRaster(other_id, handle);
     }
 }
 
@@ -52,7 +58,7 @@ RasterizerPipeline::~RasterizerPipeline() {
     auto const self_id = rasterizerPipelineID.load(std::memory_order_acquire);
     if (self_id > 0) {
         bool destroy = false;
-        if (auto const handle = gRasterizerPipelineStorage.acquire_write(self_id); decRaster(handle)) {
+        if (auto const handle = gRasterizerPipelineStorage.acquire_write(self_id); decRaster(self_id, handle)) {
             destroy = true;
         }
         if (destroy) {
@@ -80,7 +86,7 @@ RasterizerPipeline& RasterizerPipeline::operator=(const RasterizerPipeline& othe
     if (other_id == 0) {
         bool should_destroy_self = false;
         if (auto const self_handle = gRasterizerPipelineStorage.acquire_write(self_id);
-            decRaster(self_handle)) {
+            decRaster(self_id, self_handle)) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {
@@ -93,7 +99,7 @@ RasterizerPipeline& RasterizerPipeline::operator=(const RasterizerPipeline& othe
     if (self_id == 0) {
         rasterizerPipelineID.store(other_id, std::memory_order_release);
         auto const other_handle = gRasterizerPipelineStorage.acquire_write(other_id);
-        incRaster(other_handle);
+        incRaster(other_id, other_handle);
         return *this;
     }
 
@@ -101,15 +107,15 @@ RasterizerPipeline& RasterizerPipeline::operator=(const RasterizerPipeline& othe
     if (self_id < other_id) {
         auto const self_handle = gRasterizerPipelineStorage.acquire_write(self_id);
         auto const other_handle = gRasterizerPipelineStorage.acquire_write(other_id);
-        incRaster(other_handle);
-        if (decRaster(self_handle)) {
+        incRaster(other_id, other_handle);
+        if (decRaster(self_id, self_handle)) {
             should_destroy_self = true;
         }
     } else {
         auto const other_handle = gRasterizerPipelineStorage.acquire_write(other_id);
         auto const self_handle = gRasterizerPipelineStorage.acquire_write(self_id);
-        incRaster(other_handle);
-        if (decRaster(self_handle)) {
+        incRaster(other_id, other_handle);
+        if (decRaster(self_id, self_handle)) {
             should_destroy_self = true;
         }
     }
@@ -131,7 +137,7 @@ RasterizerPipeline& RasterizerPipeline::operator=(RasterizerPipeline&& other) no
     if (self_id > 0) {
         bool should_destroy_self = false;
         if (auto const self_handle = gRasterizerPipelineStorage.acquire_write(self_id);
-            decRaster(self_handle)) {
+            decRaster(self_id, self_handle)) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {

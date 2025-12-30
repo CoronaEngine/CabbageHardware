@@ -4,14 +4,18 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/utils/storage.h"
 
-static void incrementDisplayerRefCount(const Corona::Kernel::Utils::Storage<DisplayerHardwareWrap>::WriteHandle& handle) {
+static void incrementDisplayerRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<DisplayerHardwareWrap>::WriteHandle& handle) {
     ++handle->refCount;
+    CFW_LOG_TRACE("HardwareDisplayer ref++: id={}, count={}", id, handle->refCount);
 }
 
-static bool decrementDisplayerRefCount(const Corona::Kernel::Utils::Storage<DisplayerHardwareWrap>::WriteHandle& handle) {
-    if (--handle->refCount == 0) {
+static bool decrementDisplayerRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<DisplayerHardwareWrap>::WriteHandle& handle) {
+    int count = --handle->refCount;
+    CFW_LOG_TRACE("HardwareDisplayer ref--: id={}, count={}", id, count);
+    if (count == 0) {
         handle->displayManager.reset();
         handle->displaySurface = nullptr;
+        CFW_LOG_TRACE("HardwareDisplayer destroyed: id={}", id);
         return true;
     }
 
@@ -24,6 +28,7 @@ HardwareDisplayer::HardwareDisplayer(void* surface) {
     auto const handle = globalDisplayerStorages.acquire_write(id);
     handle->displaySurface = surface;
     handle->displayManager = std::make_shared<DisplayManager>();
+    CFW_LOG_TRACE("HardwareDisplayer created: id={}", id);
 }
 
 HardwareDisplayer::HardwareDisplayer(const HardwareDisplayer& other) {
@@ -32,7 +37,7 @@ HardwareDisplayer::HardwareDisplayer(const HardwareDisplayer& other) {
     displaySurfaceID.store(other_id, std::memory_order_release);
     if (other_id > 0) {
         auto const handle = globalDisplayerStorages.acquire_write(other_id);
-        incrementDisplayerRefCount(handle);
+        incrementDisplayerRefCount(other_id, handle);
     }
 }
 
@@ -47,7 +52,7 @@ HardwareDisplayer::~HardwareDisplayer() {
     auto const self_id = displaySurfaceID.load(std::memory_order_acquire);
     if (self_id > 0) {
         bool destroy = false;
-        if (auto const handle = globalDisplayerStorages.acquire_write(self_id); decrementDisplayerRefCount(handle)) {
+        if (auto const handle = globalDisplayerStorages.acquire_write(self_id); decrementDisplayerRefCount(self_id, handle)) {
             destroy = true;
         }
         if (destroy) {
@@ -75,7 +80,7 @@ HardwareDisplayer& HardwareDisplayer::operator=(const HardwareDisplayer& other) 
     if (other_id == 0) {
         bool should_destroy_self = false;
         if (auto const self_handle = globalDisplayerStorages.acquire_write(self_id);
-            decrementDisplayerRefCount(self_handle)) {
+            decrementDisplayerRefCount(self_id, self_handle)) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {
@@ -88,7 +93,7 @@ HardwareDisplayer& HardwareDisplayer::operator=(const HardwareDisplayer& other) 
     if (self_id == 0) {
         displaySurfaceID.store(other_id, std::memory_order_release);
         auto const other_handle = globalDisplayerStorages.acquire_write(other_id);
-        incrementDisplayerRefCount(other_handle);
+        incrementDisplayerRefCount(other_id, other_handle);
         return *this;
     }
 
@@ -96,15 +101,15 @@ HardwareDisplayer& HardwareDisplayer::operator=(const HardwareDisplayer& other) 
     if (self_id < other_id) {
         auto const self_handle = globalDisplayerStorages.acquire_write(self_id);
         auto const other_handle = globalDisplayerStorages.acquire_write(other_id);
-        incrementDisplayerRefCount(other_handle);
-        if (decrementDisplayerRefCount(self_handle)) {
+        incrementDisplayerRefCount(other_id, other_handle);
+        if (decrementDisplayerRefCount(self_id, self_handle)) {
             should_destroy_self = true;
         }
     } else {
         auto const other_handle = globalDisplayerStorages.acquire_write(other_id);
         auto const self_handle = globalDisplayerStorages.acquire_write(self_id);
-        incrementDisplayerRefCount(other_handle);
-        if (decrementDisplayerRefCount(self_handle)) {
+        incrementDisplayerRefCount(other_id, other_handle);
+        if (decrementDisplayerRefCount(self_id, self_handle)) {
             should_destroy_self = true;
         }
     }
@@ -126,7 +131,7 @@ HardwareDisplayer& HardwareDisplayer::operator=(HardwareDisplayer&& other) noexc
     if (self_id > 0) {
         bool should_destroy_self = false;
         if (auto const self_handle = globalDisplayerStorages.acquire_write(self_id);
-            decrementDisplayerRefCount(self_handle)) {
+            decrementDisplayerRefCount(self_id, self_handle)) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {

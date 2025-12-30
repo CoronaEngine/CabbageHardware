@@ -31,23 +31,24 @@ DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
             }
         }
 
-        // 自旋 / Spin
-        if (++spins < 5)
-            continue;
+        // // 自旋 / Spin
+        // if (++spins < 5)
+        //     continue;
 
-        // 自旋次数过多 让出CPU / If spinned to many circles,then Yield CPU
-        if (++yields < 8) {
-            std::this_thread::yield();
-            continue;
-        }
+        // // 自旋次数过多 让出CPU / If spinned to many circles,then Yield CPU
+        // if (++yields < 8) {
+        //     std::this_thread::yield();
+        //     continue;
+        // }
 
-        if (true) {
-            actualSleepMicros += 3;
-            actualSleepMicros = actualSleepMicros & 0xFFFFu;
+        // if (true) {
+        //     actualSleepMicros += 3;
+        //     actualSleepMicros = actualSleepMicros & 0xFFFFu;
 
-            // 循环等待次数实在太多，微休眠 / If loop ran to many time,sleep briefly.
-            std::this_thread::sleep_for(std::chrono::microseconds(actualSleepMicros));
-        }
+        //     // 循环等待次数实在太多，微休眠 / If loop ran to many time,sleep briefly.
+        //     std::this_thread::sleep_for(std::chrono::microseconds(actualSleepMicros));
+        // }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
 
     commitCommand(queue);

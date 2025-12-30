@@ -5,14 +5,18 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/utils/storage.h"
 
-static void incExec(const Corona::Kernel::Utils::Storage<ExecutorWrap>::WriteHandle& handle) {
+static void incExec(uint32_t id, const Corona::Kernel::Utils::Storage<ExecutorWrap>::WriteHandle& handle) {
     ++handle->refCount;
+    CFW_LOG_TRACE("HardwareExecutor ref++: id={}, count={}", id, handle->refCount);
 }
 
-static bool decExec(const Corona::Kernel::Utils::Storage<ExecutorWrap>::WriteHandle& handle) {
-    if (--handle->refCount == 0) {
+static bool decExec(uint32_t id, const Corona::Kernel::Utils::Storage<ExecutorWrap>::WriteHandle& handle) {
+    int count = --handle->refCount;
+    CFW_LOG_TRACE("HardwareExecutor ref--: id={}, count={}", id, count);
+    if (count == 0) {
         delete handle->impl;
         handle->impl = nullptr;
+        CFW_LOG_TRACE("HardwareExecutor destroyed: id={}", id);
         return true;
     }
     return false;
@@ -22,6 +26,7 @@ HardwareExecutor::HardwareExecutor() : executorID(gExecutorStorage.allocate()) {
     auto const self_id = executorID.load(std::memory_order_acquire);
     auto handle = gExecutorStorage.acquire_write(self_id);
     handle->impl = new HardwareExecutorVulkan();
+    CFW_LOG_TRACE("HardwareExecutor created: id={}", self_id);
 }
 
 HardwareExecutor::HardwareExecutor(const HardwareExecutor& other) {
@@ -30,7 +35,7 @@ HardwareExecutor::HardwareExecutor(const HardwareExecutor& other) {
     auto const self_id = executorID.load(std::memory_order_acquire);
     if (self_id > 0) {
         auto const handle = gExecutorStorage.acquire_write(self_id);
-        incExec(handle);
+        incExec(self_id, handle);
     }
 }
 
@@ -45,7 +50,7 @@ HardwareExecutor::~HardwareExecutor() {
     if (self_id > 0) {
         bool should_destroy_self = false;
         if (auto const handle = gExecutorStorage.acquire_write(self_id);
-            decExec(handle)) {
+            decExec(self_id, handle)) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {
@@ -73,7 +78,7 @@ HardwareExecutor& HardwareExecutor::operator=(const HardwareExecutor& other) {
     bool should_destroy_self = false;
     if (other_id == 0) {
         if (auto const self_handle = gExecutorStorage.acquire_write(self_id);
-            decExec(self_handle)) {
+            decExec(self_id, self_handle)) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {
@@ -86,22 +91,22 @@ HardwareExecutor& HardwareExecutor::operator=(const HardwareExecutor& other) {
     if (self_id == 0) {
         executorID.store(other_id, std::memory_order_release);
         auto const other_handle = gExecutorStorage.acquire_write(other_id);
-        incExec(other_handle);
+        incExec(other_id, other_handle);
         return *this;
     }
 
     if (self_id < other_id) {
         auto const self_handle = gExecutorStorage.acquire_write(self_id);
         auto const other_handle = gExecutorStorage.acquire_write(other_id);
-        incExec(other_handle);
-        if (decExec(self_handle)) {
+        incExec(other_id, other_handle);
+        if (decExec(self_id, self_handle)) {
             should_destroy_self = true;
         }
     } else {
         auto const other_handle = gExecutorStorage.acquire_write(other_id);
         auto const self_handle = gExecutorStorage.acquire_write(self_id);
-        incExec(other_handle);
-        if (decExec(self_handle)) {
+        incExec(other_id, other_handle);
+        if (decExec(self_id, self_handle)) {
             should_destroy_self = true;
         }
     }
@@ -124,7 +129,7 @@ HardwareExecutor& HardwareExecutor::operator=(HardwareExecutor&& other) noexcept
     if (self_id > 0) {
         bool should_destroy_self = false;
         if (auto const self_handle = gExecutorStorage.acquire_write(self_id);
-            decExec(self_handle)) {
+            decExec(self_id, self_handle)) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {

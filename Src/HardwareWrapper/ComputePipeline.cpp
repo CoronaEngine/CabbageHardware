@@ -5,14 +5,18 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/utils/storage.h"
 
-static void incCompute(const Corona::Kernel::Utils::Storage<ComputePipelineWrap>::WriteHandle& write_handle) {
+static void incCompute(uint32_t id, const Corona::Kernel::Utils::Storage<ComputePipelineWrap>::WriteHandle& write_handle) {
     ++write_handle->refCount;
+    CFW_LOG_TRACE("ComputePipeline ref++: id={}, count={}", id, write_handle->refCount);
 }
 
-static bool decCompute(const Corona::Kernel::Utils::Storage<ComputePipelineWrap>::WriteHandle& write_handle) {
-    if (--write_handle->refCount == 0) {
+static bool decCompute(uint32_t id, const Corona::Kernel::Utils::Storage<ComputePipelineWrap>::WriteHandle& write_handle) {
+    int count = --write_handle->refCount;
+    CFW_LOG_TRACE("ComputePipeline ref--: id={}, count={}", id, count);
+    if (count == 0) {
         delete write_handle->impl;
         write_handle->impl = nullptr;
+        CFW_LOG_TRACE("ComputePipeline destroyed: id={}", id);
         return true;
     }
     return false;
@@ -23,6 +27,7 @@ ComputePipeline::ComputePipeline() {
     computePipelineID.store(id, std::memory_order_release);
     auto const handle = gComputePipelineStorage.acquire_write(id);
     handle->impl = new ComputePipelineVulkan();
+    CFW_LOG_TRACE("ComputePipeline created: id={}", id);
 }
 
 ComputePipeline::ComputePipeline(const std::string& shaderCode, EmbeddedShader::ShaderLanguage language, const std::source_location& src) {
@@ -30,6 +35,7 @@ ComputePipeline::ComputePipeline(const std::string& shaderCode, EmbeddedShader::
     computePipelineID.store(id, std::memory_order_release);
     auto const handle = gComputePipelineStorage.acquire_write(id);
     handle->impl = new ComputePipelineVulkan(shaderCode, language, src);
+    CFW_LOG_TRACE("ComputePipeline created: id={}", id);
 }
 
 ComputePipeline::ComputePipeline(const ComputePipeline& other) {
@@ -38,7 +44,7 @@ ComputePipeline::ComputePipeline(const ComputePipeline& other) {
     computePipelineID.store(other_id, std::memory_order_release);
     if (other_id > 0) {
         auto const write_handle = gComputePipelineStorage.acquire_write(other_id);
-        incCompute(write_handle);
+        incCompute(other_id, write_handle);
     }
 }
 
@@ -53,7 +59,7 @@ ComputePipeline::~ComputePipeline() {
     auto const self_id = computePipelineID.load(std::memory_order_acquire);
     if (self_id > 0) {
         bool destroy = false;
-        if (auto const write_handle = gComputePipelineStorage.acquire_write(self_id); decCompute(write_handle)) {
+        if (auto const write_handle = gComputePipelineStorage.acquire_write(self_id); decCompute(self_id, write_handle)) {
             destroy = true;
         }
         if (destroy) {
@@ -81,7 +87,7 @@ ComputePipeline& ComputePipeline::operator=(const ComputePipeline& other) {
     if (other_id == 0) {
         bool should_destroy_self = false;
         if (auto const self_handle = gComputePipelineStorage.acquire_write(self_id);
-            decCompute(self_handle)) {
+            decCompute(self_id, self_handle)) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {
@@ -94,7 +100,7 @@ ComputePipeline& ComputePipeline::operator=(const ComputePipeline& other) {
     if (self_id == 0) {
         computePipelineID.store(other_id, std::memory_order_release);
         auto const other_handle = gComputePipelineStorage.acquire_write(other_id);
-        incCompute(other_handle);
+        incCompute(other_id, other_handle);
         return *this;
     }
 
@@ -102,15 +108,15 @@ ComputePipeline& ComputePipeline::operator=(const ComputePipeline& other) {
     if (self_id < other_id) {
         auto const self_handle = gComputePipelineStorage.acquire_write(self_id);
         auto const other_handle = gComputePipelineStorage.acquire_write(other_id);
-        incCompute(other_handle);
-        if (decCompute(self_handle)) {
+        incCompute(other_id, other_handle);
+        if (decCompute(self_id, self_handle)) {
             should_destroy_self = true;
         }
     } else {
         auto const other_handle = gComputePipelineStorage.acquire_write(other_id);
         auto const self_handle = gComputePipelineStorage.acquire_write(self_id);
-        incCompute(other_handle);
-        if (decCompute(self_handle)) {
+        incCompute(other_id, other_handle);
+        if (decCompute(self_id, self_handle)) {
             should_destroy_self = true;
         }
     }
@@ -132,7 +138,7 @@ ComputePipeline& ComputePipeline::operator=(ComputePipeline&& other) noexcept {
     if (self_id > 0) {
         bool should_destroy_self = false;
         if (auto const self_handle = gComputePipelineStorage.acquire_write(self_id);
-            decCompute(self_handle)) {
+            decCompute(self_id, self_handle)) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {

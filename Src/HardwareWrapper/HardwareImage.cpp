@@ -99,13 +99,17 @@ VkImageUsageFlags convertImageUsage(ImageUsage usage, bool isCompressed) {
     return vkUsage;
 }
 
-static void incrementImageRefCount(const Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& handle) {
+static void incrementImageRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& handle) {
     ++handle->refCount;
+    CFW_LOG_TRACE("HardwareImage ref++: id={}, count={}", id, handle->refCount);
 }
 
-static bool decrementImageRefCount(const Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& handle) {
-    if (--handle->refCount == 0) {
+static bool decrementImageRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& handle) {
+    int count = --handle->refCount;
+    CFW_LOG_TRACE("HardwareImage ref--: id={}, count={}", id, count);
+    if (count == 0) {
         globalHardwareContext.getMainDevice()->resourceManager.destroyImage(*handle);
+        CFW_LOG_TRACE("HardwareImage destroyed: id={}", id);
         return true;
     }
     return false;
@@ -167,6 +171,7 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo) {
             createInfo.arrayLayers,
             createInfo.mipLevels);
     }
+    CFW_LOG_TRACE("HardwareImage created: id={}", self_image_id);
 
     if (createInfo.initialData != nullptr) {
         HardwareExecutorVulkan tempExecutor;
@@ -202,6 +207,7 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
             vkUsage,
             arrayLayers);
     }
+    CFW_LOG_TRACE("HardwareImage created: id={}", self_image_id);
 
     if (imageData != nullptr) {
         HardwareExecutorVulkan tempExecutor;
@@ -224,7 +230,7 @@ HardwareImage::HardwareImage(const HardwareImage& other) {
     imageID.store(other_image_id, std::memory_order_release);
     if (other_image_id > 0) {
         auto const handle = globalImageStorages.acquire_write(other_image_id);
-        incrementImageRefCount(handle);
+        incrementImageRefCount(other_image_id, handle);
     }
 }
 
@@ -239,7 +245,7 @@ HardwareImage::~HardwareImage() {
     auto const self_image_id = imageID.load(std::memory_order_acquire);
     if (self_image_id > 0) {
         bool destroy = false;
-        if (auto const handle = globalImageStorages.acquire_write(self_image_id); decrementImageRefCount(handle)) {
+        if (auto const handle = globalImageStorages.acquire_write(self_image_id); decrementImageRefCount(self_image_id, handle)) {
             destroy = true;
         }
         if (destroy) {
@@ -334,6 +340,7 @@ HardwareImage HardwareImage::operator[](const uint32_t index) {
                 subImageHandle->mipLevels = imageHandle->mipLevels;
             }
         }
+        CFW_LOG_TRACE("HardwareImage sub-image created: id={}, parent_id={}", subImageId, selfImageId);
 
         return subImage;
     }
@@ -359,7 +366,7 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other) {
     if (other_image_id == 0) {
         bool should_destroy_self = false;
         if (auto const self_handle = globalImageStorages.acquire_write(self_image_id);
-            decrementImageRefCount(self_handle) == true) {
+            decrementImageRefCount(self_image_id, self_handle) == true) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {
@@ -371,7 +378,7 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other) {
     if (self_image_id == 0) {
         imageID.store(other_image_id, std::memory_order_release);
         auto const other_handle = globalImageStorages.acquire_write(other_image_id);
-        incrementImageRefCount(other_handle);
+        incrementImageRefCount(other_image_id, other_handle);
         return *this;
     }
 
@@ -379,15 +386,15 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other) {
     if (self_image_id < other_image_id) {
         auto const self_handle = globalImageStorages.acquire_write(self_image_id);
         auto const other_handle = globalImageStorages.acquire_write(other_image_id);
-        incrementImageRefCount(other_handle);
-        if (decrementImageRefCount(self_handle) == true) {
+        incrementImageRefCount(other_image_id, other_handle);
+        if (decrementImageRefCount(self_image_id, self_handle) == true) {
             should_destroy_self = true;
         }
     } else {
         auto const other_handle = globalImageStorages.acquire_write(other_image_id);
         auto const self_handle = globalImageStorages.acquire_write(self_image_id);
-        incrementImageRefCount(other_handle);
-        if (decrementImageRefCount(self_handle) == true) {
+        incrementImageRefCount(other_image_id, other_handle);
+        if (decrementImageRefCount(self_image_id, self_handle) == true) {
             should_destroy_self = true;
         }
     }
@@ -409,7 +416,7 @@ HardwareImage& HardwareImage::operator=(HardwareImage&& other) noexcept {
     if (self_image_id > 0) {
         bool should_destroy_self = false;
         if (auto const self_handle = globalImageStorages.acquire_write(self_image_id);
-            decrementImageRefCount(self_handle)) {
+            decrementImageRefCount(self_image_id, self_handle)) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {

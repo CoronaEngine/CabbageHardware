@@ -38,7 +38,7 @@ struct ResourceManager {
         VkImageLayout imageLayout{VK_IMAGE_LAYOUT_UNDEFINED};
         float pixelSize{0};
         ktm::uvec2 imageSize{0, 0};
-        uint64_t refCount{0};
+        uint64_t refCount{1};
 
         VkFormat imageFormat{VK_FORMAT_MAX_ENUM};
         VkImageUsageFlags imageUsage{VK_IMAGE_USAGE_FLAG_BITS_MAX_ENUM};

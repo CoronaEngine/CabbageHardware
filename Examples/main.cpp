@@ -35,7 +35,7 @@ struct ComputeUniformBufferObject {
 };
 
 int main() {
-    //Corona::Kernel::CoronaLogger::get_logger()->set_log_level(quill::LogLevel::TraceL3);
+    // Corona::Kernel::CoronaLogger::get_logger()->set_log_level(quill::LogLevel::TraceL3);
     setupSignalHandlers();
 
     // 运行压缩纹理测试（可选）
@@ -219,7 +219,7 @@ int main() {
     for (size_t i = 0; i < windows.size(); i++) {
         std::thread(meshThread, i).detach();
         std::thread(renderThread, i).detach();
-        std::thread(displayThread, i).detach();
+        // std::thread(displayThread, i).detach();
     }
 
     while (running.load()) {

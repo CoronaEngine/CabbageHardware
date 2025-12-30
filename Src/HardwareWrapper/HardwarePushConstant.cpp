@@ -3,16 +3,20 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/utils/storage.h"
 
-static void incrementPushConstantRefCount(const Corona::Kernel::Utils::Storage<PushConstantWrap, 4, 2>::WriteHandle& handle) {
+static void incrementPushConstantRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<PushConstantWrap, 4, 2>::WriteHandle& handle) {
     ++handle->refCount;
+    CFW_LOG_TRACE("HardwarePushConstant ref++: id={}, count={}", id, handle->refCount);
 }
 
-static bool decrementPushConstantRefCount(const Corona::Kernel::Utils::Storage<PushConstantWrap, 4, 2>::WriteHandle& handle) {
-    if (--handle->refCount == 0) {
+static bool decrementPushConstantRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<PushConstantWrap, 4, 2>::WriteHandle& handle) {
+    int count = --handle->refCount;
+    CFW_LOG_TRACE("HardwarePushConstant ref--: id={}, count={}", id, count);
+    if (count == 0) {
         if (handle->data != nullptr && !handle->isSub) {
             std::free(handle->data);
             handle->data = nullptr;
         }
+        CFW_LOG_TRACE("HardwarePushConstant destroyed: id={}", id);
         return true;
     }
     return false;
@@ -20,6 +24,7 @@ static bool decrementPushConstantRefCount(const Corona::Kernel::Utils::Storage<P
 
 HardwarePushConstant::HardwarePushConstant()
     : pushConstantID(globalPushConstantStorages.allocate()) {
+    CFW_LOG_TRACE("HardwarePushConstant created: id={}", pushConstantID.load(std::memory_order_acquire));
 }
 
 HardwarePushConstant::HardwarePushConstant(uint64_t size, uint64_t offset, HardwarePushConstant* whole) {
@@ -40,6 +45,7 @@ HardwarePushConstant::HardwarePushConstant(uint64_t size, uint64_t offset, Hardw
     if (!pushConstantHandle->isSub) {
         pushConstantHandle->data = static_cast<uint8_t*>(std::malloc(size));
     }
+    CFW_LOG_TRACE("HardwarePushConstant created: id={}", self_id);
 }
 
 HardwarePushConstant::HardwarePushConstant(const HardwarePushConstant& other) {
@@ -48,7 +54,7 @@ HardwarePushConstant::HardwarePushConstant(const HardwarePushConstant& other) {
     pushConstantID.store(other_id, std::memory_order_release);
     if (other_id > 0) {
         auto const handle = globalPushConstantStorages.acquire_write(other_id);
-        incrementPushConstantRefCount(handle);
+        incrementPushConstantRefCount(other_id, handle);
     }
 }
 
@@ -63,7 +69,7 @@ HardwarePushConstant::~HardwarePushConstant() {
     auto const self_id = pushConstantID.load(std::memory_order_acquire);
     if (self_id > 0) {
         bool destroy = false;
-        if (auto const handle = globalPushConstantStorages.acquire_write(self_id); decrementPushConstantRefCount(handle)) {
+        if (auto const handle = globalPushConstantStorages.acquire_write(self_id); decrementPushConstantRefCount(self_id, handle)) {
             destroy = true;
         }
         if (destroy) {
@@ -102,7 +108,7 @@ HardwarePushConstant& HardwarePushConstant::operator=(const HardwarePushConstant
         if (other_id == 0) {
             bool should_destroy_self = false;
             if (auto const self_handle = globalPushConstantStorages.acquire_write(self_id);
-                decrementPushConstantRefCount(self_handle)) {
+                decrementPushConstantRefCount(self_id, self_handle)) {
                 should_destroy_self = true;
             }
             if (should_destroy_self) {
@@ -115,7 +121,7 @@ HardwarePushConstant& HardwarePushConstant::operator=(const HardwarePushConstant
         if (self_id == 0) {
             pushConstantID.store(other_id, std::memory_order_release);
             auto const other_handle = globalPushConstantStorages.acquire_write(other_id);
-            incrementPushConstantRefCount(other_handle);
+            incrementPushConstantRefCount(other_id, other_handle);
             return *this;
         }
 
@@ -123,15 +129,15 @@ HardwarePushConstant& HardwarePushConstant::operator=(const HardwarePushConstant
         if (self_id < other_id) {
             auto const self_handle = globalPushConstantStorages.acquire_write(self_id);
             auto const other_handle = globalPushConstantStorages.acquire_write(other_id);
-            incrementPushConstantRefCount(other_handle);
-            if (decrementPushConstantRefCount(self_handle)) {
+            incrementPushConstantRefCount(other_id, other_handle);
+            if (decrementPushConstantRefCount(self_id, self_handle)) {
                 should_destroy_self = true;
             }
         } else {
             auto const other_handle = globalPushConstantStorages.acquire_write(other_id);
             auto const self_handle = globalPushConstantStorages.acquire_write(self_id);
-            incrementPushConstantRefCount(other_handle);
-            if (decrementPushConstantRefCount(self_handle)) {
+            incrementPushConstantRefCount(other_id, other_handle);
+            if (decrementPushConstantRefCount(self_id, self_handle)) {
                 should_destroy_self = true;
             }
         }
@@ -154,7 +160,7 @@ HardwarePushConstant& HardwarePushConstant::operator=(HardwarePushConstant&& oth
     if (self_id > 0) {
         bool should_destroy_self = false;
         if (auto const self_handle = globalPushConstantStorages.acquire_write(self_id);
-            decrementPushConstantRefCount(self_handle)) {
+            decrementPushConstantRefCount(self_id, self_handle)) {
             should_destroy_self = true;
         }
         if (should_destroy_self) {
@@ -190,7 +196,7 @@ void HardwarePushConstant::copyFromRaw(const void* src, uint64_t size) {
         auto const self_id = pushConstantID.load(std::memory_order_acquire);
         if (self_id > 0) {
             bool destroy = false;
-            if (auto const handle = globalPushConstantStorages.acquire_write(self_id); decrementPushConstantRefCount(handle)) {
+            if (auto const handle = globalPushConstantStorages.acquire_write(self_id); decrementPushConstantRefCount(self_id, handle)) {
                 destroy = true;
             }
             if (destroy) {
