@@ -7,16 +7,16 @@
 
 static void incExec(uint32_t id, const Corona::Kernel::Utils::Storage<ExecutorWrap>::WriteHandle& handle) {
     ++handle->refCount;
-    CFW_LOG_TRACE("HardwareExecutor ref++: id={}, count={}", id, handle->refCount);
+    // CFW_LOG_TRACE("HardwareExecutor ref++: id={}, count={}", id, handle->refCount);
 }
 
 static bool decExec(uint32_t id, const Corona::Kernel::Utils::Storage<ExecutorWrap>::WriteHandle& handle) {
     int count = --handle->refCount;
-    CFW_LOG_TRACE("HardwareExecutor ref--: id={}, count={}", id, count);
+    // CFW_LOG_TRACE("HardwareExecutor ref--: id={}, count={}", id, count);
     if (count == 0) {
         delete handle->impl;
         handle->impl = nullptr;
-        CFW_LOG_TRACE("HardwareExecutor destroyed: id={}", id);
+        // CFW_LOG_TRACE("HardwareExecutor destroyed: id={}", id);
         return true;
     }
     return false;
@@ -26,7 +26,7 @@ HardwareExecutor::HardwareExecutor() : executorID(gExecutorStorage.allocate()) {
     auto const self_id = executorID.load(std::memory_order_acquire);
     auto handle = gExecutorStorage.acquire_write(self_id);
     handle->impl = new HardwareExecutorVulkan();
-    CFW_LOG_TRACE("HardwareExecutor created: id={}", self_id);
+    // CFW_LOG_TRACE("HardwareExecutor created: id={}", self_id);
 }
 
 HardwareExecutor::HardwareExecutor(const HardwareExecutor& other) {

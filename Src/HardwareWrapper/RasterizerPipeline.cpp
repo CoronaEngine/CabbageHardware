@@ -6,16 +6,16 @@
 
 static void incRaster(uint32_t id, const Corona::Kernel::Utils::Storage<RasterizerPipelineWrap>::WriteHandle& handle) {
     ++handle->refCount;
-    CFW_LOG_TRACE("RasterizerPipeline ref++: id={}, count={}", id, handle->refCount);
+    // CFW_LOG_TRACE("RasterizerPipeline ref++: id={}, count={}", id, handle->refCount);
 }
 
 static bool decRaster(uint32_t id, const Corona::Kernel::Utils::Storage<RasterizerPipelineWrap>::WriteHandle& handle) {
     int count = --handle->refCount;
-    CFW_LOG_TRACE("RasterizerPipeline ref--: id={}, count={}", id, count);
+    // CFW_LOG_TRACE("RasterizerPipeline ref--: id={}, count={}", id, count);
     if (count == 0) {
         delete handle->impl;
         handle->impl = nullptr;
-        CFW_LOG_TRACE("RasterizerPipeline destroyed: id={}", id);
+        // CFW_LOG_TRACE("RasterizerPipeline destroyed: id={}", id);
         return true;
     }
     return false;
@@ -26,7 +26,7 @@ RasterizerPipeline::RasterizerPipeline() {
     rasterizerPipelineID.store(id, std::memory_order_release);
     auto handle = gRasterizerPipelineStorage.acquire_write(id);
     handle->impl = new RasterizerPipelineVulkan();
-    CFW_LOG_TRACE("RasterizerPipeline created: id={}", id);
+    // CFW_LOG_TRACE("RasterizerPipeline created: id={}", id);
 }
 
 RasterizerPipeline::RasterizerPipeline(std::string vs, std::string fs, uint32_t multiviewCount, EmbeddedShader::ShaderLanguage vlang, EmbeddedShader::ShaderLanguage flang, const std::source_location& src) {
@@ -34,7 +34,7 @@ RasterizerPipeline::RasterizerPipeline(std::string vs, std::string fs, uint32_t 
     rasterizerPipelineID.store(id, std::memory_order_release);
     auto handle = gRasterizerPipelineStorage.acquire_write(id);
     handle->impl = new RasterizerPipelineVulkan(vs, fs, multiviewCount, vlang, flang, src);
-    CFW_LOG_TRACE("RasterizerPipeline created: id={}", id);
+    // CFW_LOG_TRACE("RasterizerPipeline created: id={}", id);
 }
 
 RasterizerPipeline::RasterizerPipeline(const RasterizerPipeline& other) {

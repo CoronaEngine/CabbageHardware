@@ -30,15 +30,18 @@ VkBufferUsageFlags convertBufferUsage(BufferUsage const usage) {
 
 static void incrementBufferRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& handle) {
     ++handle->refCount;
-    CFW_LOG_TRACE("HardwareBuffer ref++: id={}, count={}", id, handle->refCount);
+    // CFW_LOG_TRACE("HardwareBuffer ref++: id={}, count={}", id, handle->refCount);
 }
 
 static bool decrementBufferRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& handle) {
+    if (handle->refCount == 0) {
+        CFW_LOG_ERROR("HardwareBuffer ref count underflow! id={}", id);
+    }
     int count = --handle->refCount;
-    CFW_LOG_TRACE("HardwareBuffer ref--: id={}, count={}", id, count);
+    // CFW_LOG_TRACE("HardwareBuffer ref--: id={}, count={}", id, count);
     if (count == 0) {
         globalHardwareContext.getMainDevice()->resourceManager.destroyBuffer(*handle);
-        CFW_LOG_TRACE("HardwareBuffer destroyed: id={}", id);
+        // CFW_LOG_TRACE("HardwareBuffer destroyed: id={}", id);
         return true;
     }
     return false;
@@ -81,7 +84,7 @@ HardwareBuffer::HardwareBuffer(const HardwareBuffer& other) {
     auto const other_buffer_id = other.bufferID.load(std::memory_order_acquire);
     bufferID.store(other_buffer_id, std::memory_order_release);
     if (other_buffer_id > 0) {
-        auto const handle = globalBufferStorages.acquire_write(bufferID.load(std::memory_order_acquire));
+        auto const handle = globalBufferStorages.acquire_write(other_buffer_id);
         incrementBufferRefCount(other_buffer_id, handle);
     }
 }
@@ -91,6 +94,7 @@ HardwareBuffer::HardwareBuffer(HardwareBuffer&& other) noexcept {
     auto const other_buffer_id = other.bufferID.load(std::memory_order_relaxed);
     other.bufferID.store(0, std::memory_order_release);
     bufferID.store(other_buffer_id, std::memory_order_release);
+    // CFW_LOG_DEBUG("HardwareBuffer ctor(move): this={}, src={}, id={}", (void*)this, (void*)&other, other_buffer_id);
 }
 
 HardwareBuffer& HardwareBuffer::operator=(HardwareBuffer&& other) noexcept {
@@ -118,8 +122,9 @@ HardwareBuffer& HardwareBuffer::operator=(HardwareBuffer&& other) noexcept {
 
 HardwareBuffer::~HardwareBuffer() {
     // NOTE: 不要修改写法，避免死锁
-    if (auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
-        self_buffer_id > 0) {
+    auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
+    // CFW_LOG_DEBUG("HardwareBuffer dtor: this={}, id={}", (void*)this, self_buffer_id);
+    if (self_buffer_id > 0) {
         bool destroy = false;
         if (auto const handle = globalBufferStorages.acquire_write(self_buffer_id);
             decrementBufferRefCount(self_buffer_id, handle)) {

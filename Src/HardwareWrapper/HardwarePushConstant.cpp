@@ -5,18 +5,18 @@
 
 static void incrementPushConstantRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<PushConstantWrap, 4, 2>::WriteHandle& handle) {
     ++handle->refCount;
-    CFW_LOG_TRACE("HardwarePushConstant ref++: id={}, count={}", id, handle->refCount);
+    // CFW_LOG_TRACE("HardwarePushConstant ref++: id={}, count={}", id, handle->refCount);
 }
 
 static bool decrementPushConstantRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<PushConstantWrap, 4, 2>::WriteHandle& handle) {
     int count = --handle->refCount;
-    CFW_LOG_TRACE("HardwarePushConstant ref--: id={}, count={}", id, count);
+    // CFW_LOG_TRACE("HardwarePushConstant ref--: id={}, count={}", id, count);
     if (count == 0) {
         if (handle->data != nullptr && !handle->isSub) {
             std::free(handle->data);
             handle->data = nullptr;
         }
-        CFW_LOG_TRACE("HardwarePushConstant destroyed: id={}", id);
+        // CFW_LOG_TRACE("HardwarePushConstant destroyed: id={}", id);
         return true;
     }
     return false;
@@ -24,7 +24,7 @@ static bool decrementPushConstantRefCount(uint32_t id, const Corona::Kernel::Uti
 
 HardwarePushConstant::HardwarePushConstant()
     : pushConstantID(globalPushConstantStorages.allocate()) {
-    CFW_LOG_TRACE("HardwarePushConstant created: id={}", pushConstantID.load(std::memory_order_acquire));
+    // CFW_LOG_TRACE("HardwarePushConstant created: id={}", pushConstantID.load(std::memory_order_acquire));
 }
 
 HardwarePushConstant::HardwarePushConstant(uint64_t size, uint64_t offset, HardwarePushConstant* whole) {
@@ -45,7 +45,7 @@ HardwarePushConstant::HardwarePushConstant(uint64_t size, uint64_t offset, Hardw
     if (!pushConstantHandle->isSub) {
         pushConstantHandle->data = static_cast<uint8_t*>(std::malloc(size));
     }
-    CFW_LOG_TRACE("HardwarePushConstant created: id={}", self_id);
+    // CFW_LOG_TRACE("HardwarePushConstant created: id={}", self_id);
 }
 
 HardwarePushConstant::HardwarePushConstant(const HardwarePushConstant& other) {

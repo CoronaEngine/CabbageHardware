@@ -101,15 +101,15 @@ VkImageUsageFlags convertImageUsage(ImageUsage usage, bool isCompressed) {
 
 static void incrementImageRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& handle) {
     ++handle->refCount;
-    CFW_LOG_TRACE("HardwareImage ref++: id={}, count={}", id, handle->refCount);
+    // CFW_LOG_TRACE("HardwareImage ref++: id={}, count={}", id, handle->refCount);
 }
 
 static bool decrementImageRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& handle) {
     int count = --handle->refCount;
-    CFW_LOG_TRACE("HardwareImage ref--: id={}, count={}", id, count);
+    // CFW_LOG_TRACE("HardwareImage ref--: id={}, count={}", id, count);
     if (count == 0) {
         globalHardwareContext.getMainDevice()->resourceManager.destroyImage(*handle);
-        CFW_LOG_TRACE("HardwareImage destroyed: id={}", id);
+        // CFW_LOG_TRACE("HardwareImage destroyed: id={}", id);
         return true;
     }
     return false;

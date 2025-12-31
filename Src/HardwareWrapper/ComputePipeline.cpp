@@ -7,16 +7,16 @@
 
 static void incCompute(uint32_t id, const Corona::Kernel::Utils::Storage<ComputePipelineWrap>::WriteHandle& write_handle) {
     ++write_handle->refCount;
-    CFW_LOG_TRACE("ComputePipeline ref++: id={}, count={}", id, write_handle->refCount);
+    // CFW_LOG_TRACE("ComputePipeline ref++: id={}, count={}", id, write_handle->refCount);
 }
 
 static bool decCompute(uint32_t id, const Corona::Kernel::Utils::Storage<ComputePipelineWrap>::WriteHandle& write_handle) {
     int count = --write_handle->refCount;
-    CFW_LOG_TRACE("ComputePipeline ref--: id={}, count={}", id, count);
+    // CFW_LOG_TRACE("ComputePipeline ref--: id={}, count={}", id, count);
     if (count == 0) {
         delete write_handle->impl;
         write_handle->impl = nullptr;
-        CFW_LOG_TRACE("ComputePipeline destroyed: id={}", id);
+        // CFW_LOG_TRACE("ComputePipeline destroyed: id={}", id);
         return true;
     }
     return false;
@@ -27,7 +27,7 @@ ComputePipeline::ComputePipeline() {
     computePipelineID.store(id, std::memory_order_release);
     auto const handle = gComputePipelineStorage.acquire_write(id);
     handle->impl = new ComputePipelineVulkan();
-    CFW_LOG_TRACE("ComputePipeline created: id={}", id);
+    // CFW_LOG_TRACE("ComputePipeline created: id={}", id);
 }
 
 ComputePipeline::ComputePipeline(const std::string& shaderCode, EmbeddedShader::ShaderLanguage language, const std::source_location& src) {
@@ -35,7 +35,7 @@ ComputePipeline::ComputePipeline(const std::string& shaderCode, EmbeddedShader::
     computePipelineID.store(id, std::memory_order_release);
     auto const handle = gComputePipelineStorage.acquire_write(id);
     handle->impl = new ComputePipelineVulkan(shaderCode, language, src);
-    CFW_LOG_TRACE("ComputePipeline created: id={}", id);
+    // CFW_LOG_TRACE("ComputePipeline created: id={}", id);
 }
 
 ComputePipeline::ComputePipeline(const ComputePipeline& other) {

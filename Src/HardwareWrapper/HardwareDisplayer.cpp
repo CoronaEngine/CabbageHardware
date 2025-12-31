@@ -6,16 +6,16 @@
 
 static void incrementDisplayerRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<DisplayerHardwareWrap>::WriteHandle& handle) {
     ++handle->refCount;
-    CFW_LOG_TRACE("HardwareDisplayer ref++: id={}, count={}", id, handle->refCount);
+    // CFW_LOG_TRACE("HardwareDisplayer ref++: id={}, count={}", id, handle->refCount);
 }
 
 static bool decrementDisplayerRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<DisplayerHardwareWrap>::WriteHandle& handle) {
     int count = --handle->refCount;
-    CFW_LOG_TRACE("HardwareDisplayer ref--: id={}, count={}", id, count);
+    // CFW_LOG_TRACE("HardwareDisplayer ref--: id={}, count={}", id, count);
     if (count == 0) {
         handle->displayManager.reset();
         handle->displaySurface = nullptr;
-        CFW_LOG_TRACE("HardwareDisplayer destroyed: id={}", id);
+        // CFW_LOG_TRACE("HardwareDisplayer destroyed: id={}", id);
         return true;
     }
 
@@ -28,7 +28,7 @@ HardwareDisplayer::HardwareDisplayer(void* surface) {
     auto const handle = globalDisplayerStorages.acquire_write(id);
     handle->displaySurface = surface;
     handle->displayManager = std::make_shared<DisplayManager>();
-    CFW_LOG_TRACE("HardwareDisplayer created: id={}", id);
+    // CFW_LOG_TRACE("HardwareDisplayer created: id={}", id);
 }
 
 HardwareDisplayer::HardwareDisplayer(const HardwareDisplayer& other) {
