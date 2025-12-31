@@ -298,7 +298,6 @@ HardwareImage::~HardwareImage() {
 // }
 
 HardwareImage HardwareImage::operator[](const uint32_t index) {
-    std::lock_guard<std::mutex> lock(imageMutex);
     auto const selfImageId = imageID.load(std::memory_order_acquire);
     if (selfImageId > 0) {
         HardwareImage subImage;
@@ -429,14 +428,12 @@ HardwareImage& HardwareImage::operator=(HardwareImage&& other) noexcept {
 }
 
 HardwareImage::operator bool() const {
-    std::lock_guard<std::mutex> lock(imageMutex);
     auto const self_image_id = imageID.load(std::memory_order_acquire);
     return self_image_id > 0 &&
            globalImageStorages.acquire_read(self_image_id)->imageHandle != VK_NULL_HANDLE;
 }
 
 uint32_t HardwareImage::storeDescriptor() {
-    std::lock_guard<std::mutex> lock(imageMutex);
     auto imageHandle = globalImageStorages.acquire_write(imageID.load(std::memory_order_acquire));
     return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle);
 }
@@ -453,7 +450,6 @@ HardwareImage& HardwareImage::copyFromBuffer(const HardwareBuffer& buffer, Hardw
     if (!executor) {
         return *this;
     }
-    std::lock_guard<std::mutex> lock(imageMutex);
     auto const self_image_id = imageID.load(std::memory_order_acquire);
     auto const buffer_id = buffer.getBufferID();
     auto const executor_id = executor->getExecutorID();
@@ -480,7 +476,6 @@ HardwareImage& HardwareImage::copyFromData(const void* inputData, HardwareExecut
     }
     uint64_t bufferSize = 0;
     {
-        std::lock_guard<std::mutex> lock(imageMutex);
         auto const imageHandle = globalImageStorages.acquire_read(imageID.load(std::memory_order_acquire));
         if (mipLevel >= imageHandle->mipLevels) {
             return *this;

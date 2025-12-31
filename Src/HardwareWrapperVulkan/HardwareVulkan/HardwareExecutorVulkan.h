@@ -68,7 +68,7 @@ struct HardwareExecutorVulkan {
 
     HardwareExecutorVulkan& wait(const std::vector<VkSemaphoreSubmitInfo>& waitInfos = {},
                                  const std::vector<VkSemaphoreSubmitInfo>& signalInfos = {}) {
-        //waitFence = fence;
+        // waitFence = fence;
         waitSemaphores.insert(waitSemaphores.end(), waitInfos.begin(), waitInfos.end());
         signalSemaphores.insert(signalSemaphores.end(), signalInfos.begin(), signalInfos.end());
         return *this;

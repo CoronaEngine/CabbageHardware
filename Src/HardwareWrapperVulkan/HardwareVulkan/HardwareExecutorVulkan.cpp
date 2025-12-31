@@ -19,12 +19,10 @@ DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
             if (result == VK_SUCCESS) {
                 if (timelineCounterValue >= queue->timelineValue->load(std::memory_order_acquire) && queue->isPresent->load(std::memory_order_acquire) == false) {
                     break;
-                } 
-                else {
+                } else {
                     queue->queueMutex->unlock();
                 }
-            } 
-            else {
+            } else {
                 queue->queueMutex->unlock();
                 CFW_LOG_ERROR("Failed to get timeline semaphore counter value for queue index {}!", queueIndex);
                 return nullptr;

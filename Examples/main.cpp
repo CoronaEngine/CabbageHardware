@@ -40,7 +40,7 @@ int main() {
 
     // 运行压缩纹理测试（可选）
     // testCompressedTextures();
-    
+
     CFW_LOG_INFO("Starting main application...");
 
     if (glfwInit() < 0) {
@@ -50,39 +50,39 @@ int main() {
     CFW_LOG_INFO("Main thread started...");
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-    //GLFWwindow* window = glfwCreateWindow(800, 600, "Window Title", NULL, NULL);
-    //if (!window) {
-    //    glfwTerminate();
-    //    return -1;
-    //}
-    //const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+    // GLFWwindow* window = glfwCreateWindow(800, 600, "Window Title", NULL, NULL);
+    // if (!window) {
+    //     glfwTerminate();
+    //     return -1;
+    // }
+    // const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
 
-    //int windowedX, windowedY, windowedWidth, windowedHeight;
-    //glfwGetWindowPos(window, &windowedX, &windowedY);
-    //glfwGetWindowSize(window, &windowedWidth, &windowedHeight);
+    // int windowedX, windowedY, windowedWidth, windowedHeight;
+    // glfwGetWindowPos(window, &windowedX, &windowedY);
+    // glfwGetWindowSize(window, &windowedWidth, &windowedHeight);
 
-    //auto lastF11Toggle = std::chrono::steady_clock::now();
-    //constexpr auto f11Cooldown = std::chrono::milliseconds(100);
+    // auto lastF11Toggle = std::chrono::steady_clock::now();
+    // constexpr auto f11Cooldown = std::chrono::milliseconds(100);
 
-    //while (!glfwWindowShouldClose(window)) {
-    //    glfwPollEvents();
-    //    if (glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS) {
-    //        auto now = std::chrono::steady_clock::now();
-    //        if (now - lastF11Toggle > f11Cooldown) {
-    //            lastF11Toggle = now;
-    //            static bool isFullscreen = false;
-    //            if (isFullscreen) {
-    //                glfwSetWindowMonitor(window, NULL, windowedX, windowedY, windowedWidth, windowedHeight, 0);
-    //            } else {
-    //                glfwGetWindowPos(window, &windowedX, &windowedY);
-    //                glfwGetWindowSize(window, &windowedWidth, &windowedHeight);
-    //                glfwSetWindowMonitor(window, glfwGetPrimaryMonitor(), 0, 0, mode->width, mode->height, mode->refreshRate);
-    //            }
-    //            isFullscreen = !isFullscreen;
-    //        }
-    //    }
-    //    glfwSwapBuffers(window);
-    //}
+    // while (!glfwWindowShouldClose(window)) {
+    //     glfwPollEvents();
+    //     if (glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS) {
+    //         auto now = std::chrono::steady_clock::now();
+    //         if (now - lastF11Toggle > f11Cooldown) {
+    //             lastF11Toggle = now;
+    //             static bool isFullscreen = false;
+    //             if (isFullscreen) {
+    //                 glfwSetWindowMonitor(window, NULL, windowedX, windowedY, windowedWidth, windowedHeight, 0);
+    //             } else {
+    //                 glfwGetWindowPos(window, &windowedX, &windowedY);
+    //                 glfwGetWindowSize(window, &windowedWidth, &windowedHeight);
+    //                 glfwSetWindowMonitor(window, glfwGetPrimaryMonitor(), 0, 0, mode->width, mode->height, mode->refreshRate);
+    //             }
+    //             isFullscreen = !isFullscreen;
+    //         }
+    //     }
+    //     glfwSwapBuffers(window);
+    // }
 
     constexpr std::size_t WINDOW_COUNT = 1;
     std::vector<GLFWwindow*> windows(WINDOW_COUNT);
@@ -118,7 +118,7 @@ int main() {
     // auto textureResult = loadCompressedTexture(shaderPath + "/awesomeface.png", true);
 
     // 方式3: 加载带有 mipmap 和 array layers 的纹理
-    //auto textureResult = loadTextureWithMipmapAndLayers(shaderPath + "/awesomeface.png", 2, 5, 1, 0);
+    // auto textureResult = loadTextureWithMipmapAndLayers(shaderPath + "/awesomeface.png", 2, 5, 1, 0);
 
     if (!textureResult.success) {
         CFW_LOG_ERROR("Failed to load texture, exiting...");
@@ -151,10 +151,10 @@ int main() {
 
         while (running.load()) {
             float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
-            //CFW_LOG_INFO("Mesh thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
+            // CFW_LOG_INFO("Mesh thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
 
             for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
-                //rasterizerUniformBufferObject[i].textureIndex = texture[0][0].storeDescriptor();
+                // rasterizerUniformBufferObject[i].textureIndex = texture[0][0].storeDescriptor();
                 rasterizerUniformBufferObject[i].textureIndex = textureID;
                 rasterizerUniformBufferObject[i].model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
                 rasterizerUniformBuffers[threadIndex][i].copyFromData(&(rasterizerUniformBufferObject[i]), sizeof(rasterizerUniformBufferObject[i]));
@@ -177,7 +177,7 @@ int main() {
 
         while (running.load()) {
             float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
-            //CFW_LOG_INFO("Render thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
+            // CFW_LOG_INFO("Render thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
 
             for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
                 rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffers[threadIndex][i].storeDescriptor();
@@ -208,7 +208,7 @@ int main() {
 
         while (running.load()) {
             float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
-            //CFW_LOG_INFO("Display thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
+            // CFW_LOG_INFO("Display thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
 
             displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
             ++frameCount;

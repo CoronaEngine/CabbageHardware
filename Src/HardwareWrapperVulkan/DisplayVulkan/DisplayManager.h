@@ -41,7 +41,7 @@ class DisplayManager {
     // 同步对象
     std::vector<VkSemaphore> binaryAcquireSemaphore;
     std::vector<VkSemaphore> binaryPresentSemaphore;
-    //std::vector<VkFence> copyFences;
+    // std::vector<VkFence> copyFences;
     std::vector<VkFence> presentFences;
     std::unordered_map<VkFence, DeviceManager::QueueUtils*> fenceToPresent;
 

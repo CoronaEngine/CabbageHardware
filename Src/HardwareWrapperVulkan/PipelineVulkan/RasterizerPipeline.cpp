@@ -1,4 +1,5 @@
 ﻿#include "RasterizerPipeline.h"
+
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
 
@@ -98,7 +99,7 @@ RasterizerPipelineVulkan::RasterizerPipelineVulkan(std::string vertexShaderCode,
     extractStageBindings(fragmentResource, fragmentStageInputs, fragmentStageOutputs);
 
     // 初始化缓冲区和渲染目标
-    //tempVertexBuffers.resize(vertexStageInputs.size());
+    // tempVertexBuffers.resize(vertexStageInputs.size());
     renderTargets.resize(fragmentStageOutputs.size());
 
     // 设置多视图计数
@@ -295,7 +296,6 @@ void RasterizerPipelineVulkan::createGraphicsPipeline(EmbeddedShader::ShaderCode
     bindingDescriptions[0].stride = strideSize;
     bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());
@@ -461,7 +461,7 @@ void RasterizerPipelineVulkan::setPushConstant(const std::string& name, const vo
     auto updatePC = [&](const auto* res) {
         // 简单的越界检查
         // if (size > res->typeSize) { ... }
-        
+
         uint8_t* dst = tempPushConstant.getData();
         if (dst) {
             std::memcpy(dst + res->byteOffset, data, size);
@@ -662,7 +662,7 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
         requiredBarriers.bufferBarriers.push_back(indexBarrier);
 
         // 顶点缓冲区屏障
-        //for (const auto& vertexBuffer : mesh.vertexBuffers) 
+        // for (const auto& vertexBuffer : mesh.vertexBuffers)
         {
             VkBufferMemoryBarrier2 vertexBarrier = bufferBarrierTemplate;
             {
@@ -784,16 +784,16 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExe
     // 绘制所有几何网格
     for (const auto& mesh : geomMeshesRecord) {
         // 收集顶点缓冲区
-        //std::vector<VkBuffer> vertexBuffers;
-        //std::vector<VkDeviceSize> offsets;
-        //vertexBuffers.reserve(mesh.vertexBuffers.size());
-        //offsets.reserve(mesh.vertexBuffers.size());
+        // std::vector<VkBuffer> vertexBuffers;
+        // std::vector<VkDeviceSize> offsets;
+        // vertexBuffers.reserve(mesh.vertexBuffers.size());
+        // offsets.reserve(mesh.vertexBuffers.size());
 
-        //for (const auto& vertexBuffer : mesh.vertexBuffers) {
-        //    auto handle = globalBufferStorages.acquire_read(*vertexBuffer.getBufferID());
-        //    vertexBuffers.push_back(handle->bufferHandle);
-        //    offsets.push_back(0);
-        //}
+        // for (const auto& vertexBuffer : mesh.vertexBuffers) {
+        //     auto handle = globalBufferStorages.acquire_read(*vertexBuffer.getBufferID());
+        //     vertexBuffers.push_back(handle->bufferHandle);
+        //     offsets.push_back(0);
+        // }
 
         // 绑定顶点缓冲区
         {

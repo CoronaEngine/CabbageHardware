@@ -1,5 +1,7 @@
 ﻿#include "HardwareContext.h"
+
 #include <algorithm>
+
 #include "HardwareUtilsVulkan.h"
 
 #define VOLK_IMPLEMENTATION
@@ -62,7 +64,7 @@ HardwareContext::~HardwareContext() {
 void HardwareContext::prepareFeaturesChain() {
     // 配置所需实例扩展
     hardwareCreateInfos.requiredInstanceExtensions = [](const VkInstance&, const VkPhysicalDevice&) {
-        std::set<const char*> extensions {
+        std::set<const char*> extensions{
             "VK_KHR_surface",
             VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
             VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,

@@ -48,9 +48,9 @@ VkPhysicalDeviceFeatures2* DeviceFeaturesChain::getChainHead() {
     return &deviceFeatures2;
 }
 
-//DeviceFeaturesChain DeviceFeaturesChain::operator&(const DeviceFeaturesChain& features) const {
-//    return (*this & features.deviceFeatures2.features & features.deviceFeatures11 & features.deviceFeatures12 & features.deviceFeatures13 & features.deviceFeatures14);
-//}
+// DeviceFeaturesChain DeviceFeaturesChain::operator&(const DeviceFeaturesChain& features) const {
+//     return (*this & features.deviceFeatures2.features & features.deviceFeatures11 & features.deviceFeatures12 & features.deviceFeatures13 & features.deviceFeatures14);
+// }
 
 DeviceFeaturesChain DeviceFeaturesChain::operator&(const DeviceFeaturesChain& features) const {
     return (*this & features.deviceFeatures2.features & features.deviceFeatures11 & features.deviceFeatures12 & features.deviceFeatures13 & features.deviceFeatures14 & features.swapchainMaintenance1Features);
@@ -293,9 +293,9 @@ DeviceFeaturesChain DeviceFeaturesChain::operator|(const DeviceFeaturesChain& fe
     return (*this | features.deviceFeatures2.features | features.deviceFeatures11 | features.deviceFeatures12 | features.deviceFeatures13 | features.deviceFeatures14 | features.swapchainMaintenance1Features);
 }
 
-//DeviceFeaturesChain DeviceFeaturesChain::operator|(const DeviceFeaturesChain& features) const {
-//    return (*this | features.deviceFeatures2.features | features.deviceFeatures11 | features.deviceFeatures12 | features.deviceFeatures13 | features.deviceFeatures14);
-//}
+// DeviceFeaturesChain DeviceFeaturesChain::operator|(const DeviceFeaturesChain& features) const {
+//     return (*this | features.deviceFeatures2.features | features.deviceFeatures11 | features.deviceFeatures12 | features.deviceFeatures13 | features.deviceFeatures14);
+// }
 
 DeviceFeaturesChain DeviceFeaturesChain::operator|(const VkPhysicalDeviceFeatures2& features) const {
     return (*this | features.features);

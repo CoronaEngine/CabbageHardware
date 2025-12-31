@@ -144,7 +144,6 @@ HardwareDisplayer& HardwareDisplayer::operator=(HardwareDisplayer&& other) noexc
 }
 
 HardwareDisplayer& HardwareDisplayer::wait(const HardwareExecutor& executor) {
-    std::lock_guard<std::mutex> lock(displayerMutex);
     auto const executor_id = executor.getExecutorID();
     auto const self_id = displaySurfaceID.load(std::memory_order_acquire);
     if (executor_id > 0 && self_id > 0) {
@@ -158,7 +157,6 @@ HardwareDisplayer& HardwareDisplayer::wait(const HardwareExecutor& executor) {
 }
 
 HardwareDisplayer& HardwareDisplayer::operator<<(const HardwareImage& image) {
-    std::lock_guard<std::mutex> lock(displayerMutex);
     auto const self_id = displaySurfaceID.load(std::memory_order_acquire);
     if (self_id > 0) {
         if (auto const handle = globalDisplayerStorages.acquire_read(self_id); handle->displayManager && handle->displaySurface) {

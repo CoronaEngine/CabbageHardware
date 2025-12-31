@@ -192,7 +192,6 @@ HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer& other) {
 }
 
 HardwareBuffer::operator bool() const {
-    std::lock_guard<std::mutex> lock(bufferMutex);
     auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
     return self_buffer_id > 0 &&
            globalBufferStorages.acquire_read(self_buffer_id)->bufferHandle != VK_NULL_HANDLE;
@@ -202,7 +201,6 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer& inputBuffer, const Har
     if (!executor || executor->getExecutorID() == 0) {
         return false;
     }
-    std::scoped_lock lock(bufferMutex, inputBuffer.bufferMutex);
     auto const input_buffer_id = inputBuffer.bufferID.load(std::memory_order_acquire);
     auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
 
@@ -242,7 +240,6 @@ bool HardwareBuffer::copyFromBuffer(const HardwareBuffer& inputBuffer, const Har
 }
 
 uint32_t HardwareBuffer::storeDescriptor() const {
-    std::lock_guard<std::mutex> lock(bufferMutex);
     auto bufferHandle = globalBufferStorages.acquire_write(bufferID);
     return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(bufferHandle);
 }
@@ -251,7 +248,6 @@ bool HardwareBuffer::copyFromData(const void* inputData, const uint64_t size) co
     if (inputData == nullptr || size == 0) {
         return false;
     }
-    std::lock_guard<std::mutex> lock(bufferMutex);
     auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
     if (self_buffer_id == 0) {
         CFW_LOG_WARNING("Cannot copy data to an uninitialized HardwareBuffer.");
@@ -269,7 +265,6 @@ bool HardwareBuffer::copyToData(void* outputData, const uint64_t size) const {
     if (outputData == nullptr || size == 0) {
         return false;
     }
-    std::lock_guard<std::mutex> lock(bufferMutex);
     auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
     if (self_buffer_id == 0) {
         CFW_LOG_WARNING("Cannot copy uninitialized HardwareBuffer to out data.");
@@ -284,23 +279,19 @@ bool HardwareBuffer::copyToData(void* outputData, const uint64_t size) const {
 }
 
 void* HardwareBuffer::getMappedData() const {
-    std::lock_guard<std::mutex> lock(bufferMutex);
     return globalBufferStorages.acquire_read(bufferID.load(std::memory_order_acquire))->bufferAllocInfo.pMappedData;
 }
 
 uint64_t HardwareBuffer::getElementCount() const {
-    std::lock_guard<std::mutex> lock(bufferMutex);
     return globalBufferStorages.acquire_read(bufferID.load(std::memory_order_acquire))->elementCount;
 }
 
 uint64_t HardwareBuffer::getElementSize() const {
-    std::lock_guard<std::mutex> lock(bufferMutex);
     return globalBufferStorages.acquire_read(bufferID.load(std::memory_order_acquire))->elementSize;
 }
 
 ExternalHandle HardwareBuffer::exportBufferMemory() {
     ExternalHandle winHandle{};
-    std::lock_guard<std::mutex> lock(bufferMutex);
     const auto bufferHandle = globalBufferStorages.acquire_write(bufferID.load(std::memory_order_acquire));
 
     ResourceManager::ExternalMemoryHandle memory_handle = globalHardwareContext.getMainDevice()->resourceManager.exportBufferMemory(*bufferHandle);

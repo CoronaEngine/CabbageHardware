@@ -1,7 +1,9 @@
 ﻿#pragma once
 
 #include <corona/pal/cfw_platform.h>
+
 #include <source_location>
+
 #include "corona/kernel/core/i_logger.h"
 
 #if defined(CFW_PLATFORM_WINDOWS)

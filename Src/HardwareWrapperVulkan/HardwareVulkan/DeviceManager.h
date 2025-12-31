@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <mutex>
+
 #include "FeaturesChain.h"
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 
@@ -66,8 +67,8 @@ class DeviceManager {
 
     void createDevices(const CreateCallback& createInfo, const VkInstance& vkInstance);
     void createQueueUtils();
-    //bool createCommandBuffers();
-    //void createTimelineSemaphore();
+    // bool createCommandBuffers();
+    // void createTimelineSemaphore();
 
     void destroyQueueResources(std::vector<QueueUtils>& queues);
 

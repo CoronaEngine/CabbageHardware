@@ -13,8 +13,8 @@ void DeviceManager::initDeviceManager(const CreateCallback& createCallback, cons
 
     createDevices(createCallback, vkInstance);
     createQueueUtils();
-    //createCommandBuffers();
-    //createTimelineSemaphore();
+    // createCommandBuffers();
+    // createTimelineSemaphore();
 
     for (auto& queue : graphicsQueues) {
         CFW_LOG_INFO(
@@ -117,37 +117,37 @@ void DeviceManager::destroyQueueResources(std::vector<QueueUtils>& queues) {
     queues.clear();
 }
 
-//void DeviceManager::createTimelineSemaphore() {
-//    auto createTimelineSemaphoreForQueue = [&](QueueUtils& queue) {
-//        VkExportSemaphoreCreateInfo exportInfo{};
-//        exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
-//        exportInfo.pNext = nullptr;
-//#if _WIN32 || _WIN64
-//        exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-//#endif
-//        VkSemaphoreTypeCreateInfo typeCreateInfo{};
-//        typeCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO_KHR;
-//        typeCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR;
-//        typeCreateInfo.initialValue = 0;
-//        typeCreateInfo.pNext = &exportInfo;
+// void DeviceManager::createTimelineSemaphore() {
+//     auto createTimelineSemaphoreForQueue = [&](QueueUtils& queue) {
+//         VkExportSemaphoreCreateInfo exportInfo{};
+//         exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
+//         exportInfo.pNext = nullptr;
+// #if _WIN32 || _WIN64
+//         exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+// #endif
+//         VkSemaphoreTypeCreateInfo typeCreateInfo{};
+//         typeCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO_KHR;
+//         typeCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR;
+//         typeCreateInfo.initialValue = 0;
+//         typeCreateInfo.pNext = &exportInfo;
 //
-//        VkSemaphoreCreateInfo semaphoreInfo{};
-//        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-//        semaphoreInfo.pNext = &typeCreateInfo;
+//         VkSemaphoreCreateInfo semaphoreInfo{};
+//         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+//         semaphoreInfo.pNext = &typeCreateInfo;
 //
-//        coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &queue.timelineSemaphore));
-//    };
+//         coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &queue.timelineSemaphore));
+//     };
 //
-//    for (auto& queue : graphicsQueues) {
-//        createTimelineSemaphoreForQueue(queue);
-//    }
-//    for (auto& queue : computeQueues) {
-//        createTimelineSemaphoreForQueue(queue);
-//    }
-//    for (auto& queue : transferQueues) {
-//        createTimelineSemaphoreForQueue(queue);
-//    }
-//}
+//     for (auto& queue : graphicsQueues) {
+//         createTimelineSemaphoreForQueue(queue);
+//     }
+//     for (auto& queue : computeQueues) {
+//         createTimelineSemaphoreForQueue(queue);
+//     }
+//     for (auto& queue : transferQueues) {
+//         createTimelineSemaphoreForQueue(queue);
+//     }
+// }
 
 void DeviceManager::createDevices(const CreateCallback& initInfo, const VkInstance& vkInstance) {
     std::set<const char*> inputExtensions = initInfo.requiredDeviceExtensions(vkInstance, physicalDevice);
@@ -285,8 +285,7 @@ void DeviceManager::createQueueUtils() {
             } else if (flags & VK_QUEUE_TRANSFER_BIT) {
                 transferQueues.push_back(queueUtils);
                 ++queue_count;
-            } 
-            else {
+            } else {
                 CFW_LOG_WARNING("Queue Family Index {} does not support graphics, compute, or transfer operations.", i);
             }
         }
@@ -304,30 +303,30 @@ void DeviceManager::createQueueUtils() {
     }
 }
 
-//bool DeviceManager::createCommandBuffers() {
-//    auto createCommandBuffer = [this](QueueUtils& queue) {
-//        VkCommandPoolCreateInfo poolInfo{};
-//        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-//        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-//        poolInfo.queueFamilyIndex = queue.queueFamilyIndex;
+// bool DeviceManager::createCommandBuffers() {
+//     auto createCommandBuffer = [this](QueueUtils& queue) {
+//         VkCommandPoolCreateInfo poolInfo{};
+//         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+//         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+//         poolInfo.queueFamilyIndex = queue.queueFamilyIndex;
 //
-//        coronaHardwareCheck(vkCreateCommandPool(logicalDevice, &poolInfo, nullptr, &queue.commandPool));
+//         coronaHardwareCheck(vkCreateCommandPool(logicalDevice, &poolInfo, nullptr, &queue.commandPool));
 //
-//        VkCommandBufferAllocateInfo allocInfo{};
-//        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-//        allocInfo.commandPool = queue.commandPool;
-//        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-//        allocInfo.commandBufferCount = 1;
+//         VkCommandBufferAllocateInfo allocInfo{};
+//         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+//         allocInfo.commandPool = queue.commandPool;
+//         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+//         allocInfo.commandBufferCount = 1;
 //
-//        coronaHardwareCheck(vkAllocateCommandBuffers(logicalDevice, &allocInfo, &queue.commandBuffer));
-//    };
+//         coronaHardwareCheck(vkAllocateCommandBuffers(logicalDevice, &allocInfo, &queue.commandBuffer));
+//     };
 //
-//    for (auto& queue : graphicsQueues) createCommandBuffer(queue);
-//    for (auto& queue : computeQueues) createCommandBuffer(queue);
-//    for (auto& queue : transferQueues) createCommandBuffer(queue);
+//     for (auto& queue : graphicsQueues) createCommandBuffer(queue);
+//     for (auto& queue : computeQueues) createCommandBuffer(queue);
+//     for (auto& queue : transferQueues) createCommandBuffer(queue);
 //
-//    return true;
-//}
+//     return true;
+// }
 
 std::vector<DeviceManager::QueueUtils> DeviceManager::pickAvailableQueues(std::function<bool(const QueueUtils&)> predicate) const {
     std::vector<QueueUtils> result;

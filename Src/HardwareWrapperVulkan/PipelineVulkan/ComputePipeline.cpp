@@ -1,4 +1,5 @@
 ﻿#include "ComputePipeline.h"
+
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 
 ComputePipelineVulkan::ComputePipelineVulkan() {

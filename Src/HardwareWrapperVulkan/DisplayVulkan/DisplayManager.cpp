@@ -68,13 +68,13 @@ void DisplayManager::cleanupSyncObjects() {
     }
     presentFences.clear();
 
-    //for (auto& fence : copyFences) {
-    //    if (fence != VK_NULL_HANDLE) {
-    //        vkDestroyFence(device, fence, nullptr);
-    //        fence = VK_NULL_HANDLE;
-    //    }
-    //}
-    //copyFences.clear();
+    // for (auto& fence : copyFences) {
+    //     if (fence != VK_NULL_HANDLE) {
+    //         vkDestroyFence(device, fence, nullptr);
+    //         fence = VK_NULL_HANDLE;
+    //     }
+    // }
+    // copyFences.clear();
 
     for (auto& sem : binaryAcquireSemaphore) {
         if (sem != VK_NULL_HANDLE) {
@@ -161,7 +161,7 @@ void DisplayManager::createSyncObjects() {
     binaryAcquireSemaphore.resize(imageCount);
     binaryPresentSemaphore.resize(imageCount);
     presentFences.resize(imageCount);
-    //copyFences.resize(imageCount);
+    // copyFences.resize(imageCount);
 
     VkSemaphoreCreateInfo semaphoreInfo{};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -176,7 +176,7 @@ void DisplayManager::createSyncObjects() {
         coronaHardwareCheck(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &binaryAcquireSemaphore[i]));
         coronaHardwareCheck(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &binaryPresentSemaphore[i]));
         coronaHardwareCheck(vkCreateFence(device, &fenceInfo, nullptr, &presentFences[i]));
-        //coronaHardwareCheck(vkCreateFence(device, &fenceInfo, nullptr, &copyFences[i]));
+        // coronaHardwareCheck(vkCreateFence(device, &fenceInfo, nullptr, &copyFences[i]));
     }
 }
 
@@ -496,7 +496,7 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
         if (presentFenceResult == VK_SUCCESS) {
             if (fenceToPresent.count(presentFences[currentFrame])) {
                 fenceToPresent[presentFences[currentFrame]]->isPresent->store(false, std::memory_order_release);
-                //fenceToPresent.erase(presentFences[currentFrame]);
+                // fenceToPresent.erase(presentFences[currentFrame]);
             }
         }
 
@@ -516,7 +516,7 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
         }
 
         vkResetFences(displayDevice->deviceManager.getLogicalDevice(), 1, &presentFences[currentFrame]);
-        //vkResetFences(displayDevice->deviceManager.getLogicalDevice(), 1, &copyFences[currentFrame]);
+        // vkResetFences(displayDevice->deviceManager.getLogicalDevice(), 1, &copyFences[currentFrame]);
 
         // 跨设备传输（如果需要）
         if (auto const handle = globalImageStorages.acquire_write(displayImage.getImageID());
@@ -565,7 +565,7 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
                                << displayDeviceExecutor->wait(waitSemaphoreInfos, signalSemaphoreInfos)
                                << displayDeviceExecutor->commit();
 
-        //vkWaitForFences(displayDevice->deviceManager.getLogicalDevice(), 1, &copyFences[currentFrame], VK_TRUE, UINT64_MAX);
+        // vkWaitForFences(displayDevice->deviceManager.getLogicalDevice(), 1, &copyFences[currentFrame], VK_TRUE, UINT64_MAX);
 
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
