@@ -28,20 +28,14 @@ VkBufferUsageFlags convertBufferUsage(BufferUsage const usage) {
     return vkUsage;
 }
 
-static void incrementBufferRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& handle) {
+static void incrementBufferRefCount(uint64_t id, const Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& handle) {
     ++handle->refCount;
-    // CFW_LOG_TRACE("HardwareBuffer ref++: id={}, count={}", id, handle->refCount);
 }
 
-static bool decrementBufferRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& handle) {
-    if (handle->refCount == 0) {
-        CFW_LOG_ERROR("HardwareBuffer ref count underflow! id={}", id);
-    }
-    int count = --handle->refCount;
-    // CFW_LOG_TRACE("HardwareBuffer ref--: id={}, count={}", id, count);
-    if (count == 0) {
+static bool decrementBufferRefCount(uint64_t id, const Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle& handle) {
+    uint64_t const newCount = --handle->refCount;
+    if (newCount == 0) {
         globalHardwareContext.getMainDevice()->resourceManager.destroyBuffer(*handle);
-        // CFW_LOG_TRACE("HardwareBuffer destroyed: id={}", id);
         return true;
     }
     return false;
@@ -56,7 +50,6 @@ HardwareBuffer::HardwareBuffer(const uint32_t bufferSize, const uint32_t element
     bufferID.store(buffer_id, std::memory_order_release);
     auto const handle = globalBufferStorages.acquire_write(buffer_id);
     *handle = globalHardwareContext.getMainDevice()->resourceManager.createBuffer(bufferSize, elementSize, convertBufferUsage(usage), true, useDedicated);
-    CFW_LOG_TRACE("HardwareBuffer created: id={}", buffer_id);
 
     if (data != nullptr && handle->bufferAllocInfo.pMappedData != nullptr) {
         std::memcpy(handle->bufferAllocInfo.pMappedData, data, static_cast<size_t>(bufferSize) * elementSize);
@@ -76,7 +69,6 @@ HardwareBuffer::HardwareBuffer(const ExternalHandle& memHandle, const uint32_t b
     bufferID.store(buffer_id, std::memory_order_release);
     auto const bufferHandle = globalBufferStorages.acquire_write(buffer_id);
     *bufferHandle = globalHardwareContext.getMainDevice()->resourceManager.importBufferMemory(memory_handle, bufferSize, elementSize, allocSize, vkUsage);
-    CFW_LOG_TRACE("HardwareBuffer created from external: id={}", buffer_id);
 }
 
 HardwareBuffer::HardwareBuffer(const HardwareBuffer& other) {
@@ -94,7 +86,6 @@ HardwareBuffer::HardwareBuffer(HardwareBuffer&& other) noexcept {
     auto const other_buffer_id = other.bufferID.load(std::memory_order_relaxed);
     other.bufferID.store(0, std::memory_order_release);
     bufferID.store(other_buffer_id, std::memory_order_release);
-    // CFW_LOG_DEBUG("HardwareBuffer ctor(move): this={}, src={}, id={}", (void*)this, (void*)&other, other_buffer_id);
 }
 
 HardwareBuffer& HardwareBuffer::operator=(HardwareBuffer&& other) noexcept {
@@ -123,7 +114,6 @@ HardwareBuffer& HardwareBuffer::operator=(HardwareBuffer&& other) noexcept {
 HardwareBuffer::~HardwareBuffer() {
     // NOTE: 不要修改写法，避免死锁
     auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
-    // CFW_LOG_DEBUG("HardwareBuffer dtor: this={}, id={}", (void*)this, self_buffer_id);
     if (self_buffer_id > 0) {
         bool destroy = false;
         if (auto const handle = globalBufferStorages.acquire_write(self_buffer_id);
@@ -162,7 +152,6 @@ HardwareBuffer& HardwareBuffer::operator=(const HardwareBuffer& other) {
             globalBufferStorages.deallocate(self_buffer_id);
         }
         bufferID.store(0, std::memory_order_release);
-        CFW_LOG_WARNING("Copying from an uninitialized HardwareBuffer.");
         return *this;
     }
 
