@@ -164,19 +164,43 @@ HardwareImage RasterizerPipeline::getDepthImage() {
 }
 
 ResourceProxy RasterizerPipeline::operator[](const std::string& resourceName) {
+    return ResourceProxy(this, resourceName);
+}
+
+void RasterizerPipeline::setPushConstant(const std::string& name, const void* data, size_t size) {
     std::lock_guard<std::mutex> lock(rasterizerPipelineMutex);
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
-    auto variant_result = (*handle->impl)[resourceName];
+    handle->impl->setPushConstant(name, data, size);
+}
 
-    if (std::holds_alternative<HardwarePushConstant>(variant_result)) {
-        return ResourceProxy(std::get<HardwarePushConstant>(variant_result));
-    } else if (std::holds_alternative<HardwareBuffer*>(variant_result)) {
-        return ResourceProxy(std::get<HardwareBuffer*>(variant_result));
-    } else if (std::holds_alternative<HardwareImage*>(variant_result)) {
-        return ResourceProxy(std::get<HardwareImage*>(variant_result));
-    }
+void RasterizerPipeline::setResource(const std::string& name, const HardwareBuffer& buffer) {
+    std::lock_guard<std::mutex> lock(rasterizerPipelineMutex);
+    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
+    handle->impl->setResource(name, buffer);
+}
 
-    throw std::runtime_error("Unknown resource type in RasterizerPipeline");
+void RasterizerPipeline::setResource(const std::string& name, const HardwareImage& image) {
+    std::lock_guard<std::mutex> lock(rasterizerPipelineMutex);
+    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
+    handle->impl->setResource(name, image);
+}
+
+HardwarePushConstant RasterizerPipeline::getPushConstant(const std::string& name) const {
+    std::lock_guard<std::mutex> lock(rasterizerPipelineMutex);
+    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
+    return handle->impl->getPushConstant(name);
+}
+
+HardwareBuffer RasterizerPipeline::getBuffer(const std::string& name) const {
+    std::lock_guard<std::mutex> lock(rasterizerPipelineMutex);
+    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
+    return handle->impl->getBuffer(name);
+}
+
+HardwareImage RasterizerPipeline::getImage(const std::string& name) const {
+    std::lock_guard<std::mutex> lock(rasterizerPipelineMutex);
+    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
+    return handle->impl->getImage(name);
 }
 
 RasterizerPipeline& RasterizerPipeline::operator()(uint16_t width, uint16_t height) {

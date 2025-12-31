@@ -455,38 +455,87 @@ void RasterizerPipelineVulkan::createFramebuffers(ktm::uvec2 imageSize) {
                                             &frameBuffers));
 }
 
-std::variant<HardwarePushConstant, HardwareBuffer*, HardwareImage*> RasterizerPipelineVulkan::operator[](const std::string& resourceName) {
+void RasterizerPipelineVulkan::setPushConstant(const std::string& name, const void* data, size_t size) {
     using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
 
-    // 在顶点着色器资源中查找
-    if (auto* vertexRes = vertexResource.findShaderBindInfo(resourceName)) {
-        switch (vertexRes->bindType) {
-            case BindType::pushConstantMembers:
-                return HardwarePushConstant(vertexRes->typeSize, vertexRes->byteOffset, &tempPushConstant);
+    auto updatePC = [&](const auto* res) {
+        // 简单的越界检查
+        // if (size > res->typeSize) { ... }
+        
+        uint8_t* dst = tempPushConstant.getData();
+        if (dst) {
+            std::memcpy(dst + res->byteOffset, data, size);
+        }
+    };
 
-            //case BindType::stageInputs:
-            //    return tempVertexBuffers[vertexRes->location];
-
-            default:
-                break;
+    if (auto* vertexRes = vertexResource.findShaderBindInfo(name)) {
+        if (vertexRes->bindType == BindType::pushConstantMembers) {
+            updatePC(vertexRes);
+            return;
         }
     }
 
-    // 在片段着色器资源中查找
-    if (auto* fragmentRes = fragmentResource.findShaderBindInfo(resourceName)) {
-        switch (fragmentRes->bindType) {
-            case BindType::pushConstantMembers:
-                return HardwarePushConstant(fragmentRes->typeSize, fragmentRes->byteOffset, &tempPushConstant);
-
-            case BindType::stageOutputs:
-                return &renderTargets[fragmentRes->location];
-
-            default:
-                break;
+    if (auto* fragmentRes = fragmentResource.findShaderBindInfo(name)) {
+        if (fragmentRes->bindType == BindType::pushConstantMembers) {
+            updatePC(fragmentRes);
+            return;
         }
     }
 
-    throw std::runtime_error("Failed to find resource with name: " + resourceName);
+    throw std::runtime_error("Failed to find push constant with name: " + name);
+}
+
+void RasterizerPipelineVulkan::setResource(const std::string& name, const HardwareBuffer& buffer) {
+    // 目前 RasterizerPipeline 尚未完全支持 Buffer 绑定 (如 VertexBuffer 通过 record 绑定)
+    throw std::runtime_error("Buffer resource setting not implemented for RasterizerPipeline: " + name);
+}
+
+void RasterizerPipelineVulkan::setResource(const std::string& name, const HardwareImage& image) {
+    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
+
+    if (auto* fragmentRes = fragmentResource.findShaderBindInfo(name)) {
+        if (fragmentRes->bindType == BindType::stageOutputs) {
+            if (fragmentRes->location < renderTargets.size()) {
+                renderTargets[fragmentRes->location] = image;
+                return;
+            }
+        }
+    }
+    throw std::runtime_error("Failed to find image resource with name: " + name);
+}
+
+HardwarePushConstant RasterizerPipelineVulkan::getPushConstant(const std::string& name) {
+    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
+
+    if (auto* vertexRes = vertexResource.findShaderBindInfo(name)) {
+        if (vertexRes->bindType == BindType::pushConstantMembers) {
+            return HardwarePushConstant(vertexRes->typeSize, vertexRes->byteOffset, &tempPushConstant);
+        }
+    }
+
+    if (auto* fragmentRes = fragmentResource.findShaderBindInfo(name)) {
+        if (fragmentRes->bindType == BindType::pushConstantMembers) {
+            return HardwarePushConstant(fragmentRes->typeSize, fragmentRes->byteOffset, &tempPushConstant);
+        }
+    }
+    throw std::runtime_error("Failed to find push constant with name: " + name);
+}
+
+HardwareBuffer RasterizerPipelineVulkan::getBuffer(const std::string& name) {
+    throw std::runtime_error("Buffer resource getting not implemented for RasterizerPipeline: " + name);
+}
+
+HardwareImage RasterizerPipelineVulkan::getImage(const std::string& name) {
+    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
+
+    if (auto* fragmentRes = fragmentResource.findShaderBindInfo(name)) {
+        if (fragmentRes->bindType == BindType::stageOutputs) {
+            if (fragmentRes->location < renderTargets.size()) {
+                return renderTargets[fragmentRes->location];
+            }
+        }
+    }
+    throw std::runtime_error("Failed to find image resource with name: " + name);
 }
 
 RasterizerPipelineVulkan* RasterizerPipelineVulkan::operator()(uint16_t width, uint16_t height) {

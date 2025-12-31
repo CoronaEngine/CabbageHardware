@@ -219,7 +219,7 @@ int main() {
     for (size_t i = 0; i < windows.size(); i++) {
         std::thread(meshThread, i).detach();
         std::thread(renderThread, i).detach();
-        // std::thread(displayThread, i).detach();
+        std::thread(displayThread, i).detach();
     }
 
     while (running.load()) {

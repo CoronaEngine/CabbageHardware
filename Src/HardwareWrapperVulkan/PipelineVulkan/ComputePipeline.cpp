@@ -45,18 +45,42 @@ ComputePipelineVulkan::~ComputePipelineVulkan() {
     }
 }
 
-std::variant<HardwarePushConstant> ComputePipelineVulkan::operator[](const std::string& resourceName) {
-    auto* resource = shaderResource.findShaderBindInfo(resourceName);
+void ComputePipelineVulkan::setPushConstant(const std::string& name, const void* data, size_t size) {
+    auto* resource = shaderResource.findShaderBindInfo(name);
 
-    if (resource == nullptr) {
-        throw std::runtime_error("Failed to find resource with name: " + resourceName);
+    if (resource && resource->bindType == EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::pushConstantMembers) {
+        uint8_t* dst = pushConstant.getData();
+        if (dst) {
+            std::memcpy(dst + resource->byteOffset, data, size);
+        }
+        return;
     }
+    throw std::runtime_error("Failed to find push constant with name: " + name);
+}
 
-    if (resource->bindType != EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::pushConstantMembers) {
-        throw std::runtime_error("Resource '" + resourceName + "' is not a push constant member");
+void ComputePipelineVulkan::setResource(const std::string& name, const HardwareBuffer& buffer) {
+    throw std::runtime_error("Buffer resource setting not implemented for ComputePipeline: " + name);
+}
+
+void ComputePipelineVulkan::setResource(const std::string& name, const HardwareImage& image) {
+    throw std::runtime_error("Image resource setting not implemented for ComputePipeline: " + name);
+}
+
+HardwarePushConstant ComputePipelineVulkan::getPushConstant(const std::string& name) {
+    auto* resource = shaderResource.findShaderBindInfo(name);
+
+    if (resource && resource->bindType == EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::pushConstantMembers) {
+        return HardwarePushConstant(resource->typeSize, resource->byteOffset, &pushConstant);
     }
+    throw std::runtime_error("Failed to find push constant with name: " + name);
+}
 
-    return HardwarePushConstant(resource->typeSize, resource->byteOffset, &pushConstant);
+HardwareBuffer ComputePipelineVulkan::getBuffer(const std::string& name) {
+    throw std::runtime_error("Buffer resource getting not implemented for ComputePipeline: " + name);
+}
+
+HardwareImage ComputePipelineVulkan::getImage(const std::string& name) {
+    throw std::runtime_error("Image resource getting not implemented for ComputePipeline: " + name);
 }
 
 ComputePipelineVulkan* ComputePipelineVulkan::operator()(uint16_t x, uint16_t y, uint16_t z) {

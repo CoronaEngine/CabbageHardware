@@ -233,116 +233,41 @@ struct HardwarePushConstant {
     mutable std::mutex pushConstantMutex;
 };
 
+// Forward declarations
+struct ComputePipeline;
+struct RasterizerPipeline;
+
 // ================= 资源代理类：ResourceProxy =================
 // 支持透明读写访问 Pipeline 内部资源
 struct ResourceProxy {
-    enum class Type { kPushConstant,
-                      kBuffer,
-                      kImage };
-
    private:
-    Type type_;
-    HardwarePushConstant push_constant_{nullptr};
-    HardwareBuffer* buffer_ptr_{nullptr};
-    HardwareImage* image_ptr_{nullptr};
+    ComputePipeline* compute_pipeline_{nullptr};
+    RasterizerPipeline* rasterizer_pipeline_{nullptr};
+    std::string resource_name_;
 
    public:
-    // PushConstant - 直接存储值（已有写回机制）
-    explicit ResourceProxy(HardwarePushConstant push_constant)
-        : type_(Type::kPushConstant), push_constant_(std::move(push_constant)) {}
+    ResourceProxy(ComputePipeline* p, std::string name)
+        : compute_pipeline_(p), resource_name_(std::move(name)) {}
 
-    // Buffer - 存储指针
-    explicit ResourceProxy(HardwareBuffer* buffer)
-        : type_(Type::kBuffer), buffer_ptr_(buffer) {}
-
-    // Image - 存储指针
-    explicit ResourceProxy(HardwareImage* image)
-        : type_(Type::kImage), image_ptr_(image) {}
+    ResourceProxy(RasterizerPipeline* p, std::string name)
+        : rasterizer_pipeline_(p), resource_name_(std::move(name)) {}
 
     // ========== 赋值操作（写回内部） ==========
 
     template <typename T>
-    ResourceProxy& operator=(const T& value) {
-        if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareImage>) {
-            if (type_ == Type::kImage && image_ptr_ != nullptr) {
-                *image_ptr_ = value;
-            }
-        } else if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareBuffer>) {
-            if (type_ == Type::kBuffer && buffer_ptr_ != nullptr) {
-                *buffer_ptr_ = value;
-            }
-        } else if constexpr (!std::is_same_v<std::remove_cvref_t<T>, ResourceProxy>) {
-            if (type_ == Type::kPushConstant) {
-                push_constant_ = value;
-            }
-        }
-        return *this;
-    }
-
-    // ========== 移动赋值操作 ==========
-
-    template <typename T>
-        requires(!std::is_lvalue_reference_v<T>)  // 约束必须为右值，防止自动推导为引用类型
-    ResourceProxy& operator=(T&& value) {
-        if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareImage>) {
-            if (type_ == Type::kImage && image_ptr_ != nullptr) {
-                *image_ptr_ = std::move(value);
-            }
-        } else if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareBuffer>) {
-            if (type_ == Type::kBuffer && buffer_ptr_ != nullptr) {
-                *buffer_ptr_ = std::move(value);
-            }
-        } else if constexpr (!std::is_same_v<std::remove_cvref_t<T>, ResourceProxy>) {
-            if (type_ == Type::kPushConstant) {
-                push_constant_ = std::move(value);
-            }
-        }
-        return *this;
-    }
+    ResourceProxy& operator=(const T& value);
 
     // ========== 显式转换（读取） ==========
 
-    explicit operator HardwareImage() const {
-        return (image_ptr_ != nullptr) ? *image_ptr_ : HardwareImage();
-    }
-
-    explicit operator HardwareBuffer() const {
-        return (buffer_ptr_ != nullptr) ? *buffer_ptr_ : HardwareBuffer();
-    }
-
-    explicit operator HardwarePushConstant() const {
-        return push_constant_;
-    }
-
-    // ========== 类型查询 ==========
-
-    [[nodiscard]] Type getType() const { return type_; }
-    [[nodiscard]] bool isImage() const { return type_ == Type::kImage; }
-    [[nodiscard]] bool isBuffer() const { return type_ == Type::kBuffer; }
-    [[nodiscard]] bool isPushConstant() const { return type_ == Type::kPushConstant; }
+    explicit operator HardwareImage() const;
+    explicit operator HardwareBuffer() const;
+    explicit operator HardwarePushConstant() const;
 
     // ========== 显式获取引用 ==========
 
-    [[nodiscard]] HardwareImage& asImage() {
-        if (type_ != Type::kImage || image_ptr_ == nullptr) {
-            throw std::runtime_error("Resource is not an Image");
-        }
-        return *image_ptr_;
-    }
-
-    [[nodiscard]] HardwareBuffer& asBuffer() {
-        if (type_ != Type::kBuffer || buffer_ptr_ == nullptr) {
-            throw std::runtime_error("Resource is not a Buffer");
-        }
-        return *buffer_ptr_;
-    }
-
-    [[nodiscard]] HardwarePushConstant& asPushConstant() {
-        if (type_ != Type::kPushConstant) {
-            throw std::runtime_error("Resource is not a PushConstant");
-        }
-        return push_constant_;
-    }
+    [[nodiscard]] HardwareImage asImage() const;
+    [[nodiscard]] HardwareBuffer asBuffer() const;
+    [[nodiscard]] HardwarePushConstant asPushConstant() const;
 };
 
 // ================= 对外封装：HardwareDisplayer =================
@@ -385,6 +310,14 @@ struct ComputePipeline {
     ResourceProxy operator[](const std::string& resourceName);
     ComputePipeline& operator()(uint16_t x, uint16_t y, uint16_t z);
 
+    void setPushConstant(const std::string& name, const void* data, size_t size);
+    void setResource(const std::string& name, const HardwareBuffer& buffer);
+    void setResource(const std::string& name, const HardwareImage& image);
+
+    [[nodiscard]] HardwarePushConstant getPushConstant(const std::string& name) const;
+    [[nodiscard]] HardwareBuffer getBuffer(const std::string& name) const;
+    [[nodiscard]] HardwareImage getImage(const std::string& name) const;
+
     [[nodiscard]] uintptr_t getComputePipelineID() const {
         return computePipelineID.load(std::memory_order_acquire);
     }
@@ -417,6 +350,14 @@ struct RasterizerPipeline {
     ResourceProxy operator[](const std::string& resourceName);
     RasterizerPipeline& operator()(uint16_t width, uint16_t height);
     RasterizerPipeline& record(const HardwareBuffer& indexBuffer, const HardwareBuffer& vertexBuffer);
+
+    void setPushConstant(const std::string& name, const void* data, size_t size);
+    void setResource(const std::string& name, const HardwareBuffer& buffer);
+    void setResource(const std::string& name, const HardwareImage& image);
+
+    [[nodiscard]] HardwarePushConstant getPushConstant(const std::string& name) const;
+    [[nodiscard]] HardwareBuffer getBuffer(const std::string& name) const;
+    [[nodiscard]] HardwareImage getImage(const std::string& name) const;
 
     [[nodiscard]] uintptr_t getRasterizerPipelineID() const {
         return rasterizerPipelineID.load(std::memory_order_acquire);
@@ -453,3 +394,50 @@ struct HardwareExecutor {
     mutable std::mutex executorMutex;
     std::atomic<std::uintptr_t> executorID;
 };
+
+// ================= ResourceProxy Implementation =================
+
+template <typename T>
+ResourceProxy& ResourceProxy::operator=(const T& value) {
+    if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareImage>) {
+        if (compute_pipeline_) compute_pipeline_->setResource(resource_name_, value);
+        if (rasterizer_pipeline_) rasterizer_pipeline_->setResource(resource_name_, value);
+    } else if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareBuffer>) {
+        if (compute_pipeline_) compute_pipeline_->setResource(resource_name_, value);
+        if (rasterizer_pipeline_) rasterizer_pipeline_->setResource(resource_name_, value);
+    } else if constexpr (!std::is_same_v<std::remove_cvref_t<T>, ResourceProxy>) {
+        if (compute_pipeline_) compute_pipeline_->setPushConstant(resource_name_, &value, sizeof(T));
+        if (rasterizer_pipeline_) rasterizer_pipeline_->setPushConstant(resource_name_, &value, sizeof(T));
+    }
+    return *this;
+}
+
+inline ResourceProxy::operator HardwareImage() const {
+    return asImage();
+}
+
+inline ResourceProxy::operator HardwareBuffer() const {
+    return asBuffer();
+}
+
+inline ResourceProxy::operator HardwarePushConstant() const {
+    return asPushConstant();
+}
+
+inline HardwareImage ResourceProxy::asImage() const {
+    if (compute_pipeline_) return compute_pipeline_->getImage(resource_name_);
+    if (rasterizer_pipeline_) return rasterizer_pipeline_->getImage(resource_name_);
+    throw std::runtime_error("ResourceProxy not initialized");
+}
+
+inline HardwareBuffer ResourceProxy::asBuffer() const {
+    if (compute_pipeline_) return compute_pipeline_->getBuffer(resource_name_);
+    if (rasterizer_pipeline_) return rasterizer_pipeline_->getBuffer(resource_name_);
+    throw std::runtime_error("ResourceProxy not initialized");
+}
+
+inline HardwarePushConstant ResourceProxy::asPushConstant() const {
+    if (compute_pipeline_) return compute_pipeline_->getPushConstant(resource_name_);
+    if (rasterizer_pipeline_) return rasterizer_pipeline_->getPushConstant(resource_name_);
+    throw std::runtime_error("ResourceProxy not initialized");
+}

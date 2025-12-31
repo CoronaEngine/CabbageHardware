@@ -151,13 +151,43 @@ ComputePipeline& ComputePipeline::operator=(ComputePipeline&& other) noexcept {
 }
 
 ResourceProxy ComputePipeline::operator[](const std::string& resourceName) {
+    return ResourceProxy(this, resourceName);
+}
+
+void ComputePipeline::setPushConstant(const std::string& name, const void* data, size_t size) {
     std::lock_guard<std::mutex> lock(computePipelineMutex);
     auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
-    auto variant_result = (*handle->impl)[resourceName];
-    if (std::holds_alternative<HardwarePushConstant>(variant_result)) {
-        return ResourceProxy(std::get<HardwarePushConstant>(variant_result));
-    }
-    throw std::runtime_error("Unknown resource type in ComputePipeline");
+    handle->impl->setPushConstant(name, data, size);
+}
+
+void ComputePipeline::setResource(const std::string& name, const HardwareBuffer& buffer) {
+    std::lock_guard<std::mutex> lock(computePipelineMutex);
+    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
+    handle->impl->setResource(name, buffer);
+}
+
+void ComputePipeline::setResource(const std::string& name, const HardwareImage& image) {
+    std::lock_guard<std::mutex> lock(computePipelineMutex);
+    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
+    handle->impl->setResource(name, image);
+}
+
+HardwarePushConstant ComputePipeline::getPushConstant(const std::string& name) const {
+    std::lock_guard<std::mutex> lock(computePipelineMutex);
+    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
+    return handle->impl->getPushConstant(name);
+}
+
+HardwareBuffer ComputePipeline::getBuffer(const std::string& name) const {
+    std::lock_guard<std::mutex> lock(computePipelineMutex);
+    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
+    return handle->impl->getBuffer(name);
+}
+
+HardwareImage ComputePipeline::getImage(const std::string& name) const {
+    std::lock_guard<std::mutex> lock(computePipelineMutex);
+    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
+    return handle->impl->getImage(name);
 }
 
 ComputePipeline& ComputePipeline::operator()(uint16_t x, uint16_t y, uint16_t z) {
