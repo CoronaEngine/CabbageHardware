@@ -216,10 +216,14 @@ int main() {
         CFW_LOG_INFO("Display thread {} ended.", threadIndex);
     };
 
+    std::vector<std::thread> meshThreads;
+    std::vector<std::thread> renderThreads;
+    std::vector<std::thread> displayThreads;
+
     for (size_t i = 0; i < windows.size(); i++) {
-        std::thread(meshThread, i).detach();
-        std::thread(renderThread, i).detach();
-        std::thread(displayThread, i).detach();
+        meshThreads.emplace_back(meshThread, i);
+        renderThreads.emplace_back(renderThread, i);
+        displayThreads.emplace_back(displayThread, i);
     }
 
     while (running.load()) {
@@ -230,6 +234,12 @@ int main() {
                 break;
             }
         }
+    }
+
+    for (size_t i = 0; i < windows.size(); i++) {
+        if (meshThreads[i].joinable()) meshThreads[i].join();
+        if (renderThreads[i].joinable()) renderThreads[i].join();
+        if (displayThreads[i].joinable()) displayThreads[i].join();
     }
 
     for (size_t i = 0; i < windows.size(); i++) {
