@@ -82,7 +82,7 @@ void DeviceManager::cleanUpDeviceManager() {
 
     queueFamilies.clear();
 
-    vkDestroyDevice(logicalDevice, nullptr);
+    //vkDestroyDevice(logicalDevice, nullptr);
     logicalDevice = VK_NULL_HANDLE;
     physicalDevice = VK_NULL_HANDLE;
 

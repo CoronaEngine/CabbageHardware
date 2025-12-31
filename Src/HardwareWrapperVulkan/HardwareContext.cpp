@@ -56,7 +56,7 @@ HardwareContext::~HardwareContext() {
     cleanupDebugMessenger();
 
     if (vkInstance != VK_NULL_HANDLE) {
-        vkDestroyInstance(vkInstance, nullptr);
+        //vkDestroyInstance(vkInstance, nullptr);
         vkInstance = VK_NULL_HANDLE;
     }
 }
