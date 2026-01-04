@@ -37,7 +37,7 @@ struct CommandRecordVulkan {
     }
 
    protected:
-    ExecutorType executorType = ExecutorType::Invalid;
+    ExecutorType executorType{ExecutorType::Invalid};
 };
 
 struct HardwareExecutorVulkan {
@@ -67,9 +67,8 @@ struct HardwareExecutorVulkan {
     }
 
     HardwareExecutorVulkan& wait(const std::vector<VkSemaphoreSubmitInfo>& waitInfos = {},
-                                 const std::vector<VkSemaphoreSubmitInfo>& signalInfos = {},
-                                 VkFence fence = VK_NULL_HANDLE) {
-        waitFence = fence;
+                                 const std::vector<VkSemaphoreSubmitInfo>& signalInfos = {}) {
+        // waitFence = fence;
         waitSemaphores.insert(waitSemaphores.end(), waitInfos.begin(), waitInfos.end());
         signalSemaphores.insert(signalSemaphores.end(), signalInfos.begin(), signalInfos.end());
         return *this;
@@ -97,12 +96,12 @@ struct HardwareExecutorVulkan {
                                                          std::vector<DeviceManager::QueueUtils>& queues,
                                                          std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand);
 
-    DeviceManager::QueueUtils* currentRecordQueue = nullptr;
+    DeviceManager::QueueUtils* currentRecordQueue{nullptr};
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
 
     std::vector<CommandRecordVulkan*> commandList;
 
     std::vector<VkSemaphoreSubmitInfo> waitSemaphores;
     std::vector<VkSemaphoreSubmitInfo> signalSemaphores;
-    VkFence waitFence = VK_NULL_HANDLE;
+    VkFence waitFence{VK_NULL_HANDLE};
 };

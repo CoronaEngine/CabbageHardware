@@ -1,8 +1,9 @@
 ﻿#pragma once
 
+#include <atomic>
 #include <memory>
+#include <mutex>
 #include <type_traits>
-#include <variant>
 #include <vector>
 
 #include "Compiler/ShaderCodeCompiler.h"
@@ -84,15 +85,15 @@ struct HardwareBuffer {
     HardwareBuffer();
     HardwareBuffer(const HardwareBuffer& other);
     HardwareBuffer(HardwareBuffer&& other) noexcept;
-    HardwareBuffer(uint32_t bufferSize, uint32_t elementSize, BufferUsage usage, const void* data = nullptr);
+    HardwareBuffer(uint32_t bufferSize, uint32_t elementSize, BufferUsage usage, const void* data = nullptr, bool useDedicated = true);
 
-    HardwareBuffer(uint32_t size, BufferUsage usage, const void* data = nullptr)
-        : HardwareBuffer(1, size, usage, data) {
+    HardwareBuffer(uint32_t size, BufferUsage usage, const void* data = nullptr, bool useDedicated = true)
+        : HardwareBuffer(1, size, usage, data, useDedicated) {
     }
 
     template <IsContainer Container>
-    HardwareBuffer(const Container& input, BufferUsage usage)
-        : HardwareBuffer(input.size(), sizeof(input[0]), usage, input.data()) {
+    HardwareBuffer(const Container& input, BufferUsage usage, bool useDedicated = true)
+        : HardwareBuffer(input.size(), sizeof(input[0]), usage, input.data(), useDedicated) {
     }
 
     HardwareBuffer(const ExternalHandle& memHandle, uint32_t bufferSize, uint32_t elementSize, uint32_t allocSize, BufferUsage usage);
@@ -128,19 +129,20 @@ struct HardwareBuffer {
 
    private:
     std::atomic<std::uintptr_t> bufferID;
+    mutable std::mutex bufferMutex;
 
     friend class HardwareImage;
 };
 
 // ================= HardwareImage 参数结构体 =================
 struct HardwareImageCreateInfo {
-    uint32_t width = 0;
-    uint32_t height = 0;
+    uint32_t width{0};
+    uint32_t height{0};
     ImageFormat format = ImageFormat::RGBA8_SRGB;
     ImageUsage usage = ImageUsage::SampledImage;
-    int arrayLayers = 1;
-    int mipLevels = 1;
-    void* initialData = nullptr;
+    int arrayLayers{1};
+    int mipLevels{1};
+    void* initialData{nullptr};
 
     HardwareImageCreateInfo() = default;
     HardwareImageCreateInfo(uint32_t w, uint32_t h, ImageFormat fmt = ImageFormat::RGBA8_SRGB)
@@ -152,19 +154,21 @@ struct HardwareImage {
    public:
     HardwareImage();
     HardwareImage(const HardwareImage& other);
+    HardwareImage(HardwareImage&& other) noexcept;
     HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage = ImageUsage::SampledImage, int arrayLayers = 1, void* imageData = nullptr);
     HardwareImage(const HardwareImageCreateInfo& createInfo);
 
     ~HardwareImage();
 
     HardwareImage& operator=(const HardwareImage& other);
+    HardwareImage& operator=(HardwareImage&& other) noexcept;
     // image[layer][mip]
     HardwareImage operator[](const uint32_t index);
     explicit operator bool() const;
 
     [[nodiscard]] uint32_t storeDescriptor();
-    [[nodiscard]] std::shared_ptr<uintptr_t> getImageID() const {
-        return imageID;
+    [[nodiscard]] uintptr_t getImageID() const {
+        return imageID.load(std::memory_order_acquire);
     }
 
     //[[nodiscard]] uint32_t getNumMipLevels() const;
@@ -174,8 +178,8 @@ struct HardwareImage {
     HardwareImage& copyFromData(const void* inputData, HardwareExecutor* executor, uint32_t mipLevel = 0);
 
    private:
-    HardwareImage(std::shared_ptr<uintptr_t> parentImageID, uint32_t layer, uint32_t mipLevel);
-    std::shared_ptr<uintptr_t> imageID;
+    std::atomic<std::uintptr_t> imageID;
+    mutable std::mutex imageMutex;
 
     friend class HardwareDisplayer;
 };
@@ -185,10 +189,11 @@ struct HardwarePushConstant {
    public:
     HardwarePushConstant();
     HardwarePushConstant(const HardwarePushConstant& other);
+    HardwarePushConstant(HardwarePushConstant&& other) noexcept;
 
     template <typename T>
         requires(!std::is_same_v<std::remove_cvref_t<T>, HardwarePushConstant>)
-    HardwarePushConstant(T data) {
+    explicit HardwarePushConstant(T data) {
         copyFromRaw(&data, sizeof(T));
     }
 
@@ -198,18 +203,71 @@ struct HardwarePushConstant {
     ~HardwarePushConstant();
 
     HardwarePushConstant& operator=(const HardwarePushConstant& other);
+    HardwarePushConstant& operator=(HardwarePushConstant&& other) noexcept;
+
+    template <typename T>
+        requires(!std::is_same_v<std::remove_cvref_t<T>, HardwarePushConstant>)
+    HardwarePushConstant& operator=(const T& data) {
+        copyFromRaw(&data, sizeof(T));
+        return *this;
+    }
+
+    template <typename T>
+        requires(!std::is_same_v<std::remove_cvref_t<T>, HardwarePushConstant>)
+    HardwarePushConstant& operator=(T&& data) {
+        copyFromRaw(&data, sizeof(T));
+        return *this;
+    }
 
     // NOTE: must in the same thread
     [[nodiscard]] uint8_t* getData() const;
     [[nodiscard]] uint64_t getSize() const;
-    [[nodiscard]] std::shared_ptr<uintptr_t> getPushConstantID() const {
-        return pushConstantID;
+    [[nodiscard]] uintptr_t getPushConstantID() const {
+        return pushConstantID.load(std::memory_order_acquire);
     }
 
    private:
     void copyFromRaw(const void* src, uint64_t size);
 
-    std::shared_ptr<uintptr_t> pushConstantID;
+    std::atomic<std::uintptr_t> pushConstantID;
+    mutable std::mutex pushConstantMutex;
+};
+
+// Forward declarations
+struct ComputePipeline;
+struct RasterizerPipeline;
+
+// ================= 资源代理类：ResourceProxy =================
+// 支持透明读写访问 Pipeline 内部资源
+struct ResourceProxy {
+   private:
+    ComputePipeline* compute_pipeline_{nullptr};
+    RasterizerPipeline* rasterizer_pipeline_{nullptr};
+    std::string resource_name_;
+
+   public:
+    ResourceProxy(ComputePipeline* p, std::string name)
+        : compute_pipeline_(p), resource_name_(std::move(name)) {}
+
+    ResourceProxy(RasterizerPipeline* p, std::string name)
+        : rasterizer_pipeline_(p), resource_name_(std::move(name)) {}
+
+    // ========== 赋值操作（写回内部） ==========
+
+    template <typename T>
+    ResourceProxy& operator=(const T& value);
+
+    // ========== 显式转换（读取） ==========
+
+    explicit operator HardwareImage() const;
+    explicit operator HardwareBuffer() const;
+    explicit operator HardwarePushConstant() const;
+
+    // ========== 显式获取引用 ==========
+
+    [[nodiscard]] HardwareImage asImage() const;
+    [[nodiscard]] HardwareBuffer asBuffer() const;
+    [[nodiscard]] HardwarePushConstant asPushConstant() const;
 };
 
 // ================= 对外封装：HardwareDisplayer =================
@@ -217,19 +275,22 @@ struct HardwareDisplayer {
    public:
     explicit HardwareDisplayer(void* surface = nullptr);
     HardwareDisplayer(const HardwareDisplayer& other);
+    HardwareDisplayer(HardwareDisplayer&& other) noexcept;
     ~HardwareDisplayer();
 
     HardwareDisplayer& operator=(const HardwareDisplayer& other);
+    HardwareDisplayer& operator=(HardwareDisplayer&& other) noexcept;
     HardwareDisplayer& operator<<(const HardwareImage& image);
 
     HardwareDisplayer& wait(const HardwareExecutor& executor);
 
-    [[nodiscard]] std::shared_ptr<uintptr_t> getDisplayerID() const {
-        return displaySurfaceID;
+    [[nodiscard]] uintptr_t getDisplayerID() const {
+        return displaySurfaceID.load(std::memory_order_acquire);
     }
 
    private:
-    std::shared_ptr<uintptr_t> displaySurfaceID;
+    std::atomic<std::uintptr_t> displaySurfaceID;
+    mutable std::mutex displayerMutex;
 };
 
 // ================= 对外封装：ComputePipeline =================
@@ -240,19 +301,30 @@ struct ComputePipeline {
                     EmbeddedShader::ShaderLanguage language = EmbeddedShader::ShaderLanguage::GLSL,
                     const std::source_location& sourceLocation = std::source_location::current());
     ComputePipeline(const ComputePipeline& other);
+    ComputePipeline(ComputePipeline&& other) noexcept;
     ~ComputePipeline();
 
     ComputePipeline& operator=(const ComputePipeline& other);
+    ComputePipeline& operator=(ComputePipeline&& other) noexcept;
 
-    std::variant<HardwarePushConstant> operator[](const std::string& resourceName);
+    ResourceProxy operator[](const std::string& resourceName);
     ComputePipeline& operator()(uint16_t x, uint16_t y, uint16_t z);
 
-    [[nodiscard]] std::shared_ptr<uintptr_t> getComputePipelineID() const {
-        return computePipelineID;
+    void setPushConstant(const std::string& name, const void* data, size_t size);
+    void setResource(const std::string& name, const HardwareBuffer& buffer);
+    void setResource(const std::string& name, const HardwareImage& image);
+
+    [[nodiscard]] HardwarePushConstant getPushConstant(const std::string& name) const;
+    [[nodiscard]] HardwareBuffer getBuffer(const std::string& name) const;
+    [[nodiscard]] HardwareImage getImage(const std::string& name) const;
+
+    [[nodiscard]] uintptr_t getComputePipelineID() const {
+        return computePipelineID.load(std::memory_order_acquire);
     }
 
    private:
-    std::shared_ptr<uintptr_t> computePipelineID;
+    mutable std::mutex computePipelineMutex;
+    std::atomic<std::uintptr_t> computePipelineID;
 };
 
 // ================= 对外封装：RasterizerPipeline =================
@@ -266,23 +338,34 @@ struct RasterizerPipeline {
                        EmbeddedShader::ShaderLanguage fragmentShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
                        const std::source_location& sourceLocation = std::source_location::current());
     RasterizerPipeline(const RasterizerPipeline& other);
+    RasterizerPipeline(RasterizerPipeline&& other) noexcept;
     ~RasterizerPipeline();
 
     RasterizerPipeline& operator=(const RasterizerPipeline& other);
+    RasterizerPipeline& operator=(RasterizerPipeline&& other) noexcept;
 
     void setDepthImage(HardwareImage& depthImage);
     [[nodiscard]] HardwareImage getDepthImage();
 
-    std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> operator[](const std::string& resourceName);
+    ResourceProxy operator[](const std::string& resourceName);
     RasterizerPipeline& operator()(uint16_t width, uint16_t height);
     RasterizerPipeline& record(const HardwareBuffer& indexBuffer, const HardwareBuffer& vertexBuffer);
 
-    [[nodiscard]] std::shared_ptr<uintptr_t> getRasterizerPipelineID() const {
-        return rasterizerPipelineID;
+    void setPushConstant(const std::string& name, const void* data, size_t size);
+    void setResource(const std::string& name, const HardwareBuffer& buffer);
+    void setResource(const std::string& name, const HardwareImage& image);
+
+    [[nodiscard]] HardwarePushConstant getPushConstant(const std::string& name) const;
+    [[nodiscard]] HardwareBuffer getBuffer(const std::string& name) const;
+    [[nodiscard]] HardwareImage getImage(const std::string& name) const;
+
+    [[nodiscard]] uintptr_t getRasterizerPipelineID() const {
+        return rasterizerPipelineID.load(std::memory_order_acquire);
     }
 
    private:
-    std::shared_ptr<uintptr_t> rasterizerPipelineID;
+    mutable std::mutex rasterizerPipelineMutex;
+    std::atomic<std::uintptr_t> rasterizerPipelineID;
 };
 
 // ================= 对外封装：HardwareExecutor =================
@@ -290,9 +373,12 @@ struct HardwareExecutor {
    public:
     HardwareExecutor();
     HardwareExecutor(const HardwareExecutor& other);
+    HardwareExecutor(HardwareExecutor&& other) noexcept;
     ~HardwareExecutor();
 
     HardwareExecutor& operator=(const HardwareExecutor& other);
+    HardwareExecutor& operator=(HardwareExecutor&& other) noexcept;
+
     HardwareExecutor& operator<<(ComputePipeline& computePipeline);
     HardwareExecutor& operator<<(RasterizerPipeline& rasterizerPipeline);
     HardwareExecutor& operator<<(HardwareExecutor& other);
@@ -300,10 +386,58 @@ struct HardwareExecutor {
     HardwareExecutor& wait(HardwareExecutor& other);
     HardwareExecutor& commit();
 
-    [[nodiscard]] std::shared_ptr<uintptr_t> getExecutorID() const {
-        return executorID;
+    [[nodiscard]] uintptr_t getExecutorID() const {
+        return executorID.load(std::memory_order_acquire);
     }
 
    private:
-    std::shared_ptr<uintptr_t> executorID;
+    mutable std::mutex executorMutex;
+    std::atomic<std::uintptr_t> executorID;
 };
+
+// ================= ResourceProxy Implementation =================
+
+template <typename T>
+ResourceProxy& ResourceProxy::operator=(const T& value) {
+    if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareImage>) {
+        if (compute_pipeline_) compute_pipeline_->setResource(resource_name_, value);
+        if (rasterizer_pipeline_) rasterizer_pipeline_->setResource(resource_name_, value);
+    } else if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareBuffer>) {
+        if (compute_pipeline_) compute_pipeline_->setResource(resource_name_, value);
+        if (rasterizer_pipeline_) rasterizer_pipeline_->setResource(resource_name_, value);
+    } else if constexpr (!std::is_same_v<std::remove_cvref_t<T>, ResourceProxy>) {
+        if (compute_pipeline_) compute_pipeline_->setPushConstant(resource_name_, &value, sizeof(T));
+        if (rasterizer_pipeline_) rasterizer_pipeline_->setPushConstant(resource_name_, &value, sizeof(T));
+    }
+    return *this;
+}
+
+inline ResourceProxy::operator HardwareImage() const {
+    return asImage();
+}
+
+inline ResourceProxy::operator HardwareBuffer() const {
+    return asBuffer();
+}
+
+inline ResourceProxy::operator HardwarePushConstant() const {
+    return asPushConstant();
+}
+
+inline HardwareImage ResourceProxy::asImage() const {
+    if (compute_pipeline_) return compute_pipeline_->getImage(resource_name_);
+    if (rasterizer_pipeline_) return rasterizer_pipeline_->getImage(resource_name_);
+    throw std::runtime_error("ResourceProxy not initialized");
+}
+
+inline HardwareBuffer ResourceProxy::asBuffer() const {
+    if (compute_pipeline_) return compute_pipeline_->getBuffer(resource_name_);
+    if (rasterizer_pipeline_) return rasterizer_pipeline_->getBuffer(resource_name_);
+    throw std::runtime_error("ResourceProxy not initialized");
+}
+
+inline HardwarePushConstant ResourceProxy::asPushConstant() const {
+    if (compute_pipeline_) return compute_pipeline_->getPushConstant(resource_name_);
+    if (rasterizer_pipeline_) return rasterizer_pipeline_->getPushConstant(resource_name_);
+    throw std::runtime_error("ResourceProxy not initialized");
+}

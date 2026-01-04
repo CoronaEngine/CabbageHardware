@@ -6,6 +6,9 @@ DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
     DeviceManager::QueueUtils* queue;
     uint16_t queueIndex = 0;
 
+    uint32_t spins = 0, yields = 0;  // 当前自旋和让出计数 / Current spin and yield counters
+    uint32_t actualSleepMicros = 0;
+
     while (true) {
         uint16_t queueIndex = currentQueueIndex.fetch_add(1) % currentQueues.size();
         queue = &currentQueues[queueIndex];
@@ -14,7 +17,7 @@ DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
             uint64_t timelineCounterValue = 0;
             VkResult result = vkGetSemaphoreCounterValue(queue->deviceManager->logicalDevice, queue->timelineSemaphore, &timelineCounterValue);
             if (result == VK_SUCCESS) {
-                if (timelineCounterValue >= queue->timelineValue->load(std::memory_order_acquire)) {
+                if (timelineCounterValue >= queue->timelineValue->load(std::memory_order_acquire) && queue->isPresent->load(std::memory_order_acquire) == false) {
                     break;
                 } else {
                     queue->queueMutex->unlock();
@@ -26,7 +29,24 @@ DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
             }
         }
 
-        // std::this_thread::yield();
+        // // 自旋 / Spin
+        // if (++spins < 5)
+        //     continue;
+
+        // // 自旋次数过多 让出CPU / If spinned to many circles,then Yield CPU
+        // if (++yields < 8) {
+        //     std::this_thread::yield();
+        //     continue;
+        // }
+
+        // if (true) {
+        //     actualSleepMicros += 3;
+        //     actualSleepMicros = actualSleepMicros & 0xFFFFu;
+
+        //     // 循环等待次数实在太多，微休眠 / If loop ran to many time,sleep briefly.
+        //     std::this_thread::sleep_for(std::chrono::microseconds(actualSleepMicros));
+        // }
+        std::this_thread::sleep_for(std::chrono::microseconds(10000));
     }
 
     commitCommand(queue);
@@ -76,20 +96,17 @@ HardwareExecutorVulkan& HardwareExecutorVulkan::commit() {
             commandBufferSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
             commandBufferSubmitInfo.commandBuffer = currentRecordQueue->commandBuffer;
 
-            uint64_t previousValue = currentRecordQueue->timelineValue->fetch_add(1);
-            uint64_t newSignalValue = previousValue + 1;
-
             VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
             timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             timelineWaitSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
-            timelineWaitSemaphoreSubmitInfo.value = previousValue;
+            timelineWaitSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->fetch_add(1);
             timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
             waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);
 
             VkSemaphoreSubmitInfo timelineSignalSemaphoreSubmitInfo{};
             timelineSignalSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             timelineSignalSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
-            timelineSignalSemaphoreSubmitInfo.value = newSignalValue;
+            timelineSignalSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->load(std::memory_order_acquire);
             timelineSignalSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
             signalSemaphores.push_back(timelineSignalSemaphoreSubmitInfo);
 
@@ -101,16 +118,6 @@ HardwareExecutorVulkan& HardwareExecutorVulkan::commit() {
             submitInfo.pSignalSemaphoreInfos = signalSemaphores.data();
             submitInfo.commandBufferInfoCount = 1;
             submitInfo.pCommandBufferInfos = &commandBufferSubmitInfo;
-
-            /*try {
-                VkResult result = vkQueueSubmit2(currentRecordQueue->vkQueue, 1, &submitInfo, waitFence);
-                if (result != VK_SUCCESS) {
-                    throw std::runtime_error("Failed to submit command buffer!");
-                }
-            } catch (const std::exception& e) {
-                CFW_LOG_ERROR("Failed to submit command buffer: {}", e.what());
-                return false;
-            }*/
 
             VkResult result = vkQueueSubmit2(currentRecordQueue->vkQueue, 1, &submitInfo, waitFence);
             if (result != VK_SUCCESS) {

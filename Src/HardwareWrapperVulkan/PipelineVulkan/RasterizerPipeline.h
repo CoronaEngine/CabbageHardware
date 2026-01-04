@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <vector>
+
 #include "CabbageHardware.h"
 #include "Compiler/ShaderCodeCompiler.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/DeviceManager.h"
@@ -27,7 +28,15 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan {
         return depthImage;
     }
 
-    std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> operator[](const std::string& resourceName);
+    // std::variant<HardwarePushConstant, HardwareBuffer*, HardwareImage*> operator[](const std::string& resourceName);
+
+    void setPushConstant(const std::string& name, const void* data, size_t size);
+    void setResource(const std::string& name, const HardwareBuffer& buffer);
+    void setResource(const std::string& name, const HardwareImage& image);
+
+    [[nodiscard]] HardwarePushConstant getPushConstant(const std::string& name);
+    [[nodiscard]] HardwareBuffer getBuffer(const std::string& name);
+    [[nodiscard]] HardwareImage getImage(const std::string& name);
 
     RasterizerPipelineVulkan* operator()(uint16_t width, uint16_t height);
 
@@ -41,7 +50,6 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan {
     RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutorVulkan) override;
 
    private:
-
     struct TriangleGeomMesh {
         HardwareBuffer indexBuffer;
         HardwareBuffer vertexBuffer;
@@ -59,13 +67,13 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan {
     [[nodiscard]] VkFormat getVkFormatFromType(const std::string& typeName, uint32_t elementCount) const;
 
     ktm::uvec2 imageSize = {0, 0};
-    uint32_t pushConstantSize = 0;
-    int multiviewCount = 1;
+    uint32_t pushConstantSize{0};
+    int multiviewCount{1};
 
-    VkRenderPass renderPass = VK_NULL_HANDLE;
-    VkPipeline graphicsPipeline = VK_NULL_HANDLE;
-    VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-    VkFramebuffer frameBuffers = VK_NULL_HANDLE;
+    VkRenderPass renderPass{VK_NULL_HANDLE};
+    VkPipeline graphicsPipeline{VK_NULL_HANDLE};
+    VkPipelineLayout pipelineLayout{VK_NULL_HANDLE};
+    VkFramebuffer frameBuffers{VK_NULL_HANDLE};
 
     HardwareImage depthImage;
     std::vector<HardwareImage> renderTargets;
@@ -75,7 +83,7 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan {
 
     CommandRecordVulkan dumpCommandRecordVulkan;
     HardwarePushConstant tempPushConstant;
-    //std::vector<HardwareBuffer> tempVertexBuffers;
+    // std::vector<HardwareBuffer> tempVertexBuffers;
 
     std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> vertexStageInputs;
     std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> vertexStageOutputs;

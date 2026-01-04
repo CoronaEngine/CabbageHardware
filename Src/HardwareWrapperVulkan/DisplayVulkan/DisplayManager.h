@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <numeric>
+#include <unordered_map>
 
 #include "CabbageHardware.h"
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
@@ -24,25 +25,25 @@ class DisplayManager {
 
    private:
     // Vulkan 核心资源
-    VkSurfaceKHR vkSurface = VK_NULL_HANDLE;
-    VkSwapchainKHR swapChain = VK_NULL_HANDLE;
+    VkSurfaceKHR vkSurface{VK_NULL_HANDLE};
+    VkSwapchainKHR swapChain{VK_NULL_HANDLE};
     VkSurfaceFormatKHR surfaceFormat{};
 
     // 显示参数
     ktm::uvec2 displaySize{0, 0};
-    void* displaySurface = nullptr;
-    uint32_t currentFrame = 0;
+    void* displaySurface{nullptr};
+    uint32_t currentFrame{0};
 
     // 交换链资源
     std::vector<ResourceManager::ImageHardwareWrap> swapChainImages;
     ResourceManager::ImageHardwareWrap displayImage{};
 
     // 同步对象
-    std::vector<VkSemaphore> binaryAcquireSemaphore; // 必须用于vkAcquireNextImageKHR
+    std::vector<VkSemaphore> binaryAcquireSemaphore;
     std::vector<VkSemaphore> binaryPresentSemaphore;
-    VkSemaphore timelineSemaphore = VK_NULL_HANDLE;
-    // std::vector<VkFence> inFlightFences;
-    uint64_t frameCounter = 0; // 全局帧计数器
+    // std::vector<VkFence> copyFences;
+    std::vector<VkFence> presentFences;
+    std::unordered_map<VkFence, DeviceManager::QueueUtils*> fenceToPresent;
 
     // 队列和设备
     std::atomic_uint16_t currentQueueIndex{0};

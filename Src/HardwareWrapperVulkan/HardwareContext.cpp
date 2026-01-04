@@ -1,5 +1,7 @@
 ﻿#include "HardwareContext.h"
+
 #include <algorithm>
+
 #include "HardwareUtilsVulkan.h"
 
 #define VOLK_IMPLEMENTATION
@@ -54,7 +56,7 @@ HardwareContext::~HardwareContext() {
     cleanupDebugMessenger();
 
     if (vkInstance != VK_NULL_HANDLE) {
-        vkDestroyInstance(vkInstance, nullptr);
+        //vkDestroyInstance(vkInstance, nullptr);
         vkInstance = VK_NULL_HANDLE;
     }
 }
@@ -64,6 +66,8 @@ void HardwareContext::prepareFeaturesChain() {
     hardwareCreateInfos.requiredInstanceExtensions = [](const VkInstance&, const VkPhysicalDevice&) {
         std::set<const char*> extensions{
             "VK_KHR_surface",
+            VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
+            VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
             VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
             VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME};
 
@@ -82,6 +86,7 @@ void HardwareContext::prepareFeaturesChain() {
     hardwareCreateInfos.requiredDeviceExtensions = [](const VkInstance&, const VkPhysicalDevice&) {
         return std::set<const char*>{
             VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+            VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
             VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
             VK_KHR_16BIT_STORAGE_EXTENSION_NAME,
             VK_KHR_MULTIVIEW_EXTENSION_NAME,
@@ -131,7 +136,12 @@ void HardwareContext::prepareFeaturesChain() {
         features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
         features13.synchronization2 = VK_TRUE;
 
-        return (DeviceFeaturesChain() | features | features11 | features12 | features13);
+        // 启用 swapchainMaintenance1 特性
+        VkPhysicalDeviceSwapchainMaintenance1FeaturesEXT features_swapchain_maintenance1{};
+        features_swapchain_maintenance1.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_EXT;
+        features_swapchain_maintenance1.swapchainMaintenance1 = VK_TRUE;
+
+        return (DeviceFeaturesChain() | features | features11 | features12 | features13 | features_swapchain_maintenance1);
     };
 }
 

@@ -1,4 +1,5 @@
 ﻿#include "RasterizerPipeline.h"
+
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
 
@@ -98,7 +99,7 @@ RasterizerPipelineVulkan::RasterizerPipelineVulkan(std::string vertexShaderCode,
     extractStageBindings(fragmentResource, fragmentStageInputs, fragmentStageOutputs);
 
     // 初始化缓冲区和渲染目标
-    //tempVertexBuffers.resize(vertexStageInputs.size());
+    // tempVertexBuffers.resize(vertexStageInputs.size());
     renderTargets.resize(fragmentStageOutputs.size());
 
     // 设置多视图计数
@@ -164,7 +165,7 @@ void RasterizerPipelineVulkan::createRenderPass(int multiviewCount) {
     for (const auto& renderTarget : renderTargets) {
         VkAttachmentDescription attachment{};
         {
-            auto const handle = globalImageStorages.acquire_read(*renderTarget.getImageID());
+            auto const handle = globalImageStorages.acquire_read(renderTarget.getImageID());
             attachment.format = handle->imageFormat;
         }
         attachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -294,7 +295,6 @@ void RasterizerPipelineVulkan::createGraphicsPipeline(EmbeddedShader::ShaderCode
     bindingDescriptions[0].binding = 0;
     bindingDescriptions[0].stride = strideSize;
     bindingDescriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -431,11 +431,11 @@ void RasterizerPipelineVulkan::createFramebuffers(ktm::uvec2 imageSize) {
     attachments.reserve(renderTargets.size() + 1);
 
     for (const auto& renderTarget : renderTargets) {
-        auto const handle = globalImageStorages.acquire_read(*renderTarget.getImageID());
+        auto const handle = globalImageStorages.acquire_read(renderTarget.getImageID());
         attachments.push_back(handle->imageView);
     }
     {
-        auto const depthHandle = globalImageStorages.acquire_read(*depthImage.getImageID());
+        auto const depthHandle = globalImageStorages.acquire_read(depthImage.getImageID());
         attachments.push_back(depthHandle->imageView);
     }
 
@@ -455,38 +455,87 @@ void RasterizerPipelineVulkan::createFramebuffers(ktm::uvec2 imageSize) {
                                             &frameBuffers));
 }
 
-std::variant<HardwarePushConstant, HardwareBuffer, HardwareImage> RasterizerPipelineVulkan::operator[](const std::string& resourceName) {
+void RasterizerPipelineVulkan::setPushConstant(const std::string& name, const void* data, size_t size) {
     using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
 
-    // 在顶点着色器资源中查找
-    if (auto* vertexRes = vertexResource.findShaderBindInfo(resourceName)) {
-        switch (vertexRes->bindType) {
-            case BindType::pushConstantMembers:
-                return HardwarePushConstant(vertexRes->typeSize, vertexRes->byteOffset, &tempPushConstant);
+    auto updatePC = [&](const auto* res) {
+        // 简单的越界检查
+        // if (size > res->typeSize) { ... }
 
-            //case BindType::stageInputs:
-            //    return tempVertexBuffers[vertexRes->location];
+        uint8_t* dst = tempPushConstant.getData();
+        if (dst) {
+            std::memcpy(dst + res->byteOffset, data, size);
+        }
+    };
 
-            default:
-                break;
+    if (auto* vertexRes = vertexResource.findShaderBindInfo(name)) {
+        if (vertexRes->bindType == BindType::pushConstantMembers) {
+            updatePC(vertexRes);
+            return;
         }
     }
 
-    // 在片段着色器资源中查找
-    if (auto* fragmentRes = fragmentResource.findShaderBindInfo(resourceName)) {
-        switch (fragmentRes->bindType) {
-            case BindType::pushConstantMembers:
-                return HardwarePushConstant(fragmentRes->typeSize, fragmentRes->byteOffset, &tempPushConstant);
+    if (auto* fragmentRes = fragmentResource.findShaderBindInfo(name)) {
+        if (fragmentRes->bindType == BindType::pushConstantMembers) {
+            updatePC(fragmentRes);
+            return;
+        }
+    }
 
-            case BindType::stageOutputs:
+    throw std::runtime_error("Failed to find push constant with name: " + name);
+}
+
+void RasterizerPipelineVulkan::setResource(const std::string& name, const HardwareBuffer& buffer) {
+    // 目前 RasterizerPipeline 尚未完全支持 Buffer 绑定 (如 VertexBuffer 通过 record 绑定)
+    throw std::runtime_error("Buffer resource setting not implemented for RasterizerPipeline: " + name);
+}
+
+void RasterizerPipelineVulkan::setResource(const std::string& name, const HardwareImage& image) {
+    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
+
+    if (auto* fragmentRes = fragmentResource.findShaderBindInfo(name)) {
+        if (fragmentRes->bindType == BindType::stageOutputs) {
+            if (fragmentRes->location < renderTargets.size()) {
+                renderTargets[fragmentRes->location] = image;
+                return;
+            }
+        }
+    }
+    throw std::runtime_error("Failed to find image resource with name: " + name);
+}
+
+HardwarePushConstant RasterizerPipelineVulkan::getPushConstant(const std::string& name) {
+    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
+
+    if (auto* vertexRes = vertexResource.findShaderBindInfo(name)) {
+        if (vertexRes->bindType == BindType::pushConstantMembers) {
+            return HardwarePushConstant(vertexRes->typeSize, vertexRes->byteOffset, &tempPushConstant);
+        }
+    }
+
+    if (auto* fragmentRes = fragmentResource.findShaderBindInfo(name)) {
+        if (fragmentRes->bindType == BindType::pushConstantMembers) {
+            return HardwarePushConstant(fragmentRes->typeSize, fragmentRes->byteOffset, &tempPushConstant);
+        }
+    }
+    throw std::runtime_error("Failed to find push constant with name: " + name);
+}
+
+HardwareBuffer RasterizerPipelineVulkan::getBuffer(const std::string& name) {
+    throw std::runtime_error("Buffer resource getting not implemented for RasterizerPipeline: " + name);
+}
+
+HardwareImage RasterizerPipelineVulkan::getImage(const std::string& name) {
+    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
+
+    if (auto* fragmentRes = fragmentResource.findShaderBindInfo(name)) {
+        if (fragmentRes->bindType == BindType::stageOutputs) {
+            if (fragmentRes->location < renderTargets.size()) {
                 return renderTargets[fragmentRes->location];
-
-            default:
-                break;
+            }
         }
     }
-
-    throw std::runtime_error("Failed to find resource with name: " + resourceName);
+    throw std::runtime_error("Failed to find image resource with name: " + name);
 }
 
 RasterizerPipelineVulkan* RasterizerPipelineVulkan::operator()(uint16_t width, uint16_t height) {
@@ -547,7 +596,7 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
     // 颜色附件屏障
     for (auto& renderTarget : renderTargets) {
         {
-            auto const handle = globalImageStorages.acquire_read(*renderTarget.getImageID());
+            auto const handle = globalImageStorages.acquire_read(renderTarget.getImageID());
             VkImageMemoryBarrier2 imageBarrier = imageBarrierTemplate;
             imageBarrier.image = handle->imageHandle;
             imageBarrier.oldLayout = handle->imageLayout;
@@ -561,7 +610,7 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
 
         // 更新图像布局
         {
-            auto handle = globalImageStorages.acquire_write(*renderTarget.getImageID());
+            auto handle = globalImageStorages.acquire_write(renderTarget.getImageID());
             handle->imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         }
     }
@@ -569,7 +618,7 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
     // 深度附件屏障
     if (depthImage) {
         {
-            auto const handle = globalImageStorages.acquire_read(*depthImage.getImageID());
+            auto const handle = globalImageStorages.acquire_read(depthImage.getImageID());
             VkImageMemoryBarrier2 imageBarrier = imageBarrierTemplate;
             imageBarrier.image = handle->imageHandle;
             imageBarrier.oldLayout = handle->imageLayout;
@@ -584,7 +633,7 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
 
         // 更新图像布局
         {
-            auto handle = globalImageStorages.acquire_write(*depthImage.getImageID());
+            auto handle = globalImageStorages.acquire_write(depthImage.getImageID());
             handle->imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         }
     }
@@ -613,7 +662,7 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
         requiredBarriers.bufferBarriers.push_back(indexBarrier);
 
         // 顶点缓冲区屏障
-        //for (const auto& vertexBuffer : mesh.vertexBuffers) 
+        // for (const auto& vertexBuffer : mesh.vertexBuffers)
         {
             VkBufferMemoryBarrier2 vertexBarrier = bufferBarrierTemplate;
             {
@@ -654,7 +703,7 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExe
 
         // 转换深度图像布局
         {
-            auto const handle = globalImageStorages.acquire_write(*depthImage.getImageID());
+            auto const handle = globalImageStorages.acquire_write(depthImage.getImageID());
             mainDevice->resourceManager.transitionImageLayout(hardwareExecutor.currentRecordQueue->commandBuffer,
                                                               *handle,
                                                               VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
@@ -673,17 +722,17 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExe
     clearValues.reserve(renderTargets.size() + 1);
 
     for (const auto& renderTarget : renderTargets) {
-        auto const handle = globalImageStorages.acquire_read(*renderTarget.getImageID());
+        auto const handle = globalImageStorages.acquire_read(renderTarget.getImageID());
         clearValues.push_back(handle->clearValue);
     }
 
     {
-        auto const handle = globalImageStorages.acquire_read(*depthImage.getImageID());
+        auto const handle = globalImageStorages.acquire_read(depthImage.getImageID());
         clearValues.push_back(handle->clearValue);
     }
 
     {
-        auto const handle = globalImageStorages.acquire_read(*depthImage.getImageID());
+        auto const handle = globalImageStorages.acquire_read(depthImage.getImageID());
         VkRenderPassBeginInfo renderPassInfo{};
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderPassInfo.renderPass = renderPass;
@@ -735,16 +784,16 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExe
     // 绘制所有几何网格
     for (const auto& mesh : geomMeshesRecord) {
         // 收集顶点缓冲区
-        //std::vector<VkBuffer> vertexBuffers;
-        //std::vector<VkDeviceSize> offsets;
-        //vertexBuffers.reserve(mesh.vertexBuffers.size());
-        //offsets.reserve(mesh.vertexBuffers.size());
+        // std::vector<VkBuffer> vertexBuffers;
+        // std::vector<VkDeviceSize> offsets;
+        // vertexBuffers.reserve(mesh.vertexBuffers.size());
+        // offsets.reserve(mesh.vertexBuffers.size());
 
-        //for (const auto& vertexBuffer : mesh.vertexBuffers) {
-        //    auto handle = globalBufferStorages.acquire_read(*vertexBuffer.getBufferID());
-        //    vertexBuffers.push_back(handle->bufferHandle);
-        //    offsets.push_back(0);
-        //}
+        // for (const auto& vertexBuffer : mesh.vertexBuffers) {
+        //     auto handle = globalBufferStorages.acquire_read(*vertexBuffer.getBufferID());
+        //     vertexBuffers.push_back(handle->bufferHandle);
+        //     offsets.push_back(0);
+        // }
 
         // 绑定顶点缓冲区
         {
