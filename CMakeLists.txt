@@ -92,3 +92,16 @@ if(CABBAGE_HARDWARE_BUILD_EXAMPLES)
 
     add_subdirectory(Examples)
 endif()
+
+
+if (MSVC)
+    # 启用 AddressSanitizer 编译选项
+    add_compile_options(/fsanitize=address)
+
+    # 必须禁用增量链接 (Incremental Linking)
+    # ASan 不兼容 /INCREMENTAL
+    add_link_options(/INCREMENTAL:NO)
+    
+    # (可选) 为了获得更好的堆栈追踪信息，可以加上这个
+    add_compile_options(/Zi) 
+endif()
