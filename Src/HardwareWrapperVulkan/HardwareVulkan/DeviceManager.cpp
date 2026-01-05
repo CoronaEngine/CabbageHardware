@@ -268,7 +268,6 @@ void DeviceManager::createQueueUtils() {
             queueUtils.deviceManager = this;
             queueUtils.queueMutex = std::make_shared<std::mutex>();
             queueUtils.timelineValue = std::make_shared<std::atomic_uint64_t>(0);
-            queueUtils.isPresent = std::make_shared<std::atomic_bool>(false);
 
             createTimelineSemaphoreForQueue(queueUtils);
             createCommandBufferForQueue(queueUtils);

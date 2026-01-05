@@ -18,7 +18,6 @@ class DeviceManager {
     struct QueueUtils {
         std::shared_ptr<std::mutex> queueMutex;
         std::shared_ptr<std::atomic_uint64_t> timelineValue;
-        std::shared_ptr<std::atomic_bool> isPresent;
         VkSemaphore timelineSemaphore{VK_NULL_HANDLE};
         uint32_t queueFamilyIndex = -1;
         VkQueue vkQueue{VK_NULL_HANDLE};
