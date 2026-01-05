@@ -8,6 +8,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+//#include <semaphore>
 
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
@@ -84,11 +85,23 @@ int main() {
     //     glfwSwapBuffers(window);
     // }
 
-    constexpr std::size_t WINDOW_COUNT = 1;
+    constexpr std::size_t WINDOW_COUNT = 4;
     std::vector<GLFWwindow*> windows(WINDOW_COUNT);
     for (size_t i = 0; i < windows.size(); i++) {
         windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
     }
+
+    // 同步原语：每个窗口一套信号量，控制流水线 Mesh -> Render -> Display -> Mesh
+    /*std::vector<std::unique_ptr<std::binary_semaphore>> meshSemaphores;
+    std::vector<std::unique_ptr<std::binary_semaphore>> renderSemaphores;
+    std::vector<std::unique_ptr<std::binary_semaphore>> displaySemaphores;*/
+
+    //for (size_t i = 0; i < WINDOW_COUNT; ++i) {
+    //    // 初始状态：允许 Mesh 线程开始，Render 和 Display 等待
+    //    meshSemaphores.push_back(std::make_unique<std::binary_semaphore>(1));
+    //    renderSemaphores.push_back(std::make_unique<std::binary_semaphore>(0));
+    //    displaySemaphores.push_back(std::make_unique<std::binary_semaphore>(0));
+    //}
 
     {
         std::vector<HardwareImage> finalOutputImages(windows.size());
@@ -154,6 +167,10 @@ int main() {
             uint64_t frameCount = 0;
 
             while (running.load()) {
+                // 等待上一帧显示完成（或初始状态）
+                /*meshSemaphores[threadIndex]->acquire();
+                if (!running.load()) break;*/
+
                 float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
                 // CFW_LOG_INFO("Mesh thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
 
@@ -167,7 +184,12 @@ int main() {
                 computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
                 computeUniformBuffers[threadIndex].copyFromData(&computeUniformData, sizeof(computeUniformData));
                 ++frameCount;
+
+                // 通知渲染线程可以开始
+                //renderSemaphores[threadIndex]->release();
             }
+            // 退出时释放后续信号量，防止死锁
+            //renderSemaphores[threadIndex]->release();
             CFW_LOG_INFO("Mesh thread {} ended.", threadIndex);
         };
 
@@ -180,6 +202,10 @@ int main() {
             uint64_t frameCount = 0;
 
             while (running.load()) {
+                // 等待数据更新完成
+                //renderSemaphores[threadIndex]->acquire();
+                //if (!running.load()) break;
+
                 float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
                 // CFW_LOG_INFO("Render thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
 
@@ -199,7 +225,11 @@ int main() {
                                        << computer(1920 / 8, 1080 / 8, 1)
                                        << executors[threadIndex].commit();
                 ++frameCount;
+
+                // 通知显示线程可以开始
+                //displaySemaphores[threadIndex]->release();
             }
+            //displaySemaphores[threadIndex]->release();
             CFW_LOG_INFO("Render thread {} ended.", threadIndex);
         };
 
@@ -211,12 +241,20 @@ int main() {
             uint64_t frameCount = 0;
 
             while (running.load()) {
+                // 等待渲染提交完成
+                //displaySemaphores[threadIndex]->acquire();
+                //if (!running.load()) break;
+
                 float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
                 // CFW_LOG_INFO("Display thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
 
                 displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
                 ++frameCount;
+
+                // 通知 Mesh 线程开始下一帧
+                //meshSemaphores[threadIndex]->release();
             }
+            //meshSemaphores[threadIndex]->release();
             CFW_LOG_INFO("Display thread {} ended.", threadIndex);
         };
 
@@ -235,6 +273,12 @@ int main() {
             for (size_t i = 0; i < windows.size(); i++) {
                 if (glfwWindowShouldClose(windows[i])) {
                     running.store(false);
+                    // 释放所有信号量以唤醒等待的线程
+                    /*for (size_t j = 0; j < WINDOW_COUNT; ++j) {
+                        meshSemaphores[j]->release();
+                        renderSemaphores[j]->release();
+                        displaySemaphores[j]->release();
+                    }*/
                     break;
                 }
             }
