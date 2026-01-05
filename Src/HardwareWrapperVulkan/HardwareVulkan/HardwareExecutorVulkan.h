@@ -94,7 +94,8 @@ struct HardwareExecutorVulkan {
 
     static DeviceManager::QueueUtils* pickQueueAndCommit(std::atomic_uint16_t& queueIndex,
                                                          std::vector<DeviceManager::QueueUtils>& queues,
-                                                         std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand);
+                                                         std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand,
+                                                         bool needsCommandBuffer = true);
 
     DeviceManager::QueueUtils* currentRecordQueue{nullptr};
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
