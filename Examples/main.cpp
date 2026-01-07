@@ -21,7 +21,8 @@
 #include "TextureTest.h"
 #include "corona/kernel/core/i_logger.h"
 
-struct RasterizerUniformBufferObject {
+struct RasterizerUniformBufferObject
+{
     uint32_t textureIndex;
     ktm::fmat4x4 model = ktm::rotate3d_axis(ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
     ktm::fmat4x4 view = ktm::look_at_lh(ktm::fvec3(2.0f, 2.0f, 2.0f), ktm::fvec3(0.0f, 0.0f, 0.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
@@ -31,11 +32,13 @@ struct RasterizerUniformBufferObject {
     ktm::fvec3 lightPos = ktm::fvec3(1.0f, 1.0f, 1.0f);
 };
 
-struct ComputeUniformBufferObject {
+struct ComputeUniformBufferObject
+{
     uint32_t imageID;
 };
 
-int main() {
+int main()
+{
     Corona::Kernel::CoronaLogger::get_logger()->set_log_level(quill::LogLevel::TraceL3);
     setupSignalHandlers();
 
@@ -44,7 +47,8 @@ int main() {
 
     CFW_LOG_INFO("Starting main application...");
 
-    if (glfwInit() < 0) {
+    if (glfwInit() < 0)
+    {
         return -1;
     }
 
@@ -85,9 +89,10 @@ int main() {
     //     glfwSwapBuffers(window);
     // }
 
-    constexpr std::size_t WINDOW_COUNT = 4;
+    constexpr std::size_t WINDOW_COUNT = 1;
     std::vector<GLFWwindow*> windows(WINDOW_COUNT);
-    for (size_t i = 0; i < windows.size(); i++) {
+    for (size_t i = 0; i < windows.size(); i++)
+    {
         windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
     }
 
@@ -106,7 +111,8 @@ int main() {
     {
         std::vector<HardwareImage> finalOutputImages(windows.size());
         std::vector<HardwareExecutor> executors(windows.size());
-        for (size_t i = 0; i < finalOutputImages.size(); i++) {
+        for (size_t i = 0; i < finalOutputImages.size(); i++)
+        {
             HardwareImageCreateInfo createInfo;
             createInfo.width = 1920;
             createInfo.height = 1080;
@@ -126,15 +132,16 @@ int main() {
 
         // 纹理加载 - 选择以下任一方式
         // 方式1: 加载普通纹理
-        auto textureResult = loadTexture(shaderPath + "/awesomeface.png");
+        //auto textureResult = loadTexture(shaderPath + "/awesomeface.png");
 
         // 方式2: 加载BC1压缩纹理
-        // auto textureResult = loadCompressedTexture(shaderPath + "/awesomeface.png", true);
+        auto textureResult = loadCompressedTexture(shaderPath + "/awesomeface.png", true);
 
         // 方式3: 加载带有 mipmap 和 array layers 的纹理
         // auto textureResult = loadTextureWithMipmapAndLayers(shaderPath + "/awesomeface.png", 2, 5, 1, 0);
 
-        if (!textureResult.success) {
+        if (!textureResult.success)
+        {
             CFW_LOG_ERROR("Failed to load texture, exiting...");
             for (size_t i = 0; i < windows.size(); i++) {
                 glfwDestroyWindow(windows[i]);
@@ -151,14 +158,16 @@ int main() {
 
         std::atomic_bool running = true;
 
-        auto meshThread = [&](uint32_t threadIndex) {
+        auto meshThread = [&](uint32_t threadIndex) 
+            {
             CFW_LOG_INFO("Mesh thread {} started...", threadIndex);
             ComputeUniformBufferObject computeUniformData(windows.size());
             computeUniformBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::UniformBuffer);
 
             std::vector<ktm::fmat4x4> modelMat(20);
             std::vector<RasterizerUniformBufferObject> rasterizerUniformBufferObject(modelMat.size());
-            for (size_t i = 0; i < modelMat.size(); i++) {
+            for (size_t i = 0; i < modelMat.size(); i++)
+            {
                 modelMat[i] = (ktm::translate3d(ktm::fvec3((i % 5) - 2.0f, (i / 5) - 0.5f, 0.0f)) * ktm::scale3d(ktm::fvec3(0.1, 0.1, 0.1)) * ktm::rotate3d_axis(ktm::radians(i * 30.0f), ktm::fvec3(0.0f, 0.0f, 1.0f)));
                 rasterizerUniformBuffers[threadIndex].push_back(HardwareBuffer(sizeof(RasterizerUniformBufferObject), BufferUsage::UniformBuffer, &(modelMat[i])));
             }
@@ -166,7 +175,8 @@ int main() {
             auto startTime = std::chrono::high_resolution_clock::now();
             uint64_t frameCount = 0;
 
-            while (running.load()) {
+            while (running.load())
+            {
                 // 等待上一帧显示完成（或初始状态）
                 /*meshSemaphores[threadIndex]->acquire();
                 if (!running.load()) break;*/
@@ -174,7 +184,8 @@ int main() {
                 float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
                 // CFW_LOG_INFO("Mesh thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
 
-                for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
+                for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++)
+                {
                     // rasterizerUniformBufferObject[i].textureIndex = texture[0][0].storeDescriptor();
                     rasterizerUniformBufferObject[i].textureIndex = textureID;
                     rasterizerUniformBufferObject[i].model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
@@ -193,7 +204,8 @@ int main() {
             CFW_LOG_INFO("Mesh thread {} ended.", threadIndex);
         };
 
-        auto renderThread = [&](uint32_t threadIndex) {
+        auto renderThread = [&](uint32_t threadIndex)
+            {
             CFW_LOG_INFO("Render thread {} started...", threadIndex);
             RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
             ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
@@ -201,7 +213,8 @@ int main() {
             auto startTime = std::chrono::high_resolution_clock::now();
             uint64_t frameCount = 0;
 
-            while (running.load()) {
+            while (running.load())
+            {
                 // 等待数据更新完成
                 //renderSemaphores[threadIndex]->acquire();
                 //if (!running.load()) break;
@@ -209,7 +222,8 @@ int main() {
                 float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
                 // CFW_LOG_INFO("Render thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
 
-                for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++) {
+                for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++)
+                {
                     rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffers[threadIndex][i].storeDescriptor();
                     // rasterizer["inPosition"] = postionBuffer;
                     // rasterizer["inColor"] = colorBuffer;
@@ -233,14 +247,16 @@ int main() {
             CFW_LOG_INFO("Render thread {} ended.", threadIndex);
         };
 
-        auto displayThread = [&](uint32_t threadIndex) {
+        auto displayThread = [&](uint32_t threadIndex)
+            {
             CFW_LOG_INFO("Display thread {} started...", threadIndex);
             HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
 
             auto startTime = std::chrono::high_resolution_clock::now();
             uint64_t frameCount = 0;
 
-            while (running.load()) {
+            while (running.load())
+            {
                 // 等待渲染提交完成
                 //displaySemaphores[threadIndex]->acquire();
                 //if (!running.load()) break;
@@ -262,16 +278,20 @@ int main() {
         std::vector<std::thread> renderThreads;
         std::vector<std::thread> displayThreads;
 
-        for (size_t i = 0; i < windows.size(); i++) {
+        for (size_t i = 0; i < windows.size(); i++)
+        {
             meshThreads.emplace_back(meshThread, i);
             renderThreads.emplace_back(renderThread, i);
             displayThreads.emplace_back(displayThread, i);
         }
 
-        while (running.load()) {
+        while (running.load())
+        {
             glfwPollEvents();
-            for (size_t i = 0; i < windows.size(); i++) {
-                if (glfwWindowShouldClose(windows[i])) {
+            for (size_t i = 0; i < windows.size(); i++)
+            {
+                if (glfwWindowShouldClose(windows[i]))
+                {
                     running.store(false);
                     // 释放所有信号量以唤醒等待的线程
                     /*for (size_t j = 0; j < WINDOW_COUNT; ++j) {
@@ -284,16 +304,19 @@ int main() {
             }
         }
 
-        for (size_t i = 0; i < windows.size(); i++) {
+        for (size_t i = 0; i < windows.size(); i++)
+        {
             if (meshThreads[i].joinable()) meshThreads[i].join();
             if (renderThreads[i].joinable()) renderThreads[i].join();
             if (displayThreads[i].joinable()) displayThreads[i].join();
         }
     }
 
-    for (size_t i = 0; i < windows.size(); i++) {
+    for (size_t i = 0; i < windows.size(); i++)
+    {
         glfwDestroyWindow(windows[i]);
     }
+
     glfwTerminate();
 
     return 0;
