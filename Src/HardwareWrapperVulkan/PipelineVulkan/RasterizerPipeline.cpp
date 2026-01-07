@@ -565,10 +565,6 @@ CommandRecordVulkan* RasterizerPipelineVulkan::record(const HardwareBuffer& inde
 CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) {
     RequiredBarriers requiredBarriers;
 
-    if (geomMeshesRecord.size() <= 0) {
-        return requiredBarriers;
-    }
-
     // 内存屏障
     requiredBarriers.memoryBarriers.resize(1);
     auto& memoryBarrier = requiredBarriers.memoryBarriers[0];
@@ -679,9 +675,6 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
 }
 
 void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan& hardwareExecutor) {
-    if (geomMeshesRecord.size() <= 0) {
-        return;
-    }
 
     const auto mainDevice = globalHardwareContext.getMainDevice();
 
