@@ -231,7 +231,7 @@ int main()
                     // rasterizer["inNormal"] = normalBuffer;
                     rasterizer["outColor"] = finalOutputImages[threadIndex];
 
-                    executors[threadIndex] << rasterizer.record(indexBuffer, vertexBuffer);
+                    rasterizer.record(indexBuffer, vertexBuffer);
                 }
 
                 computer["pushConsts.uniformBufferIndex"] = computeUniformBuffers[threadIndex].storeDescriptor();
