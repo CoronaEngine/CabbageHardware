@@ -4,7 +4,8 @@
 
 class DisplayManager;
 
-struct HardwareContext {
+struct HardwareContext 
+{
    public:
     struct HardwareUtils {
         DeviceManager deviceManager;
