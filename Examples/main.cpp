@@ -39,7 +39,7 @@ struct ComputeUniformBufferObject
 
 int main()
 {
-    Corona::Kernel::CoronaLogger::get_logger()->set_log_level(quill::LogLevel::TraceL3);
+    //Corona::Kernel::CoronaLogger::get_logger()->set_log_level(quill::LogLevel::TraceL3);
     setupSignalHandlers();
 
     // 运行压缩纹理测试（可选）
@@ -89,7 +89,7 @@ int main()
     //     glfwSwapBuffers(window);
     // }
 
-    constexpr std::size_t WINDOW_COUNT = 1;
+    constexpr std::size_t WINDOW_COUNT = 16;
     std::vector<GLFWwindow*> windows(WINDOW_COUNT);
     for (size_t i = 0; i < windows.size(); i++)
     {
@@ -132,10 +132,10 @@ int main()
 
         // 纹理加载 - 选择以下任一方式
         // 方式1: 加载普通纹理
-        //auto textureResult = loadTexture(shaderPath + "/awesomeface.png");
+        auto textureResult = loadTexture(shaderPath + "/awesomeface.png");
 
         // 方式2: 加载BC1压缩纹理
-        auto textureResult = loadCompressedTexture(shaderPath + "/awesomeface.png", true);
+        //auto textureResult = loadCompressedTexture(shaderPath + "/awesomeface.png", true);
 
         // 方式3: 加载带有 mipmap 和 array layers 的纹理
         // auto textureResult = loadTextureWithMipmapAndLayers(shaderPath + "/awesomeface.png", 2, 5, 1, 0);
@@ -143,7 +143,8 @@ int main()
         if (!textureResult.success)
         {
             CFW_LOG_ERROR("Failed to load texture, exiting...");
-            for (size_t i = 0; i < windows.size(); i++) {
+            for (size_t i = 0; i < windows.size(); i++) 
+            {
                 glfwDestroyWindow(windows[i]);
             }
             glfwTerminate();
@@ -158,22 +159,22 @@ int main()
 
         std::atomic_bool running = true;
 
-        auto meshThread = [&](uint32_t threadIndex) 
+        auto meshThread = [&](uint32_t threadIndex)
             {
-            CFW_LOG_INFO("Mesh thread {} started...", threadIndex);
-            ComputeUniformBufferObject computeUniformData(windows.size());
-            computeUniformBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::UniformBuffer);
+                CFW_LOG_INFO("Mesh thread {} started...", threadIndex);
+                ComputeUniformBufferObject computeUniformData(windows.size());
+                computeUniformBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::UniformBuffer);
 
-            std::vector<ktm::fmat4x4> modelMat(20);
-            std::vector<RasterizerUniformBufferObject> rasterizerUniformBufferObject(modelMat.size());
-            for (size_t i = 0; i < modelMat.size(); i++)
-            {
-                modelMat[i] = (ktm::translate3d(ktm::fvec3((i % 5) - 2.0f, (i / 5) - 0.5f, 0.0f)) * ktm::scale3d(ktm::fvec3(0.1, 0.1, 0.1)) * ktm::rotate3d_axis(ktm::radians(i * 30.0f), ktm::fvec3(0.0f, 0.0f, 1.0f)));
-                rasterizerUniformBuffers[threadIndex].push_back(HardwareBuffer(sizeof(RasterizerUniformBufferObject), BufferUsage::UniformBuffer, &(modelMat[i])));
-            }
+                std::vector<ktm::fmat4x4> modelMat(20);
+                std::vector<RasterizerUniformBufferObject> rasterizerUniformBufferObject(modelMat.size());
+                for (size_t i = 0; i < modelMat.size(); i++)
+                {
+                    modelMat[i] = (ktm::translate3d(ktm::fvec3((i % 5) - 2.0f, (i / 5) - 0.5f, 0.0f)) * ktm::scale3d(ktm::fvec3(0.1, 0.1, 0.1)) * ktm::rotate3d_axis(ktm::radians(i * 30.0f), ktm::fvec3(0.0f, 0.0f, 1.0f)));
+                    rasterizerUniformBuffers[threadIndex].push_back(HardwareBuffer(sizeof(RasterizerUniformBufferObject), BufferUsage::UniformBuffer, &(modelMat[i])));
+                }
 
-            auto startTime = std::chrono::high_resolution_clock::now();
-            uint64_t frameCount = 0;
+                auto startTime = std::chrono::high_resolution_clock::now();
+                uint64_t frameCount = 0;
 
             while (running.load())
             {

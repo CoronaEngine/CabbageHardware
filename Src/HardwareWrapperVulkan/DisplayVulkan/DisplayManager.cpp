@@ -635,6 +635,7 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage)
 
         *displayDeviceExecutor << &blitCmd << &transitionCmd
                                << displayDeviceExecutor->wait(waitSemaphoreInfos, signalSemaphoreInfos)
+                               //<< displayDeviceExecutor->commitTest();
                                << displayDeviceExecutor->commit();
 
         // vkWaitForFences(displayDevice->deviceManager.getLogicalDevice(), 1, &copyFences[currentFrame], VK_TRUE, UINT64_MAX);
