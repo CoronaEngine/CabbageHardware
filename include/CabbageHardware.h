@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "Compiler/ShaderCodeCompiler.h"
+#include "HardwareCommands.h"
 
 // Forward declare platform-specific types instead of including platform headers
 #if defined(_WIN32)
@@ -110,7 +111,17 @@ struct HardwareBuffer {
 
     [[nodiscard]] uint32_t storeDescriptor() const;
 
-    bool copyFromBuffer(const HardwareBuffer& inputBuffer, const HardwareExecutor* executor) const;
+    // 流式拷贝命令（用于 HardwareExecutor << ）
+    [[nodiscard]] BufferCopyCommand copyTo(const HardwareBuffer& dst,
+                                           uint64_t srcOffset = 0,
+                                           uint64_t dstOffset = 0,
+                                           uint64_t size = 0) const;
+    [[nodiscard]] BufferToImageCommand copyTo(const HardwareImage& dst,
+                                              uint64_t bufferOffset = 0,
+                                              uint32_t imageLayer = 0,
+                                              uint32_t imageMip = 0) const;
+
+    // CPU 映射内存操作（非 GPU 命令）
     bool copyFromData(const void* inputData, uint64_t size) const;
     bool copyToData(void* outputData, uint64_t size) const;
 
@@ -173,9 +184,6 @@ struct HardwareImage {
 
     //[[nodiscard]] uint32_t getNumMipLevels() const;
     //[[nodiscard]] uint32_t getArrayLayers() const;
-
-    HardwareImage& copyFromBuffer(const HardwareBuffer& buffer, HardwareExecutor* executor, uint32_t mipLevel = 0);
-    HardwareImage& copyFromData(const void* inputData, HardwareExecutor* executor, uint32_t mipLevel = 0);
 
    private:
     std::atomic<std::uintptr_t> imageID;
@@ -382,6 +390,7 @@ struct HardwareExecutor {
     HardwareExecutor& operator<<(ComputePipeline& computePipeline);
     HardwareExecutor& operator<<(RasterizerPipeline& rasterizerPipeline);
     HardwareExecutor& operator<<(HardwareExecutor& other);
+    HardwareExecutor& operator<<(const CopyCommand& cmd);
 
     HardwareExecutor& wait(HardwareExecutor& other);
     HardwareExecutor& commit();
