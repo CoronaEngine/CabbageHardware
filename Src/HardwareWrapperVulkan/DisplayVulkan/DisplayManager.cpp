@@ -493,12 +493,12 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
 
         // 等待前一帧完成
         VkResult presentFenceResult = vkWaitForFences(displayDevice->deviceManager.getLogicalDevice(), 1, &presentFences[currentFrame], VK_TRUE, UINT64_MAX);
-        if (presentFenceResult == VK_SUCCESS) {
-            if (fenceToPresent.count(presentFences[currentFrame])) {
-                fenceToPresent[presentFences[currentFrame]]->isPresent->store(false, std::memory_order_release);
-                // fenceToPresent.erase(presentFences[currentFrame]);
-            }
-        }
+        //if (presentFenceResult == VK_SUCCESS) {
+        //    if (fenceToPresent.count(presentFences[currentFrame])) {
+        //        fenceToPresent[presentFences[currentFrame]]->isPresent->store(false, std::memory_order_release);
+        //        // fenceToPresent.erase(presentFences[currentFrame]);
+        //    }
+        //}
 
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(displayDevice->deviceManager.getLogicalDevice(),
@@ -585,14 +585,14 @@ bool DisplayManager::displayFrame(void* surface, HardwareImage displayImage) {
         auto commitToQueue = [&](DeviceManager::QueueUtils* currentRecordQueue) -> bool {
             VkResult queueResult = vkQueuePresentKHR(currentRecordQueue->vkQueue, &presentInfo);
 
-            if (queueResult == VK_SUCCESS || queueResult == VK_SUBOPTIMAL_KHR) {
-                currentRecordQueue->isPresent->store(true, std::memory_order_release);
+            /*if (queueResult == VK_SUCCESS || queueResult == VK_SUBOPTIMAL_KHR) {
+                
                 fenceToPresent[presentFences[currentFrame]] = currentRecordQueue;
-            }
+            }*/
             return (queueResult == VK_SUCCESS || queueResult == VK_SUBOPTIMAL_KHR);
         };
 
-        HardwareExecutorVulkan::pickQueueAndCommit(currentQueueIndex, presentQueues, commitToQueue);
+        HardwareExecutorVulkan::pickQueueAndCommit(currentQueueIndex, presentQueues, commitToQueue, false);
         currentFrame = (currentFrame + 1) % swapChainImages.size();
         return true;
     } catch (const std::exception& e) {

@@ -43,7 +43,7 @@ class DisplayManager {
     std::vector<VkSemaphore> binaryPresentSemaphore;
     // std::vector<VkFence> copyFences;
     std::vector<VkFence> presentFences;
-    std::unordered_map<VkFence, DeviceManager::QueueUtils*> fenceToPresent;
+    //std::unordered_map<VkFence, DeviceManager::QueueUtils*> fenceToPresent;
 
     // 队列和设备
     std::atomic_uint16_t currentQueueIndex{0};

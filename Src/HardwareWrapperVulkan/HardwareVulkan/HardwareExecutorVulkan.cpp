@@ -2,22 +2,25 @@
 
 DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomic_uint16_t& currentQueueIndex,
                                                                       std::vector<DeviceManager::QueueUtils>& currentQueues,
-                                                                      std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand) {
+                                                                      std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand,
+                                                                      bool needsCommandBuffer) {
     DeviceManager::QueueUtils* queue;
     uint16_t queueIndex = 0;
-
-    uint32_t spins = 0, yields = 0;  // 当前自旋和让出计数 / Current spin and yield counters
-    uint32_t actualSleepMicros = 0;
+    uint32_t yields = 0;
 
     while (true) {
         uint16_t queueIndex = currentQueueIndex.fetch_add(1) % currentQueues.size();
         queue = &currentQueues[queueIndex];
 
         if (queue->queueMutex->try_lock()) {
+            if (!needsCommandBuffer) {
+                break;
+            }
+
             uint64_t timelineCounterValue = 0;
             VkResult result = vkGetSemaphoreCounterValue(queue->deviceManager->logicalDevice, queue->timelineSemaphore, &timelineCounterValue);
             if (result == VK_SUCCESS) {
-                if (timelineCounterValue >= queue->timelineValue->load(std::memory_order_acquire) && queue->isPresent->load(std::memory_order_acquire) == false) {
+                if (timelineCounterValue >= queue->timelineValue->load(std::memory_order_acquire)) {
                     break;
                 } else {
                     queue->queueMutex->unlock();
@@ -29,24 +32,12 @@ DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
             }
         }
 
-        // // 自旋 / Spin
-        // if (++spins < 5)
-        //     continue;
+         if (++yields < 8) {
+             std::this_thread::yield();
+             continue;
+         }
 
-        // // 自旋次数过多 让出CPU / If spinned to many circles,then Yield CPU
-        // if (++yields < 8) {
-        //     std::this_thread::yield();
-        //     continue;
-        // }
-
-        // if (true) {
-        //     actualSleepMicros += 3;
-        //     actualSleepMicros = actualSleepMicros & 0xFFFFu;
-
-        //     // 循环等待次数实在太多，微休眠 / If loop ran to many time,sleep briefly.
-        //     std::this_thread::sleep_for(std::chrono::microseconds(actualSleepMicros));
-        // }
-        std::this_thread::yield();
+        //std::this_thread::sleep_for(std::chrono::microseconds(10000));
     }
 
     commitCommand(queue);
@@ -54,6 +45,87 @@ DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
 
     return queue;
 }
+
+//DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomic_uint16_t& currentQueueIndex,
+//                                                                      std::vector<DeviceManager::QueueUtils>& currentQueues,
+//                                                                      std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand) {
+//    DeviceManager::QueueUtils* queue = nullptr;
+//    size_t queueCount = currentQueues.size();
+//
+//    // 1. 快速路径：尝试遍历所有队列，寻找立即可用的队列 (Fast Path)
+//    // 避免不必要的阻塞，如果运气好能直接找到空闲队列
+//    for (size_t i = 0; i < queueCount; ++i) {
+//        uint16_t index = currentQueueIndex.fetch_add(1) % queueCount;
+//        queue = &currentQueues[index];
+//
+//        if (queue->queueMutex->try_lock()) {
+//            uint64_t timelineCounterValue = 0;
+//            VkResult result = vkGetSemaphoreCounterValue(queue->deviceManager->logicalDevice, queue->timelineSemaphore, &timelineCounterValue);
+//            if (result == VK_SUCCESS) {
+//                // 检查 GPU 是否完成且当前不在 Present 状态
+//                if (timelineCounterValue >= queue->timelineValue->load(std::memory_order_acquire) &&
+//                    queue->isPresent->load(std::memory_order_acquire) == false) {
+//                    goto COMMIT_AND_RETURN;
+//                }
+//            }
+//            queue->queueMutex->unlock();
+//        }
+//    }
+//
+//    // 2. 慢速路径：所有队列都忙，必须阻塞等待 (Slow Path)
+//    // 既然都忙，就选一个队列（这里选下一个）进行阻塞等待，直到它可用。
+//    {
+//        uint16_t index = currentQueueIndex.fetch_add(1) % queueCount;
+//        queue = &currentQueues[index];
+//
+//        // 阻塞获取锁，不再 try_lock
+//        queue->queueMutex->lock();
+//
+//        // 等待 isPresent 标志清除
+//        // 如果该队列正在被显示引擎使用，我们必须等待。
+//        // 这里使用 yield 循环，因为 Present 通常很快。
+//        while (queue->isPresent->load(std::memory_order_acquire)) {
+//            queue->queueMutex->unlock();
+//            std::this_thread::yield();
+//            queue->queueMutex->lock();
+//        }
+//
+//        // 检查 GPU 进度
+//        uint64_t targetValue = queue->timelineValue->load(std::memory_order_acquire);
+//        uint64_t currentValue = 0;
+//        VkResult result = vkGetSemaphoreCounterValue(queue->deviceManager->logicalDevice, queue->timelineSemaphore, &currentValue);
+//
+//        if (result == VK_SUCCESS) {
+//            if (currentValue < targetValue) {
+//                // GPU 还没跑完，使用 vkWaitSemaphores 高效阻塞等待
+//                // 这会让操作系统挂起当前线程，直到 GPU 发出信号，不会占用 CPU 且响应最快
+//                VkSemaphoreWaitInfo waitInfo{};
+//                waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+//                waitInfo.semaphoreCount = 1;
+//                waitInfo.pSemaphores = &queue->timelineSemaphore;
+//                waitInfo.pValues = &targetValue;
+//
+//                // 等待直到 GPU 追上进度 (使用 UINT64_MAX 表示无限等待)
+//                VkResult waitResult = vkWaitSemaphores(queue->deviceManager->logicalDevice, &waitInfo, UINT64_MAX);
+//                if (waitResult != VK_SUCCESS) {
+//                    queue->queueMutex->unlock();
+//                    CFW_LOG_ERROR("Failed to wait for timeline semaphore! VkResult: {}", coronaHardwareResultStr(waitResult));
+//                    return nullptr;
+//                }
+//            }
+//        } else {
+//            queue->queueMutex->unlock();
+//            CFW_LOG_ERROR("Failed to get timeline semaphore counter value for queue index {}!", index);
+//            return nullptr;
+//        }
+//    }
+//
+//COMMIT_AND_RETURN:
+//    commitCommand(queue);
+//    queue->queueMutex->unlock();
+//
+//    return queue;
+//}
 
 HardwareExecutorVulkan& HardwareExecutorVulkan::commit() {
     if (commandList.size() > 0) {

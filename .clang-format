@@ -1,5 +1,5 @@
----
-BasedOnStyle: Google
+﻿---
+BasedOnStyle: Microsoft
 # 列字符数限制
 ColumnLimit: 0
 IndentWidth: 4
