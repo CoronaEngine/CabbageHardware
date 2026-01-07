@@ -1,4 +1,5 @@
 ﻿#include "CabbageHardware.h"
+#include "HardwareCommands.h"
 #include "HardwareWrapperVulkan/HardwareContext.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/ResourceCommand.h"
@@ -522,6 +523,19 @@ uint32_t HardwareImage::storeDescriptor()
 {
     auto imageHandle = globalImageStorages.acquire_write(imageID.load(std::memory_order_acquire));
     return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle);
+}
+
+ImageCopyCommand HardwareImage::copyTo(const HardwareImage& dst,
+                                       uint32_t srcLayer, uint32_t dstLayer,
+                                       uint32_t srcMip, uint32_t dstMip) const {
+    return ImageCopyCommand(*this, dst, srcLayer, dstLayer, srcMip, dstMip);
+}
+
+ImageToBufferCommand HardwareImage::copyTo(const HardwareBuffer& dst,
+                                           uint32_t imageLayer,
+                                           uint32_t imageMip,
+                                           uint64_t bufferOffset) const {
+    return ImageToBufferCommand(*this, dst, imageLayer, imageMip, bufferOffset);
 }
 
 // uint32_t HardwareImage::getNumMipLevels() const {

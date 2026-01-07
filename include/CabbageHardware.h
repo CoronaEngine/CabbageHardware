@@ -182,6 +182,15 @@ struct HardwareImage {
         return imageID.load(std::memory_order_acquire);
     }
 
+    // 流式拷贝命令（用于 HardwareExecutor << ）
+    [[nodiscard]] ImageCopyCommand copyTo(const HardwareImage& dst,
+                                          uint32_t srcLayer = 0, uint32_t dstLayer = 0,
+                                          uint32_t srcMip = 0, uint32_t dstMip = 0) const;
+    [[nodiscard]] ImageToBufferCommand copyTo(const HardwareBuffer& dst,
+                                              uint32_t imageLayer = 0,
+                                              uint32_t imageMip = 0,
+                                              uint64_t bufferOffset = 0) const;
+
     //[[nodiscard]] uint32_t getNumMipLevels() const;
     //[[nodiscard]] uint32_t getArrayLayers() const;
 

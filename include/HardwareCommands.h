@@ -31,3 +31,18 @@ struct BufferToImageCommand : CopyCommand {
     BufferToImageCommand(const HardwareBuffer& src, const HardwareImage& dst,
                          uint64_t bufferOffset = 0, uint32_t imageLayer = 0, uint32_t imageMip = 0);
 };
+
+// ================= Image 到 Image 拷贝命令 =================
+struct ImageCopyCommand : CopyCommand {
+    ImageCopyCommand() = default;
+    ImageCopyCommand(const HardwareImage& src, const HardwareImage& dst,
+                     uint32_t srcLayer = 0, uint32_t dstLayer = 0,
+                     uint32_t srcMip = 0, uint32_t dstMip = 0);
+};
+
+// ================= Image 到 Buffer 拷贝命令 =================
+struct ImageToBufferCommand : CopyCommand {
+    ImageToBufferCommand() = default;
+    ImageToBufferCommand(const HardwareImage& src, const HardwareBuffer& dst,
+                         uint32_t imageLayer = 0, uint32_t imageMip = 0, uint64_t bufferOffset = 0);
+};
