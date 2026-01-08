@@ -135,7 +135,7 @@ int main()
         auto textureResult = loadTexture(shaderPath + "/awesomeface.png");
 
         // 方式2: 加载BC1压缩纹理
-        //auto textureResult = loadCompressedTexture(shaderPath + "/awesomeface.png", true);
+        // auto textureResult = loadCompressedTexture(shaderPath + "/awesomeface.png", true);
 
         // 方式3: 加载带有 mipmap 和 array layers 的纹理
         // auto textureResult = loadTextureWithMipmapAndLayers(shaderPath + "/awesomeface.png", 2, 5, 1, 0);

@@ -1,4 +1,5 @@
 ﻿#include "CabbageHardware.h"
+#include "HardwareCommands.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 #include "HardwareWrapperVulkan/PipelineVulkan/ComputePipeline.h"
 #include "HardwareWrapperVulkan/PipelineVulkan/RasterizerPipeline.h"
@@ -165,6 +166,30 @@ HardwareExecutor& HardwareExecutor::operator<<(RasterizerPipeline& rasterizerPip
 
 HardwareExecutor& HardwareExecutor::operator<<(HardwareExecutor& other) {
     return other;
+}
+
+// CopyCommandImpl 前向声明（定义在 HardwareCommands.cpp 中）
+struct CopyCommandImpl {
+    virtual ~CopyCommandImpl() = default;
+    virtual CommandRecordVulkan* getCommandRecord() = 0;
+};
+
+HardwareExecutor& HardwareExecutor::operator<<(const CopyCommand& cmd) {
+    if (!cmd.impl) {
+        return *this;
+    }
+    auto const self_id = executorID.load(std::memory_order_acquire);
+    if (self_id == 0) {
+        return *this;
+    }
+    auto executor_handle = gExecutorStorage.acquire_write(self_id);
+    if (executor_handle->impl) {
+        CommandRecordVulkan* record = cmd.impl->getCommandRecord();
+        if (record) {
+            *executor_handle->impl << record;
+        }
+    }
+    return *this;
 }
 
 HardwareExecutor& HardwareExecutor::wait(HardwareExecutor& other) {

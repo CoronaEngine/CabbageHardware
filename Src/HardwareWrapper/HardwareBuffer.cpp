@@ -1,4 +1,5 @@
 ﻿#include "CabbageHardware.h"
+#include "HardwareCommands.h"
 #include "HardwareWrapperVulkan/HardwareContext.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/ResourceCommand.h"
@@ -226,46 +227,18 @@ HardwareBuffer::operator bool() const
     return self_buffer_id > 0 && globalBufferStorages.acquire_read(self_buffer_id)->bufferHandle != VK_NULL_HANDLE;
 }
 
-bool HardwareBuffer::copyFromBuffer(const HardwareBuffer& inputBuffer, const HardwareExecutor* executor) const {
-    if (!executor || executor->getExecutorID() == 0) {
-        return false;
-    }
-    auto const input_buffer_id = inputBuffer.bufferID.load(std::memory_order_acquire);
-    auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
+BufferCopyCommand HardwareBuffer::copyTo(const HardwareBuffer& dst,
+                                         uint64_t srcOffset,
+                                         uint64_t dstOffset,
+                                         uint64_t size) const {
+    return BufferCopyCommand(*this, dst, srcOffset, dstOffset, size);
+}
 
-    if (executor->getExecutorID() == 0) {
-        CFW_LOG_WARNING("Invalid HardwareExecutor provided for buffer copy.");
-        return false;
-    }
-
-    if (input_buffer_id == 0 || self_buffer_id == 0) {
-        CFW_LOG_WARNING("Copy operation failed due to uninitialized HardwareBuffer.");
-        return false;
-    }
-
-    if (input_buffer_id < self_buffer_id) {
-        auto const executor_handle = gExecutorStorage.acquire_write(executor->getExecutorID());
-        auto const srcBuffer = globalBufferStorages.acquire_write(input_buffer_id);
-        auto const dstBuffer = globalBufferStorages.acquire_write(self_buffer_id);
-        CopyBufferCommand copyCmd(*srcBuffer, *dstBuffer);
-
-        if (!executor_handle->impl) {
-            return false;
-        }
-        *executor_handle->impl << &copyCmd;
-    } else {
-        auto const executor_handle = gExecutorStorage.acquire_write(executor->getExecutorID());
-        auto const dstBuffer = globalBufferStorages.acquire_write(self_buffer_id);
-        auto const srcBuffer = globalBufferStorages.acquire_write(input_buffer_id);
-        CopyBufferCommand copyCmd(*srcBuffer, *dstBuffer);
-
-        if (!executor_handle->impl) {
-            return false;
-        }
-        *executor_handle->impl << &copyCmd;
-    }
-
-    return true;
+BufferToImageCommand HardwareBuffer::copyTo(const HardwareImage& dst,
+                                            uint64_t bufferOffset,
+                                            uint32_t imageLayer,
+                                            uint32_t imageMip) const {
+    return BufferToImageCommand(*this, dst, bufferOffset, imageLayer, imageMip);
 }
 
 uint32_t HardwareBuffer::storeDescriptor() const {
