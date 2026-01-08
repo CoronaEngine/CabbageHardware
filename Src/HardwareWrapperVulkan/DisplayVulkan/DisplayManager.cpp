@@ -206,7 +206,7 @@ void DisplayManager::createSyncObjects()
         coronaHardwareCheck(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &binaryAcquireSemaphore[i]));
         coronaHardwareCheck(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &binaryPresentSemaphore[i]));
         coronaHardwareCheck(vkCreateFence(device, &fenceInfo, nullptr, &presentFences[i]));
-        // coronaHardwareCheck(vkCreateFence(device, &fenceInfo, nullptr, &copyFences[i]));
+        //coronaHardwareCheck(vkCreateFence(device, &fenceInfo, nullptr, &copyFences[i]));
     }
 }
 
@@ -288,7 +288,7 @@ void DisplayManager::choosePresentDevice()
     }
 #endif
 
-    if (!displayDevice || presentQueues.empty()) 
+    if (!displayDevice || presentQueues.empty())
     {
         throw std::runtime_error("Failed to find suitable present device");
     }
@@ -297,7 +297,7 @@ void DisplayManager::choosePresentDevice()
     displayDeviceExecutor = std::make_shared<HardwareExecutorVulkan>(displayDevice);
 }
 
-void DisplayManager::createSwapChain() 
+void DisplayManager::createSwapChain()
 {
     VkSurfaceCapabilitiesKHR capabilities;
     VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
@@ -439,7 +439,7 @@ void DisplayManager::createSwapChain()
     }
 }
 
-void DisplayManager::recreateSwapChain() 
+void DisplayManager::recreateSwapChain()
 {
     vkDeviceWaitIdle(displayDevice->deviceManager.getLogicalDevice());
     cleanupSwapChainImages();
@@ -496,7 +496,7 @@ void DisplayManager::setupCrossDeviceTransfer(const ResourceManager::ImageHardwa
     dstStaging = displayDevice->resourceManager.importBufferMemory(memHandle, srcStaging.elementCount, srcStaging.elementSize,srcStaging.bufferAllocInfo.size,srcStaging.bufferUsage);*/
 }
 
-bool DisplayManager::waitExecutor(HardwareExecutorVulkan& executor) 
+bool DisplayManager::waitExecutor(HardwareExecutorVulkan& executor)
 {
     waitedExecutor = std::make_shared<HardwareExecutorVulkan>(executor);
     return true;

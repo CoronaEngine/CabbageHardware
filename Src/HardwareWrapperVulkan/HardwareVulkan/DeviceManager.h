@@ -5,9 +5,11 @@
 #include "FeaturesChain.h"
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 
-class DeviceManager {
+class DeviceManager 
+{
    public:
-    struct ExternalSemaphoreHandle {
+    struct ExternalSemaphoreHandle 
+    {
 #if _WIN32 || _WIN64
         HANDLE handle = nullptr;
 #else
@@ -15,7 +17,8 @@ class DeviceManager {
 #endif
     };
 
-    struct QueueUtils {
+    struct QueueUtils 
+    {
         std::shared_ptr<std::mutex> queueMutex;
         std::shared_ptr<std::atomic_uint64_t> timelineValue;
         VkSemaphore timelineSemaphore{VK_NULL_HANDLE};
@@ -26,7 +29,8 @@ class DeviceManager {
         DeviceManager* deviceManager{nullptr};
     };
 
-    struct FeaturesUtils {
+    struct FeaturesUtils 
+    {
         std::set<const char*> instanceExtensions;
         std::set<const char*> deviceExtensions;
         VkPhysicalDeviceAccelerationStructurePropertiesKHR accelerationStructureProperties{};
@@ -57,7 +61,8 @@ class DeviceManager {
     FeaturesUtils& getFeaturesUtils() { return deviceFeaturesUtils; }
     uint16_t getQueueFamilyNumber() const { return static_cast<uint16_t>(queueFamilies.size()); }
 
-    bool operator==(const DeviceManager& other) const {
+    bool operator==(const DeviceManager& other) const
+    {
         return physicalDevice == other.physicalDevice && logicalDevice == other.logicalDevice;
     }
 

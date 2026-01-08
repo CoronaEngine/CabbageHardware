@@ -55,7 +55,7 @@ HardwareExecutorVulkan& HardwareExecutorVulkan::commit()
 {
     if (commandList.size() > 0) 
     {
-        auto commitToQueue = [&](DeviceManager::QueueUtils* currentRecordQueue) -> bool 
+        auto commitToQueue = [&](DeviceManager::QueueUtils* currentRecordQueue) -> bool
             {
                 this->currentRecordQueue = currentRecordQueue;
 

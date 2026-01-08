@@ -45,7 +45,7 @@ struct CommandRecordVulkan
     ExecutorType executorType{ExecutorType::Invalid};
 };
 
-struct HardwareExecutorVulkan 
+struct HardwareExecutorVulkan
 {
     explicit HardwareExecutorVulkan(std::shared_ptr<HardwareContext::HardwareUtils> context)
         : hardwareContext(std::move(context)) 
@@ -86,7 +86,7 @@ struct HardwareExecutorVulkan
         return *this;
     }
 
-    HardwareExecutorVulkan& wait(HardwareExecutorVulkan& other) 
+    HardwareExecutorVulkan& wait(HardwareExecutorVulkan& other)
     {
         if (other)
         {

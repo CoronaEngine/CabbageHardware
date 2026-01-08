@@ -109,11 +109,10 @@ inline void printExtensionWarning(const char* extensionName)
 
 inline VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) 
 {
-    CFW_LOG_ERROR(
-        "---------- Vulkan Validation Layer ----------\n"
-        "{}\n"
-        "----------------------------------------------\n",
-        pCallbackData->pMessage);
+    CFW_LOG_ERROR("---------- Vulkan Validation Layer ----------\n"
+                  "{}\n"
+                  "----------------------------------------------\n",
+                  pCallbackData->pMessage);
     return VK_FALSE;
 }
 
@@ -121,33 +120,38 @@ inline VkResult createDebugUtilsMessengerEXT(VkInstance instance, const VkDebugU
 {
     auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
 
-    if (func != nullptr) {
+    if (func != nullptr) 
+    {
         return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
     }
     return VK_ERROR_EXTENSION_NOT_PRESENT;
 }
 
-inline void destroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator) {
+inline void destroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator)
+{
     auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
 
-    if (func != nullptr) {
+    if (func != nullptr)
+    {
         func(instance, debugMessenger, pAllocator);
     }
 }
 
-inline constexpr int getDeviceTypePriority(VkPhysicalDeviceType deviceType) {
-    switch (deviceType) {
-        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
-            return 0;
-        case VK_PHYSICAL_DEVICE_TYPE_OTHER:
-            return 1;
-        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
-            return 2;
-        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
-            return 3;
-        case VK_PHYSICAL_DEVICE_TYPE_CPU:
-            return 4;
-        default:
-            return 5;
+inline constexpr int getDeviceTypePriority(VkPhysicalDeviceType deviceType)
+{
+    switch (deviceType) 
+    {
+    case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+        return 0;
+    case VK_PHYSICAL_DEVICE_TYPE_OTHER:
+        return 1;
+    case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+        return 2;
+    case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+        return 3;
+    case VK_PHYSICAL_DEVICE_TYPE_CPU:
+        return 4;
+    default:
+        return 5;
     }
 }
