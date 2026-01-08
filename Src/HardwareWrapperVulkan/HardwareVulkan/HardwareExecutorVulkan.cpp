@@ -1,6 +1,6 @@
 ﻿#include "HardwareExecutorVulkan.h"
 
-DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomic_uint16_t &currentQueueIndex,
+DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomic_uint16_t &currentQueueIndex,
                                                                       std::vector<DeviceManager::QueueUtils> &currentQueues,
                                                                       std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand,
                                                                       bool needsCommandBuffer)
@@ -17,6 +17,23 @@ DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
         {
             if (!needsCommandBuffer)
             {
+                if (queue->queueWaitFence != VK_NULL_HANDLE)
+                {
+                    VkResult status = vkGetFenceStatus(queue->deviceManager->logicalDevice, queue->queueWaitFence);
+                    if (status == VK_SUCCESS)
+                    {
+                        // fence已经是signaled状态
+                        queue->queueWaitFence = VK_NULL_HANDLE;
+                        break;
+                    }
+                    else if (status == VK_NOT_READY)
+                    {
+                        // fence还未signaled
+                        queue->queueMutex->unlock();
+                        std::this_thread::yield();
+                        continue;
+                    }
+                }
                 break;
             }
 

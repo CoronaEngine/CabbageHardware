@@ -75,12 +75,12 @@ struct HardwareExecutorVulkan
         return *this;
     }
 
-    HardwareExecutorVulkan &operator<<(HardwareExecutorVulkan &other)
+    HardwareExecutorVulkan& operator<<(HardwareExecutorVulkan &other)
     {
         return other;
     }
 
-    HardwareExecutorVulkan &wait(const std::vector<VkSemaphoreSubmitInfo> &waitInfos = {},
+    HardwareExecutorVulkan& wait(const std::vector<VkSemaphoreSubmitInfo> &waitInfos = {},
                                  const std::vector<VkSemaphoreSubmitInfo> &signalInfos = {})
     {
         // waitFence = fence;
@@ -89,7 +89,7 @@ struct HardwareExecutorVulkan
         return *this;
     }
 
-    HardwareExecutorVulkan &wait(HardwareExecutorVulkan &other)
+    HardwareExecutorVulkan& wait(HardwareExecutorVulkan &other)
     {
         if (other)
         {
@@ -108,11 +108,11 @@ struct HardwareExecutorVulkan
         return (!commandList.empty()) && (currentRecordQueue != nullptr);
     }
 
-    HardwareExecutorVulkan &commit();
+    HardwareExecutorVulkan& commit();
 
-    static DeviceManager::QueueUtils *pickQueueAndCommit(std::atomic_uint16_t &queueIndex,
-                                                         std::vector<DeviceManager::QueueUtils> &queues,
-                                                         std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand,
+    static DeviceManager::QueueUtils* pickQueueAndCommit(std::atomic_uint16_t& queueIndex,
+                                                         std::vector<DeviceManager::QueueUtils>& queues,
+                                                         std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand,
                                                          bool needsCommandBuffer = true);
 
     DeviceManager::QueueUtils *currentRecordQueue{nullptr};
@@ -120,5 +120,7 @@ struct HardwareExecutorVulkan
     std::vector<CommandRecordVulkan *> commandList;
     std::vector<VkSemaphoreSubmitInfo> waitSemaphores;
     std::vector<VkSemaphoreSubmitInfo> signalSemaphores;
+    //std::vector<VkFence> prentFences;
     VkFence waitFence{VK_NULL_HANDLE};
+    //std::unordered_map<VkFence, DeviceManager::QueueUtils*> fenceToPresent;
 };
