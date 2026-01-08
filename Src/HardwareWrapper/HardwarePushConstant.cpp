@@ -3,13 +3,13 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/utils/storage.h"
 
-static void incrementPushConstantRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<PushConstantWrap, 4, 2>::WriteHandle &handle)
+static void incrementPushConstantRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<PushConstantWrap>::WriteHandle &handle)
 {
     ++handle->refCount;
     // CFW_LOG_TRACE("HardwarePushConstant ref++: id={}, count={}", id, handle->refCount);
 }
 
-static bool decrementPushConstantRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<PushConstantWrap, 4, 2>::WriteHandle &handle)
+static bool decrementPushConstantRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<PushConstantWrap>::WriteHandle &handle)
 {
     int count = --handle->refCount;
     // CFW_LOG_TRACE("HardwarePushConstant ref--: id={}, count={}", id, count);
