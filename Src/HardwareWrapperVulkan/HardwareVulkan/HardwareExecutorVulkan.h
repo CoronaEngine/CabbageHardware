@@ -109,7 +109,6 @@ struct HardwareExecutorVulkan
     }
 
     HardwareExecutorVulkan &commit();
-    HardwareExecutorVulkan &commitTest();
 
     static DeviceManager::QueueUtils *pickQueueAndCommit(std::atomic_uint16_t &queueIndex,
                                                          std::vector<DeviceManager::QueueUtils> &queues,
@@ -118,9 +117,7 @@ struct HardwareExecutorVulkan
 
     DeviceManager::QueueUtils *currentRecordQueue{nullptr};
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
-
     std::vector<CommandRecordVulkan *> commandList;
-
     std::vector<VkSemaphoreSubmitInfo> waitSemaphores;
     std::vector<VkSemaphoreSubmitInfo> signalSemaphores;
     VkFence waitFence{VK_NULL_HANDLE};
