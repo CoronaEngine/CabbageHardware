@@ -2,19 +2,23 @@
 
 // CopyBufferCommand implementations
 CopyBufferCommand::CopyBufferCommand(ResourceManager::BufferHardwareWrap& src, ResourceManager::BufferHardwareWrap& dst)
-    : srcBuffer(src), dstBuffer(dst) {
+    : srcBuffer(src), dstBuffer(dst) 
+{
     executorType = ExecutorType::Transfer;
 }
 
-CommandRecordVulkan::ExecutorType CopyBufferCommand::getExecutorType() {
+CommandRecordVulkan::ExecutorType CopyBufferCommand::getExecutorType() 
+{
     return CommandRecordVulkan::ExecutorType::Transfer;
 }
 
-void CopyBufferCommand::commitCommand(HardwareExecutorVulkan& hardwareExecutor) {
+void CopyBufferCommand::commitCommand(HardwareExecutorVulkan& hardwareExecutor) 
+{
     hardwareExecutor.hardwareContext->resourceManager.copyBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, srcBuffer, dstBuffer);
 }
 
-CommandRecordVulkan::RequiredBarriers CopyBufferCommand::getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) {
+CommandRecordVulkan::RequiredBarriers CopyBufferCommand::getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) 
+{
     CommandRecordVulkan::RequiredBarriers requiredBarriers;
 
     {
@@ -56,19 +60,23 @@ CommandRecordVulkan::RequiredBarriers CopyBufferCommand::getRequiredBarriers(Har
 
 // CopyImageCommand implementations
 CopyImageCommand::CopyImageCommand(ResourceManager::ImageHardwareWrap& srcImg, ResourceManager::ImageHardwareWrap& dstImg)
-    : srcImage(srcImg), dstImage(dstImg) {
+    : srcImage(srcImg), dstImage(dstImg) 
+{
     executorType = ExecutorType::Transfer;
 }
 
-CommandRecordVulkan::ExecutorType CopyImageCommand::getExecutorType() {
+CommandRecordVulkan::ExecutorType CopyImageCommand::getExecutorType() 
+{
     return CommandRecordVulkan::ExecutorType::Transfer;
 }
 
-void CopyImageCommand::commitCommand(HardwareExecutorVulkan& hardwareExecutor) {
+void CopyImageCommand::commitCommand(HardwareExecutorVulkan& hardwareExecutor) 
+{
     hardwareExecutor.hardwareContext->resourceManager.copyImage(hardwareExecutor.currentRecordQueue->commandBuffer, srcImage, dstImage);
 }
 
-CommandRecordVulkan::RequiredBarriers CopyImageCommand::getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) {
+CommandRecordVulkan::RequiredBarriers CopyImageCommand::getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) 
+{
     CommandRecordVulkan::RequiredBarriers requiredBarriers;
 
     {

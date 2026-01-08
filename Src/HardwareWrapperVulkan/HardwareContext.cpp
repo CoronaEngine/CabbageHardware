@@ -9,8 +9,10 @@
 
 HardwareContext globalHardwareContext;
 
-HardwareContext::HardwareContext() {
-    if (volkInitialize() != VK_SUCCESS) {
+HardwareContext::HardwareContext() 
+{
+    if (volkInitialize() != VK_SUCCESS) 
+    {
         throw std::runtime_error("Failed to initialize Volk!");
     }
 
@@ -22,7 +24,8 @@ HardwareContext::HardwareContext() {
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(vkInstance, &deviceCount, nullptr);
 
-    if (deviceCount == 0) {
+    if (deviceCount == 0) 
+    {
         throw std::runtime_error("Failed to find GPUs! Please ensure you have a Vulkan-capable GPU.");
     }
 
@@ -30,7 +33,8 @@ HardwareContext::HardwareContext() {
     vkEnumeratePhysicalDevices(vkInstance, &deviceCount, devices.data());
 
     hardwareUtils.reserve(devices.size());
-    for (const auto& physicalDevice : devices) {
+    for (const auto& physicalDevice : devices) 
+    {
         auto utils = std::make_shared<HardwareUtils>();
         utils->deviceManager.initDeviceManager(hardwareCreateInfos, vkInstance, physicalDevice);
         utils->resourceManager.initResourceManager(utils->deviceManager);
@@ -42,9 +46,12 @@ HardwareContext::HardwareContext() {
     CFW_LOG_DEBUG("Hardware Context initialized with {} device(s)", hardwareUtils.size());
 }
 
-HardwareContext::~HardwareContext() {
-    for (auto& utils : hardwareUtils) {
-        if (utils) {
+HardwareContext::~HardwareContext() 
+{
+    for (auto& utils : hardwareUtils) 
+    {
+        if (utils) 
+        {
             utils->resourceManager.cleanUpResourceManager();
             utils->deviceManager.cleanUpDeviceManager();
         }
@@ -55,16 +62,19 @@ HardwareContext::~HardwareContext() {
 
     cleanupDebugMessenger();
 
-    if (vkInstance != VK_NULL_HANDLE) {
+    if (vkInstance != VK_NULL_HANDLE)
+    {
         //vkDestroyInstance(vkInstance, nullptr);
         vkInstance = VK_NULL_HANDLE;
     }
 }
 
-void HardwareContext::prepareFeaturesChain() {
+void HardwareContext::prepareFeaturesChain()
+{
     // 配置所需实例扩展
-    hardwareCreateInfos.requiredInstanceExtensions = [](const VkInstance&, const VkPhysicalDevice&) {
-        std::set<const char*> extensions{
+    hardwareCreateInfos.requiredInstanceExtensions = [](const VkInstance&, const VkPhysicalDevice&)
+        {
+            std::set<const char*> extensions{
             "VK_KHR_surface",
             VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
             VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,

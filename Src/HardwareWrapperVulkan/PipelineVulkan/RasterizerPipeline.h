@@ -8,7 +8,8 @@
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/ResourceManager.h"
 
-struct RasterizerPipelineVulkan : public CommandRecordVulkan {
+struct RasterizerPipelineVulkan : public CommandRecordVulkan
+{
    public:
     RasterizerPipelineVulkan();
     ~RasterizerPipelineVulkan() override;
@@ -20,11 +21,13 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan {
                              EmbeddedShader::ShaderLanguage fragmentShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
                              const std::source_location& sourceLocation = std::source_location::current());
 
-    void setDepthImage(HardwareImage& depthImage) {
+    void setDepthImage(HardwareImage& depthImage) 
+    {
         this->depthImage = depthImage;
     }
 
-    [[nodiscard]] HardwareImage& getDepthImage() {
+    [[nodiscard]] HardwareImage& getDepthImage()
+    {
         return depthImage;
     }
 
@@ -42,7 +45,8 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan {
 
     CommandRecordVulkan* record(const HardwareBuffer& indexBuffer, const HardwareBuffer& vertexBuffer);
 
-    ExecutorType getExecutorType() override {
+    ExecutorType getExecutorType() override 
+    {
         return CommandRecordVulkan::ExecutorType::Graphics;
     }
 
@@ -50,7 +54,8 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan {
     RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutorVulkan) override;
 
    private:
-    struct TriangleGeomMesh {
+    struct TriangleGeomMesh 
+    {
         HardwareBuffer indexBuffer;
         HardwareBuffer vertexBuffer;
         VkDeviceSize vertexOffset;

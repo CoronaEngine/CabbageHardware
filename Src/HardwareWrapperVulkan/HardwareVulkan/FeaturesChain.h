@@ -6,7 +6,8 @@
 
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 
-struct DeviceFeaturesChain {
+struct DeviceFeaturesChain 
+{
    public:
     DeviceFeaturesChain();
 
@@ -53,7 +54,8 @@ struct DeviceFeaturesChain {
     friend DeviceFeaturesChain;
 };
 
-struct CreateCallback {
+struct CreateCallback
+{
     using InstanceExtensionsFunc = std::function<std::set<const char*>(const VkInstance&, const VkPhysicalDevice&)>;
     using DeviceExtensionsFunc = std::function<std::set<const char*>(const VkInstance&, const VkPhysicalDevice&)>;
     using DeviceFeaturesFunc = std::function<DeviceFeaturesChain(const VkInstance&, const VkPhysicalDevice&)>;

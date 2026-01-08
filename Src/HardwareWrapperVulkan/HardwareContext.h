@@ -4,9 +4,11 @@
 
 class DisplayManager;
 
-struct HardwareContext {
+struct HardwareContext 
+{
    public:
-    struct HardwareUtils {
+    struct HardwareUtils
+    {
         DeviceManager deviceManager;
         ResourceManager resourceManager;
     };
@@ -19,15 +21,18 @@ struct HardwareContext {
     HardwareContext(HardwareContext&&) = delete;
     HardwareContext& operator=(HardwareContext&&) = delete;
 
-    [[nodiscard]] VkInstance getVulkanInstance() const {
+    [[nodiscard]] VkInstance getVulkanInstance() const
+    {
         return vkInstance;
     }
 
-    [[nodiscard]] const std::vector<std::shared_ptr<HardwareUtils>>& getAllDevices() const {
+    [[nodiscard]] const std::vector<std::shared_ptr<HardwareUtils>>& getAllDevices() const
+    {
         return hardwareUtils;
     }
 
-    [[nodiscard]] std::shared_ptr<HardwareUtils> getMainDevice() const {
+    [[nodiscard]] std::shared_ptr<HardwareUtils> getMainDevice() const
+    {
         return mainDevice;
     }
 

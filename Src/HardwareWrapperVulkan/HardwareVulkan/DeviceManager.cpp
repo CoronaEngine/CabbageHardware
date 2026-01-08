@@ -4,11 +4,13 @@
 
 DeviceManager::DeviceManager() = default;
 
-DeviceManager::~DeviceManager() {
+DeviceManager::~DeviceManager()
+{
     cleanUpDeviceManager();
 }
 
-void DeviceManager::initDeviceManager(const CreateCallback& createCallback, const VkInstance& vkInstance, const VkPhysicalDevice& physicalDevice) {
+void DeviceManager::initDeviceManager(const CreateCallback& createCallback, const VkInstance& vkInstance, const VkPhysicalDevice& physicalDevice) 
+{
     this->physicalDevice = physicalDevice;
 
     createDevices(createCallback, vkInstance);
@@ -16,44 +18,46 @@ void DeviceManager::initDeviceManager(const CreateCallback& createCallback, cons
     // createCommandBuffers();
     // createTimelineSemaphore();
 
-    for (auto& queue : graphicsQueues) {
-        CFW_LOG_INFO(
-            "Graphics Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
-            queue.queueFamilyIndex,
-            reinterpret_cast<std::uintptr_t>(&queue),
-            reinterpret_cast<std::uintptr_t>(queue.vkQueue),
-            reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
-            reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
-            reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
-            reinterpret_cast<std::uintptr_t>(queue.commandPool),
-            reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
-            reinterpret_cast<std::uintptr_t>(queue.deviceManager));
+    for (auto& queue : graphicsQueues) 
+    {
+        CFW_LOG_INFO("Graphics Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
+                     queue.queueFamilyIndex,
+                     reinterpret_cast<std::uintptr_t>(&queue),
+                     reinterpret_cast<std::uintptr_t>(queue.vkQueue),
+                     reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
+                     reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
+                     reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
+                     reinterpret_cast<std::uintptr_t>(queue.commandPool),
+                     reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
+                     reinterpret_cast<std::uintptr_t>(queue.deviceManager));
     }
-    for (auto& queue : computeQueues) {
-        CFW_LOG_INFO(
-            "Compute Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
-            queue.queueFamilyIndex,
-            reinterpret_cast<std::uintptr_t>(&queue),
-            reinterpret_cast<std::uintptr_t>(queue.vkQueue),
-            reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
-            reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
-            reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
-            reinterpret_cast<std::uintptr_t>(queue.commandPool),
-            reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
-            reinterpret_cast<std::uintptr_t>(queue.deviceManager));
+
+    for (auto& queue : computeQueues) 
+    {
+        CFW_LOG_INFO("Compute Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
+                     queue.queueFamilyIndex,
+                     reinterpret_cast<std::uintptr_t>(&queue),
+                     reinterpret_cast<std::uintptr_t>(queue.vkQueue),
+                     reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
+                     reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
+                     reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
+                     reinterpret_cast<std::uintptr_t>(queue.commandPool),
+                     reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
+                     reinterpret_cast<std::uintptr_t>(queue.deviceManager));
     }
-    for (auto& queue : transferQueues) {
-        CFW_LOG_INFO(
-            "Transfer Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
-            queue.queueFamilyIndex,
-            reinterpret_cast<std::uintptr_t>(&queue),
-            reinterpret_cast<std::uintptr_t>(queue.vkQueue),
-            reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
-            reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
-            reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
-            reinterpret_cast<std::uintptr_t>(queue.commandPool),
-            reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
-            reinterpret_cast<std::uintptr_t>(queue.deviceManager));
+
+    for (auto& queue : transferQueues) 
+    {
+        CFW_LOG_INFO("Transfer Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
+                     queue.queueFamilyIndex,
+                     reinterpret_cast<std::uintptr_t>(&queue),
+                     reinterpret_cast<std::uintptr_t>(queue.vkQueue),
+                     reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
+                     reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
+                     reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
+                     reinterpret_cast<std::uintptr_t>(queue.commandPool),
+                     reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
+                     reinterpret_cast<std::uintptr_t>(queue.deviceManager));
     }
 
     CFW_LOG_INFO("Graphics Queue Count: {}", graphicsQueues.size());
@@ -61,8 +65,10 @@ void DeviceManager::initDeviceManager(const CreateCallback& createCallback, cons
     CFW_LOG_INFO("Transfer Queue Count: {}", transferQueues.size());
 }
 
-void DeviceManager::cleanUpDeviceManager() {
-    if (logicalDevice == VK_NULL_HANDLE) {
+void DeviceManager::cleanUpDeviceManager()
+{
+    if (logicalDevice == VK_NULL_HANDLE) 
+    {
         graphicsQueues.clear();
         computeQueues.clear();
         transferQueues.clear();
@@ -91,19 +97,24 @@ void DeviceManager::cleanUpDeviceManager() {
     currentTransferQueueIndex = 0;
 }
 
-void DeviceManager::destroyQueueResources(std::vector<QueueUtils>& queues) {
-    for (auto& queue : queues) {
-        if (queue.commandBuffer != VK_NULL_HANDLE && queue.commandPool != VK_NULL_HANDLE) {
+void DeviceManager::destroyQueueResources(std::vector<QueueUtils>& queues)
+{
+    for (auto& queue : queues) 
+    {
+        if (queue.commandBuffer != VK_NULL_HANDLE && queue.commandPool != VK_NULL_HANDLE) 
+        {
             vkFreeCommandBuffers(logicalDevice, queue.commandPool, 1, &queue.commandBuffer);
             queue.commandBuffer = VK_NULL_HANDLE;
         }
 
-        if (queue.commandPool != VK_NULL_HANDLE) {
+        if (queue.commandPool != VK_NULL_HANDLE)
+        {
             vkDestroyCommandPool(logicalDevice, queue.commandPool, nullptr);
             queue.commandPool = VK_NULL_HANDLE;
         }
 
-        if (queue.timelineSemaphore != VK_NULL_HANDLE) {
+        if (queue.timelineSemaphore != VK_NULL_HANDLE)
+        {
             vkDestroySemaphore(logicalDevice, queue.timelineSemaphore, nullptr);
             queue.timelineSemaphore = VK_NULL_HANDLE;
         }
@@ -149,7 +160,8 @@ void DeviceManager::destroyQueueResources(std::vector<QueueUtils>& queues) {
 //     }
 // }
 
-void DeviceManager::createDevices(const CreateCallback& initInfo, const VkInstance& vkInstance) {
+void DeviceManager::createDevices(const CreateCallback& initInfo, const VkInstance& vkInstance)
+{
     std::set<const char*> inputExtensions = initInfo.requiredDeviceExtensions(vkInstance, physicalDevice);
     std::vector<const char*> requiredExtensions = std::vector<const char*>(inputExtensions.begin(), inputExtensions.end());
 
@@ -170,18 +182,22 @@ void DeviceManager::createDevices(const CreateCallback& initInfo, const VkInstan
     std::vector<VkExtensionProperties> availableExtensions(extensionCount);
     vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, availableExtensions.data());
 
-    requiredExtensions.erase(std::remove_if(requiredExtensions.begin(), requiredExtensions.end(),
-                                            [&availableExtensions](const char* required) {
-                                                bool supported = std::any_of(availableExtensions.begin(), availableExtensions.end(),
-                                                                             [required](const VkExtensionProperties& available) {
-                                                                                 return strcmp(required, available.extensionName) == 0;
-                                                                             });
+    requiredExtensions.erase(std::remove_if(requiredExtensions.begin(), 
+                             requiredExtensions.end(),
+                             [&availableExtensions](const char* required) 
+                             {
+                                 bool supported = std::any_of(availableExtensions.begin(), availableExtensions.end(),
+                                 [required](const VkExtensionProperties& available) 
+                                 {
+                                     return strcmp(required, available.extensionName) == 0;
+                                 });
 
-                                                if (!supported) {
-                                                    printExtensionWarning(required);
-                                                }
-                                                return !supported;
-                                            }),
+                                 if (!supported) 
+                                 {
+                                     printExtensionWarning(required);
+                                 }
+                                 return !supported;
+                             }),
                              requiredExtensions.end());
 
     vkGetPhysicalDeviceFeatures2(physicalDevice, deviceFeaturesUtils.featuresChain.getChainHead());
@@ -195,7 +211,8 @@ void DeviceManager::createDevices(const CreateCallback& initInfo, const VkInstan
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::vector<std::vector<float>> queuePriorities(queueFamilies.size());
 
-    for (int i = 0; i < queueFamilies.size(); i++) {
+    for (int i = 0; i < queueFamilies.size(); i++)
+    {
         queuePriorities[i].resize(queueFamilies[i].queueCount, 1.0f);
 
         VkDeviceQueueCreateInfo queueCreateInfo{};
@@ -221,48 +238,53 @@ void DeviceManager::createDevices(const CreateCallback& initInfo, const VkInstan
     coronaHardwareCheck(vkCreateDevice(physicalDevice, &createInfo, nullptr, &logicalDevice));
 }
 
-void DeviceManager::createQueueUtils() {
-    auto createTimelineSemaphoreForQueue = [&](QueueUtils& queue) {
-        VkExportSemaphoreCreateInfo exportInfo{};
-        exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
-        exportInfo.pNext = nullptr;
+void DeviceManager::createQueueUtils()
+{
+    auto createTimelineSemaphoreForQueue = [&](QueueUtils& queue)
+        {
+            VkExportSemaphoreCreateInfo exportInfo{};
+            exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
+            exportInfo.pNext = nullptr;
 #if _WIN32 || _WIN64
-        exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+            exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #endif
-        VkSemaphoreTypeCreateInfo typeCreateInfo{};
-        typeCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO_KHR;
-        typeCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR;
-        typeCreateInfo.initialValue = 0;
-        typeCreateInfo.pNext = &exportInfo;
+            VkSemaphoreTypeCreateInfo typeCreateInfo{};
+            typeCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO_KHR;
+            typeCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR;
+            typeCreateInfo.initialValue = 0;
+            typeCreateInfo.pNext = &exportInfo;
 
-        VkSemaphoreCreateInfo semaphoreInfo{};
-        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-        semaphoreInfo.pNext = &typeCreateInfo;
+            VkSemaphoreCreateInfo semaphoreInfo{};
+            semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+            semaphoreInfo.pNext = &typeCreateInfo;
 
-        coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &queue.timelineSemaphore));
-    };
+            coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &queue.timelineSemaphore));
+        };
 
-    auto createCommandBufferForQueue = [this](QueueUtils& queue) {
-        VkCommandPoolCreateInfo poolInfo{};
-        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        poolInfo.queueFamilyIndex = queue.queueFamilyIndex;
+    auto createCommandBufferForQueue = [this](QueueUtils& queue)
+        {
+            VkCommandPoolCreateInfo poolInfo{};
+            poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+            poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+            poolInfo.queueFamilyIndex = queue.queueFamilyIndex;
 
-        coronaHardwareCheck(vkCreateCommandPool(logicalDevice, &poolInfo, nullptr, &queue.commandPool));
+            coronaHardwareCheck(vkCreateCommandPool(logicalDevice, &poolInfo, nullptr, &queue.commandPool));
 
-        VkCommandBufferAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.commandPool = queue.commandPool;
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = 1;
+            VkCommandBufferAllocateInfo allocInfo{};
+            allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            allocInfo.commandPool = queue.commandPool;
+            allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            allocInfo.commandBufferCount = 1;
 
-        coronaHardwareCheck(vkAllocateCommandBuffers(logicalDevice, &allocInfo, &queue.commandBuffer));
-    };
+            coronaHardwareCheck(vkAllocateCommandBuffers(logicalDevice, &allocInfo, &queue.commandBuffer));
+        };
 
     int queue_count = 0;
 
-    for (int i = 0; i < queueFamilies.size(); i++) {
-        for (uint32_t queueIndex = 0; queueIndex < queueFamilies[i].queueCount; queueIndex++) {
+    for (int i = 0; i < queueFamilies.size(); i++)
+    {
+        for (uint32_t queueIndex = 0; queueIndex < queueFamilies[i].queueCount; queueIndex++)
+        {
             QueueUtils queueUtils{};
             queueUtils.queueFamilyIndex = static_cast<uint32_t>(i);
             queueUtils.deviceManager = this;
@@ -275,29 +297,42 @@ void DeviceManager::createQueueUtils() {
             vkGetDeviceQueue(logicalDevice, static_cast<uint32_t>(i), queueIndex, &queueUtils.vkQueue);
 
             const VkQueueFlags flags = queueFamilies[i].queueFlags;
-            if (flags & VK_QUEUE_GRAPHICS_BIT) {
+            if (flags & VK_QUEUE_GRAPHICS_BIT)
+            {
                 graphicsQueues.push_back(queueUtils);
                 ++queue_count;
-            } else if (flags & VK_QUEUE_COMPUTE_BIT) {
+            }
+            else if (flags & VK_QUEUE_COMPUTE_BIT) 
+            {
                 computeQueues.push_back(queueUtils);
                 ++queue_count;
-            } else if (flags & VK_QUEUE_TRANSFER_BIT) {
+            }
+            else if (flags & VK_QUEUE_TRANSFER_BIT) 
+            {
                 transferQueues.push_back(queueUtils);
                 ++queue_count;
-            } else {
+            }
+            else
+            {
                 CFW_LOG_WARNING("Queue Family Index {} does not support graphics, compute, or transfer operations.", i);
             }
         }
     }
 
-    if (!graphicsQueues.empty()) {
-        if (computeQueues.empty()) {
+    if (!graphicsQueues.empty())
+    {
+        if (computeQueues.empty())
+        {
             computeQueues.push_back(graphicsQueues[0]);
         }
-        if (transferQueues.empty()) {
+
+        if (transferQueues.empty())
+        {
             transferQueues.push_back(graphicsQueues[0]);
         }
-    } else {
+    } 
+    else
+    {
         throw std::runtime_error("No graphics queues found!");
     }
 }
@@ -327,25 +362,30 @@ void DeviceManager::createQueueUtils() {
 //     return true;
 // }
 
-std::vector<DeviceManager::QueueUtils> DeviceManager::pickAvailableQueues(std::function<bool(const QueueUtils&)> predicate) const {
+std::vector<DeviceManager::QueueUtils> DeviceManager::pickAvailableQueues(std::function<bool(const QueueUtils&)> predicate) const
+{
     std::vector<QueueUtils> result;
 
-    auto addMatchingQueues = [&](const std::vector<QueueUtils>& queues) {
-        for (const auto& queue : queues) {
-            if (predicate(queue)) {
-                result.push_back(queue);
+    auto addMatchingQueues = [&](const std::vector<QueueUtils>& queues) 
+        {
+            for (const auto& queue : queues) 
+            {
+                if (predicate(queue)) 
+                {
+                    result.push_back(queue);
+                }
             }
-        }
-    };
+        };
 
-    addMatchingQueues(graphicsQueues);
+    //addMatchingQueues(graphicsQueues);
     addMatchingQueues(computeQueues);
     addMatchingQueues(transferQueues);
 
     return result;
 }
 
-DeviceManager::ExternalSemaphoreHandle DeviceManager::exportSemaphore(VkSemaphore& semaphore) {
+DeviceManager::ExternalSemaphoreHandle DeviceManager::exportSemaphore(VkSemaphore& semaphore)
+{
     ExternalSemaphoreHandle handleInfo{};
 
 #if _WIN32 || _WIN64
@@ -358,7 +398,8 @@ DeviceManager::ExternalSemaphoreHandle DeviceManager::exportSemaphore(VkSemaphor
     HANDLE handle = nullptr;
     coronaHardwareCheck(vkGetSemaphoreWin32HandleKHR(logicalDevice, &getHandleInfo, &handle));
 
-    if (handle == nullptr) {
+    if (handle == nullptr)
+    {
         throw std::runtime_error("Failed to export semaphore: handle is null");
     }
 
@@ -370,7 +411,8 @@ DeviceManager::ExternalSemaphoreHandle DeviceManager::exportSemaphore(VkSemaphor
     return handleInfo;
 }
 
-VkSemaphore DeviceManager::importSemaphore(const DeviceManager::ExternalSemaphoreHandle& memHandle, const VkSemaphore& semaphore) {
+VkSemaphore DeviceManager::importSemaphore(const DeviceManager::ExternalSemaphoreHandle& memHandle, const VkSemaphore& semaphore) 
+{
 #if _WIN32 || _WIN64
     VkImportSemaphoreWin32HandleInfoKHR importInfo{};
     importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR;
