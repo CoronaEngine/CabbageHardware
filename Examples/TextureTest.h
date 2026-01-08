@@ -99,7 +99,8 @@ inline void testCompressedTextures()
         // bc1UnormCreateInfo.initialData = compressedData.data();
 
         HardwareImage textureBC1Unorm(bc1UnormCreateInfo);
-        textureBC1Unorm.copyFrom(compressedData.data());
+        HardwareExecutor tempExecutor;
+        tempExecutor << textureBC1Unorm.copyFrom(compressedData.data()) << tempExecutor.commit();
         CFW_LOG_DEBUG("BC1_RGB_UNORM texture created success, descriptor ID: {}", textureBC1Unorm.storeDescriptor());
 
         CFW_LOG_DEBUG("Testing BC1_RGB_SRGB format...");
@@ -113,7 +114,7 @@ inline void testCompressedTextures()
         // bc1SrgbCreateInfo.initialData = compressedData.data();
 
         HardwareImage textureBC1Srgb(bc1SrgbCreateInfo);
-        textureBC1Srgb.copyFrom(compressedData.data());
+        tempExecutor << textureBC1Srgb.copyFrom(compressedData.data()) << tempExecutor.commit();
         CFW_LOG_DEBUG("BC1_RGB_SRGB texture created success, descriptor ID: {}", textureBC1Srgb.storeDescriptor());
 
         CFW_LOG_DEBUG("=== All compressed format tests passed ===");
@@ -151,6 +152,8 @@ inline TextureLoadResult loadTexture(const std::string &texturePath)
     // createInfo.initialData = data;
 
     result.texture = HardwareImage(createInfo);
+    HardwareExecutor tempExecutor;
+    tempExecutor << result.texture.copyFrom(data) << tempExecutor.commit();
     result.descriptorID = result.texture.storeDescriptor();
     result.success = true;
 
@@ -192,6 +195,8 @@ inline TextureLoadResult loadCompressedTexture(const std::string &texturePath, b
     // createInfo.initialData = compressedData.data();
 
     result.texture = HardwareImage(createInfo);
+    HardwareExecutor tempExecutor;
+    tempExecutor << result.texture.copyFrom(compressedData.data()) << tempExecutor.commit();
     result.descriptorID = result.texture.storeDescriptor();
     result.success = true;
 
@@ -243,6 +248,8 @@ inline TextureLoadResult loadTextureWithMipmapAndLayers(const std::string &textu
 
     // 获取指定 layer 和 mip 的视图
     auto textureView = result.texture[viewLayer][viewMip];
+    HardwareExecutor tempExecutor;
+    tempExecutor << textureView.copyFrom(layerData.data()) << tempExecutor.commit();
     result.descriptorID = textureView.storeDescriptor();
     result.success = true;
 

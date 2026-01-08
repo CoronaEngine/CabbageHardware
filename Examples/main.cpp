@@ -122,6 +122,7 @@ int main()
             createInfo.mipLevels = 1;
 
             finalOutputImages[i] = HardwareImage(createInfo);
+            
         }
 
         HardwareBuffer vertexBuffer = HardwareBuffer(vertices, BufferUsage::VertexBuffer);
