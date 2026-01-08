@@ -2,6 +2,7 @@
 
 #include <corona/pal/cfw_platform.h>
 
+#include <iostream>
 #include <source_location>
 
 #include "corona/kernel/core/i_logger.h"
@@ -109,10 +110,9 @@ inline void printExtensionWarning(const char *extensionName)
 
 inline VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData)
 {
-    CFW_LOG_ERROR("---------- Vulkan Validation Layer ----------\n"
-                  "{}\n"
-                  "----------------------------------------------\n",
-                  pCallbackData->pMessage);
+    std::cerr << "---------- Vulkan Validation Layer ----------\n"
+              << pCallbackData->pMessage << "\n"
+              << "----------------------------------------------\n";
     return VK_FALSE;
 }
 
