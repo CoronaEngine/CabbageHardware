@@ -40,11 +40,9 @@ class DisplayManager
     ResourceManager::ImageHardwareWrap displayImage{};
 
     // 同步对象
-    std::vector<VkSemaphore> binaryAcquireSemaphore;
-    std::vector<VkSemaphore> binaryPresentSemaphore;
-    // std::vector<VkFence> copyFences;
+    std::vector<VkSemaphore> imageAvailableSemaphores;
+    std::vector<VkSemaphore> renderFinishedSemaphores;
     std::vector<VkFence> presentFences;
-    // std::unordered_map<VkFence, DeviceManager::QueueUtils*> fenceToPresent;
 
     // 队列和设备
     std::atomic_uint16_t currentQueueIndex{0};
@@ -57,9 +55,9 @@ class DisplayManager
     ResourceManager::BufferHardwareWrap dstStaging{};
 
     // 执行器
-    std::shared_ptr<HardwareExecutorVulkan> mainDeviceExecutor;
-    std::shared_ptr<HardwareExecutorVulkan> displayDeviceExecutor;
     std::shared_ptr<HardwareExecutorVulkan> waitedExecutor;
+    std::shared_ptr<HardwareExecutorVulkan> mainDeviceExecutor;
+    std::vector<std::shared_ptr<HardwareExecutorVulkan>> displayDeviceExecutors;
 
     // 内部方法
     void cleanUpDisplayManager();
