@@ -8,8 +8,10 @@
 
 class HardwareExecutor;
 
-struct ResourceManager {
-    struct ExternalMemoryHandle {
+struct ResourceManager 
+{
+    struct ExternalMemoryHandle 
+    {
 #if _WIN32 || _WIN64
         HANDLE handle = nullptr;
 #else
@@ -17,7 +19,8 @@ struct ResourceManager {
 #endif
     };
 
-    struct BufferHardwareWrap {
+    struct BufferHardwareWrap 
+    {
         uint32_t elementCount{0};
         uint32_t elementSize{0};
         uint64_t refCount{1};
@@ -34,7 +37,8 @@ struct ResourceManager {
         ResourceManager* resourceManager{nullptr};
     };
 
-    struct ImageHardwareWrap {
+    struct ImageHardwareWrap 
+    {
         VkImageLayout imageLayout{VK_IMAGE_LAYOUT_UNDEFINED};
         float pixelSize{0};
         ktm::uvec2 imageSize{0, 0};
@@ -63,7 +67,8 @@ struct ResourceManager {
         ResourceManager* resourceManager{nullptr};
     };
 
-    struct BindlessDescriptorSet {
+    struct BindlessDescriptorSet 
+    {
         VkDescriptorPool descriptorPool{VK_NULL_HANDLE};
         VkDescriptorSetLayout descriptorSetLayout{VK_NULL_HANDLE};
         VkDescriptorSet descriptorSet{VK_NULL_HANDLE};
@@ -136,7 +141,8 @@ struct ResourceManager {
     BindlessDescriptorSet bindlessDescriptors[4];
 
    private:
-    enum class DescriptorBindingType : uint8_t {
+    enum class DescriptorBindingType : uint8_t 
+    {
         Uniform = 0,
         Texture = 1,
         StorageBuffer = 2,
@@ -144,7 +150,8 @@ struct ResourceManager {
     };
 
     template <typename THandle>
-    struct BindingEntry {
+    struct BindingEntry 
+    {
         THandle handle = static_cast<THandle>(VK_NULL_HANDLE);
         int bindingIndex = -1;
     };

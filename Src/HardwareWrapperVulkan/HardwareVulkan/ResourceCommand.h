@@ -1,7 +1,8 @@
 ﻿#pragma once
 #include "HardwareExecutorVulkan.h"
 
-struct CopyBufferCommand : public CommandRecordVulkan {
+struct CopyBufferCommand : public CommandRecordVulkan
+{
     ResourceManager::BufferHardwareWrap& srcBuffer;
     ResourceManager::BufferHardwareWrap& dstBuffer;
 
@@ -12,7 +13,8 @@ struct CopyBufferCommand : public CommandRecordVulkan {
     CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) override;
 };
 
-struct CopyImageCommand : public CommandRecordVulkan {
+struct CopyImageCommand : public CommandRecordVulkan
+{
     ResourceManager::ImageHardwareWrap& srcImage;
     ResourceManager::ImageHardwareWrap& dstImage;
 

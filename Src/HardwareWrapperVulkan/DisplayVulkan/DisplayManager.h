@@ -8,7 +8,8 @@
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 
-class DisplayManager {
+class DisplayManager
+{
    public:
     DisplayManager();
     ~DisplayManager();
