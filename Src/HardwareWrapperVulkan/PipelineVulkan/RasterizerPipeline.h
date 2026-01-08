@@ -10,7 +10,7 @@
 
 struct RasterizerPipelineVulkan : public CommandRecordVulkan
 {
-   public:
+  public:
     RasterizerPipelineVulkan();
     ~RasterizerPipelineVulkan() override;
 
@@ -19,42 +19,42 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan
                              uint32_t multiviewCount = 1,
                              EmbeddedShader::ShaderLanguage vertexShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
                              EmbeddedShader::ShaderLanguage fragmentShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
-                             const std::source_location& sourceLocation = std::source_location::current());
+                             const std::source_location &sourceLocation = std::source_location::current());
 
-    void setDepthImage(HardwareImage& depthImage) 
+    void setDepthImage(HardwareImage &depthImage)
     {
         this->depthImage = depthImage;
     }
 
-    [[nodiscard]] HardwareImage& getDepthImage()
+    [[nodiscard]] HardwareImage &getDepthImage()
     {
         return depthImage;
     }
 
     // std::variant<HardwarePushConstant, HardwareBuffer*, HardwareImage*> operator[](const std::string& resourceName);
 
-    void setPushConstant(const std::string& name, const void* data, size_t size);
-    void setResource(const std::string& name, const HardwareBuffer& buffer);
-    void setResource(const std::string& name, const HardwareImage& image);
+    void setPushConstant(const std::string &name, const void *data, size_t size);
+    void setResource(const std::string &name, const HardwareBuffer &buffer);
+    void setResource(const std::string &name, const HardwareImage &image);
 
-    [[nodiscard]] HardwarePushConstant getPushConstant(const std::string& name);
-    [[nodiscard]] HardwareBuffer getBuffer(const std::string& name);
-    [[nodiscard]] HardwareImage getImage(const std::string& name);
+    [[nodiscard]] HardwarePushConstant getPushConstant(const std::string &name);
+    [[nodiscard]] HardwareBuffer getBuffer(const std::string &name);
+    [[nodiscard]] HardwareImage getImage(const std::string &name);
 
-    RasterizerPipelineVulkan* operator()(uint16_t width, uint16_t height);
+    RasterizerPipelineVulkan *operator()(uint16_t width, uint16_t height);
 
-    CommandRecordVulkan* record(const HardwareBuffer& indexBuffer, const HardwareBuffer& vertexBuffer);
+    CommandRecordVulkan *record(const HardwareBuffer &indexBuffer, const HardwareBuffer &vertexBuffer);
 
-    ExecutorType getExecutorType() override 
+    ExecutorType getExecutorType() override
     {
         return CommandRecordVulkan::ExecutorType::Graphics;
     }
 
-    void commitCommand(HardwareExecutorVulkan& hardwareExecutorVulkan) override;
-    RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutorVulkan) override;
+    void commitCommand(HardwareExecutorVulkan &hardwareExecutorVulkan) override;
+    RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutorVulkan) override;
 
-   private:
-    struct TriangleGeomMesh 
+  private:
+    struct TriangleGeomMesh
     {
         HardwareBuffer indexBuffer;
         HardwareBuffer vertexBuffer;
@@ -65,11 +65,11 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan
     std::vector<TriangleGeomMesh> geomMeshesRecord;
 
     void createRenderPass(int multiviewCount = 1);
-    void createGraphicsPipeline(EmbeddedShader::ShaderCodeModule& vertShaderCode,
-                                EmbeddedShader::ShaderCodeModule& fragShaderCode);
+    void createGraphicsPipeline(EmbeddedShader::ShaderCodeModule &vertShaderCode,
+                                EmbeddedShader::ShaderCodeModule &fragShaderCode);
     void createFramebuffers(ktm::uvec2 imageSize);
 
-    [[nodiscard]] VkFormat getVkFormatFromType(const std::string& typeName, uint32_t elementCount) const;
+    [[nodiscard]] VkFormat getVkFormatFromType(const std::string &typeName, uint32_t elementCount) const;
 
     ktm::uvec2 imageSize = {0, 0};
     uint32_t pushConstantSize{0};

@@ -11,7 +11,7 @@ extern Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> global
 
 struct RasterizerPipelineWrap
 {
-    RasterizerPipelineVulkan* impl = nullptr;
+    RasterizerPipelineVulkan *impl = nullptr;
     uint64_t refCount = 1;
 };
 
@@ -19,7 +19,7 @@ extern Corona::Kernel::Utils::Storage<RasterizerPipelineWrap> gRasterizerPipelin
 
 struct ComputePipelineWrap
 {
-    ComputePipelineVulkan* impl = nullptr;
+    ComputePipelineVulkan *impl = nullptr;
     uint64_t refCount = 1;
 };
 
@@ -27,24 +27,24 @@ extern Corona::Kernel::Utils::Storage<ComputePipelineWrap> gComputePipelineStora
 
 struct DisplayerHardwareWrap
 {
-    void* displaySurface = nullptr;
+    void *displaySurface = nullptr;
     std::shared_ptr<DisplayManager> displayManager;
     uint64_t refCount = 1;
 };
 
 extern Corona::Kernel::Utils::Storage<DisplayerHardwareWrap> globalDisplayerStorages;
 
-struct ExecutorWrap 
+struct ExecutorWrap
 {
-    HardwareExecutorVulkan* impl = nullptr;
+    HardwareExecutorVulkan *impl = nullptr;
     uint64_t refCount = 1;
 };
 
 extern Corona::Kernel::Utils::Storage<ExecutorWrap> gExecutorStorage;
 
-struct PushConstantWrap 
+struct PushConstantWrap
 {
-    uint8_t* data{nullptr};
+    uint8_t *data{nullptr};
     uint64_t size{0};
     uint64_t refCount{1};
     bool isSub{false};

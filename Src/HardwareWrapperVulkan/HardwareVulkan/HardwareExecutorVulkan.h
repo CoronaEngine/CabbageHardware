@@ -9,9 +9,9 @@
 
 struct HardwareExecutorVulkan;
 
-struct CommandRecordVulkan 
+struct CommandRecordVulkan
 {
-    enum class ExecutorType 
+    enum class ExecutorType
     {
         Graphics,
         Compute,
@@ -19,7 +19,7 @@ struct CommandRecordVulkan
         Invalid
     };
 
-    struct RequiredBarriers 
+    struct RequiredBarriers
     {
         std::vector<VkMemoryBarrier2> memoryBarriers;
         std::vector<VkBufferMemoryBarrier2> bufferBarriers;
@@ -29,56 +29,59 @@ struct CommandRecordVulkan
     CommandRecordVulkan() = default;
     virtual ~CommandRecordVulkan() = default;
 
-    virtual void commitCommand(HardwareExecutorVulkan& executor) {}
+    virtual void commitCommand(HardwareExecutorVulkan &executor)
+    {
+    }
 
-    virtual RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& executor) 
+    virtual RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &executor)
     {
         return RequiredBarriers{};
     }
 
-    virtual ExecutorType getExecutorType() 
+    virtual ExecutorType getExecutorType()
     {
         return ExecutorType::Invalid;
     }
 
-   protected:
+  protected:
     ExecutorType executorType{ExecutorType::Invalid};
 };
 
 struct HardwareExecutorVulkan
 {
     explicit HardwareExecutorVulkan(std::shared_ptr<HardwareContext::HardwareUtils> context)
-        : hardwareContext(std::move(context)) 
+        : hardwareContext(std::move(context))
     {
-        if (!hardwareContext) {
+        if (!hardwareContext)
+        {
             throw std::invalid_argument("Hardware context cannot be null");
         }
     }
 
     // 兼容旧代码的构造函数，但建议逐步废弃，建议在调用处显式传递
     explicit HardwareExecutorVulkan()
-        : hardwareContext(globalHardwareContext.getMainDevice()) 
+        : hardwareContext(globalHardwareContext.getMainDevice())
     {
     }
 
     ~HardwareExecutorVulkan() = default;
 
-    HardwareExecutorVulkan& operator<<(CommandRecordVulkan* commandRecord)
+    HardwareExecutorVulkan &operator<<(CommandRecordVulkan *commandRecord)
     {
-        if (commandRecord && commandRecord->getExecutorType() != CommandRecordVulkan::ExecutorType::Invalid) 
+        if (commandRecord && commandRecord->getExecutorType() != CommandRecordVulkan::ExecutorType::Invalid)
         {
             commandList.push_back(commandRecord);
         }
         return *this;
     }
 
-    HardwareExecutorVulkan& operator<<(HardwareExecutorVulkan& other)
+    HardwareExecutorVulkan &operator<<(HardwareExecutorVulkan &other)
     {
         return other;
     }
 
-    HardwareExecutorVulkan& wait(const std::vector<VkSemaphoreSubmitInfo>& waitInfos = {},
-                                 const std::vector<VkSemaphoreSubmitInfo>& signalInfos = {})
+    HardwareExecutorVulkan &wait(const std::vector<VkSemaphoreSubmitInfo> &waitInfos = {},
+                                 const std::vector<VkSemaphoreSubmitInfo> &signalInfos = {})
     {
         // waitFence = fence;
         waitSemaphores.insert(waitSemaphores.end(), waitInfos.begin(), waitInfos.end());
@@ -86,7 +89,7 @@ struct HardwareExecutorVulkan
         return *this;
     }
 
-    HardwareExecutorVulkan& wait(HardwareExecutorVulkan& other)
+    HardwareExecutorVulkan &wait(HardwareExecutorVulkan &other)
     {
         if (other)
         {
@@ -105,18 +108,18 @@ struct HardwareExecutorVulkan
         return (!commandList.empty()) && (currentRecordQueue != nullptr);
     }
 
-    HardwareExecutorVulkan& commit();
+    HardwareExecutorVulkan &commit();
     HardwareExecutorVulkan &commitTest();
 
-    static DeviceManager::QueueUtils* pickQueueAndCommit(std::atomic_uint16_t& queueIndex,
-                                                         std::vector<DeviceManager::QueueUtils>& queues,
-                                                         std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand,
+    static DeviceManager::QueueUtils *pickQueueAndCommit(std::atomic_uint16_t &queueIndex,
+                                                         std::vector<DeviceManager::QueueUtils> &queues,
+                                                         std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand,
                                                          bool needsCommandBuffer = true);
 
-    DeviceManager::QueueUtils* currentRecordQueue{nullptr};
+    DeviceManager::QueueUtils *currentRecordQueue{nullptr};
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
 
-    std::vector<CommandRecordVulkan*> commandList;
+    std::vector<CommandRecordVulkan *> commandList;
 
     std::vector<VkSemaphoreSubmitInfo> waitSemaphores;
     std::vector<VkSemaphoreSubmitInfo> signalSemaphores;

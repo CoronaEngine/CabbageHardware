@@ -12,9 +12,9 @@ struct ImageFormatInfo
     bool isCompressed;
 };
 
-ImageFormatInfo convertImageFormat(ImageFormat format) 
+ImageFormatInfo convertImageFormat(ImageFormat format)
 {
-    switch (format) 
+    switch (format)
     {
     // Uncompressed formats
     case ImageFormat::RGBA8_UINT:
@@ -116,17 +116,18 @@ VkImageUsageFlags convertImageUsage(ImageUsage usage, bool isCompressed)
     return vkUsage;
 }
 
-static void incrementImageRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& handle)
+static void incrementImageRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle &handle)
 {
     ++handle->refCount;
     // CFW_LOG_TRACE("HardwareImage ref++: id={}, count={}", id, handle->refCount);
 }
 
-static bool decrementImageRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle& handle)
+static bool decrementImageRefCount(uint32_t id, const Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle &handle)
 {
     int count = --handle->refCount;
     // CFW_LOG_TRACE("HardwareImage ref--: id={}, count={}", id, count);
-    if (count == 0) {
+    if (count == 0)
+    {
         globalHardwareContext.getMainDevice()->resourceManager.destroyImage(*handle);
         // CFW_LOG_TRACE("HardwareImage destroyed: id={}", id);
         return true;
@@ -173,7 +174,7 @@ HardwareImage::HardwareImage()
 //     }
 // }
 
-HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo)
+HardwareImage::HardwareImage(const HardwareImageCreateInfo &createInfo)
 {
     const auto [vkFormat, pixelSize, isCompressed] = convertImageFormat(createInfo.format);
     const VkImageUsageFlags vkUsage = convertImageUsage(createInfo.usage, isCompressed);
@@ -195,12 +196,12 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo)
 
     CFW_LOG_TRACE("HardwareImage created: id={}", self_image_id);
 
-    if (createInfo.initialData != nullptr) 
+    if (createInfo.initialData != nullptr)
     {
         HardwareExecutorVulkan tempExecutor;
         auto imageHandle = globalImageStorages.acquire_write(self_image_id);
 
-        const uint8_t* currentSrcDataPtr = static_cast<const uint8_t *>(createInfo.initialData);
+        const uint8_t *currentSrcDataPtr = static_cast<const uint8_t *>(createInfo.initialData);
         for (int mip = 0; mip < createInfo.mipLevels; ++mip)
         {
             uint32_t mipWidth = std::max(1u, createInfo.width >> mip);
@@ -240,7 +241,7 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo& createInfo)
 }
 
 // TODO : 后面会被弃用
-HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage, int arrayLayers, void* imageData) 
+HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageFormat, ImageUsage imageUsage, int arrayLayers, void *imageData)
 {
     const auto [vkFormat, pixelSize, isCompressed] = convertImageFormat(imageFormat);
     const VkImageUsageFlags vkUsage = convertImageUsage(imageUsage, isCompressed);
@@ -277,18 +278,19 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
     }
 }
 
-HardwareImage::HardwareImage(const HardwareImage& other)
+HardwareImage::HardwareImage(const HardwareImage &other)
 {
     std::lock_guard<std::mutex> lock(other.imageMutex);
     auto const other_image_id = other.imageID.load(std::memory_order_acquire);
     imageID.store(other_image_id, std::memory_order_release);
-    if (other_image_id > 0) {
+    if (other_image_id > 0)
+    {
         auto const handle = globalImageStorages.acquire_write(other_image_id);
         incrementImageRefCount(other_image_id, handle);
     }
 }
 
-HardwareImage::HardwareImage(HardwareImage&& other) noexcept
+HardwareImage::HardwareImage(HardwareImage &&other) noexcept
 {
     std::lock_guard<std::mutex> lock(other.imageMutex);
     auto const other_image_id = other.imageID.load(std::memory_order_acquire);
@@ -379,7 +381,7 @@ HardwareImage HardwareImage::operator[](const uint32_t index)
             subImageHandle->aspectMask = imageHandle->aspectMask;
             subImageHandle->clearValue = imageHandle->clearValue;
             subImageHandle->imageUsage = imageHandle->imageUsage;
-            subImageHandle->imageHandle = imageHandle->imageHandle;  // 共享同一个 VkImage
+            subImageHandle->imageHandle = imageHandle->imageHandle; // 共享同一个 VkImage
             subImageHandle->imageAlloc = imageHandle->imageAlloc;
             subImageHandle->imageAllocInfo = imageHandle->imageAllocInfo;
             subImageHandle->bindlessIndex = -1;
@@ -410,7 +412,7 @@ HardwareImage HardwareImage::operator[](const uint32_t index)
     return HardwareImage();
 }
 
-HardwareImage& HardwareImage::operator=(const HardwareImage& other)
+HardwareImage &HardwareImage::operator=(const HardwareImage &other)
 {
     if (this == &other)
     {
@@ -464,7 +466,7 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other)
         {
             should_destroy_self = true;
         }
-    } 
+    }
     else
     {
         auto const other_handle = globalImageStorages.acquire_write(other_image_id);
@@ -483,7 +485,7 @@ HardwareImage& HardwareImage::operator=(const HardwareImage& other)
     return *this;
 }
 
-HardwareImage& HardwareImage::operator=(HardwareImage&& other) noexcept
+HardwareImage &HardwareImage::operator=(HardwareImage &&other) noexcept
 {
     if (this == &other)
     {
@@ -525,16 +527,18 @@ uint32_t HardwareImage::storeDescriptor()
     return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle);
 }
 
-ImageCopyCommand HardwareImage::copyTo(const HardwareImage& dst,
+ImageCopyCommand HardwareImage::copyTo(const HardwareImage &dst,
                                        uint32_t srcLayer, uint32_t dstLayer,
-                                       uint32_t srcMip, uint32_t dstMip) const {
+                                       uint32_t srcMip, uint32_t dstMip) const
+{
     return ImageCopyCommand(*this, dst, srcLayer, dstLayer, srcMip, dstMip);
 }
 
-ImageToBufferCommand HardwareImage::copyTo(const HardwareBuffer& dst,
+ImageToBufferCommand HardwareImage::copyTo(const HardwareBuffer &dst,
                                            uint32_t imageLayer,
                                            uint32_t imageMip,
-                                           uint64_t bufferOffset) const {
+                                           uint64_t bufferOffset) const
+{
     return ImageToBufferCommand(*this, dst, imageLayer, imageMip, bufferOffset);
 }
 

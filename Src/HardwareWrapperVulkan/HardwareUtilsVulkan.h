@@ -21,7 +21,7 @@
 #include <vk_mem_alloc.h>
 #include <volk.h>
 
-static inline const char* coronaHardwareResultStr(VkResult ret)
+static inline const char *coronaHardwareResultStr(VkResult ret)
 {
     switch ((VkResult)ret)
     {
@@ -88,7 +88,7 @@ static inline const char* coronaHardwareResultStr(VkResult ret)
     }
 }
 
-static inline void coronaHardwareCheck(VkResult result, const std::source_location& loc = std::source_location::current())
+static inline void coronaHardwareCheck(VkResult result, const std::source_location &loc = std::source_location::current())
 {
     if (result != VK_SUCCESS)
     {
@@ -97,17 +97,17 @@ static inline void coronaHardwareCheck(VkResult result, const std::source_locati
     }
 }
 
-inline void printDeviceInfo(const VkPhysicalDeviceProperties& properties)
+inline void printDeviceInfo(const VkPhysicalDeviceProperties &properties)
 {
     CFW_LOG_INFO("---------- GPU: {} ----------", properties.deviceName);
 }
 
-inline void printExtensionWarning(const char* extensionName)
+inline void printExtensionWarning(const char *extensionName)
 {
     CFW_LOG_WARNING("      Extensions Warning: Device does not support: {}", extensionName);
 }
 
-inline VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) 
+inline VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData)
 {
     CFW_LOG_ERROR("---------- Vulkan Validation Layer ----------\n"
                   "{}\n"
@@ -116,18 +116,18 @@ inline VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityF
     return VK_FALSE;
 }
 
-inline VkResult createDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) 
+inline VkResult createDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkDebugUtilsMessengerEXT *pDebugMessenger)
 {
     auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
 
-    if (func != nullptr) 
+    if (func != nullptr)
     {
         return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
     }
     return VK_ERROR_EXTENSION_NOT_PRESENT;
 }
 
-inline void destroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator)
+inline void destroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks *pAllocator)
 {
     auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
 
@@ -139,7 +139,7 @@ inline void destroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMesse
 
 inline constexpr int getDeviceTypePriority(VkPhysicalDeviceType deviceType)
 {
-    switch (deviceType) 
+    switch (deviceType)
     {
     case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
         return 0;

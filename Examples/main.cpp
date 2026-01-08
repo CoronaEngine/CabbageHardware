@@ -8,7 +8,7 @@
 #include <string>
 #include <thread>
 #include <vector>
-//#include <semaphore>
+// #include <semaphore>
 
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
@@ -39,7 +39,7 @@ struct ComputeUniformBufferObject
 
 int main()
 {
-    //Corona::Kernel::CoronaLogger::get_logger()->set_log_level(quill::LogLevel::TraceL3);
+    // Corona::Kernel::CoronaLogger::get_logger()->set_log_level(quill::LogLevel::TraceL3);
     setupSignalHandlers();
 
     // 运行压缩纹理测试（可选）
@@ -90,7 +90,7 @@ int main()
     // }
 
     constexpr std::size_t WINDOW_COUNT = 1;
-    std::vector<GLFWwindow*> windows(WINDOW_COUNT);
+    std::vector<GLFWwindow *> windows(WINDOW_COUNT);
     for (size_t i = 0; i < windows.size(); i++)
     {
         windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
@@ -101,12 +101,12 @@ int main()
     std::vector<std::unique_ptr<std::binary_semaphore>> renderSemaphores;
     std::vector<std::unique_ptr<std::binary_semaphore>> displaySemaphores;*/
 
-    //for (size_t i = 0; i < WINDOW_COUNT; ++i) {
-    //    // 初始状态：允许 Mesh 线程开始，Render 和 Display 等待
-    //    meshSemaphores.push_back(std::make_unique<std::binary_semaphore>(1));
-    //    renderSemaphores.push_back(std::make_unique<std::binary_semaphore>(0));
-    //    displaySemaphores.push_back(std::make_unique<std::binary_semaphore>(0));
-    //}
+    // for (size_t i = 0; i < WINDOW_COUNT; ++i) {
+    //     // 初始状态：允许 Mesh 线程开始，Render 和 Display 等待
+    //     meshSemaphores.push_back(std::make_unique<std::binary_semaphore>(1));
+    //     renderSemaphores.push_back(std::make_unique<std::binary_semaphore>(0));
+    //     displaySemaphores.push_back(std::make_unique<std::binary_semaphore>(0));
+    // }
 
     {
         std::vector<HardwareImage> finalOutputImages(windows.size());
@@ -143,7 +143,7 @@ int main()
         if (!textureResult.success)
         {
             CFW_LOG_ERROR("Failed to load texture, exiting...");
-            for (size_t i = 0; i < windows.size(); i++) 
+            for (size_t i = 0; i < windows.size(); i++)
             {
                 glfwDestroyWindow(windows[i]);
             }
@@ -152,132 +152,129 @@ int main()
         }
 
         uint32_t textureID = textureResult.descriptorID;
-        HardwareImage& texture = textureResult.texture;
+        HardwareImage &texture = textureResult.texture;
 
         std::vector<std::vector<HardwareBuffer>> rasterizerUniformBuffers(windows.size());
         std::vector<HardwareBuffer> computeUniformBuffers(windows.size());
 
         std::atomic_bool running = true;
 
-        auto meshThread = [&](uint32_t threadIndex)
+        auto meshThread = [&](uint32_t threadIndex) {
+            CFW_LOG_INFO("Mesh thread {} started...", threadIndex);
+            ComputeUniformBufferObject computeUniformData(windows.size());
+            computeUniformBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::UniformBuffer);
+
+            std::vector<ktm::fmat4x4> modelMat(20);
+            std::vector<RasterizerUniformBufferObject> rasterizerUniformBufferObject(modelMat.size());
+            for (size_t i = 0; i < modelMat.size(); i++)
             {
-                CFW_LOG_INFO("Mesh thread {} started...", threadIndex);
-                ComputeUniformBufferObject computeUniformData(windows.size());
-                computeUniformBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::UniformBuffer);
+                modelMat[i] = (ktm::translate3d(ktm::fvec3((i % 5) - 2.0f, (i / 5) - 0.5f, 0.0f)) * ktm::scale3d(ktm::fvec3(0.1, 0.1, 0.1)) * ktm::rotate3d_axis(ktm::radians(i * 30.0f), ktm::fvec3(0.0f, 0.0f, 1.0f)));
+                rasterizerUniformBuffers[threadIndex].push_back(HardwareBuffer(sizeof(RasterizerUniformBufferObject), BufferUsage::UniformBuffer, &(modelMat[i])));
+            }
 
-                std::vector<ktm::fmat4x4> modelMat(20);
-                std::vector<RasterizerUniformBufferObject> rasterizerUniformBufferObject(modelMat.size());
-                for (size_t i = 0; i < modelMat.size(); i++)
-                {
-                    modelMat[i] = (ktm::translate3d(ktm::fvec3((i % 5) - 2.0f, (i / 5) - 0.5f, 0.0f)) * ktm::scale3d(ktm::fvec3(0.1, 0.1, 0.1)) * ktm::rotate3d_axis(ktm::radians(i * 30.0f), ktm::fvec3(0.0f, 0.0f, 1.0f)));
-                    rasterizerUniformBuffers[threadIndex].push_back(HardwareBuffer(sizeof(RasterizerUniformBufferObject), BufferUsage::UniformBuffer, &(modelMat[i])));
-                }
+            auto startTime = std::chrono::high_resolution_clock::now();
+            uint64_t frameCount = 0;
 
-                auto startTime = std::chrono::high_resolution_clock::now();
-                uint64_t frameCount = 0;
-
-                while (running.load())
-                {
-                    // 等待上一帧显示完成（或初始状态）
-                    /*meshSemaphores[threadIndex]->acquire();
-                    if (!running.load()) break;*/
-
-                    float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
-                    // CFW_LOG_INFO("Mesh thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
-
-                    for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++)
-                    {
-                        // rasterizerUniformBufferObject[i].textureIndex = texture[0][0].storeDescriptor();
-                        rasterizerUniformBufferObject[i].textureIndex = textureID;
-                        rasterizerUniformBufferObject[i].model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
-                        rasterizerUniformBuffers[threadIndex][i].copyFromData(&(rasterizerUniformBufferObject[i]), sizeof(rasterizerUniformBufferObject[i]));
-                    }
-
-                    computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
-                    computeUniformBuffers[threadIndex].copyFromData(&computeUniformData, sizeof(computeUniformData));
-                    ++frameCount;
-
-                    // 通知渲染线程可以开始
-                    //renderSemaphores[threadIndex]->release();
-                }
-                // 退出时释放后续信号量，防止死锁
-                //renderSemaphores[threadIndex]->release();
-                CFW_LOG_INFO("Mesh thread {} ended.", threadIndex);
-            };
-
-        auto renderThread = [&](uint32_t threadIndex)
+            while (running.load())
             {
-                CFW_LOG_INFO("Render thread {} started...", threadIndex);
-                RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
-                ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
+                // 等待上一帧显示完成（或初始状态）
+                /*meshSemaphores[threadIndex]->acquire();
+                if (!running.load()) break;*/
 
-                auto startTime = std::chrono::high_resolution_clock::now();
-                uint64_t frameCount = 0;
+                float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
+                // CFW_LOG_INFO("Mesh thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
 
-                while (running.load())
+                for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++)
                 {
-                    // 等待数据更新完成
-                    //renderSemaphores[threadIndex]->acquire();
-                    //if (!running.load()) break;
-
-                    float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
-                    // CFW_LOG_INFO("Render thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
-
-                    for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++)
-                    {
-                        rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffers[threadIndex][i].storeDescriptor();
-                        // rasterizer["inPosition"] = postionBuffer;
-                        // rasterizer["inColor"] = colorBuffer;
-                        // rasterizer["inTexCoord"] = uvBuffer;
-                        // rasterizer["inNormal"] = normalBuffer;
-                        rasterizer["outColor"] = finalOutputImages[threadIndex];
-
-                        rasterizer.record(indexBuffer, vertexBuffer);
-                    }
-
-                    computer["pushConsts.uniformBufferIndex"] = computeUniformBuffers[threadIndex].storeDescriptor();
-                    executors[threadIndex] << rasterizer(1920, 1080)
-                                           << computer(1920 / 8, 1080 / 8, 1)
-                                           << executors[threadIndex].commit();
-                    ++frameCount;
-
-                    // 通知显示线程可以开始
-                    //displaySemaphores[threadIndex]->release();
+                    // rasterizerUniformBufferObject[i].textureIndex = texture[0][0].storeDescriptor();
+                    rasterizerUniformBufferObject[i].textureIndex = textureID;
+                    rasterizerUniformBufferObject[i].model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
+                    rasterizerUniformBuffers[threadIndex][i].copyFromData(&(rasterizerUniformBufferObject[i]), sizeof(rasterizerUniformBufferObject[i]));
                 }
-                //displaySemaphores[threadIndex]->release();
-                CFW_LOG_INFO("Render thread {} ended.", threadIndex);
-            };
 
-        auto displayThread = [&](uint32_t threadIndex)
+                computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
+                computeUniformBuffers[threadIndex].copyFromData(&computeUniformData, sizeof(computeUniformData));
+                ++frameCount;
+
+                // 通知渲染线程可以开始
+                // renderSemaphores[threadIndex]->release();
+            }
+            // 退出时释放后续信号量，防止死锁
+            // renderSemaphores[threadIndex]->release();
+            CFW_LOG_INFO("Mesh thread {} ended.", threadIndex);
+        };
+
+        auto renderThread = [&](uint32_t threadIndex) {
+            CFW_LOG_INFO("Render thread {} started...", threadIndex);
+            RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
+            ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
+
+            auto startTime = std::chrono::high_resolution_clock::now();
+            uint64_t frameCount = 0;
+
+            while (running.load())
             {
-                CFW_LOG_INFO("Display thread {} started...", threadIndex);
-                HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
+                // 等待数据更新完成
+                // renderSemaphores[threadIndex]->acquire();
+                // if (!running.load()) break;
 
-                auto startTime = std::chrono::high_resolution_clock::now();
-                uint64_t frameCount = 0;
+                float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
+                // CFW_LOG_INFO("Render thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
 
-                while (running.load())
+                for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++)
                 {
-                    // 等待渲染提交完成
-                    //displaySemaphores[threadIndex]->acquire();
-                    //if (!running.load()) break;
+                    rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffers[threadIndex][i].storeDescriptor();
+                    // rasterizer["inPosition"] = postionBuffer;
+                    // rasterizer["inColor"] = colorBuffer;
+                    // rasterizer["inTexCoord"] = uvBuffer;
+                    // rasterizer["inNormal"] = normalBuffer;
+                    rasterizer["outColor"] = finalOutputImages[threadIndex];
 
-                    float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
-                    // CFW_LOG_INFO("Display thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
-
-                    displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
-                    ++frameCount;
-
-                    // 通知 Mesh 线程开始下一帧
-                    //meshSemaphores[threadIndex]->release();
+                    rasterizer.record(indexBuffer, vertexBuffer);
                 }
-                //meshSemaphores[threadIndex]->release();
-                CFW_LOG_INFO("Display thread {} ended.", threadIndex);
-            };
 
-            std::vector<std::thread> meshThreads;
-            std::vector<std::thread> renderThreads;
-            std::vector<std::thread> displayThreads;
+                computer["pushConsts.uniformBufferIndex"] = computeUniformBuffers[threadIndex].storeDescriptor();
+                executors[threadIndex] << rasterizer(1920, 1080)
+                                       << computer(1920 / 8, 1080 / 8, 1)
+                                       << executors[threadIndex].commit();
+                ++frameCount;
+
+                // 通知显示线程可以开始
+                // displaySemaphores[threadIndex]->release();
+            }
+            // displaySemaphores[threadIndex]->release();
+            CFW_LOG_INFO("Render thread {} ended.", threadIndex);
+        };
+
+        auto displayThread = [&](uint32_t threadIndex) {
+            CFW_LOG_INFO("Display thread {} started...", threadIndex);
+            HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
+
+            auto startTime = std::chrono::high_resolution_clock::now();
+            uint64_t frameCount = 0;
+
+            while (running.load())
+            {
+                // 等待渲染提交完成
+                // displaySemaphores[threadIndex]->acquire();
+                // if (!running.load()) break;
+
+                float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
+                // CFW_LOG_INFO("Display thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
+
+                displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
+                ++frameCount;
+
+                // 通知 Mesh 线程开始下一帧
+                // meshSemaphores[threadIndex]->release();
+            }
+            // meshSemaphores[threadIndex]->release();
+            CFW_LOG_INFO("Display thread {} ended.", threadIndex);
+        };
+
+        std::vector<std::thread> meshThreads;
+        std::vector<std::thread> renderThreads;
+        std::vector<std::thread> displayThreads;
 
         for (size_t i = 0; i < windows.size(); i++)
         {
@@ -307,9 +304,12 @@ int main()
 
         for (size_t i = 0; i < windows.size(); i++)
         {
-            if (meshThreads[i].joinable()) meshThreads[i].join();
-            if (renderThreads[i].joinable()) renderThreads[i].join();
-            if (displayThreads[i].joinable()) displayThreads[i].join();
+            if (meshThreads[i].joinable())
+                meshThreads[i].join();
+            if (renderThreads[i].joinable())
+                renderThreads[i].join();
+            if (displayThreads[i].joinable())
+                displayThreads[i].join();
         }
     }
 

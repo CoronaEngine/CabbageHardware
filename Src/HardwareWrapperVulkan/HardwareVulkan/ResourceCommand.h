@@ -3,26 +3,26 @@
 
 struct CopyBufferCommand : public CommandRecordVulkan
 {
-    ResourceManager::BufferHardwareWrap& srcBuffer;
-    ResourceManager::BufferHardwareWrap& dstBuffer;
+    ResourceManager::BufferHardwareWrap &srcBuffer;
+    ResourceManager::BufferHardwareWrap &dstBuffer;
 
-    CopyBufferCommand(ResourceManager::BufferHardwareWrap& src, ResourceManager::BufferHardwareWrap& dst);
+    CopyBufferCommand(ResourceManager::BufferHardwareWrap &src, ResourceManager::BufferHardwareWrap &dst);
 
     ExecutorType getExecutorType() override;
-    void commitCommand(HardwareExecutorVulkan& hardwareExecutor) override;
-    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) override;
+    void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override;
+    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override;
 };
 
 struct CopyImageCommand : public CommandRecordVulkan
 {
-    ResourceManager::ImageHardwareWrap& srcImage;
-    ResourceManager::ImageHardwareWrap& dstImage;
+    ResourceManager::ImageHardwareWrap &srcImage;
+    ResourceManager::ImageHardwareWrap &dstImage;
 
-    CopyImageCommand(ResourceManager::ImageHardwareWrap& srcImg, ResourceManager::ImageHardwareWrap& dstImg);
+    CopyImageCommand(ResourceManager::ImageHardwareWrap &srcImg, ResourceManager::ImageHardwareWrap &dstImg);
 
     ExecutorType getExecutorType() override;
-    void commitCommand(HardwareExecutorVulkan& hardwareExecutor) override;
-    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) override;
+    void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override;
+    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override;
 };
 
 // struct CopyBufferToImageCommand : public CommandRecordVulkan {
@@ -95,23 +95,27 @@ struct CopyImageCommand : public CommandRecordVulkan
 //     }
 // };
 
-struct CopyBufferToImageCommand : public CommandRecordVulkan {
-    ResourceManager::BufferHardwareWrap& srcBuffer;
-    ResourceManager::ImageHardwareWrap& dstImage;
+struct CopyBufferToImageCommand : public CommandRecordVulkan
+{
+    ResourceManager::BufferHardwareWrap &srcBuffer;
+    ResourceManager::ImageHardwareWrap &dstImage;
     uint32_t mipLevel;
 
-    CopyBufferToImageCommand(ResourceManager::BufferHardwareWrap& srcBuf,
-                             ResourceManager::ImageHardwareWrap& dstImg,
+    CopyBufferToImageCommand(ResourceManager::BufferHardwareWrap &srcBuf,
+                             ResourceManager::ImageHardwareWrap &dstImg,
                              uint32_t mip = 0)
-        : srcBuffer(srcBuf), dstImage(dstImg), mipLevel(mip) {
+        : srcBuffer(srcBuf), dstImage(dstImg), mipLevel(mip)
+    {
         executorType = ExecutorType::Transfer;
     }
 
-    ExecutorType getExecutorType() override {
+    ExecutorType getExecutorType() override
+    {
         return CommandRecordVulkan::ExecutorType::Transfer;
     }
 
-    void commitCommand(HardwareExecutorVulkan& hardwareExecutor) override {
+    void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override
+    {
         // 使用带 mipLevel 参数的重载版本
         hardwareExecutor.hardwareContext->resourceManager.copyBufferToImage(
             hardwareExecutor.currentRecordQueue->commandBuffer,
@@ -121,7 +125,8 @@ struct CopyBufferToImageCommand : public CommandRecordVulkan {
             dstImage.arrayLayers);
     }
 
-    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) override {
+    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override
+    {
         CommandRecordVulkan::RequiredBarriers requiredBarriers;
         {
             VkBufferMemoryBarrier2 srcBufferBarrier{};
@@ -143,10 +148,10 @@ struct CopyBufferToImageCommand : public CommandRecordVulkan {
             VkImageMemoryBarrier2 dstImageBarrier{};
             dstImageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
             dstImageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-            dstImageBarrier.srcAccessMask = 0;  // 初始转换，没有源访问
+            dstImageBarrier.srcAccessMask = 0; // 初始转换，没有源访问
             dstImageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             dstImageBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-            dstImageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;  // 从未定义布局开始
+            dstImageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; // 从未定义布局开始
             dstImageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
             dstImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             dstImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -155,7 +160,7 @@ struct CopyBufferToImageCommand : public CommandRecordVulkan {
             dstImageBarrier.subresourceRange.baseMipLevel = mipLevel;
             dstImageBarrier.subresourceRange.levelCount = 1;
             dstImageBarrier.subresourceRange.baseArrayLayer = 0;
-            dstImageBarrier.subresourceRange.layerCount = dstImage.arrayLayers;  // 转换所有图层
+            dstImageBarrier.subresourceRange.layerCount = dstImage.arrayLayers; // 转换所有图层
             dstImageBarrier.pNext = nullptr;
 
             dstImage.imageLayout = dstImageBarrier.newLayout;
@@ -166,24 +171,29 @@ struct CopyBufferToImageCommand : public CommandRecordVulkan {
     }
 };
 
-struct CopyImageToBufferCommand : public CommandRecordVulkan {
-    ResourceManager::ImageHardwareWrap& srcImage;
-    ResourceManager::BufferHardwareWrap& dstBuffer;
+struct CopyImageToBufferCommand : public CommandRecordVulkan
+{
+    ResourceManager::ImageHardwareWrap &srcImage;
+    ResourceManager::BufferHardwareWrap &dstBuffer;
 
-    CopyImageToBufferCommand(ResourceManager::ImageHardwareWrap& srcImg, ResourceManager::BufferHardwareWrap& dstBuf)
-        : srcImage(srcImg), dstBuffer(dstBuf) {
+    CopyImageToBufferCommand(ResourceManager::ImageHardwareWrap &srcImg, ResourceManager::BufferHardwareWrap &dstBuf)
+        : srcImage(srcImg), dstBuffer(dstBuf)
+    {
         executorType = ExecutorType::Transfer;
     }
 
-    ExecutorType getExecutorType() override {
+    ExecutorType getExecutorType() override
+    {
         return CommandRecordVulkan::ExecutorType::Transfer;
     }
 
-    void commitCommand(HardwareExecutorVulkan& hardwareExecutor) override {
+    void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override
+    {
         hardwareExecutor.hardwareContext->resourceManager.copyImageToBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, srcImage, dstBuffer);
     }
 
-    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) override {
+    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override
+    {
         CommandRecordVulkan::RequiredBarriers requiredBarriers;
         {
             VkImageMemoryBarrier2 srcImageBarrier{};
@@ -228,24 +238,29 @@ struct CopyImageToBufferCommand : public CommandRecordVulkan {
     }
 };
 
-struct BlitImageCommand : public CommandRecordVulkan {
-    ResourceManager::ImageHardwareWrap& srcImage;
-    ResourceManager::ImageHardwareWrap& dstImage;
+struct BlitImageCommand : public CommandRecordVulkan
+{
+    ResourceManager::ImageHardwareWrap &srcImage;
+    ResourceManager::ImageHardwareWrap &dstImage;
 
-    BlitImageCommand(ResourceManager::ImageHardwareWrap& srcImg, ResourceManager::ImageHardwareWrap& dstImg)
-        : srcImage(srcImg), dstImage(dstImg) {
+    BlitImageCommand(ResourceManager::ImageHardwareWrap &srcImg, ResourceManager::ImageHardwareWrap &dstImg)
+        : srcImage(srcImg), dstImage(dstImg)
+    {
         executorType = ExecutorType::Graphics;
     }
 
-    ExecutorType getExecutorType() override {
+    ExecutorType getExecutorType() override
+    {
         return CommandRecordVulkan::ExecutorType::Graphics;
     }
 
-    void commitCommand(HardwareExecutorVulkan& hardwareExecutor) override {
+    void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override
+    {
         hardwareExecutor.hardwareContext->resourceManager.blitImage(hardwareExecutor.currentRecordQueue->commandBuffer, srcImage, dstImage);
     }
 
-    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) override {
+    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override
+    {
         CommandRecordVulkan::RequiredBarriers requiredBarriers;
 
         {
@@ -299,26 +314,31 @@ struct BlitImageCommand : public CommandRecordVulkan {
     }
 };
 
-struct TransitionImageLayoutCommand : public CommandRecordVulkan {
-    ResourceManager::ImageHardwareWrap& image;
+struct TransitionImageLayoutCommand : public CommandRecordVulkan
+{
+    ResourceManager::ImageHardwareWrap &image;
     VkImageLayout imageLayout;
     VkPipelineStageFlags2 dstStageMask;
     VkAccessFlags2 dstAccessMask;
 
-    TransitionImageLayoutCommand(ResourceManager::ImageHardwareWrap& image, VkImageLayout imageLayout, VkPipelineStageFlags2 dstStageMask, VkAccessFlags2 dstAccessMask)
-        : image(image), imageLayout(imageLayout), dstStageMask(dstStageMask), dstAccessMask(dstAccessMask) {
+    TransitionImageLayoutCommand(ResourceManager::ImageHardwareWrap &image, VkImageLayout imageLayout, VkPipelineStageFlags2 dstStageMask, VkAccessFlags2 dstAccessMask)
+        : image(image), imageLayout(imageLayout), dstStageMask(dstStageMask), dstAccessMask(dstAccessMask)
+    {
         executorType = ExecutorType::Transfer;
     }
 
-    ExecutorType getExecutorType() override {
+    ExecutorType getExecutorType() override
+    {
         return CommandRecordVulkan::ExecutorType::Transfer;
     }
 
-    void commitCommand(HardwareExecutorVulkan& hardwareExecutor) override {
+    void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override
+    {
         hardwareExecutor.hardwareContext->resourceManager.transitionImageLayout(hardwareExecutor.currentRecordQueue->commandBuffer, image, imageLayout, dstStageMask, dstAccessMask);
     }
 
-    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan& hardwareExecutor) override {
+    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override
+    {
         return CommandRecordVulkan::RequiredBarriers{};
     }
 };

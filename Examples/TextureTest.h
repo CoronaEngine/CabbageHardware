@@ -15,34 +15,43 @@
 #include "corona/kernel/core/i_logger.h"
 
 // 纹理加载结果
-struct TextureLoadResult {
+struct TextureLoadResult
+{
     HardwareImage texture;
     uint32_t descriptorID = 0;
     bool success = false;
 };
 
 // BC1压缩辅助函数
-inline std::vector<uint8_t> compressToBC1(const unsigned char* data, int width, int height, int channels) {
+inline std::vector<uint8_t> compressToBC1(const unsigned char *data, int width, int height, int channels)
+{
     uint32_t blockCountX = (width + 3) / 4;
     uint32_t blockCountY = (height + 3) / 4;
     std::vector<uint8_t> compressedData(blockCountX * blockCountY * 8);
 
-    for (uint32_t by = 0; by < blockCountY; ++by) {
-        for (uint32_t bx = 0; bx < blockCountX; ++bx) {
+    for (uint32_t by = 0; by < blockCountY; ++by)
+    {
+        for (uint32_t bx = 0; bx < blockCountX; ++bx)
+        {
             uint8_t block[64];
 
-            for (int py = 0; py < 4; ++py) {
-                for (int px = 0; px < 4; ++px) {
+            for (int py = 0; py < 4; ++py)
+            {
+                for (int px = 0; px < 4; ++px)
+                {
                     int x = bx * 4 + px;
                     int y = by * 4 + py;
 
-                    if (x < width && y < height) {
+                    if (x < width && y < height)
+                    {
                         int srcIdx = (y * width + x) * channels;
                         block[(py * 4 + px) * 4 + 0] = data[srcIdx + 0];
                         block[(py * 4 + px) * 4 + 1] = channels > 1 ? data[srcIdx + 1] : data[srcIdx];
                         block[(py * 4 + px) * 4 + 2] = channels > 2 ? data[srcIdx + 2] : data[srcIdx];
                         block[(py * 4 + px) * 4 + 3] = 255;
-                    } else {
+                    }
+                    else
+                    {
                         block[(py * 4 + px) * 4 + 0] = 0;
                         block[(py * 4 + px) * 4 + 1] = 0;
                         block[(py * 4 + px) * 4 + 2] = 0;
@@ -51,7 +60,7 @@ inline std::vector<uint8_t> compressToBC1(const unsigned char* data, int width, 
                 }
             }
 
-            uint8_t* outBlock = &compressedData[(by * blockCountX + bx) * 8];
+            uint8_t *outBlock = &compressedData[(by * blockCountX + bx) * 8];
             stb_compress_dxt_block(outBlock, block, 0, STB_DXT_NORMAL);
         }
     }
@@ -59,12 +68,14 @@ inline std::vector<uint8_t> compressToBC1(const unsigned char* data, int width, 
     return compressedData;
 }
 
-inline void testCompressedTextures() {
+inline void testCompressedTextures()
+{
     CFW_LOG_DEBUG("=== Start testing texture compression formats ===");
 
     int width, height, channels;
-    unsigned char* data = stbi_load(std::string(shaderPath + "/awesomeface.png").c_str(), &width, &height, &channels, 4);
-    if (!data) {
+    unsigned char *data = stbi_load(std::string(shaderPath + "/awesomeface.png").c_str(), &width, &height, &channels, 4);
+    if (!data)
+    {
         CFW_LOG_ERROR("Failed to load texture: {}", stbi_failure_reason());
         return;
     }
@@ -75,7 +86,8 @@ inline void testCompressedTextures() {
     CFW_LOG_DEBUG("BC1 compressed size: {} bytes", compressedData.size());
     CFW_LOG_DEBUG("Compression ratio: {}:1", (float)(width * height * 4) / compressedData.size());
 
-    try {
+    try
+    {
         CFW_LOG_DEBUG("Testing BC1_RGB_UNORM format...");
         HardwareImageCreateInfo bc1UnormCreateInfo;
         bc1UnormCreateInfo.width = width;
@@ -103,8 +115,9 @@ inline void testCompressedTextures() {
         CFW_LOG_DEBUG("BC1_RGB_SRGB texture created success, descriptor ID: {}", textureBC1Srgb.storeDescriptor());
 
         CFW_LOG_DEBUG("=== All compressed format tests passed ===");
-
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception &e)
+    {
         CFW_LOG_ERROR("Compress texture failed: {}", e.what());
     }
 
@@ -112,12 +125,14 @@ inline void testCompressedTextures() {
 }
 
 // 加载普通纹理
-inline TextureLoadResult loadTexture(const std::string& texturePath) {
+inline TextureLoadResult loadTexture(const std::string &texturePath)
+{
     TextureLoadResult result;
 
     int width, height, channels;
-    unsigned char* data = stbi_load(texturePath.c_str(), &width, &height, &channels, 4);
-    if (!data) {
+    unsigned char *data = stbi_load(texturePath.c_str(), &width, &height, &channels, 4);
+    if (!data)
+    {
         CFW_LOG_ERROR("Failed to load texture '{}': {}", texturePath, stbi_failure_reason());
         return result;
     }
@@ -144,12 +159,14 @@ inline TextureLoadResult loadTexture(const std::string& texturePath) {
 }
 
 // 加载BC1压缩纹理
-inline TextureLoadResult loadCompressedTexture(const std::string& texturePath, bool useSRGB = true) {
+inline TextureLoadResult loadCompressedTexture(const std::string &texturePath, bool useSRGB = true)
+{
     TextureLoadResult result;
 
     int width, height, channels;
-    unsigned char* data = stbi_load(texturePath.c_str(), &width, &height, &channels, 4);
-    if (!data) {
+    unsigned char *data = stbi_load(texturePath.c_str(), &width, &height, &channels, 4);
+    if (!data)
+    {
         CFW_LOG_ERROR("Failed to load texture '{}': {}", texturePath, stbi_failure_reason());
         return result;
     }
@@ -182,16 +199,18 @@ inline TextureLoadResult loadCompressedTexture(const std::string& texturePath, b
 }
 
 // 加载带有 mipmap 和 array layers 的纹理
-inline TextureLoadResult loadTextureWithMipmapAndLayers(const std::string& texturePath,
+inline TextureLoadResult loadTextureWithMipmapAndLayers(const std::string &texturePath,
                                                         int arrayLayers,
                                                         int mipLevels,
                                                         int viewLayer = 0,
-                                                        int viewMip = 0) {
+                                                        int viewMip = 0)
+{
     TextureLoadResult result;
 
     int width, height, channels;
-    unsigned char* data = stbi_load(texturePath.c_str(), &width, &height, &channels, 4);
-    if (!data) {
+    unsigned char *data = stbi_load(texturePath.c_str(), &width, &height, &channels, 4);
+    if (!data)
+    {
         CFW_LOG_ERROR("Failed to load texture '{}': {}", texturePath, stbi_failure_reason());
         return result;
     }
@@ -203,7 +222,8 @@ inline TextureLoadResult loadTextureWithMipmapAndLayers(const std::string& textu
     size_t layerSize = width * height * 4;
     layerData.resize(layerSize * arrayLayers);
 
-    for (int i = 0; i < arrayLayers; i++) {
+    for (int i = 0; i < arrayLayers; i++)
+    {
         memcpy(layerData.data() + layerSize * i, data, layerSize);
     }
     stbi_image_free(data);

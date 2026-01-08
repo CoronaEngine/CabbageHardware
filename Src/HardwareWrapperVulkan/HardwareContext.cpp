@@ -9,9 +9,9 @@
 
 HardwareContext globalHardwareContext;
 
-HardwareContext::HardwareContext() 
+HardwareContext::HardwareContext()
 {
-    if (volkInitialize() != VK_SUCCESS) 
+    if (volkInitialize() != VK_SUCCESS)
     {
         throw std::runtime_error("Failed to initialize Volk!");
     }
@@ -24,7 +24,7 @@ HardwareContext::HardwareContext()
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(vkInstance, &deviceCount, nullptr);
 
-    if (deviceCount == 0) 
+    if (deviceCount == 0)
     {
         throw std::runtime_error("Failed to find GPUs! Please ensure you have a Vulkan-capable GPU.");
     }
@@ -33,7 +33,7 @@ HardwareContext::HardwareContext()
     vkEnumeratePhysicalDevices(vkInstance, &deviceCount, devices.data());
 
     hardwareUtils.reserve(devices.size());
-    for (const auto& physicalDevice : devices) 
+    for (const auto &physicalDevice : devices)
     {
         auto utils = std::make_shared<HardwareUtils>();
         utils->deviceManager.initDeviceManager(hardwareCreateInfos, vkInstance, physicalDevice);
@@ -46,11 +46,11 @@ HardwareContext::HardwareContext()
     CFW_LOG_DEBUG("Hardware Context initialized with {} device(s)", hardwareUtils.size());
 }
 
-HardwareContext::~HardwareContext() 
+HardwareContext::~HardwareContext()
 {
-    for (auto& utils : hardwareUtils) 
+    for (auto &utils : hardwareUtils)
     {
-        if (utils) 
+        if (utils)
         {
             utils->resourceManager.cleanUpResourceManager();
             utils->deviceManager.cleanUpDeviceManager();
@@ -64,7 +64,7 @@ HardwareContext::~HardwareContext()
 
     if (vkInstance != VK_NULL_HANDLE)
     {
-        //vkDestroyInstance(vkInstance, nullptr);
+        // vkDestroyInstance(vkInstance, nullptr);
         vkInstance = VK_NULL_HANDLE;
     }
 }
@@ -72,9 +72,8 @@ HardwareContext::~HardwareContext()
 void HardwareContext::prepareFeaturesChain()
 {
     // 配置所需实例扩展
-    hardwareCreateInfos.requiredInstanceExtensions = [](const VkInstance&, const VkPhysicalDevice&)
-        {
-            std::set<const char*> extensions{
+    hardwareCreateInfos.requiredInstanceExtensions = [](const VkInstance &, const VkPhysicalDevice &) {
+        std::set<const char *> extensions{
             "VK_KHR_surface",
             VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
             VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
@@ -93,8 +92,8 @@ void HardwareContext::prepareFeaturesChain()
     };
 
     // 配置所需设备扩展
-    hardwareCreateInfos.requiredDeviceExtensions = [](const VkInstance&, const VkPhysicalDevice&) {
-        return std::set<const char*>{
+    hardwareCreateInfos.requiredDeviceExtensions = [](const VkInstance &, const VkPhysicalDevice &) {
+        return std::set<const char *>{
             VK_KHR_SWAPCHAIN_EXTENSION_NAME,
             VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
             VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
@@ -115,7 +114,7 @@ void HardwareContext::prepareFeaturesChain()
         };
     };
 
-    hardwareCreateInfos.requiredDeviceFeatures = [](const VkInstance&, const VkPhysicalDevice&) {
+    hardwareCreateInfos.requiredDeviceFeatures = [](const VkInstance &, const VkPhysicalDevice &) {
         VkPhysicalDeviceFeatures features{};
         features.samplerAnisotropy = VK_TRUE;
         features.shaderInt16 = VK_TRUE;
@@ -155,10 +154,11 @@ void HardwareContext::prepareFeaturesChain()
     };
 }
 
-void HardwareContext::createVkInstance(const CreateCallback& initInfo) {
+void HardwareContext::createVkInstance(const CreateCallback &initInfo)
+{
     const auto inputExtensions = initInfo.requiredInstanceExtensions(vkInstance, nullptr);
-    std::vector<const char*> requiredExtensions(inputExtensions.begin(), inputExtensions.end());
-    std::vector<const char*> requiredLayers;
+    std::vector<const char *> requiredExtensions(inputExtensions.begin(), inputExtensions.end());
+    std::vector<const char *> requiredLayers;
 
 #ifdef CABBAGE_ENGINE_DEBUG
     uint32_t layerCount = 0;
@@ -167,11 +167,12 @@ void HardwareContext::createVkInstance(const CreateCallback& initInfo) {
     vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
 
     const auto validationLayerAvailable = std::any_of(availableLayers.begin(), availableLayers.end(),
-                                                      [](const VkLayerProperties& props) {
+                                                      [](const VkLayerProperties &props) {
                                                           return strcmp("VK_LAYER_KHRONOS_validation", props.layerName) == 0;
                                                       });
 
-    if (validationLayerAvailable) {
+    if (validationLayerAvailable)
+    {
         requiredExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
         requiredExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
         requiredLayers.push_back("VK_LAYER_KHRONOS_validation");
@@ -184,13 +185,14 @@ void HardwareContext::createVkInstance(const CreateCallback& initInfo) {
     vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, availableExtensions.data());
 
     requiredExtensions.erase(std::remove_if(requiredExtensions.begin(), requiredExtensions.end(),
-                                            [&availableExtensions](const char* ext) {
+                                            [&availableExtensions](const char *ext) {
                                                 const bool supported = std::any_of(availableExtensions.begin(), availableExtensions.end(),
-                                                                                   [ext](const VkExtensionProperties& props) {
+                                                                                   [ext](const VkExtensionProperties &props) {
                                                                                        return strcmp(ext, props.extensionName) == 0;
                                                                                    });
 
-                                                if (!supported) {
+                                                if (!supported)
+                                                {
                                                     CFW_LOG_WARNING("Warning: Instance extension not supported: {}", ext);
                                                 }
                                                 return !supported;
@@ -213,7 +215,8 @@ void HardwareContext::createVkInstance(const CreateCallback& initInfo) {
 
 #ifdef CABBAGE_ENGINE_DEBUG
     VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-    if (!requiredLayers.empty()) {
+    if (!requiredLayers.empty())
+    {
         debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
         debugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
                                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
@@ -228,13 +231,15 @@ void HardwareContext::createVkInstance(const CreateCallback& initInfo) {
     coronaHardwareCheck(vkCreateInstance(&createInfo, nullptr, &vkInstance));
 
 #ifdef CABBAGE_ENGINE_DEBUG
-    if (!requiredLayers.empty()) {
+    if (!requiredLayers.empty())
+    {
         setupDebugMessenger();
     }
 #endif
 }
 
-void HardwareContext::setupDebugMessenger() {
+void HardwareContext::setupDebugMessenger()
+{
 #ifdef CABBAGE_ENGINE_DEBUG
     VkDebugUtilsMessengerCreateInfoEXT createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -245,28 +250,33 @@ void HardwareContext::setupDebugMessenger() {
                              VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
     createInfo.pfnUserCallback = debugCallback;
 
-    if (createDebugUtilsMessengerEXT(vkInstance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
+    if (createDebugUtilsMessengerEXT(vkInstance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS)
+    {
         throw std::runtime_error("Failed to set up debug messenger!");
     }
 #endif
 }
 
-void HardwareContext::cleanupDebugMessenger() {
+void HardwareContext::cleanupDebugMessenger()
+{
 #ifdef CABBAGE_ENGINE_DEBUG
-    if (debugMessenger != VK_NULL_HANDLE && vkInstance != VK_NULL_HANDLE) {
+    if (debugMessenger != VK_NULL_HANDLE && vkInstance != VK_NULL_HANDLE)
+    {
         destroyDebugUtilsMessengerEXT(vkInstance, debugMessenger, nullptr);
         debugMessenger = VK_NULL_HANDLE;
     }
 #endif
 }
 
-void HardwareContext::chooseMainDevice() {
-    if (hardwareUtils.empty()) {
+void HardwareContext::chooseMainDevice()
+{
+    if (hardwareUtils.empty())
+    {
         throw std::runtime_error("No hardware devices available!");
     }
 
     mainDevice = *std::min_element(hardwareUtils.begin(), hardwareUtils.end(),
-                                   [](const std::shared_ptr<HardwareUtils>& a, const std::shared_ptr<HardwareUtils>& b) {
+                                   [](const std::shared_ptr<HardwareUtils> &a, const std::shared_ptr<HardwareUtils> &b) {
                                        const auto typeA = a->deviceManager.getFeaturesUtils().supportedProperties.properties.deviceType;
                                        const auto typeB = b->deviceManager.getFeaturesUtils().supportedProperties.properties.deviceType;
                                        return getDeviceTypePriority(typeA) < getDeviceTypePriority(typeB);

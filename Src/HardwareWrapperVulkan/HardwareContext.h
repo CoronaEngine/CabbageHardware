@@ -4,9 +4,9 @@
 
 class DisplayManager;
 
-struct HardwareContext 
+struct HardwareContext
 {
-   public:
+  public:
     struct HardwareUtils
     {
         DeviceManager deviceManager;
@@ -16,17 +16,17 @@ struct HardwareContext
     HardwareContext();
     ~HardwareContext();
 
-    HardwareContext(const HardwareContext&) = delete;
-    HardwareContext& operator=(const HardwareContext&) = delete;
-    HardwareContext(HardwareContext&&) = delete;
-    HardwareContext& operator=(HardwareContext&&) = delete;
+    HardwareContext(const HardwareContext &) = delete;
+    HardwareContext &operator=(const HardwareContext &) = delete;
+    HardwareContext(HardwareContext &&) = delete;
+    HardwareContext &operator=(HardwareContext &&) = delete;
 
     [[nodiscard]] VkInstance getVulkanInstance() const
     {
         return vkInstance;
     }
 
-    [[nodiscard]] const std::vector<std::shared_ptr<HardwareUtils>>& getAllDevices() const
+    [[nodiscard]] const std::vector<std::shared_ptr<HardwareUtils>> &getAllDevices() const
     {
         return hardwareUtils;
     }
@@ -36,9 +36,9 @@ struct HardwareContext
         return mainDevice;
     }
 
-   private:
+  private:
     void prepareFeaturesChain();
-    void createVkInstance(const CreateCallback& createInfo);
+    void createVkInstance(const CreateCallback &createInfo);
     void chooseMainDevice();
     void setupDebugMessenger();
     void cleanupDebugMessenger();
