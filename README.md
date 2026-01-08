@@ -5,7 +5,9 @@
 - （紧急）多线程同步BUG：display无法使用timeline，无法判断queue任务是否完成
 - （紧急）多显卡：同步VK_KHR_external_semaphore
 - （紧急）多显卡：import mem崩溃
+- HardwareExecutor默认选择不同的队列家族
 - 自动判断image的layout
+- 交换链逻辑错误
 - 解决命令行的Warning
 - BUG：VMA的buffer导入导出
 - BUG：mutiview初始化黑屏
