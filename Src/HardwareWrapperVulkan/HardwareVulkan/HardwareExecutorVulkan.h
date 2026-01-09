@@ -111,6 +111,11 @@ struct HardwareExecutorVulkan
     HardwareExecutorVulkan& commit();
     HardwareExecutorVulkan& commitTest();
 
+    //void waitUntilCommitIsComplete();
+    //void waitUntilAllCommitAreComplete();
+    //void disposeWhenCommitCompletes(std::shared_ptr<Buffer> buffer);
+    //void disposeWhenCommitCompletes(std::function<void()> &&deallocator);
+
     static DeviceManager::QueueUtils* pickQueueAndCommit(std::atomic_uint16_t& queueIndex,
                                                          std::vector<DeviceManager::QueueUtils>& queues,
                                                          std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand,
@@ -124,4 +129,5 @@ struct HardwareExecutorVulkan
     //std::vector<VkFence> prentFences;
     VkFence waitFence{VK_NULL_HANDLE};
     //std::unordered_map<VkFence, DeviceManager::QueueUtils*> fenceToPresent;
+    //std::vector<std::vector<std::shared_ptr<Buffer>>> buffer_to_dispose_;
 };

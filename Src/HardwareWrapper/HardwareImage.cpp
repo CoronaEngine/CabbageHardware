@@ -551,8 +551,8 @@ ImageToBufferCommand HardwareImage::copyTo(const HardwareBuffer &dst,
 // }
 
 BufferToImageCommand HardwareImage::copyFrom(const void *inputData,
-                                              uint32_t imageLayer,
-                                              uint32_t imageMip) const
+                                             uint32_t imageLayer,
+                                             uint32_t imageMip) const
 {
     if (inputData == nullptr)
     {
@@ -573,5 +573,6 @@ BufferToImageCommand HardwareImage::copyFrom(const void *inputData,
     }
 
     HardwareBuffer stagingBuffer(bufferSize, BufferUsage::StorageBuffer, inputData);
-    return BufferToImageCommand(stagingBuffer, *this, 0, imageLayer, imageMip);
+    auto cmd = BufferToImageCommand(stagingBuffer, *this, 0, imageLayer, imageMip);
+    return cmd;
 }

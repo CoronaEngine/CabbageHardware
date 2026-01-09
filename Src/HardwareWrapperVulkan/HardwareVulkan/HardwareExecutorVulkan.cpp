@@ -188,12 +188,15 @@ HardwareExecutorVulkan &HardwareExecutorVulkan::commit()
         signalSemaphores.clear();
         waitFence = VK_NULL_HANDLE;
 
-        VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
-        timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        timelineWaitSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
-        timelineWaitSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->load(std::memory_order_acquire);
-        timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-        waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);
+        if (this->currentRecordQueue != nullptr)
+        {
+            VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
+            timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            timelineWaitSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
+            timelineWaitSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->load(std::memory_order_acquire);
+            timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+            waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);
+        }
     }
 
     return *this;

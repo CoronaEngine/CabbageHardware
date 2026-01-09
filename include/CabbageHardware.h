@@ -205,8 +205,8 @@ struct HardwareImage
                                               uint32_t imageMip = 0,
                                               uint64_t bufferOffset = 0) const;
     [[nodiscard]] BufferToImageCommand copyFrom(const void *inputData,
-                                                uint32_t imageLayer = 1,
-                                                uint32_t imageMip = 1) const;
+                                                uint32_t imageLayer = 0,
+                                                uint32_t imageMip = 0) const;
 
     //[[nodiscard]] uint32_t getNumMipLevels() const;
     //[[nodiscard]] uint32_t getArrayLayers() const;

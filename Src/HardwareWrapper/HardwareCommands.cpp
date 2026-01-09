@@ -1,4 +1,4 @@
-#include "HardwareCommands.h"
+﻿#include "HardwareCommands.h"
 #include "CabbageHardware.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/ResourceCommand.h"
