@@ -159,7 +159,8 @@ int main()
 
         std::atomic_bool running = true;
 
-        auto meshThread = [&](uint32_t threadIndex) {
+        auto meshThread = [&](uint32_t threadIndex)
+        {
             CFW_LOG_INFO("Mesh thread {} started...", threadIndex);
             ComputeUniformBufferObject computeUniformData(windows.size());
             computeUniformBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::UniformBuffer);
@@ -204,7 +205,8 @@ int main()
             CFW_LOG_INFO("Mesh thread {} ended.", threadIndex);
         };
 
-        auto renderThread = [&](uint32_t threadIndex) {
+        auto renderThread = [&](uint32_t threadIndex)
+        {
             CFW_LOG_INFO("Render thread {} started...", threadIndex);
             RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
             ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
@@ -246,7 +248,8 @@ int main()
             CFW_LOG_INFO("Render thread {} ended.", threadIndex);
         };
 
-        auto displayThread = [&](uint32_t threadIndex) {
+        auto displayThread = [&](uint32_t threadIndex) 
+        {
             CFW_LOG_INFO("Display thread {} started...", threadIndex);
             HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
 
@@ -292,7 +295,8 @@ int main()
                 {
                     running.store(false);
                     // 释放所有信号量以唤醒等待的线程
-                    /*for (size_t j = 0; j < WINDOW_COUNT; ++j) {
+                    /*for (size_t j = 0; j < WINDOW_COUNT; ++j)
+                    {
                         meshSemaphores[j]->release();
                         renderSemaphores[j]->release();
                         displaySemaphores[j]->release();

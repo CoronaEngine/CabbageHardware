@@ -57,7 +57,8 @@ class DisplayManager
     // 执行器
     std::shared_ptr<HardwareExecutorVulkan> waitedExecutor;
     std::shared_ptr<HardwareExecutorVulkan> mainDeviceExecutor;
-    std::vector<std::shared_ptr<HardwareExecutorVulkan>> displayDeviceExecutors;
+    std::shared_ptr<HardwareExecutorVulkan> displayDeviceExecutor;
+    //std::vector<std::shared_ptr<HardwareExecutorVulkan>> displayDeviceExecutors;
 
     // 内部方法
     void cleanUpDisplayManager();

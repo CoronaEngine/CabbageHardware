@@ -109,6 +109,7 @@ struct HardwareExecutorVulkan
     }
 
     HardwareExecutorVulkan& commit();
+    HardwareExecutorVulkan& commitTest();
 
     static DeviceManager::QueueUtils* pickQueueAndCommit(std::atomic_uint16_t& queueIndex,
                                                          std::vector<DeviceManager::QueueUtils>& queues,

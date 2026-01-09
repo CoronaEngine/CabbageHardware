@@ -54,7 +54,8 @@ void DisplayManager::cleanUpDisplayManager()
     // 清理状态
     presentQueues.clear();
     mainDeviceExecutor.reset();
-    displayDeviceExecutors.clear();
+    //displayDeviceExecutors.clear();
+    displayDeviceExecutor.reset();
     waitedExecutor.reset();
     displaySurface = nullptr;
     displaySize = {0, 0};
@@ -209,11 +210,11 @@ void DisplayManager::createSyncObjects()
         //coronaHardwareCheck(vkCreateFence(device, &fenceInfo, nullptr, &copyFences[i]));
     }
 
-    displayDeviceExecutors.resize(imageCount);
+    /*displayDeviceExecutors.resize(imageCount);
     for (size_t i = 0; i < imageCount; i++)
     {
         displayDeviceExecutors[i] = std::make_shared<HardwareExecutorVulkan>(displayDevice);
-    }
+    }*/
 }
 
 void DisplayManager::createVkSurface(void *surface)
@@ -298,6 +299,7 @@ void DisplayManager::choosePresentDevice()
     }
 
     mainDeviceExecutor = std::make_shared<HardwareExecutorVulkan>(globalHardwareContext.getMainDevice());
+    displayDeviceExecutor = std::make_shared<HardwareExecutorVulkan>(displayDevice);
 }
 
 void DisplayManager::createSwapChain()
@@ -448,7 +450,7 @@ void DisplayManager::recreateSwapChain()
     vkDeviceWaitIdle(device);
 
     cleanupSyncObjects();
-    displayDeviceExecutors.clear();
+    //displayDeviceExecutors.clear();
     cleanupSwapChainImages();
 
     createSwapChain();
@@ -554,7 +556,8 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         if (waitedExecutor)
         {
             mainDeviceExecutor->wait(*waitedExecutor);
-            displayDeviceExecutors[currentFrame]->wait(*waitedExecutor);
+            //displayDeviceExecutors[currentFrame]->wait(*waitedExecutor);
+            displayDeviceExecutor->wait(*waitedExecutor);
         }
 
         // 检查交换链是否需要重建
@@ -606,7 +609,8 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
             // vkDeviceWaitIdle(displayDevice->deviceManager.getLogicalDevice());
 
             CopyBufferToImageCommand copyCmd2(dstStaging, this->displayImage);
-            (*displayDeviceExecutors[currentFrame]) << &copyCmd2;
+            //(*displayDeviceExecutors[currentFrame]) << &copyCmd2;
+            (*displayDeviceExecutor) << &copyCmd2;
         }
 
         std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos;
@@ -636,9 +640,13 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
                                                    VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
                                                    VK_ACCESS_2_NONE);
 
-        *displayDeviceExecutors[currentFrame] << &blitCmd << &transitionCmd
+        /**displayDeviceExecutors[currentFrame] << &blitCmd << &transitionCmd
                                               << displayDeviceExecutors[currentFrame]->wait(waitSemaphoreInfos, signalSemaphoreInfos)
-                                              << displayDeviceExecutors[currentFrame]->commit();
+                                              << displayDeviceExecutors[currentFrame]->commit();*/
+
+        *displayDeviceExecutor << &blitCmd << &transitionCmd
+                               << displayDeviceExecutor->wait(waitSemaphoreInfos, signalSemaphoreInfos)
+                               << displayDeviceExecutor->commitTest();
 
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
