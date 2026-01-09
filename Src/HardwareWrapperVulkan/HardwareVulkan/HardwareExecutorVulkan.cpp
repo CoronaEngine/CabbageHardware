@@ -1,5 +1,111 @@
 ﻿#include "HardwareExecutorVulkan.h"
 
+// ================= 静态成员初始化 =================
+std::mutex HardwareExecutorVulkan::cleanupMutex;
+std::condition_variable HardwareExecutorVulkan::cleanupCV;
+std::deque<HardwareExecutorVulkan::SubmittedBatch> HardwareExecutorVulkan::globalPendingBatches;
+std::thread HardwareExecutorVulkan::cleanupThread;
+std::atomic<bool> HardwareExecutorVulkan::cleanupThreadRunning{false};
+std::once_flag HardwareExecutorVulkan::cleanupThreadInitFlag;
+
+// ================= 异步清理线程实现 =================
+
+void HardwareExecutorVulkan::initCleanupThread()
+{
+    std::call_once(cleanupThreadInitFlag, []() {
+        cleanupThreadRunning.store(true, std::memory_order_release);
+        cleanupThread = std::thread(&HardwareExecutorVulkan::cleanupThreadFunc);
+    });
+}
+
+void HardwareExecutorVulkan::shutdownCleanupThread()
+{
+    if (cleanupThreadRunning.load(std::memory_order_acquire))
+    {
+        cleanupThreadRunning.store(false, std::memory_order_release);
+        cleanupCV.notify_all();
+        if (cleanupThread.joinable())
+        {
+            cleanupThread.join();
+        }
+    }
+}
+
+void HardwareExecutorVulkan::cleanupThreadFunc()
+{
+    while (cleanupThreadRunning.load(std::memory_order_acquire))
+    {
+        std::vector<SubmittedBatch> completedBatches;
+        
+        {
+            std::unique_lock<std::mutex> lock(cleanupMutex);
+            
+            // 等待有新的批次或退出信号
+            cleanupCV.wait_for(lock, std::chrono::milliseconds(100), []() {
+                return !globalPendingBatches.empty() || !cleanupThreadRunning.load(std::memory_order_acquire);
+            });
+            
+            if (!cleanupThreadRunning.load(std::memory_order_acquire) && globalPendingBatches.empty())
+            {
+                break;
+            }
+            
+            // 检查并移除已完成的批次
+            auto it = globalPendingBatches.begin();
+            while (it != globalPendingBatches.end())
+            {
+                uint64_t currentValue = 0;
+                VkResult result = vkGetSemaphoreCounterValue(it->device, it->semaphore, &currentValue);
+                
+                if (result == VK_SUCCESS && currentValue >= it->timelineValue)
+                {
+                    // GPU 已完成，移到待释放列表
+                    completedBatches.push_back(std::move(*it));
+                    it = globalPendingBatches.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+        }
+        
+        // 在锁外释放资源，避免长时间持有锁
+        completedBatches.clear();
+    }
+    
+    // 线程退出前清理所有剩余批次
+    std::lock_guard<std::mutex> lock(cleanupMutex);
+    globalPendingBatches.clear();
+}
+
+void HardwareExecutorVulkan::addBatchToCleanup(SubmittedBatch batch)
+{
+    // 确保清理线程已启动
+    initCleanupThread();
+    
+    {
+        std::lock_guard<std::mutex> lock(cleanupMutex);
+        globalPendingBatches.push_back(std::move(batch));
+    }
+    cleanupCV.notify_one();
+}
+
+void HardwareExecutorVulkan::addPendingCommand(std::shared_ptr<CopyCommandImpl> cmdImpl)
+{
+    if (cmdImpl)
+    {
+        pendingCommands.push_back(std::move(cmdImpl));
+    }
+}
+
+void HardwareExecutorVulkan::scheduleCleanup()
+{
+    // 如果有 pending commands，在 commit 后会自动添加到清理队列
+    // 这个方法可以用于手动触发清理检查
+    cleanupCV.notify_one();
+}
+
 DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomic_uint16_t &currentQueueIndex,
                                                                       std::vector<DeviceManager::QueueUtils> &currentQueues,
                                                                       std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand,
@@ -178,6 +284,18 @@ HardwareExecutorVulkan &HardwareExecutorVulkan::commit()
         default:
             CFW_LOG_ERROR("Unknown executor type in HardwareExecutorVulkan!");
             break;
+        }
+
+        // 将 pending commands 提交到异步清理队列，等待 GPU 执行完成后释放
+        if (!pendingCommands.empty() && currentRecordQueue != nullptr)
+        {
+            SubmittedBatch batch;
+            batch.device = hardwareContext->deviceManager.logicalDevice;
+            batch.semaphore = currentRecordQueue->timelineSemaphore;
+            batch.timelineValue = currentRecordQueue->timelineValue->load(std::memory_order_acquire);
+            batch.commands = std::move(pendingCommands);
+            addBatchToCleanup(std::move(batch));
+            pendingCommands.clear();
         }
 
         commandList.clear();

@@ -14,8 +14,9 @@ struct CopyCommandImpl
 // ================= Buffer 到 Buffer 拷贝命令实现 =================
 struct BufferCopyCommandImpl : CopyCommandImpl
 {
-    uint64_t srcBufferID{0};
-    uint64_t dstBufferID{0};
+    // 持有资源副本，确保在 GPU 执行完成前资源不被释放
+    HardwareBuffer srcBuffer;
+    HardwareBuffer dstBuffer;
     uint64_t srcOffset{0};
     uint64_t dstOffset{0};
     uint64_t size{0};
@@ -24,6 +25,8 @@ struct BufferCopyCommandImpl : CopyCommandImpl
 
     CommandRecordVulkan *getCommandRecord() override
     {
+        auto srcBufferID = srcBuffer.getBufferID();
+        auto dstBufferID = dstBuffer.getBufferID();
         if (srcBufferID == 0 || dstBufferID == 0)
         {
             return nullptr;
@@ -50,8 +53,9 @@ struct BufferCopyCommandImpl : CopyCommandImpl
 // ================= Buffer 到 Image 拷贝命令实现 =================
 struct BufferToImageCommandImpl : CopyCommandImpl
 {
-    uint64_t srcBufferID{0};
-    uint64_t dstImageID{0};
+    // 持有资源副本，确保在 GPU 执行完成前资源不被释放
+    HardwareBuffer srcBuffer;
+    HardwareImage dstImage;
     uint64_t bufferOffset{0};
     uint32_t imageLayer{0};
     uint32_t imageMip{0};
@@ -60,6 +64,8 @@ struct BufferToImageCommandImpl : CopyCommandImpl
 
     CommandRecordVulkan *getCommandRecord() override
     {
+        auto srcBufferID = srcBuffer.getBufferID();
+        auto dstImageID = dstImage.getImageID();
         if (srcBufferID == 0 || dstImageID == 0)
         {
             return nullptr;
@@ -78,8 +84,8 @@ BufferCopyCommand::BufferCopyCommand(const HardwareBuffer &src, const HardwareBu
                                      uint64_t srcOffset, uint64_t dstOffset, uint64_t size)
 {
     auto implPtr = std::make_shared<BufferCopyCommandImpl>();
-    implPtr->srcBufferID = src.getBufferID();
-    implPtr->dstBufferID = dst.getBufferID();
+    implPtr->srcBuffer = src;  // 拷贝，增加引用计数
+    implPtr->dstBuffer = dst;  // 拷贝，增加引用计数
     implPtr->srcOffset = srcOffset;
     implPtr->dstOffset = dstOffset;
     implPtr->size = size;
@@ -91,8 +97,8 @@ BufferToImageCommand::BufferToImageCommand(const HardwareBuffer &src, const Hard
                                            uint64_t bufferOffset, uint32_t imageLayer, uint32_t imageMip)
 {
     auto implPtr = std::make_shared<BufferToImageCommandImpl>();
-    implPtr->srcBufferID = src.getBufferID();
-    implPtr->dstImageID = dst.getImageID();
+    implPtr->srcBuffer = src;  // 拷贝，增加引用计数
+    implPtr->dstImage = dst;   // 拷贝，增加引用计数
     implPtr->bufferOffset = bufferOffset;
     implPtr->imageLayer = imageLayer;
     implPtr->imageMip = imageMip;
@@ -102,8 +108,9 @@ BufferToImageCommand::BufferToImageCommand(const HardwareBuffer &src, const Hard
 // ================= Image 到 Image 拷贝命令实现 =================
 struct ImageCopyCommandImpl : CopyCommandImpl
 {
-    uint64_t srcImageID{0};
-    uint64_t dstImageID{0};
+    // 持有资源副本，确保在 GPU 执行完成前资源不被释放
+    HardwareImage srcImage;
+    HardwareImage dstImage;
     uint32_t srcLayer{0};
     uint32_t dstLayer{0};
     uint32_t srcMip{0};
@@ -113,6 +120,8 @@ struct ImageCopyCommandImpl : CopyCommandImpl
 
     CommandRecordVulkan *getCommandRecord() override
     {
+        auto srcImageID = srcImage.getImageID();
+        auto dstImageID = dstImage.getImageID();
         if (srcImageID == 0 || dstImageID == 0)
         {
             return nullptr;
@@ -142,8 +151,8 @@ ImageCopyCommand::ImageCopyCommand(const HardwareImage &src, const HardwareImage
                                    uint32_t srcMip, uint32_t dstMip)
 {
     auto implPtr = std::make_shared<ImageCopyCommandImpl>();
-    implPtr->srcImageID = src.getImageID();
-    implPtr->dstImageID = dst.getImageID();
+    implPtr->srcImage = src;  // 拷贝，增加引用计数
+    implPtr->dstImage = dst;  // 拷贝，增加引用计数
     implPtr->srcLayer = srcLayer;
     implPtr->dstLayer = dstLayer;
     implPtr->srcMip = srcMip;
@@ -154,8 +163,9 @@ ImageCopyCommand::ImageCopyCommand(const HardwareImage &src, const HardwareImage
 // ================= Image 到 Buffer 拷贝命令实现 =================
 struct ImageToBufferCommandImpl : CopyCommandImpl
 {
-    uint64_t srcImageID{0};
-    uint64_t dstBufferID{0};
+    // 持有资源副本，确保在 GPU 执行完成前资源不被释放
+    HardwareImage srcImage;
+    HardwareBuffer dstBuffer;
     uint32_t imageLayer{0};
     uint32_t imageMip{0};
     uint64_t bufferOffset{0};
@@ -164,6 +174,8 @@ struct ImageToBufferCommandImpl : CopyCommandImpl
 
     CommandRecordVulkan *getCommandRecord() override
     {
+        auto srcImageID = srcImage.getImageID();
+        auto dstBufferID = dstBuffer.getBufferID();
         if (srcImageID == 0 || dstBufferID == 0)
         {
             return nullptr;
@@ -182,8 +194,8 @@ ImageToBufferCommand::ImageToBufferCommand(const HardwareImage &src, const Hardw
                                            uint32_t imageLayer, uint32_t imageMip, uint64_t bufferOffset)
 {
     auto implPtr = std::make_shared<ImageToBufferCommandImpl>();
-    implPtr->srcImageID = src.getImageID();
-    implPtr->dstBufferID = dst.getBufferID();
+    implPtr->srcImage = src;    // 拷贝，增加引用计数
+    implPtr->dstBuffer = dst;   // 拷贝，增加引用计数
     implPtr->imageLayer = imageLayer;
     implPtr->imageMip = imageMip;
     implPtr->bufferOffset = bufferOffset;

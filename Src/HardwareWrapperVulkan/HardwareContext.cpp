@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "HardwareUtilsVulkan.h"
+#include "HardwareVulkan/HardwareExecutorVulkan.h"
 
 #define VOLK_IMPLEMENTATION
 #include <volk.h>
@@ -48,6 +49,9 @@ HardwareContext::HardwareContext()
 
 HardwareContext::~HardwareContext()
 {
+    // 先关闭异步清理线程，确保所有资源被正确释放
+    HardwareExecutorVulkan::shutdownCleanupThread();
+
     for (auto &utils : hardwareUtils)
     {
         if (utils)
