@@ -54,6 +54,7 @@ void DisplayManager::cleanUpDisplayManager()
     // 清理状态
     presentQueues.clear();
     mainDeviceExecutor.reset();
+    //displayDeviceExecutors.clear();
     displayDeviceExecutor.reset();
     waitedExecutor.reset();
     displaySurface = nullptr;
@@ -85,23 +86,23 @@ void DisplayManager::cleanupSyncObjects()
     // }
     // copyFences.clear();
 
-    for (auto &sem : binaryAcquireSemaphore)
+    for (auto &sem : imageAvailableSemaphores)
     {
         if (sem != VK_NULL_HANDLE)
         {
             vkDestroySemaphore(device, sem, nullptr);
         }
     }
-    binaryAcquireSemaphore.clear();
+    imageAvailableSemaphores.clear();
 
-    for (auto &sem : binaryPresentSemaphore)
+    for (auto &sem : renderFinishedSemaphores)
     {
         if (sem != VK_NULL_HANDLE)
         {
             vkDestroySemaphore(device, sem, nullptr);
         }
     }
-    binaryPresentSemaphore.clear();
+    renderFinishedSemaphores.clear();
 }
 
 void DisplayManager::cleanupSwapChainImages()
@@ -187,10 +188,10 @@ void DisplayManager::createSyncObjects()
         throw std::runtime_error("Cannot create sync objects: no swapchain images");
     }
 
-    binaryAcquireSemaphore.resize(imageCount);
-    binaryPresentSemaphore.resize(imageCount);
+    imageAvailableSemaphores.resize(imageCount);
+    renderFinishedSemaphores.resize(imageCount);
     presentFences.resize(imageCount);
-    // copyFences.resize(imageCount);
+    //copyFences.resize(imageCount);
 
     VkSemaphoreCreateInfo semaphoreInfo{};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -203,11 +204,17 @@ void DisplayManager::createSyncObjects()
 
     for (size_t i = 0; i < imageCount; i++)
     {
-        coronaHardwareCheck(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &binaryAcquireSemaphore[i]));
-        coronaHardwareCheck(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &binaryPresentSemaphore[i]));
+        coronaHardwareCheck(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]));
+        coronaHardwareCheck(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]));
         coronaHardwareCheck(vkCreateFence(device, &fenceInfo, nullptr, &presentFences[i]));
-        // coronaHardwareCheck(vkCreateFence(device, &fenceInfo, nullptr, &copyFences[i]));
+        //coronaHardwareCheck(vkCreateFence(device, &fenceInfo, nullptr, &copyFences[i]));
     }
+
+    /*displayDeviceExecutors.resize(imageCount);
+    for (size_t i = 0; i < imageCount; i++)
+    {
+        displayDeviceExecutors[i] = std::make_shared<HardwareExecutorVulkan>(displayDevice);
+    }*/
 }
 
 void DisplayManager::createVkSurface(void *surface)
@@ -439,9 +446,15 @@ void DisplayManager::createSwapChain()
 
 void DisplayManager::recreateSwapChain()
 {
-    vkDeviceWaitIdle(displayDevice->deviceManager.getLogicalDevice());
+    VkDevice device = displayDevice->deviceManager.getLogicalDevice();
+    vkDeviceWaitIdle(device);
+
+    cleanupSyncObjects();
+    //displayDeviceExecutors.clear();
     cleanupSwapChainImages();
+
     createSwapChain();
+    createSyncObjects();
 }
 
 bool DisplayManager::needsSwapChainRecreation(const ktm::uvec2 &newSize) const
@@ -543,6 +556,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         if (waitedExecutor)
         {
             mainDeviceExecutor->wait(*waitedExecutor);
+            //displayDeviceExecutors[currentFrame]->wait(*waitedExecutor);
             displayDeviceExecutor->wait(*waitedExecutor);
         }
 
@@ -560,18 +574,12 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
 
         // 等待前一帧完成
         VkResult presentFenceResult = vkWaitForFences(displayDevice->deviceManager.getLogicalDevice(), 1, &presentFences[currentFrame], VK_TRUE, UINT64_MAX);
-        // if (presentFenceResult == VK_SUCCESS) {
-        //     if (fenceToPresent.count(presentFences[currentFrame])) {
-        //         fenceToPresent[presentFences[currentFrame]]->isPresent->store(false, std::memory_order_release);
-        //         // fenceToPresent.erase(presentFences[currentFrame]);
-        //     }
-        // }
 
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(displayDevice->deviceManager.getLogicalDevice(),
                                                 swapChain,
                                                 UINT64_MAX,
-                                                binaryAcquireSemaphore[currentFrame],
+                                                imageAvailableSemaphores[currentFrame],
                                                 VK_NULL_HANDLE,
                                                 &imageIndex);
 
@@ -601,6 +609,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
             // vkDeviceWaitIdle(displayDevice->deviceManager.getLogicalDevice());
 
             CopyBufferToImageCommand copyCmd2(dstStaging, this->displayImage);
+            //(*displayDeviceExecutors[currentFrame]) << &copyCmd2;
             (*displayDeviceExecutor) << &copyCmd2;
         }
 
@@ -608,7 +617,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         {
             VkSemaphoreSubmitInfo waitInfo{};
             waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-            waitInfo.semaphore = binaryAcquireSemaphore[currentFrame];
+            waitInfo.semaphore = imageAvailableSemaphores[currentFrame];
             waitInfo.value = 0;
             waitInfo.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             waitSemaphoreInfos.push_back(waitInfo);
@@ -618,7 +627,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         {
             VkSemaphoreSubmitInfo signalInfoPresent{};
             signalInfoPresent.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-            signalInfoPresent.semaphore = binaryPresentSemaphore[currentFrame];
+            signalInfoPresent.semaphore = renderFinishedSemaphores[currentFrame];
             signalInfoPresent.value = 0;
             signalInfoPresent.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
             signalSemaphoreInfos.push_back(signalInfoPresent);
@@ -631,17 +640,18 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
                                                    VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
                                                    VK_ACCESS_2_NONE);
 
+        /**displayDeviceExecutors[currentFrame] << &blitCmd << &transitionCmd
+                                              << displayDeviceExecutors[currentFrame]->wait(waitSemaphoreInfos, signalSemaphoreInfos)
+                                              << displayDeviceExecutors[currentFrame]->commit();*/
+
         *displayDeviceExecutor << &blitCmd << &transitionCmd
                                << displayDeviceExecutor->wait(waitSemaphoreInfos, signalSemaphoreInfos)
-                               //<< displayDeviceExecutor->commitTest();
-                               << displayDeviceExecutor->commit();
-
-        // vkWaitForFences(displayDevice->deviceManager.getLogicalDevice(), 1, &copyFences[currentFrame], VK_TRUE, UINT64_MAX);
+                               << displayDeviceExecutor->commitTest();
 
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = &binaryPresentSemaphore[currentFrame];
+        presentInfo.pWaitSemaphores = &renderFinishedSemaphores[currentFrame];
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = &swapChain;
         presentInfo.pImageIndices = &imageIndex;
@@ -653,15 +663,13 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         presentFenceInfo.pNext = const_cast<void *>(presentInfo.pNext);
         presentInfo.pNext = &presentFenceInfo;
 
-        auto commitToQueue = [&](DeviceManager::QueueUtils *currentRecordQueue) -> bool {
-            VkResult queueResult = vkQueuePresentKHR(currentRecordQueue->vkQueue, &presentInfo);
+        auto commitToQueue = [&](DeviceManager::QueueUtils* currentRecordQueue) -> bool 
+            {
+                VkResult queueResult = vkQueuePresentKHR(currentRecordQueue->vkQueue, &presentInfo);
+                //currentRecordQueue->queueWaitFence = presentFences[currentFrame];
 
-            /*if (queueResult == VK_SUCCESS || queueResult == VK_SUBOPTIMAL_KHR) {
-
-                fenceToPresent[presentFences[currentFrame]] = currentRecordQueue;
-            }*/
-            return (queueResult == VK_SUCCESS || queueResult == VK_SUBOPTIMAL_KHR);
-        };
+                return (queueResult == VK_SUCCESS || queueResult == VK_SUBOPTIMAL_KHR);
+            };
 
         HardwareExecutorVulkan::pickQueueAndCommit(currentQueueIndex, presentQueues, commitToQueue, false);
         currentFrame = (currentFrame + 1) % swapChainImages.size();

@@ -22,6 +22,7 @@ class DeviceManager
         std::shared_ptr<std::mutex> queueMutex;
         std::shared_ptr<std::atomic_uint64_t> timelineValue;
         VkSemaphore timelineSemaphore{VK_NULL_HANDLE};
+        VkFence queueWaitFence{VK_NULL_HANDLE};
         uint32_t queueFamilyIndex = -1;
         VkQueue vkQueue{VK_NULL_HANDLE};
         VkCommandPool commandPool{VK_NULL_HANDLE};
@@ -86,8 +87,8 @@ class DeviceManager
 
     void createDevices(const CreateCallback &createInfo, const VkInstance &vkInstance);
     void createQueueUtils();
-    // bool createCommandBuffers();
-    // void createTimelineSemaphore();
+    //bool createCommandBuffers();
+    //void createTimelineSemaphore();
 
     void destroyQueueResources(std::vector<QueueUtils> &queues);
 

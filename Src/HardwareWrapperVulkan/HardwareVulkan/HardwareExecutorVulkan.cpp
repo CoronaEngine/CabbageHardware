@@ -1,6 +1,6 @@
 ﻿#include "HardwareExecutorVulkan.h"
 
-DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomic_uint16_t &currentQueueIndex,
+DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomic_uint16_t &currentQueueIndex,
                                                                       std::vector<DeviceManager::QueueUtils> &currentQueues,
                                                                       std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand,
                                                                       bool needsCommandBuffer)
@@ -15,10 +15,27 @@ DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
 
         if (queue->queueMutex->try_lock())
         {
-            if (!needsCommandBuffer)
-            {
-                break;
-            }
+            //if (!needsCommandBuffer)
+            //{
+            //    if (queue->queueWaitFence != VK_NULL_HANDLE)
+            //    {
+            //        VkResult status = vkGetFenceStatus(queue->deviceManager->logicalDevice, queue->queueWaitFence);
+            //        if (status == VK_SUCCESS)
+            //        {
+            //            // fence已经是signaled状态
+            //            queue->queueWaitFence = VK_NULL_HANDLE;
+            //            break;
+            //        }
+            //        else if (status == VK_NOT_READY)
+            //        {
+            //            // fence还未signaled
+            //            queue->queueMutex->unlock();
+            //            std::this_thread::yield();
+            //            continue;
+            //        }
+            //    }
+            //    break;
+            //}
 
             uint64_t timelineCounterValue = 0;
             VkResult result = vkGetSemaphoreCounterValue(queue->deviceManager->logicalDevice, queue->timelineSemaphore, &timelineCounterValue);
@@ -42,7 +59,7 @@ DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
         }
 
         std::this_thread::yield();
-        // std::this_thread::sleep_for(std::chrono::microseconds(10000));
+        //std::this_thread::sleep_for(std::chrono::microseconds(10000));
     }
 
     commitCommand(queue);
@@ -301,6 +318,13 @@ HardwareExecutorVulkan &HardwareExecutorVulkan::commitTest()
         waitSemaphores.clear();
         signalSemaphores.clear();
         waitFence = VK_NULL_HANDLE;
+
+        /*VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
+        timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        timelineWaitSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
+        timelineWaitSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->load(std::memory_order_acquire);
+        timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);*/
     }
 
     return *this;

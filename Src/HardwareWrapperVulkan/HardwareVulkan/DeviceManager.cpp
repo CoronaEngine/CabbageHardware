@@ -238,25 +238,29 @@ void DeviceManager::createDevices(const CreateCallback &initInfo, const VkInstan
 
 void DeviceManager::createQueueUtils()
 {
-    auto createTimelineSemaphoreForQueue = [&](QueueUtils &queue) {
-        VkExportSemaphoreCreateInfo exportInfo{};
-        exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
-        exportInfo.pNext = nullptr;
+    auto createTimelineSemaphoreForQueue = [&](QueueUtils &queue) 
+        {
+            VkExportSemaphoreCreateInfo exportInfo{};
+            exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
+            exportInfo.pNext = nullptr;
 #if _WIN32 || _WIN64
-        exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+            exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #endif
-        VkSemaphoreTypeCreateInfo typeCreateInfo{};
-        typeCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO_KHR;
-        typeCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR;
-        typeCreateInfo.initialValue = 0;
-        typeCreateInfo.pNext = &exportInfo;
+            VkSemaphoreTypeCreateInfo typeCreateInfo{};
+            typeCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO_KHR;
+            typeCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR;
+            typeCreateInfo.initialValue = 0;
+            typeCreateInfo.pNext = &exportInfo;
 
-        VkSemaphoreCreateInfo semaphoreInfo{};
-        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-        semaphoreInfo.pNext = &typeCreateInfo;
+            VkSemaphoreCreateInfo semaphoreInfo{};
+            semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        
+            semaphoreInfo.pNext = &typeCreateInfo;
 
-        coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &queue.timelineSemaphore));
-    };
+        
+            coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &queue.timelineSemaphore));
+    
+        };
 
     auto createCommandBufferForQueue = [this](QueueUtils &queue) {
         VkCommandPoolCreateInfo poolInfo{};
@@ -372,7 +376,7 @@ std::vector<DeviceManager::QueueUtils> DeviceManager::pickAvailableQueues(std::f
         }
     };
 
-    // addMatchingQueues(graphicsQueues);
+    //addMatchingQueues(graphicsQueues);
     addMatchingQueues(computeQueues);
     addMatchingQueues(transferQueues);
 

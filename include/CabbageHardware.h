@@ -50,7 +50,7 @@ enum class ImageFormat : uint32_t
     BC5_RG_SNORM,
 
     ASTC_4x4_UNORM,
-    ASTC_4x4_SRGB,
+    ASTC_4x4_SRGB
 };
 
 enum class ImageUsage : uint32_t
