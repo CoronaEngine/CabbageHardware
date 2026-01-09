@@ -376,7 +376,7 @@ std::vector<DeviceManager::QueueUtils> DeviceManager::pickAvailableQueues(std::f
         }
     };
 
-    addMatchingQueues(graphicsQueues);
+    //addMatchingQueues(graphicsQueues);
     addMatchingQueues(computeQueues);
     addMatchingQueues(transferQueues);
 

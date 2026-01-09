@@ -15,27 +15,27 @@ DeviceManager::QueueUtils* HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
 
         if (queue->queueMutex->try_lock())
         {
-            if (!needsCommandBuffer)
-            {
-                if (queue->queueWaitFence != VK_NULL_HANDLE)
-                {
-                    VkResult status = vkGetFenceStatus(queue->deviceManager->logicalDevice, queue->queueWaitFence);
-                    if (status == VK_SUCCESS)
-                    {
-                        // fence已经是signaled状态
-                        queue->queueWaitFence = VK_NULL_HANDLE;
-                        break;
-                    }
-                    else if (status == VK_NOT_READY)
-                    {
-                        // fence还未signaled
-                        queue->queueMutex->unlock();
-                        std::this_thread::yield();
-                        continue;
-                    }
-                }
-                break;
-            }
+            //if (!needsCommandBuffer)
+            //{
+            //    if (queue->queueWaitFence != VK_NULL_HANDLE)
+            //    {
+            //        VkResult status = vkGetFenceStatus(queue->deviceManager->logicalDevice, queue->queueWaitFence);
+            //        if (status == VK_SUCCESS)
+            //        {
+            //            // fence已经是signaled状态
+            //            queue->queueWaitFence = VK_NULL_HANDLE;
+            //            break;
+            //        }
+            //        else if (status == VK_NOT_READY)
+            //        {
+            //            // fence还未signaled
+            //            queue->queueMutex->unlock();
+            //            std::this_thread::yield();
+            //            continue;
+            //        }
+            //    }
+            //    break;
+            //}
 
             uint64_t timelineCounterValue = 0;
             VkResult result = vkGetSemaphoreCounterValue(queue->deviceManager->logicalDevice, queue->timelineSemaphore, &timelineCounterValue);

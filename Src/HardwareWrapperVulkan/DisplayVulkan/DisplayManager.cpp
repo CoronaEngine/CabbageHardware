@@ -571,12 +571,6 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
 
         // 等待前一帧完成
         VkResult presentFenceResult = vkWaitForFences(displayDevice->deviceManager.getLogicalDevice(), 1, &presentFences[currentFrame], VK_TRUE, UINT64_MAX);
-        // if (presentFenceResult == VK_SUCCESS) {
-        //     if (fenceToPresent.count(presentFences[currentFrame])) {
-        //         fenceToPresent[presentFences[currentFrame]]->isPresent->store(false, std::memory_order_release);
-        //         // fenceToPresent.erase(presentFences[currentFrame]);
-        //     }
-        // }
 
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(displayDevice->deviceManager.getLogicalDevice(),
@@ -664,12 +658,8 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         auto commitToQueue = [&](DeviceManager::QueueUtils* currentRecordQueue) -> bool 
             {
                 VkResult queueResult = vkQueuePresentKHR(currentRecordQueue->vkQueue, &presentInfo);
-                currentRecordQueue->queueWaitFence = presentFences[currentFrame];
+                //currentRecordQueue->queueWaitFence = presentFences[currentFrame];
 
-            /*if (queueResult == VK_SUCCESS || queueResult == VK_SUBOPTIMAL_KHR) {
-
-                fenceToPresent[presentFences[currentFrame]] = currentRecordQueue;
-            }*/
                 return (queueResult == VK_SUCCESS || queueResult == VK_SUBOPTIMAL_KHR);
             };
 
