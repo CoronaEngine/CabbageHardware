@@ -759,7 +759,7 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
             depthCreateInfo.usage = ImageUsage::DepthImage;
             depthCreateInfo.arrayLayers = 1;
             depthCreateInfo.mipLevels = 1;
-            depthCreateInfo.initialData = nullptr;
+            // depthCreateInfo.initialData = nullptr;
 
             depthImage = HardwareImage(depthCreateInfo);
         }

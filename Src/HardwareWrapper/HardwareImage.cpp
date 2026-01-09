@@ -196,48 +196,48 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo &createInfo)
 
     CFW_LOG_TRACE("HardwareImage created: id={}", self_image_id);
 
-    if (createInfo.initialData != nullptr)
-    {
-        HardwareExecutorVulkan tempExecutor;
-        auto imageHandle = globalImageStorages.acquire_write(self_image_id);
+    // if (createInfo.initialData != nullptr)
+    // {
+    //     HardwareExecutorVulkan tempExecutor;
+    //     auto imageHandle = globalImageStorages.acquire_write(self_image_id);
 
-        const uint8_t *currentSrcDataPtr = static_cast<const uint8_t *>(createInfo.initialData);
-        for (int mip = 0; mip < createInfo.mipLevels; ++mip)
-        {
-            uint32_t mipWidth = std::max(1u, createInfo.width >> mip);
-            uint32_t mipHeight = std::max(1u, createInfo.height >> mip);
-            uint32_t mipSize = 0;
+    //     const uint8_t *currentSrcDataPtr = static_cast<const uint8_t *>(createInfo.initialData);
+    //     for (int mip = 0; mip < createInfo.mipLevels; ++mip)
+    //     {
+    //         uint32_t mipWidth = std::max(1u, createInfo.width >> mip);
+    //         uint32_t mipHeight = std::max(1u, createInfo.height >> mip);
+    //         uint32_t mipSize = 0;
 
-            if (isCompressed)
-            {
-                const uint32_t blockWidth = 4;
-                const uint32_t blockHeight = 4;
-                // 向上取整计算 Block 数量
-                uint32_t widthInBlocks = (mipWidth + blockWidth - 1) / blockWidth;
-                uint32_t heightInBlocks = (mipHeight + blockHeight - 1) / blockHeight;
-                // 计算每个 Block 的字节数 (例如 BC1: 0.5 * 16 = 8 bytes)
-                uint32_t bytesPerBlock = static_cast<uint32_t>(imageHandle->pixelSize * 16.0f);
+    //         if (isCompressed)
+    //         {
+    //             const uint32_t blockWidth = 4;
+    //             const uint32_t blockHeight = 4;
+    //             // 向上取整计算 Block 数量
+    //             uint32_t widthInBlocks = (mipWidth + blockWidth - 1) / blockWidth;
+    //             uint32_t heightInBlocks = (mipHeight + blockHeight - 1) / blockHeight;
+    //             // 计算每个 Block 的字节数 (例如 BC1: 0.5 * 16 = 8 bytes)
+    //             uint32_t bytesPerBlock = static_cast<uint32_t>(imageHandle->pixelSize * 16.0f);
 
-                mipSize = widthInBlocks * heightInBlocks * bytesPerBlock * imageHandle->arrayLayers;
-            }
-            else
-            {
-                mipSize = mipWidth * mipHeight * static_cast<uint32_t>(imageHandle->pixelSize) * imageHandle->arrayLayers;
-            }
+    //             mipSize = widthInBlocks * heightInBlocks * bytesPerBlock * imageHandle->arrayLayers;
+    //         }
+    //         else
+    //         {
+    //             mipSize = mipWidth * mipHeight * static_cast<uint32_t>(imageHandle->pixelSize) * imageHandle->arrayLayers;
+    //         }
 
-            HardwareBuffer stagingBuffer(mipSize,
-                                         1,
-                                         BufferUsage::StorageBuffer,
-                                         currentSrcDataPtr,
-                                         false);
+    //         HardwareBuffer stagingBuffer(mipSize,
+    //                                      1,
+    //                                      BufferUsage::StorageBuffer,
+    //                                      currentSrcDataPtr,
+    //                                      false);
 
-            auto bufferHandle = globalBufferStorages.acquire_write(stagingBuffer.getBufferID());
+    //         auto bufferHandle = globalBufferStorages.acquire_write(stagingBuffer.getBufferID());
 
-            CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, mip);
-            tempExecutor << &copyCmd << tempExecutor.commit();
-            currentSrcDataPtr += mipSize;
-        }
-    }
+    //         CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, mip);
+    //         tempExecutor << &copyCmd << tempExecutor.commit();
+    //         currentSrcDataPtr += mipSize;
+    //     }
+    // }
 }
 
 // TODO : 后面会被弃用
@@ -549,3 +549,29 @@ ImageToBufferCommand HardwareImage::copyTo(const HardwareBuffer &dst,
 //     }
 //     return 0;
 // }
+
+BufferToImageCommand HardwareImage::copyFrom(const void *inputData,
+                                              uint32_t imageLayer,
+                                              uint32_t imageMip) const
+{
+    if (inputData == nullptr)
+    {
+        return BufferToImageCommand();
+    }
+
+    uint64_t bufferSize = 0;
+
+    {
+        auto const imageHandle = globalImageStorages.acquire_read(imageID.load(std::memory_order_acquire));
+        if (imageMip >= imageHandle->mipLevels)
+        {
+            return BufferToImageCommand();
+        }
+        const uint32_t width = std::max(1u, imageHandle->imageSize.x >> imageMip);
+        const uint32_t height = std::max(1u, imageHandle->imageSize.y >> imageMip);
+        bufferSize = width * height * imageHandle->pixelSize;
+    }
+
+    HardwareBuffer stagingBuffer(bufferSize, BufferUsage::StorageBuffer, inputData);
+    return BufferToImageCommand(stagingBuffer, *this, 0, imageLayer, imageMip);
+}
