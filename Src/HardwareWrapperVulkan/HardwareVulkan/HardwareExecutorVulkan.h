@@ -1,18 +1,13 @@
 ﻿#pragma once
 
 #include <atomic>
-#include <condition_variable>
-#include <deque>
 #include <functional>
 #include <memory>
-#include <mutex>
-#include <thread>
 #include <vector>
 
 #include "HardwareWrapperVulkan/HardwareContext.h"
 
 struct HardwareExecutorVulkan;
-struct CopyCommandImpl;  // 前向声明
 
 struct CommandRecordVulkan
 {
@@ -116,10 +111,6 @@ struct HardwareExecutorVulkan
     HardwareExecutorVulkan& commit();
     HardwareExecutorVulkan& commitTest();
 
-    // 延迟销毁相关方法
-    void addPendingCommand(std::shared_ptr<CopyCommandImpl> cmdImpl);
-    void scheduleCleanup();  // 通知清理线程有新的批次需要检查
-
     //void waitUntilCommitIsComplete();
     //void waitUntilAllCommitAreComplete();
     //void disposeWhenCommitCompletes(std::shared_ptr<Buffer> buffer);
@@ -138,29 +129,5 @@ struct HardwareExecutorVulkan
     //std::vector<VkFence> prentFences;
     VkFence waitFence{VK_NULL_HANDLE};
     //std::unordered_map<VkFence, DeviceManager::QueueUtils*> fenceToPresent;
-
-    // 延迟销毁队列：存储已提交但 GPU 尚未执行完成的命令
-    struct SubmittedBatch
-    {
-        VkDevice device{VK_NULL_HANDLE};
-        VkSemaphore semaphore{VK_NULL_HANDLE};
-        uint64_t timelineValue{0};
-        std::vector<std::shared_ptr<CopyCommandImpl>> commands;
-    };
-    std::vector<std::shared_ptr<CopyCommandImpl>> pendingCommands;  // 当前批次待提交的命令
-
-    // 异步清理相关 - 静态成员，所有 Executor 共享
-    static void initCleanupThread();
-    static void shutdownCleanupThread();
-    static void addBatchToCleanup(SubmittedBatch batch);
-
-  private:
-    static void cleanupThreadFunc();
-    
-    static std::mutex cleanupMutex;
-    static std::condition_variable cleanupCV;
-    static std::deque<SubmittedBatch> globalPendingBatches;
-    static std::thread cleanupThread;
-    static std::atomic<bool> cleanupThreadRunning;
-    static std::once_flag cleanupThreadInitFlag;
+    //std::vector<std::vector<std::shared_ptr<Buffer>>> buffer_to_dispose_;
 };

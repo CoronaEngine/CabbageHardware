@@ -230,8 +230,6 @@ HardwareExecutor &HardwareExecutor::operator<<(const CopyCommand &cmd)
         if (record)
         {
             *executor_handle->impl << record;
-            // 将 command impl 添加到 pending 列表，确保资源在 GPU 执行完成前不被释放
-            executor_handle->impl->addPendingCommand(cmd.impl);
         }
     }
     return *this;
