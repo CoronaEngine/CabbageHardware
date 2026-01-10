@@ -82,9 +82,15 @@ void DeviceManager::cleanUpDeviceManager()
 
     vkDeviceWaitIdle(logicalDevice);
 
+    // 清空已销毁资源追踪集合，准备新一轮清理
+    destroyedPools.clear();
+
     destroyQueueResources(graphicsQueues);
     destroyQueueResources(computeQueues);
     destroyQueueResources(transferQueues);
+
+    // 清理完成后清空追踪集合
+    destroyedPools.clear();
 
     queueFamilies.clear();
 
@@ -101,6 +107,21 @@ void DeviceManager::destroyQueueResources(std::vector<QueueUtils> &queues)
 {
     for (auto &queue : queues)
     {
+        // 检查资源是否已被其他队列容器释放（共享队列情况）
+        // 通过检查 commandPool 是否已在 destroyedPools 中来避免重复释放
+        if (destroyedPools.find(queue.commandPool) != destroyedPools.end())
+        {
+            // 资源已被释放，只需清理引用
+            queue.commandBuffer = VK_NULL_HANDLE;
+            queue.commandPool = VK_NULL_HANDLE;
+            queue.timelineSemaphore = VK_NULL_HANDLE;
+            queue.vkQueue = VK_NULL_HANDLE;
+            queue.queueFamilyIndex = static_cast<uint32_t>(-1);
+            queue.queueMutex.reset();
+            queue.deviceManager = nullptr;
+            continue;
+        }
+
         if (queue.commandBuffer != VK_NULL_HANDLE && queue.commandPool != VK_NULL_HANDLE)
         {
             vkFreeCommandBuffers(logicalDevice, queue.commandPool, 1, &queue.commandBuffer);
@@ -109,6 +130,7 @@ void DeviceManager::destroyQueueResources(std::vector<QueueUtils> &queues)
 
         if (queue.commandPool != VK_NULL_HANDLE)
         {
+            destroyedPools.insert(queue.commandPool);
             vkDestroyCommandPool(logicalDevice, queue.commandPool, nullptr);
             queue.commandPool = VK_NULL_HANDLE;
         }
