@@ -14,16 +14,24 @@ struct CopyCommandImpl
 // ================= Buffer 到 Buffer 拷贝命令实现 =================
 struct BufferCopyCommandImpl : CopyCommandImpl
 {
-    uint64_t srcBufferID{0};
-    uint64_t dstBufferID{0};
+    HardwareBuffer srcBuffer;
+    HardwareBuffer dstBuffer;
     uint64_t srcOffset{0};
     uint64_t dstOffset{0};
     uint64_t size{0};
 
     std::unique_ptr<CopyBufferCommand> command;
 
+    BufferCopyCommandImpl(const HardwareBuffer &src, const HardwareBuffer &dst)
+        : srcBuffer(src), dstBuffer(dst)
+    {
+    }
+
     CommandRecordVulkan *getCommandRecord() override
     {
+        uint64_t srcBufferID = srcBuffer.getBufferID();
+        uint64_t dstBufferID = dstBuffer.getBufferID();
+
         if (srcBufferID == 0 || dstBufferID == 0)
         {
             return nullptr;
@@ -50,23 +58,28 @@ struct BufferCopyCommandImpl : CopyCommandImpl
 // ================= Buffer 到 Image 拷贝命令实现 =================
 struct BufferToImageCommandImpl : CopyCommandImpl
 {
-    uint64_t srcBufferID{0};
-    uint64_t dstImageID{0};
+    HardwareBuffer srcBuffer;
+    HardwareImage dstImage;
     uint64_t bufferOffset{0};
     uint32_t imageLayer{0};
     uint32_t imageMip{0};
 
     std::unique_ptr<CopyBufferToImageCommand> command;
 
+    BufferToImageCommandImpl(const HardwareBuffer &src, const HardwareImage &dst)
+        : srcBuffer(src), dstImage(dst)
+    {
+    }
+
     CommandRecordVulkan *getCommandRecord() override
     {
-        if (srcBufferID == 0 || dstImageID == 0)
+        if (srcBuffer.getBufferID() == 0 || dstImage.getImageID() == 0)
         {
             return nullptr;
         }
 
-        auto srcHandle = globalBufferStorages.acquire_write(srcBufferID);
-        auto dstHandle = globalImageStorages.acquire_write(dstImageID);
+        auto srcHandle = globalBufferStorages.acquire_write(srcBuffer.getBufferID());
+        auto dstHandle = globalImageStorages.acquire_write(dstImage.getImageID());
         command = std::make_unique<CopyBufferToImageCommand>(*srcHandle, *dstHandle, imageMip);
 
         return command.get();
@@ -77,9 +90,7 @@ struct BufferToImageCommandImpl : CopyCommandImpl
 BufferCopyCommand::BufferCopyCommand(const HardwareBuffer &src, const HardwareBuffer &dst,
                                      uint64_t srcOffset, uint64_t dstOffset, uint64_t size)
 {
-    auto implPtr = std::make_shared<BufferCopyCommandImpl>();
-    implPtr->srcBufferID = src.getBufferID();
-    implPtr->dstBufferID = dst.getBufferID();
+    auto implPtr = std::make_shared<BufferCopyCommandImpl>(src, dst);
     implPtr->srcOffset = srcOffset;
     implPtr->dstOffset = dstOffset;
     implPtr->size = size;
@@ -90,9 +101,7 @@ BufferCopyCommand::BufferCopyCommand(const HardwareBuffer &src, const HardwareBu
 BufferToImageCommand::BufferToImageCommand(const HardwareBuffer &src, const HardwareImage &dst,
                                            uint64_t bufferOffset, uint32_t imageLayer, uint32_t imageMip)
 {
-    auto implPtr = std::make_shared<BufferToImageCommandImpl>();
-    implPtr->srcBufferID = src.getBufferID();
-    implPtr->dstImageID = dst.getImageID();
+    auto implPtr = std::make_shared<BufferToImageCommandImpl>(src, dst);
     implPtr->bufferOffset = bufferOffset;
     implPtr->imageLayer = imageLayer;
     implPtr->imageMip = imageMip;
@@ -102,8 +111,8 @@ BufferToImageCommand::BufferToImageCommand(const HardwareBuffer &src, const Hard
 // ================= Image 到 Image 拷贝命令实现 =================
 struct ImageCopyCommandImpl : CopyCommandImpl
 {
-    uint64_t srcImageID{0};
-    uint64_t dstImageID{0};
+    HardwareImage srcImage;
+    HardwareImage dstImage;
     uint32_t srcLayer{0};
     uint32_t dstLayer{0};
     uint32_t srcMip{0};
@@ -111,8 +120,16 @@ struct ImageCopyCommandImpl : CopyCommandImpl
 
     std::unique_ptr<CopyImageCommand> command;
 
+    ImageCopyCommandImpl(const HardwareImage &src, const HardwareImage &dst)
+        : srcImage(src), dstImage(dst)
+    {
+    }
+
     CommandRecordVulkan *getCommandRecord() override
     {
+        uint64_t srcImageID = srcImage.getImageID();
+        uint64_t dstImageID = dstImage.getImageID();
+
         if (srcImageID == 0 || dstImageID == 0)
         {
             return nullptr;
@@ -141,9 +158,7 @@ ImageCopyCommand::ImageCopyCommand(const HardwareImage &src, const HardwareImage
                                    uint32_t srcLayer, uint32_t dstLayer,
                                    uint32_t srcMip, uint32_t dstMip)
 {
-    auto implPtr = std::make_shared<ImageCopyCommandImpl>();
-    implPtr->srcImageID = src.getImageID();
-    implPtr->dstImageID = dst.getImageID();
+    auto implPtr = std::make_shared<ImageCopyCommandImpl>(src, dst);
     implPtr->srcLayer = srcLayer;
     implPtr->dstLayer = dstLayer;
     implPtr->srcMip = srcMip;
@@ -154,23 +169,28 @@ ImageCopyCommand::ImageCopyCommand(const HardwareImage &src, const HardwareImage
 // ================= Image 到 Buffer 拷贝命令实现 =================
 struct ImageToBufferCommandImpl : CopyCommandImpl
 {
-    uint64_t srcImageID{0};
-    uint64_t dstBufferID{0};
+    HardwareImage srcImage;
+    HardwareBuffer dstBuffer;
     uint32_t imageLayer{0};
     uint32_t imageMip{0};
     uint64_t bufferOffset{0};
 
     std::unique_ptr<CopyImageToBufferCommand> command;
 
+    ImageToBufferCommandImpl(const HardwareImage &src, const HardwareBuffer &dst)
+        : srcImage(src), dstBuffer(dst)
+    {
+    }
+
     CommandRecordVulkan *getCommandRecord() override
     {
-        if (srcImageID == 0 || dstBufferID == 0)
+        if (srcImage.getImageID() == 0 || dstBuffer.getBufferID() == 0)
         {
             return nullptr;
         }
 
-        auto srcHandle = globalImageStorages.acquire_write(srcImageID);
-        auto dstHandle = globalBufferStorages.acquire_write(dstBufferID);
+        auto srcHandle = globalImageStorages.acquire_write(srcImage.getImageID());
+        auto dstHandle = globalBufferStorages.acquire_write(dstBuffer.getBufferID());
         command = std::make_unique<CopyImageToBufferCommand>(*srcHandle, *dstHandle);
 
         return command.get();
@@ -181,9 +201,7 @@ struct ImageToBufferCommandImpl : CopyCommandImpl
 ImageToBufferCommand::ImageToBufferCommand(const HardwareImage &src, const HardwareBuffer &dst,
                                            uint32_t imageLayer, uint32_t imageMip, uint64_t bufferOffset)
 {
-    auto implPtr = std::make_shared<ImageToBufferCommandImpl>();
-    implPtr->srcImageID = src.getImageID();
-    implPtr->dstBufferID = dst.getBufferID();
+    auto implPtr = std::make_shared<ImageToBufferCommandImpl>(src, dst);
     implPtr->imageLayer = imageLayer;
     implPtr->imageMip = imageMip;
     implPtr->bufferOffset = bufferOffset;

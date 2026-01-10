@@ -573,6 +573,6 @@ BufferToImageCommand HardwareImage::copyFrom(const void *inputData,
     }
 
     HardwareBuffer stagingBuffer(bufferSize, BufferUsage::StorageBuffer, inputData);
-    auto cmd = BufferToImageCommand(stagingBuffer, *this, 0, imageLayer, imageMip);
+    auto cmd = BufferToImageCommand(std::move(stagingBuffer), *this, 0, imageLayer, imageMip);
     return cmd;
 }
