@@ -3,11 +3,22 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "HardwareWrapperVulkan/HardwareContext.h"
 
 struct HardwareExecutorVulkan;
+struct CopyCommandImpl; // 前向声明
+
+// ========== 延迟释放条目 ==========
+struct DeferredRelease
+{
+    uint64_t timelineValue;                    // GPU 完成此值后可释放
+    std::shared_ptr<CopyCommandImpl> resource; // 持有资源的引用
+    VkSemaphore semaphore;                     // 对应的 timeline semaphore
+};
 
 struct CommandRecordVulkan
 {
@@ -56,15 +67,21 @@ struct HardwareExecutorVulkan
         {
             throw std::invalid_argument("Hardware context cannot be null");
         }
+        // 预分配以减少重分配
+        pendingResources.reserve(32);
+        deferredReleaseQueue.reserve(128);
     }
 
     // 兼容旧代码的构造函数，但建议逐步废弃，建议在调用处显式传递
     explicit HardwareExecutorVulkan()
         : hardwareContext(globalHardwareContext.getMainDevice())
     {
+        // 预分配以减少重分配
+        pendingResources.reserve(32);
+        deferredReleaseQueue.reserve(128);
     }
 
-    ~HardwareExecutorVulkan() = default;
+    ~HardwareExecutorVulkan();
 
     HardwareExecutorVulkan &operator<<(CommandRecordVulkan *commandRecord)
     {
@@ -75,12 +92,12 @@ struct HardwareExecutorVulkan
         return *this;
     }
 
-    HardwareExecutorVulkan& operator<<(HardwareExecutorVulkan &other)
+    HardwareExecutorVulkan &operator<<(HardwareExecutorVulkan &other)
     {
         return other;
     }
 
-    HardwareExecutorVulkan& wait(const std::vector<VkSemaphoreSubmitInfo> &waitInfos = {},
+    HardwareExecutorVulkan &wait(const std::vector<VkSemaphoreSubmitInfo> &waitInfos = {},
                                  const std::vector<VkSemaphoreSubmitInfo> &signalInfos = {})
     {
         // waitFence = fence;
@@ -89,7 +106,7 @@ struct HardwareExecutorVulkan
         return *this;
     }
 
-    HardwareExecutorVulkan& wait(HardwareExecutorVulkan &other)
+    HardwareExecutorVulkan &wait(HardwareExecutorVulkan &other)
     {
         if (other)
         {
@@ -108,17 +125,31 @@ struct HardwareExecutorVulkan
         return (!commandList.empty()) && (currentRecordQueue != nullptr);
     }
 
-    HardwareExecutorVulkan& commit();
-    HardwareExecutorVulkan& commitTest();
+    HardwareExecutorVulkan &commit();
+    HardwareExecutorVulkan &commitTest();
 
-    //void waitUntilCommitIsComplete();
-    //void waitUntilAllCommitAreComplete();
-    //void disposeWhenCommitCompletes(std::shared_ptr<Buffer> buffer);
-    //void disposeWhenCommitCompletes(std::function<void()> &&deallocator);
+    // ========== 延迟释放相关接口 ==========
+    void cleanupCompletedResources();
+    void waitForAllDeferredResources();
 
-    static DeviceManager::QueueUtils* pickQueueAndCommit(std::atomic_uint16_t& queueIndex,
-                                                         std::vector<DeviceManager::QueueUtils>& queues,
-                                                         std::function<bool(DeviceManager::QueueUtils* currentRecordQueue)> commitCommand,
+    // 调试：获取统计信息
+    struct DeferredReleaseStats
+    {
+        size_t currentPending = 0;   // 当前等待中的资源数
+        size_t totalSemaphores = 0;  // 涉及的 semaphore 数量
+        uint64_t oldestTimeline = 0; // 最老的等待 timeline
+        uint64_t newestTimeline = 0; // 最新的等待 timeline
+    };
+    DeferredReleaseStats getDeferredReleaseStats() const;
+
+    // void waitUntilCommitIsComplete();
+    // void waitUntilAllCommitAreComplete();
+    // void disposeWhenCommitCompletes(std::shared_ptr<Buffer> buffer);
+    // void disposeWhenCommitCompletes(std::function<void()> &&deallocator);
+
+    static DeviceManager::QueueUtils *pickQueueAndCommit(std::atomic_uint16_t &queueIndex,
+                                                         std::vector<DeviceManager::QueueUtils> &queues,
+                                                         std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand,
                                                          bool needsCommandBuffer = true);
 
     DeviceManager::QueueUtils *currentRecordQueue{nullptr};
@@ -126,8 +157,12 @@ struct HardwareExecutorVulkan
     std::vector<CommandRecordVulkan *> commandList;
     std::vector<VkSemaphoreSubmitInfo> waitSemaphores;
     std::vector<VkSemaphoreSubmitInfo> signalSemaphores;
-    //std::vector<VkFence> prentFences;
+    // std::vector<VkFence> prentFences;
     VkFence waitFence{VK_NULL_HANDLE};
-    //std::unordered_map<VkFence, DeviceManager::QueueUtils*> fenceToPresent;
-    //std::vector<std::vector<std::shared_ptr<Buffer>>> buffer_to_dispose_;
+    // std::unordered_map<VkFence, DeviceManager::QueueUtils*> fenceToPresent;
+    // std::vector<std::vector<std::shared_ptr<Buffer>>> buffer_to_dispose_;
+
+    // ========== 延迟释放成员 ==========
+    std::vector<std::shared_ptr<CopyCommandImpl>> pendingResources;
+    std::vector<DeferredRelease> deferredReleaseQueue;
 };

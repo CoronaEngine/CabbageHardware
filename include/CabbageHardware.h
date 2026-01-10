@@ -438,6 +438,13 @@ struct HardwareExecutor
     HardwareExecutor &wait(HardwareExecutor &other);
     HardwareExecutor &commit();
 
+    // ========== 延迟释放相关接口 ==========
+    /// @brief 等待所有延迟释放的资源完成（阻塞）
+    void waitForDeferredResources();
+
+    /// @brief 手动触发一次清理（非阻塞）
+    void cleanupDeferredResources();
+
     [[nodiscard]] uintptr_t getExecutorID() const
     {
         return executorID.load(std::memory_order_acquire);
