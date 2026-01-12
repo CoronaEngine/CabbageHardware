@@ -96,9 +96,11 @@ inline void testCompressedTextures()
         bc1UnormCreateInfo.usage = ImageUsage::SampledImage;
         bc1UnormCreateInfo.arrayLayers = 1;
         bc1UnormCreateInfo.mipLevels = 1;
-        bc1UnormCreateInfo.initialData = compressedData.data();
+        // bc1UnormCreateInfo.initialData = compressedData.data();
 
         HardwareImage textureBC1Unorm(bc1UnormCreateInfo);
+        HardwareExecutor tempExecutor;
+        tempExecutor << textureBC1Unorm.copyFrom(compressedData.data()) << tempExecutor.commit();
         CFW_LOG_DEBUG("BC1_RGB_UNORM texture created success, descriptor ID: {}", textureBC1Unorm.storeDescriptor());
 
         CFW_LOG_DEBUG("Testing BC1_RGB_SRGB format...");
@@ -109,9 +111,10 @@ inline void testCompressedTextures()
         bc1SrgbCreateInfo.usage = ImageUsage::SampledImage;
         bc1SrgbCreateInfo.arrayLayers = 1;
         bc1SrgbCreateInfo.mipLevels = 1;
-        bc1SrgbCreateInfo.initialData = compressedData.data();
+        // bc1SrgbCreateInfo.initialData = compressedData.data();
 
         HardwareImage textureBC1Srgb(bc1SrgbCreateInfo);
+        tempExecutor << textureBC1Srgb.copyFrom(compressedData.data()) << tempExecutor.commit();
         CFW_LOG_DEBUG("BC1_RGB_SRGB texture created success, descriptor ID: {}", textureBC1Srgb.storeDescriptor());
 
         CFW_LOG_DEBUG("=== All compressed format tests passed ===");
@@ -146,9 +149,11 @@ inline TextureLoadResult loadTexture(const std::string &texturePath)
     createInfo.usage = ImageUsage::SampledImage;
     createInfo.arrayLayers = 1;
     createInfo.mipLevels = 1;
-    createInfo.initialData = data;
+    // createInfo.initialData = data;
 
     result.texture = HardwareImage(createInfo);
+    HardwareExecutor tempExecutor;
+    tempExecutor << result.texture.copyFrom(data) << tempExecutor.commit();
     result.descriptorID = result.texture.storeDescriptor();
     result.success = true;
 
@@ -187,9 +192,11 @@ inline TextureLoadResult loadCompressedTexture(const std::string &texturePath, b
     createInfo.usage = ImageUsage::SampledImage;
     createInfo.arrayLayers = 1;
     createInfo.mipLevels = 1;
-    createInfo.initialData = compressedData.data();
+    // createInfo.initialData = compressedData.data();
 
     result.texture = HardwareImage(createInfo);
+    HardwareExecutor tempExecutor;
+    tempExecutor << result.texture.copyFrom(compressedData.data()) << tempExecutor.commit();
     result.descriptorID = result.texture.storeDescriptor();
     result.success = true;
 
@@ -235,12 +242,14 @@ inline TextureLoadResult loadTextureWithMipmapAndLayers(const std::string &textu
     createInfo.usage = ImageUsage::SampledImage;
     createInfo.arrayLayers = arrayLayers;
     createInfo.mipLevels = mipLevels;
-    createInfo.initialData = layerData.data();
+    // createInfo.initialData = layerData.data();
 
     result.texture = HardwareImage(createInfo);
 
     // 获取指定 layer 和 mip 的视图
     auto textureView = result.texture[viewLayer][viewMip];
+    HardwareExecutor tempExecutor;
+    tempExecutor << textureView.copyFrom(layerData.data()) << tempExecutor.commit();
     result.descriptorID = textureView.storeDescriptor();
     result.success = true;
 

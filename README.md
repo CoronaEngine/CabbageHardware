@@ -1,4 +1,4 @@
-# TODO（按优先级排序）
+﻿# TODO（按优先级排序）
 - （紧急）多线程内存泄漏、多线程死锁、多线程crash
 - （紧急）shader中不同的textureSampler，分离的图像和采样器描述符
 - （紧急）多显卡：同步VK_KHR_external_semaphore

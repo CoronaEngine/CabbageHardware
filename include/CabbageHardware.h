@@ -163,7 +163,7 @@ struct HardwareImageCreateInfo
     ImageUsage usage = ImageUsage::SampledImage;
     int arrayLayers{1};
     int mipLevels{1};
-    void *initialData{nullptr};
+    // void *initialData{nullptr};
 
     HardwareImageCreateInfo() = default;
     HardwareImageCreateInfo(uint32_t w, uint32_t h, ImageFormat fmt = ImageFormat::RGBA8_SRGB)
@@ -204,6 +204,9 @@ struct HardwareImage
                                               uint32_t imageLayer = 0,
                                               uint32_t imageMip = 0,
                                               uint64_t bufferOffset = 0) const;
+    [[nodiscard]] BufferToImageCommand copyFrom(const void *inputData,
+                                                uint32_t imageLayer = 0,
+                                                uint32_t imageMip = 0) const;
 
     //[[nodiscard]] uint32_t getNumMipLevels() const;
     //[[nodiscard]] uint32_t getArrayLayers() const;
@@ -434,6 +437,13 @@ struct HardwareExecutor
 
     HardwareExecutor &wait(HardwareExecutor &other);
     HardwareExecutor &commit();
+
+    // ========== 延迟释放相关接口 ==========
+    /// @brief 等待所有延迟释放的资源完成（阻塞）
+    void waitForDeferredResources();
+
+    /// @brief 手动触发一次清理（非阻塞）
+    void cleanupDeferredResources();
 
     [[nodiscard]] uintptr_t getExecutorID() const
     {

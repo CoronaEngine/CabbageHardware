@@ -230,6 +230,9 @@ HardwareExecutor &HardwareExecutor::operator<<(const CopyCommand &cmd)
         if (record)
         {
             *executor_handle->impl << record;
+
+            // ===== 将资源添加到待释放列表 =====
+            executor_handle->impl->pendingResources.push_back(cmd.impl);
         }
     }
     return *this;
@@ -274,4 +277,36 @@ HardwareExecutor &HardwareExecutor::commit()
     auto handle = gExecutorStorage.acquire_write(executorID.load(std::memory_order_acquire));
     handle->impl->commit();
     return *this;
+}
+
+// ========== 延迟释放相关接口实现 ==========
+
+void HardwareExecutor::waitForDeferredResources()
+{
+    auto const self_id = executorID.load(std::memory_order_acquire);
+    if (self_id == 0)
+    {
+        return;
+    }
+
+    auto handle = gExecutorStorage.acquire_write(self_id);
+    if (handle->impl)
+    {
+        handle->impl->waitForAllDeferredResources();
+    }
+}
+
+void HardwareExecutor::cleanupDeferredResources()
+{
+    auto const self_id = executorID.load(std::memory_order_acquire);
+    if (self_id == 0)
+    {
+        return;
+    }
+
+    auto handle = gExecutorStorage.acquire_write(self_id);
+    if (handle->impl)
+    {
+        handle->impl->cleanupCompletedResources();
+    }
 }

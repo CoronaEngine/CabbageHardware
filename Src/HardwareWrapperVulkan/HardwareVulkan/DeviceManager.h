@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <mutex>
+#include <set>
 
 #include "FeaturesChain.h"
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
@@ -104,4 +105,7 @@ class DeviceManager
     std::vector<QueueUtils> computeQueues;
     std::vector<QueueUtils> transferQueues;
     std::vector<VkQueueFamilyProperties> queueFamilies;
+
+    // 用于追踪已销毁的资源，避免共享队列的重复释放
+    std::set<VkCommandPool> destroyedPools;
 };
