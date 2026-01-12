@@ -569,7 +569,25 @@ BufferToImageCommand HardwareImage::copyFrom(const void *inputData,
         }
         const uint32_t width = std::max(1u, imageHandle->imageSize.x >> imageMip);
         const uint32_t height = std::max(1u, imageHandle->imageSize.y >> imageMip);
-        bufferSize = width * height * imageHandle->pixelSize;
+
+        // 判断是否是压缩格式 (压缩格式的 pixelSize < 2.0f)
+        const bool isCompressed = imageHandle->pixelSize < 2.0f;
+
+        if (isCompressed)
+        {
+            const uint32_t blockWidth = 4;
+            const uint32_t blockHeight = 4;
+            // 向上取整计算 Block 数量
+            uint32_t widthInBlocks = (width + blockWidth - 1) / blockWidth;
+            uint32_t heightInBlocks = (height + blockHeight - 1) / blockHeight;
+            // 计算每个 Block 的字节数 (例如 BC1: 0.5 * 16 = 8 bytes)
+            uint32_t bytesPerBlock = static_cast<uint32_t>(imageHandle->pixelSize * 16.0f);
+            bufferSize = widthInBlocks * heightInBlocks * bytesPerBlock;
+        }
+        else
+        {
+            bufferSize = width * height * static_cast<uint32_t>(imageHandle->pixelSize);
+        }
     }
 
     HardwareBuffer stagingBuffer(bufferSize, BufferUsage::StorageBuffer, inputData);
