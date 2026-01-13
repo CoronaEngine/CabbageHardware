@@ -573,7 +573,14 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         }
 
         // 等待前一帧完成
-        VkResult presentFenceResult = vkWaitForFences(displayDevice->deviceManager.getLogicalDevice(), 1, &presentFences[currentFrame], VK_TRUE, UINT64_MAX);
+        VkResult fenceResult = vkWaitForFences(displayDevice->deviceManager.getLogicalDevice(), 1, &presentFences[currentFrame], VK_TRUE, UINT64_MAX);
+        if (fenceResult != VK_SUCCESS)
+        {
+            CFW_LOG_ERROR("Failed to wait for present fence: {}", static_cast<int>(fenceResult));
+            return false;
+        }
+
+        vkResetFences(displayDevice->deviceManager.getLogicalDevice(), 1, &presentFences[currentFrame]);
 
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(displayDevice->deviceManager.getLogicalDevice(),
@@ -592,9 +599,6 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         {
             throw std::runtime_error("Failed to acquire swap chain image");
         }
-
-        vkResetFences(displayDevice->deviceManager.getLogicalDevice(), 1, &presentFences[currentFrame]);
-        // vkResetFences(displayDevice->deviceManager.getLogicalDevice(), 1, &copyFences[currentFrame]);
 
         // 跨设备传输（如果需要）
         if (auto const handle = globalImageStorages.acquire_write(displayImage.getImageID());
@@ -617,6 +621,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         {
             VkSemaphoreSubmitInfo waitInfo{};
             waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            waitInfo.pNext = nullptr;
             waitInfo.semaphore = imageAvailableSemaphores[currentFrame];
             waitInfo.value = 0;
             waitInfo.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_2_TRANSFER_BIT;
@@ -625,12 +630,13 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
 
         std::vector<VkSemaphoreSubmitInfo> signalSemaphoreInfos;
         {
-            VkSemaphoreSubmitInfo signalInfoPresent{};
-            signalInfoPresent.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-            signalInfoPresent.semaphore = renderFinishedSemaphores[currentFrame];
-            signalInfoPresent.value = 0;
-            signalInfoPresent.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-            signalSemaphoreInfos.push_back(signalInfoPresent);
+            VkSemaphoreSubmitInfo signalInfo{};
+            signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            signalInfo.pNext = nullptr;
+            signalInfo.semaphore = renderFinishedSemaphores[currentFrame];
+            signalInfo.value = 0;
+            signalInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+            signalSemaphoreInfos.push_back(signalInfo);
         }
 
         // 执行 Blit 和转换布局
