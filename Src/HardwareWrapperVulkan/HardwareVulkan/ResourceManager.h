@@ -150,15 +150,23 @@ struct ResourceManager
         return exportBufferPool;
     }
 
-    BindlessDescriptorSet bindlessDescriptors[4];
+    // 干掉了 Uniform Buffer 和 Storage Buffer 分开的设计，统一用 Storage Buffer 来绑定
+    BindlessDescriptorSet bindlessDescriptors[3];
 
   private:
+    //enum class DescriptorBindingType : uint8_t
+    //{
+    //    Uniform = 0,
+    //    Texture = 1,
+    //    StorageBuffer = 2,
+    //    StorageImage = 3
+    //};
+
     enum class DescriptorBindingType : uint8_t
     {
-        Uniform = 0,
-        Texture = 1,
-        StorageBuffer = 2,
-        StorageImage = 3
+        Texture = 0,
+        StorageBuffer = 1,
+        StorageImage = 2
     };
 
     template <typename THandle>
@@ -183,10 +191,11 @@ struct ResourceManager
     VmaPool exportBufferPool{VK_NULL_HANDLE};
     VkSampler textureSampler{VK_NULL_HANDLE};
 
-    const uint32_t uniformBinding{0};
-    const uint32_t textureBinding{1};
-    const uint32_t storageBufferBinding{2};
-    const uint32_t storageImageBinding{3};
+    // 干掉了 Uniform Buffer 和 Storage Buffer 分开的设计，统一用 Storage Buffer 来绑定
+    //const uint32_t uniformBinding{0};
+    const uint32_t textureBinding{0};
+    const uint32_t storageBufferBinding{1};
+    const uint32_t storageImageBinding{2};
 
     uint64_t deviceMemorySize{0};
     uint64_t hostSharedMemorySize{0};
