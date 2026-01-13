@@ -269,22 +269,30 @@ void DeviceManager::createQueueUtils()
             exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #endif
             VkSemaphoreTypeCreateInfo typeCreateInfo{};
-            typeCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO_KHR;
-            typeCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR;
+            typeCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+            typeCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
             typeCreateInfo.initialValue = 0;
             typeCreateInfo.pNext = &exportInfo;
 
             VkSemaphoreCreateInfo semaphoreInfo{};
             semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-        
             semaphoreInfo.pNext = &typeCreateInfo;
+            semaphoreInfo.flags = 0;
 
-        
             coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &queue.timelineSemaphore));
-    
+
+#ifdef CABBAGE_ENGINE_DEBUG
+            uint64_t initialValue = UINT64_MAX;
+            vkGetSemaphoreCounterValue(logicalDevice, queue.timelineSemaphore, &initialValue);
+            if (initialValue != 0)
+            {
+                CFW_LOG_ERROR("Timeline semaphore initial value is {}, expected 0!", initialValue);
+            }
+#endif
         };
 
-    auto createCommandBufferForQueue = [this](QueueUtils &queue) {
+    auto createCommandBufferForQueue = [this](QueueUtils &queue) 
+    {
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
