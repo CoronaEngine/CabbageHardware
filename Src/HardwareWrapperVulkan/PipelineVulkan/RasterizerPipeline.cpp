@@ -831,8 +831,8 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
 
     // 绑定描述符集
     std::vector<VkDescriptorSet> descriptorSets;
-    descriptorSets.reserve(4);
-    for (size_t i = 0; i < 4; ++i)
+    descriptorSets.reserve(3);
+    for (size_t i = 0; i < 3; ++i)
     {
         descriptorSets.push_back(mainDevice->resourceManager.bindlessDescriptors[i].descriptorSet);
     }
