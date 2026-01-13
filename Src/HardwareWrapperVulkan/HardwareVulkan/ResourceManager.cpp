@@ -127,18 +127,18 @@ void ResourceManager::createVmaAllocator()
     }
 
 #ifdef CABBAGE_ENGINE_DEBUG
-    const auto toGB = [](uint64_t bytes) -> double {
+    const auto toGB = [](uint64_t bytes) -> double 
+    {
         return bytes / 1073741824.0; // 1024^3
     };
 
-    CFW_LOG_DEBUG(
-        "[ResourceManager] VMA Allocator created successfully:\n"
-        "  Device Memory:        {:.2f} GB\n"
-        "  Host Shared Memory:   {:.2f} GB\n"
-        "  Multi-Instance Memory: {:.2f} GB",
-        toGB(deviceMemorySize),
-        toGB(hostSharedMemorySize),
-        toGB(multiInstanceMemorySize));
+    CFW_LOG_DEBUG("[ResourceManager] VMA Allocator created successfully:\n"
+                  "  Device Memory:        {:.2f} GB\n"
+                  "  Host Shared Memory:   {:.2f} GB\n"
+                  "  Multi-Instance Memory: {:.2f} GB",
+                  toGB(deviceMemorySize),
+                  toGB(hostSharedMemorySize),
+                  toGB(multiInstanceMemorySize));
 #endif
 }
 
@@ -168,140 +168,10 @@ void ResourceManager::createTextureSampler()
     coronaHardwareCheck(vkCreateSampler(device->getLogicalDevice(), &samplerInfo, nullptr, &textureSampler));
 }
 
-//void ResourceManager::createBindlessDescriptorSet()
-//{
-//    VkPhysicalDeviceDescriptorIndexingProperties indexingProperties{};
-//    indexingProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES_EXT;
-//
-//    VkPhysicalDeviceProperties2 deviceProperties{};
-//    deviceProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-//    deviceProperties.pNext = &indexingProperties;
-//
-//    vkGetPhysicalDeviceProperties2(device->getPhysicalDevice(), &deviceProperties);
-//
-//    struct DescriptorTypeConfig
-//    {
-//        VkDescriptorType type;
-//        std::function<uint32_t(const VkPhysicalDeviceDescriptorIndexingProperties &)> computeMaxCount;
-//    };
-//
-//    constexpr uint32_t PREFERRED_MAX_RESOURCES = 10000u;
-//    const DescriptorTypeConfig configs[4] =
-//        {
-//            // Uniform Buffer
-//            {
-//                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-//                [](const auto &props) {
-//                    return std::min({PREFERRED_MAX_RESOURCES,
-//                                     props.maxUpdateAfterBindDescriptorsInAllPools / 4,
-//                                     props.maxPerStageUpdateAfterBindResources / 4,
-//                                     props.maxPerStageDescriptorUpdateAfterBindUniformBuffers,
-//                                     props.maxDescriptorSetUpdateAfterBindUniformBuffers});
-//                }},
-//            // Combined Image Sampler
-//            {
-//                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-//                [](const auto &props) {
-//                    return std::min({PREFERRED_MAX_RESOURCES,
-//                                     props.maxUpdateAfterBindDescriptorsInAllPools / 4,
-//                                     props.maxPerStageUpdateAfterBindResources / 4,
-//                                     props.maxPerStageDescriptorUpdateAfterBindSampledImages,
-//                                     props.maxDescriptorSetUpdateAfterBindSampledImages});
-//                }},
-//            // Storage Buffer
-//            {
-//                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-//                [](const auto &props) {
-//                    return std::min({PREFERRED_MAX_RESOURCES,
-//                                     props.maxUpdateAfterBindDescriptorsInAllPools / 4,
-//                                     props.maxPerStageUpdateAfterBindResources / 4,
-//                                     props.maxPerStageDescriptorUpdateAfterBindStorageBuffers,
-//                                     props.maxDescriptorSetUpdateAfterBindStorageBuffers});
-//                }},
-//            // Storage Image
-//            {
-//                VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-//                [](const auto &props) {
-//                    return std::min({PREFERRED_MAX_RESOURCES,
-//                                     props.maxUpdateAfterBindDescriptorsInAllPools / 4,
-//                                     props.maxPerStageUpdateAfterBindResources / 4,
-//                                     props.maxPerStageDescriptorUpdateAfterBindStorageImages,
-//                                     props.maxDescriptorSetUpdateAfterBindStorageImages});
-//                }}};
-//
-//    std::array<uint32_t, 4> maxResourceCounts;
-//    for (size_t i = 0; i < 4; ++i)
-//    {
-//        maxResourceCounts[i] = configs[i].computeMaxCount(indexingProperties);
-//    }
-//
-//    constexpr VkDescriptorBindingFlags bindingFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT 
-//                                                    | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT 
-//                                                    | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
-//
-//    VkDevice logicalDevice = device->getLogicalDevice();
-//
-//    for (size_t i = 0; i < 4; ++i)
-//    {
-//        const uint32_t maxCount = maxResourceCounts[i];
-//        const VkDescriptorType descriptorType = configs[i].type;
-//
-//        // 创建描述符集布局
-//        VkDescriptorSetLayoutBinding binding{};
-//        binding.binding = 0;
-//        binding.descriptorType = descriptorType;
-//        binding.descriptorCount = maxCount;
-//        binding.stageFlags = VK_SHADER_STAGE_ALL;
-//
-//        VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo{};
-//        bindingFlagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
-//        bindingFlagsInfo.bindingCount = 1;
-//        bindingFlagsInfo.pBindingFlags = &bindingFlags;
-//
-//        VkDescriptorSetLayoutCreateInfo layoutInfo{};
-//        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-//        layoutInfo.bindingCount = 1;
-//        layoutInfo.pBindings = &binding;
-//        layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-//        layoutInfo.pNext = &bindingFlagsInfo;
-//
-//        coronaHardwareCheck(vkCreateDescriptorSetLayout(logicalDevice, &layoutInfo, nullptr, &bindlessDescriptors[i].descriptorSetLayout));
-//
-//        // 创建描述符池
-//        VkDescriptorPoolSize poolSize{};
-//        poolSize.type = descriptorType;
-//        poolSize.descriptorCount = maxCount;
-//
-//        VkDescriptorPoolCreateInfo poolInfo{};
-//        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-//        poolInfo.poolSizeCount = 1;
-//        poolInfo.pPoolSizes = &poolSize;
-//        poolInfo.maxSets = 1; // 每个池只需要一个描述符集
-//        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
-//
-//        coronaHardwareCheck(vkCreateDescriptorPool(logicalDevice, &poolInfo, nullptr, &bindlessDescriptors[i].descriptorPool));
-//
-//        // 分配描述符集（支持变长）
-//        VkDescriptorSetVariableDescriptorCountAllocateInfo variableCountInfo{};
-//        variableCountInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
-//        variableCountInfo.descriptorSetCount = 1;
-//        variableCountInfo.pDescriptorCounts = &maxCount;
-//
-//        VkDescriptorSetAllocateInfo allocInfo{};
-//        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-//        allocInfo.descriptorPool = bindlessDescriptors[i].descriptorPool;
-//        allocInfo.descriptorSetCount = 1;
-//        allocInfo.pSetLayouts = &bindlessDescriptors[i].descriptorSetLayout;
-//        allocInfo.pNext = &variableCountInfo;
-//
-//        coronaHardwareCheck(vkAllocateDescriptorSets(logicalDevice, &allocInfo, &bindlessDescriptors[i].descriptorSet));
-//    }
-//}
-
 void ResourceManager::createBindlessDescriptorSet()
 {
     VkPhysicalDeviceDescriptorIndexingProperties indexingProperties{};
-    indexingProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES;
+    indexingProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES_EXT;
 
     VkPhysicalDeviceProperties2 deviceProperties{};
     deviceProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
@@ -309,72 +179,91 @@ void ResourceManager::createBindlessDescriptorSet()
 
     vkGetPhysicalDeviceProperties2(device->getPhysicalDevice(), &deviceProperties);
 
-#ifdef CABBAGE_ENGINE_DEBUG
-    CFW_LOG_DEBUG(
-        "[ResourceManager] Descriptor Indexing Properties:\n"
-        "  maxUpdateAfterBindDescriptorsInAllPools: {}\n"
-        "  maxPerStageUpdateAfterBindResources: {}\n"
-        "  maxPerStageDescriptorUpdateAfterBindUniformBuffers: {}\n"
-        "  maxPerStageDescriptorUpdateAfterBindSampledImages: {}\n"
-        "  maxPerStageDescriptorUpdateAfterBindStorageBuffers: {}\n"
-        "  maxPerStageDescriptorUpdateAfterBindStorageImages: {}",
-        indexingProperties.maxUpdateAfterBindDescriptorsInAllPools,
-        indexingProperties.maxPerStageUpdateAfterBindResources,
-        indexingProperties.maxPerStageDescriptorUpdateAfterBindUniformBuffers,
-        indexingProperties.maxPerStageDescriptorUpdateAfterBindSampledImages,
-        indexingProperties.maxPerStageDescriptorUpdateAfterBindStorageBuffers,
-        indexingProperties.maxPerStageDescriptorUpdateAfterBindStorageImages);
-#endif
-
-    // 直接使用固定数量，大多数现代 GPU 支持至少 500000 个描述符
-    constexpr uint32_t PREFERRED_MAX_RESOURCES = 10000u;
-
-    // 计算每种类型的最大描述符数量，使用更简单的逻辑
-    auto computeMaxCount = [&](uint32_t perStageLimit, uint32_t setLimit) -> uint32_t {
-        // 如果查询到的值为 0 或异常小，使用默认值
-        if (perStageLimit == 0)
-            perStageLimit = UINT32_MAX;
-        if (setLimit == 0)
-            setLimit = UINT32_MAX;
-
-        uint32_t result = std::min({PREFERRED_MAX_RESOURCES, perStageLimit, setLimit});
-
-        // 确保至少有一个合理的最小值
-        return std::max(result, 1000u);
+    struct DescriptorTypeConfig
+    {
+        VkDescriptorType type;
+        std::function<uint32_t(const VkPhysicalDeviceDescriptorIndexingProperties &)> computeMaxCount;
     };
 
-    std::array<uint32_t, 4> maxResourceCounts = {
-        computeMaxCount(indexingProperties.maxPerStageDescriptorUpdateAfterBindUniformBuffers,
-                        indexingProperties.maxDescriptorSetUpdateAfterBindUniformBuffers),
-        computeMaxCount(indexingProperties.maxPerStageDescriptorUpdateAfterBindSampledImages,
-                        indexingProperties.maxDescriptorSetUpdateAfterBindSampledImages),
-        computeMaxCount(indexingProperties.maxPerStageDescriptorUpdateAfterBindStorageBuffers,
-                        indexingProperties.maxDescriptorSetUpdateAfterBindStorageBuffers),
-        computeMaxCount(indexingProperties.maxPerStageDescriptorUpdateAfterBindStorageImages,
-                        indexingProperties.maxDescriptorSetUpdateAfterBindStorageImages)};
+    #ifdef CABBAGE_ENGINE_DEBUG
+    CFW_LOG_DEBUG("[ResourceManager] Descriptor Indexing Properties:\n"
+                  "  maxUpdateAfterBindDescriptorsInAllPools: {}\n"
+                  "  maxPerStageUpdateAfterBindResources: {}\n"
+                  "  maxPerStageDescriptorUpdateAfterBindUniformBuffers: {}\n"
+                  "  maxPerStageDescriptorUpdateAfterBindSampledImages: {}\n"
+                  "  maxPerStageDescriptorUpdateAfterBindStorageBuffers: {}\n"
+                  "  maxPerStageDescriptorUpdateAfterBindStorageImages: {}",
+                  indexingProperties.maxUpdateAfterBindDescriptorsInAllPools,
+                  indexingProperties.maxPerStageUpdateAfterBindResources,
+                  indexingProperties.maxPerStageDescriptorUpdateAfterBindUniformBuffers,
+                  indexingProperties.maxPerStageDescriptorUpdateAfterBindSampledImages,
+                  indexingProperties.maxPerStageDescriptorUpdateAfterBindStorageBuffers,
+                  indexingProperties.maxPerStageDescriptorUpdateAfterBindStorageImages);
+#endif
 
-    constexpr VkDescriptorType descriptorTypes[4] = {
-        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-        VK_DESCRIPTOR_TYPE_STORAGE_IMAGE};
+    constexpr uint32_t PREFERRED_MAX_RESOURCES = 10000u;
 
-    constexpr VkDescriptorBindingFlags bindingFlags =
-        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
-        VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
-        VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+    const DescriptorTypeConfig configs[3] =
+        {
+            // Uniform Buffer
+            // 目前限制为总数的四分之一，以避免单一类型耗尽资源
+            // 现在更新为三分之一
+            /*{
+                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                [](const auto &props) {
+                    return std::min({PREFERRED_MAX_RESOURCES,
+                                     props.maxUpdateAfterBindDescriptorsInAllPools / 4,
+                                     props.maxPerStageUpdateAfterBindResources / 4,
+                                     props.maxPerStageDescriptorUpdateAfterBindUniformBuffers,
+                                     props.maxDescriptorSetUpdateAfterBindUniformBuffers});
+                }},*/
+            // Combined Image Sampler
+            {
+                VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                [](const auto &props) {
+                    return std::min({PREFERRED_MAX_RESOURCES,
+                                     props.maxUpdateAfterBindDescriptorsInAllPools / 3,
+                                     props.maxPerStageUpdateAfterBindResources / 3,
+                                     props.maxPerStageDescriptorUpdateAfterBindSampledImages,
+                                     props.maxDescriptorSetUpdateAfterBindSampledImages});
+                }},
+            // Storage Buffer
+            {
+                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                [](const auto &props) {
+                    return std::min({PREFERRED_MAX_RESOURCES,
+                                     props.maxUpdateAfterBindDescriptorsInAllPools / 3,
+                                     props.maxPerStageUpdateAfterBindResources / 3,
+                                     props.maxPerStageDescriptorUpdateAfterBindStorageBuffers,
+                                     props.maxDescriptorSetUpdateAfterBindStorageBuffers});
+                }},
+            // Storage Image
+            {
+                VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                [](const auto &props) {
+                    return std::min({PREFERRED_MAX_RESOURCES,
+                                     props.maxUpdateAfterBindDescriptorsInAllPools / 3,
+                                     props.maxPerStageUpdateAfterBindResources / 3,
+                                     props.maxPerStageDescriptorUpdateAfterBindStorageImages,
+                                     props.maxDescriptorSetUpdateAfterBindStorageImages});
+                }}};
+
+    std::array<uint32_t, 3> maxResourceCounts;
+    for (size_t i = 0; i < 3; ++i)
+    {
+        maxResourceCounts[i] = configs[i].computeMaxCount(indexingProperties);
+    }
+
+    constexpr VkDescriptorBindingFlags bindingFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT 
+                                                    | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT 
+                                                    | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
 
     VkDevice logicalDevice = device->getLogicalDevice();
 
-    for (size_t i = 0; i < 4; ++i)
+    for (size_t i = 0; i < 3; ++i)
     {
         const uint32_t maxCount = maxResourceCounts[i];
-        const VkDescriptorType descriptorType = descriptorTypes[i];
-
-#ifdef CABBAGE_ENGINE_DEBUG
-        CFW_LOG_DEBUG("[ResourceManager] Creating bindless descriptor set {}: type={}, maxCount={}",
-                      i, static_cast<uint32_t>(descriptorType), maxCount);
-#endif
+        const VkDescriptorType descriptorType = configs[i].type;
 
         // 创建描述符集布局
         VkDescriptorSetLayoutBinding binding{};
@@ -1166,8 +1055,9 @@ int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<Resource
     {
         buffer->bindlessIndex = globalBufferStorages.seq_id(buffer);
 
-        VkDescriptorType descriptorType = (buffer->bufferUsage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        //VkDescriptorType descriptorType = (buffer->bufferUsage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 
+        // 统一使用 Storage Buffer 类型
         VkDescriptorBufferInfo bufferInfo{};
         bufferInfo.buffer = buffer->bufferHandle;
         bufferInfo.offset = 0;
@@ -1177,10 +1067,11 @@ int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<Resource
         writes.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes.descriptorCount = 1;
         writes.pBufferInfo = &bufferInfo;
-        writes.descriptorType = descriptorType;
+        //writes.descriptorType = descriptorType;
+        writes.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         writes.dstArrayElement = buffer->bindlessIndex;
 
-        if (writes.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+        /*if (writes.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
         {
             writes.dstSet = bindlessDescriptors[uniformBinding].descriptorSet;
             writes.dstBinding = 0;
@@ -1189,7 +1080,9 @@ int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<Resource
         {
             writes.dstSet = bindlessDescriptors[storageBufferBinding].descriptorSet;
             writes.dstBinding = 0;
-        }
+        }*/
+        writes.dstSet = bindlessDescriptors[storageBufferBinding].descriptorSet;
+        writes.dstBinding = 0;
 
         vkUpdateDescriptorSets(device->getLogicalDevice(), 1, &writes, 0, nullptr);
     }
