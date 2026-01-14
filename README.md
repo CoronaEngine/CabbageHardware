@@ -4,6 +4,7 @@
 - （紧急）多显卡：同步VK_KHR_external_semaphore
 - （紧急）多显卡：import mem崩溃
 - （兼容性）GT1030：bindless的ubo数量限制
+-  加载 gltf 模型材质，vulkan 内存屏障报错
 - HardwareExecutor默认选择不同的队列家族
 - 自动判断image的layout
 - 交换链逻辑错误
