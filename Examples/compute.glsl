@@ -1,15 +1,17 @@
 #version 450
 #extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+
 layout(local_size_x = 8, local_size_y = 8) in;
 
-layout(set = 3, binding = 0, rgba16) uniform image2D inputImageRGBA16[];
+layout(set = 2, binding = 0, rgba16f) uniform image2D inputImageRGBA16[];
 
 layout(push_constant) uniform PushConsts
 {
     uint uniformBufferIndex;
 } pushConsts;
 
-layout(set = 0, binding = 0) uniform UniformBufferObject
+layout(set = 1, binding = 0, scalar) buffer UniformBufferObject
 {
     uint imageID;
 }uniformBufferObjects[];
@@ -32,7 +34,6 @@ vec3 acesFilmicToneMapInverse(vec3 x)
     vec3 c = 2 * (2.43 * x - 2.51);
     return ((a - b) / c);
 }
-
 
 void main()
 {
