@@ -8,7 +8,7 @@
 #include <string>
 #include <thread>
 #include <vector>
-// #include <semaphore>
+//#include <semaphore>
 
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
@@ -89,7 +89,7 @@ int main()
     //     glfwSwapBuffers(window);
     // }
 
-    constexpr std::size_t WINDOW_COUNT = 4;
+    constexpr std::size_t WINDOW_COUNT = 1;
     std::vector<GLFWwindow *> windows(WINDOW_COUNT);
     for (size_t i = 0; i < windows.size(); i++)
     {
@@ -163,15 +163,16 @@ int main()
         auto meshThread = [&](uint32_t threadIndex)
         {
             CFW_LOG_INFO("Mesh thread {} started...", threadIndex);
+
             ComputeUniformBufferObject computeUniformData(windows.size());
-            computeUniformBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::UniformBuffer);
+            computeUniformBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::StorageBuffer);
 
             std::vector<ktm::fmat4x4> modelMat(20);
             std::vector<RasterizerUniformBufferObject> rasterizerUniformBufferObject(modelMat.size());
             for (size_t i = 0; i < modelMat.size(); i++)
             {
                 modelMat[i] = (ktm::translate3d(ktm::fvec3((i % 5) - 2.0f, (i / 5) - 0.5f, 0.0f)) * ktm::scale3d(ktm::fvec3(0.1, 0.1, 0.1)) * ktm::rotate3d_axis(ktm::radians(i * 30.0f), ktm::fvec3(0.0f, 0.0f, 1.0f)));
-                rasterizerUniformBuffers[threadIndex].push_back(HardwareBuffer(sizeof(RasterizerUniformBufferObject), BufferUsage::UniformBuffer, &(modelMat[i])));
+                rasterizerUniformBuffers[threadIndex].push_back(HardwareBuffer(sizeof(RasterizerUniformBufferObject), BufferUsage::StorageBuffer, &(modelMat[i])));
             }
 
             auto startTime = std::chrono::high_resolution_clock::now();
@@ -203,12 +204,14 @@ int main()
             }
             // 退出时释放后续信号量，防止死锁
             // renderSemaphores[threadIndex]->release();
+
             CFW_LOG_INFO("Mesh thread {} ended.", threadIndex);
         };
 
         auto renderThread = [&](uint32_t threadIndex)
         {
             CFW_LOG_INFO("Render thread {} started...", threadIndex);
+
             RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
             ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
 
@@ -246,12 +249,14 @@ int main()
                 // displaySemaphores[threadIndex]->release();
             }
             // displaySemaphores[threadIndex]->release();
+
             CFW_LOG_INFO("Render thread {} ended.", threadIndex);
         };
 
         auto displayThread = [&](uint32_t threadIndex) 
         {
             CFW_LOG_INFO("Display thread {} started...", threadIndex);
+
             HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
 
             auto startTime = std::chrono::high_resolution_clock::now();
@@ -273,6 +278,7 @@ int main()
                 // meshSemaphores[threadIndex]->release();
             }
             // meshSemaphores[threadIndex]->release();
+
             CFW_LOG_INFO("Display thread {} ended.", threadIndex);
         };
 
