@@ -410,8 +410,8 @@ void RasterizerPipelineVulkan::createGraphicsPipeline(EmbeddedShader::ShaderCode
 
     // 获取描述符集布局
     std::vector<VkDescriptorSetLayout> setLayouts;
-    setLayouts.reserve(4);
-    for (size_t i = 0; i < 4; ++i)
+    setLayouts.reserve(3);
+    for (size_t i = 0; i < 3; ++i)
     {
         setLayouts.push_back(mainDevice->resourceManager.bindlessDescriptors[i].descriptorSetLayout);
     }
