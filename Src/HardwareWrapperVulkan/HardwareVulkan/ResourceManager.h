@@ -67,6 +67,13 @@ struct ResourceManager
         ResourceManager *resourceManager{nullptr};
     };
 
+    struct UniformDescriptorSet
+    {
+        VkDescriptorPool descriptorPool{VK_NULL_HANDLE};
+        VkDescriptorSetLayout descriptorSetLayout{VK_NULL_HANDLE};
+        VkDescriptorSet descriptorSet{VK_NULL_HANDLE};
+    };
+
     struct BindlessDescriptorSet
     {
         VkDescriptorPool descriptorPool{VK_NULL_HANDLE};
@@ -145,28 +152,22 @@ struct ResourceManager
     {
         return vmaAllocator;
     }
+
     [[nodiscard]] VmaPool getVmaPool() const
     {
         return exportBufferPool;
     }
 
-    // 干掉了 Uniform Buffer 和 Storage Buffer 分开的设计，统一用 Storage Buffer 来绑定
+    UniformDescriptorSet uniformDescriptor;
     BindlessDescriptorSet bindlessDescriptors[3];
-
+    
   private:
-    //enum class DescriptorBindingType : uint8_t
-    //{
-    //    Uniform = 0,
-    //    Texture = 1,
-    //    StorageBuffer = 2,
-    //    StorageImage = 3
-    //};
-
     enum class DescriptorBindingType : uint8_t
     {
-        Texture = 0,
-        StorageBuffer = 1,
-        StorageImage = 2
+       Uniform = 0,
+       Texture = 1,
+       StorageBuffer = 2,
+       StorageImage = 3
     };
 
     template <typename THandle>
@@ -178,9 +179,10 @@ struct ResourceManager
 
     void createVmaAllocator();
     void createTextureSampler();
+    void createUniformDescriptorSet();
     void createBindlessDescriptorSet();
     void createExternalBufferMemoryPool();
-
+    
     void createDedicatedBuffer(const VkBufferCreateInfo &bufferInfo, const VmaAllocationCreateInfo &allocInfo, BufferHardwareWrap &resultBuffer);
     void createPooledBuffer(const VkBufferCreateInfo &bufferInfo, const VmaAllocationCreateInfo &allocInfo, BufferHardwareWrap &resultBuffer);
     void createNonExportableBuffer(const VkBufferCreateInfo &bufferInfo, const VmaAllocationCreateInfo &allocInfo, BufferHardwareWrap &resultBuffer);
@@ -191,15 +193,18 @@ struct ResourceManager
     VmaPool exportBufferPool{VK_NULL_HANDLE};
     VkSampler textureSampler{VK_NULL_HANDLE};
 
-    // 干掉了 Uniform Buffer 和 Storage Buffer 分开的设计，统一用 Storage Buffer 来绑定
-    //const uint32_t uniformBinding{0};
-    const uint32_t textureBinding{0};
-    const uint32_t storageBufferBinding{1};
-    const uint32_t storageImageBinding{2};
+    const uint32_t uniformBinding{0};
+    const uint32_t textureBinding{1};
+    const uint32_t storageBufferBinding{2};
+    const uint32_t storageImageBinding{3};
 
     uint64_t deviceMemorySize{0};
     uint64_t hostSharedMemorySize{0};
     uint64_t multiInstanceMemorySize{0};
 
     DeviceManager *device{nullptr};
+
+    // 缓存的物理设备属性，避免重复查询
+    VkPhysicalDeviceProperties cachedDeviceProperties{};
+    VkPhysicalDeviceDescriptorIndexingProperties cachedIndexingProperties{};
 };

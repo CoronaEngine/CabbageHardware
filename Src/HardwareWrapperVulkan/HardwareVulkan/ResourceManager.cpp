@@ -18,8 +18,19 @@ void ResourceManager::initResourceManager(DeviceManager &device)
 {
     this->device = &device;
 
+    // 首先查询并缓存物理设备属性，避免后续重复查询
+    cachedIndexingProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES_EXT;
+
+    VkPhysicalDeviceProperties2 deviceProperties2{};
+    deviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    deviceProperties2.pNext = &cachedIndexingProperties;
+
+    vkGetPhysicalDeviceProperties2(device.getPhysicalDevice(), &deviceProperties2);
+    cachedDeviceProperties = deviceProperties2.properties;
+
     createVmaAllocator();
     createTextureSampler();
+    createUniformDescriptorSet();
     createBindlessDescriptorSet();
     createExternalBufferMemoryPool();
 }
@@ -36,7 +47,20 @@ void ResourceManager::cleanUpResourceManager()
     // 等待设备空闲
     vkDeviceWaitIdle(logicalDevice);
 
-    // 清理描述符相关资源
+    // 清理uniform描述符相关资源
+    if (uniformDescriptor.descriptorPool != VK_NULL_HANDLE)
+    {
+        vkDestroyDescriptorPool(logicalDevice, uniformDescriptor.descriptorPool, nullptr);
+        uniformDescriptor.descriptorPool = VK_NULL_HANDLE;
+    }
+
+    if (uniformDescriptor.descriptorSetLayout != VK_NULL_HANDLE)
+    {
+        vkDestroyDescriptorSetLayout(logicalDevice, uniformDescriptor.descriptorSetLayout, nullptr);
+        uniformDescriptor.descriptorSetLayout = VK_NULL_HANDLE;
+    }
+
+    // 清理bindless描述符相关资源
     for (auto &bindlessDesc : bindlessDescriptors)
     {
         if (bindlessDesc.descriptorPool != VK_NULL_HANDLE)
@@ -144,9 +168,6 @@ void ResourceManager::createVmaAllocator()
 
 void ResourceManager::createTextureSampler()
 {
-    VkPhysicalDeviceProperties properties{};
-    vkGetPhysicalDeviceProperties(device->getPhysicalDevice(), &properties);
-
     VkSamplerCreateInfo samplerInfo{};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     samplerInfo.magFilter = VK_FILTER_NEAREST;
@@ -155,7 +176,7 @@ void ResourceManager::createTextureSampler()
     samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     samplerInfo.anisotropyEnable = VK_FALSE;
-    samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+    samplerInfo.maxAnisotropy = cachedDeviceProperties.limits.maxSamplerAnisotropy;
     samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
     samplerInfo.compareEnable = VK_FALSE;
@@ -168,17 +189,63 @@ void ResourceManager::createTextureSampler()
     coronaHardwareCheck(vkCreateSampler(device->getLogicalDevice(), &samplerInfo, nullptr, &textureSampler));
 }
 
+void ResourceManager::createUniformDescriptorSet()
+{
+    VkDevice logicalDevice = device->getLogicalDevice();
+    
+    // 根据设备限制确定描述符数量
+    // 使用设备支持的最大值与合理默认值之间的最小值
+    uint32_t maxUniformBuffers = std::min(static_cast<uint32_t>(100),
+                                   cachedIndexingProperties.maxPerStageDescriptorUpdateAfterBindUniformBuffers > 0 ? 
+                                          cachedIndexingProperties.maxPerStageDescriptorUpdateAfterBindUniformBuffers : 
+                                          cachedDeviceProperties.limits.maxUniformBufferRange);
+    
+    // 确保至少有一个uniform buffer
+    maxUniformBuffers = std::max(maxUniformBuffers, 1u);
+    
+    // 创建描述符集布局 - 用于uniform buffer，支持多个绑定
+    VkDescriptorSetLayoutBinding layoutBinding{};
+    layoutBinding.binding = 0;  // uniform buffer的起始绑定点
+    layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    layoutBinding.descriptorCount = maxUniformBuffers;  // 根据设备限制动态设置
+    layoutBinding.stageFlags = VK_SHADER_STAGE_ALL;
+    layoutBinding.pImmutableSamplers = nullptr;
+    
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &layoutBinding;
+    layoutInfo.flags = 0;  // 不使用bindless特性
+    
+    coronaHardwareCheck(vkCreateDescriptorSetLayout(logicalDevice, &layoutInfo, nullptr, &uniformDescriptor.descriptorSetLayout));
+    
+    // 创建描述符池 - 用于传统的uniform buffer
+    VkDescriptorPoolSize poolSize{};
+    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    // 描述符池的数量通常是布局中描述符数量的几倍，以支持多个描述符集
+    poolSize.descriptorCount = maxUniformBuffers * 10;  // 最多支持10个这样的描述符集
+    
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.maxSets = 10;  // 最大描述符集数量
+    poolInfo.flags = 0;  // 不使用可更新池
+    
+    coronaHardwareCheck(vkCreateDescriptorPool(logicalDevice, &poolInfo, nullptr, &uniformDescriptor.descriptorPool));
+    
+    // 分配描述符集
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = uniformDescriptor.descriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &uniformDescriptor.descriptorSetLayout;
+    
+    coronaHardwareCheck(vkAllocateDescriptorSets(logicalDevice, &allocInfo, &uniformDescriptor.descriptorSet));
+}
+
 void ResourceManager::createBindlessDescriptorSet()
 {
-    VkPhysicalDeviceDescriptorIndexingProperties indexingProperties{};
-    indexingProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES_EXT;
-
-    VkPhysicalDeviceProperties2 deviceProperties{};
-    deviceProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-    deviceProperties.pNext = &indexingProperties;
-
-    vkGetPhysicalDeviceProperties2(device->getPhysicalDevice(), &deviceProperties);
-
     struct DescriptorTypeConfig
     {
         VkDescriptorType type;
@@ -193,12 +260,12 @@ void ResourceManager::createBindlessDescriptorSet()
                   "  maxPerStageDescriptorUpdateAfterBindSampledImages: {}\n"
                   "  maxPerStageDescriptorUpdateAfterBindStorageBuffers: {}\n"
                   "  maxPerStageDescriptorUpdateAfterBindStorageImages: {}",
-                  indexingProperties.maxUpdateAfterBindDescriptorsInAllPools,
-                  indexingProperties.maxPerStageUpdateAfterBindResources,
-                  indexingProperties.maxPerStageDescriptorUpdateAfterBindUniformBuffers,
-                  indexingProperties.maxPerStageDescriptorUpdateAfterBindSampledImages,
-                  indexingProperties.maxPerStageDescriptorUpdateAfterBindStorageBuffers,
-                  indexingProperties.maxPerStageDescriptorUpdateAfterBindStorageImages);
+                  cachedIndexingProperties.maxUpdateAfterBindDescriptorsInAllPools,
+                  cachedIndexingProperties.maxPerStageUpdateAfterBindResources,
+                  cachedIndexingProperties.maxPerStageDescriptorUpdateAfterBindUniformBuffers,
+                  cachedIndexingProperties.maxPerStageDescriptorUpdateAfterBindSampledImages,
+                  cachedIndexingProperties.maxPerStageDescriptorUpdateAfterBindStorageBuffers,
+                  cachedIndexingProperties.maxPerStageDescriptorUpdateAfterBindStorageImages);
 #endif
 
     constexpr uint32_t PREFERRED_MAX_RESOURCES = 10000u;
@@ -251,7 +318,7 @@ void ResourceManager::createBindlessDescriptorSet()
     std::array<uint32_t, 3> maxResourceCounts;
     for (size_t i = 0; i < 3; ++i)
     {
-        maxResourceCounts[i] = configs[i].computeMaxCount(indexingProperties);
+        maxResourceCounts[i] = configs[i].computeMaxCount(cachedIndexingProperties);
     }
 
     constexpr VkDescriptorBindingFlags bindingFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT 
