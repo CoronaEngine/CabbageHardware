@@ -21,7 +21,17 @@
 #include "TextureTest.h"
 #include "corona/kernel/core/i_logger.h"
 
-struct RasterizerUniformBufferObject
+// uniform buffer中
+struct GlobalUniformParam
+{
+    float globalTime;
+    float globalScale;
+    uint32_t frameCount;
+    uint32_t padding;  // 为了对齐
+};
+
+// storage buffer
+struct RasterizerStorageBufferObject
 {
     uint32_t textureIndex;
     ktm::fmat4x4 model = ktm::rotate3d_axis(ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
@@ -32,7 +42,7 @@ struct RasterizerUniformBufferObject
     ktm::fvec3 lightPos = ktm::fvec3(1.0f, 1.0f, 1.0f);
 };
 
-struct ComputeUniformBufferObject
+struct ComputeStorageBufferObject
 {
     uint32_t imageID;
 };
@@ -155,8 +165,9 @@ int main()
         uint32_t textureID = textureResult.descriptorID;
         HardwareImage &texture = textureResult.texture;
 
-        std::vector<std::vector<HardwareBuffer>> rasterizerUniformBuffers(windows.size());
-        std::vector<HardwareBuffer> computeUniformBuffers(windows.size());
+        std::vector<std::vector<HardwareBuffer>> rasterizerStorageBuffers(windows.size());
+        std::vector<HardwareBuffer> globalUniformParamBuffers(windows.size());
+        std::vector<HardwareBuffer> computeStorageBuffers(windows.size());
 
         std::atomic_bool running = true;
 
@@ -164,15 +175,18 @@ int main()
         {
             CFW_LOG_INFO("Mesh thread {} started...", threadIndex);
 
-            ComputeUniformBufferObject computeUniformData(windows.size());
-            computeUniformBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeUniformBufferObject), BufferUsage::StorageBuffer);
+            ComputeStorageBufferObject computeUniformData(windows.size());
+            computeStorageBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeStorageBufferObject), BufferUsage::StorageBuffer);
+
+            GlobalUniformParam globalUniformParamData(windows.size());
+            globalUniformParamBuffers[threadIndex] = HardwareBuffer(sizeof(GlobalUniformParam), BufferUsage::UniformBuffer);
 
             std::vector<ktm::fmat4x4> modelMat(20);
-            std::vector<RasterizerUniformBufferObject> rasterizerUniformBufferObject(modelMat.size());
+            std::vector<RasterizerStorageBufferObject> rasterizerStorageBufferObjects(modelMat.size());
             for (size_t i = 0; i < modelMat.size(); i++)
             {
                 modelMat[i] = (ktm::translate3d(ktm::fvec3((i % 5) - 2.0f, (i / 5) - 0.5f, 0.0f)) * ktm::scale3d(ktm::fvec3(0.1, 0.1, 0.1)) * ktm::rotate3d_axis(ktm::radians(i * 30.0f), ktm::fvec3(0.0f, 0.0f, 1.0f)));
-                rasterizerUniformBuffers[threadIndex].push_back(HardwareBuffer(sizeof(RasterizerUniformBufferObject), BufferUsage::StorageBuffer, &(modelMat[i])));
+                rasterizerStorageBuffers[threadIndex].push_back(HardwareBuffer(sizeof(RasterizerStorageBufferObject), BufferUsage::StorageBuffer, &(modelMat[i])));
             }
 
             auto startTime = std::chrono::high_resolution_clock::now();
@@ -184,19 +198,26 @@ int main()
                 /*meshSemaphores[threadIndex]->acquire();
                 if (!running.load()) break;*/
 
-                float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
-                // CFW_LOG_INFO("Mesh thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
+                float currentTime = std::chrono::duration<float, std::chrono::seconds::period>(  std::chrono::high_resolution_clock::now() - startTime).count();
 
-                for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++)
+                for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
                 {
                     // rasterizerUniformBufferObject[i].textureIndex = texture[0][0].storeDescriptor();
-                    rasterizerUniformBufferObject[i].textureIndex = textureID;
-                    rasterizerUniformBufferObject[i].model = modelMat[i] * ktm::rotate3d_axis(time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
-                    rasterizerUniformBuffers[threadIndex][i].copyFromData(&(rasterizerUniformBufferObject[i]), sizeof(rasterizerUniformBufferObject[i]));
+                    rasterizerStorageBufferObjects[i].textureIndex = textureID;
+                    rasterizerStorageBufferObjects[i].model = modelMat[i] * ktm::rotate3d_axis(currentTime * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
+                    rasterizerStorageBuffers[threadIndex][i].copyFromData(&(rasterizerStorageBufferObjects[i]), sizeof(rasterizerStorageBufferObjects[i]));
                 }
 
                 computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
-                computeUniformBuffers[threadIndex].copyFromData(&computeUniformData, sizeof(computeUniformData));
+                computeStorageBuffers[threadIndex].copyFromData(&computeUniformData, sizeof(computeUniformData));
+
+                GlobalUniformParam updatedParam{};
+                updatedParam.globalTime = currentTime;
+                updatedParam.globalScale = 2.0f + sin(currentTime) * 2.0f; // 轻微缩放动画
+                updatedParam.frameCount = static_cast<uint32_t>(frameCount);
+                updatedParam.padding = 0;
+                globalUniformParamBuffers[threadIndex].copyFromData(&updatedParam, sizeof(updatedParam));
+
                 ++frameCount;
 
                 // 通知渲染线程可以开始
@@ -224,12 +245,12 @@ int main()
                 // renderSemaphores[threadIndex]->acquire();
                 // if (!running.load()) break;
 
-                float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
-                // CFW_LOG_INFO("Render thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
+                float currentTime = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
-                for (size_t i = 0; i < rasterizerUniformBuffers[threadIndex].size(); i++)
+                for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
                 {
-                    rasterizer["pushConsts.uniformBufferIndex"] = rasterizerUniformBuffers[threadIndex][i].storeDescriptor();
+                    rasterizer["pushConsts.storageBufferIndex"] = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
+                    rasterizer["pushConsts.uniformBufferIndex"] = globalUniformParamBuffers[threadIndex].storeDescriptor();
                     // rasterizer["inPosition"] = postionBuffer;
                     // rasterizer["inColor"] = colorBuffer;
                     // rasterizer["inTexCoord"] = uvBuffer;
@@ -239,7 +260,8 @@ int main()
                     rasterizer.record(indexBuffer, vertexBuffer);
                 }
 
-                computer["pushConsts.uniformBufferIndex"] = computeUniformBuffers[threadIndex].storeDescriptor();
+                computer["pushConsts.storageBufferIndex"] = computeStorageBuffers[threadIndex].storeDescriptor();
+
                 executors[threadIndex] << rasterizer(1920, 1080)
                                        << computer(1920 / 8, 1080 / 8, 1)
                                        << executors[threadIndex].commit();
