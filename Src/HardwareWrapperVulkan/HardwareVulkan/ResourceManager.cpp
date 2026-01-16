@@ -195,10 +195,8 @@ void ResourceManager::createUniformDescriptorSet()
     
     // 根据设备限制确定描述符数量
     // 使用设备支持的最大值与合理默认值之间的最小值
-    uint32_t maxUniformBuffers = std::min(static_cast<uint32_t>(100),
-                                   cachedIndexingProperties.maxPerStageDescriptorUpdateAfterBindUniformBuffers > 0 ? 
-                                          cachedIndexingProperties.maxPerStageDescriptorUpdateAfterBindUniformBuffers : 
-                                          cachedDeviceProperties.limits.maxUniformBufferRange);
+    uint32_t maxUniformBuffers = std::min(static_cast<uint32_t>(1000), // 提高默认上限
+                                          cachedDeviceProperties.limits.maxPerStageDescriptorUniformBuffers);
     
     // 确保至少有一个uniform buffer
     maxUniformBuffers = std::max(maxUniformBuffers, 1u);
@@ -211,11 +209,22 @@ void ResourceManager::createUniformDescriptorSet()
     layoutBinding.stageFlags = VK_SHADER_STAGE_ALL;
     layoutBinding.pImmutableSamplers = nullptr;
     
+    // 启用绑定更新后的功能，使我们能够动态更新描述符
+    VkDescriptorBindingFlags bindingFlags = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
+                                            VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
+                                            VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+    
+    VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo{};
+    bindingFlagsInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+    bindingFlagsInfo.bindingCount = 1;
+    bindingFlagsInfo.pBindingFlags = &bindingFlags;
+    
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = 1;
     layoutInfo.pBindings = &layoutBinding;
-    layoutInfo.flags = 0;  // 不使用bindless特性
+    layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+    layoutInfo.pNext = &bindingFlagsInfo;
     
     coronaHardwareCheck(vkCreateDescriptorSetLayout(logicalDevice, &layoutInfo, nullptr, &uniformDescriptor.descriptorSetLayout));
     
@@ -223,23 +232,29 @@ void ResourceManager::createUniformDescriptorSet()
     VkDescriptorPoolSize poolSize{};
     poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     // 描述符池的数量通常是布局中描述符数量的几倍，以支持多个描述符集
-    poolSize.descriptorCount = maxUniformBuffers * 10;  // 最多支持10个这样的描述符集
+    poolSize.descriptorCount = maxUniformBuffers;  // 每个uniform buffer都需要一个槽位
     
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = 1;
     poolInfo.pPoolSizes = &poolSize;
-    poolInfo.maxSets = 10;  // 最大描述符集数量
-    poolInfo.flags = 0;  // 不使用可更新池
+    poolInfo.maxSets = 1;  // 只需要一个描述符集
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;  // 允许动态更新
     
     coronaHardwareCheck(vkCreateDescriptorPool(logicalDevice, &poolInfo, nullptr, &uniformDescriptor.descriptorPool));
     
-    // 分配描述符集
+    // 分配描述符集（支持变长）
+    VkDescriptorSetVariableDescriptorCountAllocateInfo variableCountInfo{};
+    variableCountInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
+    variableCountInfo.descriptorSetCount = 1;
+    variableCountInfo.pDescriptorCounts = &maxUniformBuffers;
+    
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = uniformDescriptor.descriptorPool;
     allocInfo.descriptorSetCount = 1;
     allocInfo.pSetLayouts = &uniformDescriptor.descriptorSetLayout;
+    allocInfo.pNext = &variableCountInfo;
     
     coronaHardwareCheck(vkAllocateDescriptorSets(logicalDevice, &allocInfo, &uniformDescriptor.descriptorSet));
 }
@@ -1122,9 +1137,8 @@ int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<Resource
     {
         buffer->bindlessIndex = globalBufferStorages.seq_id(buffer);
 
-        //VkDescriptorType descriptorType = (buffer->bufferUsage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        VkDescriptorType descriptorType = (buffer->bufferUsage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 
-        // 统一使用 Storage Buffer 类型
         VkDescriptorBufferInfo bufferInfo{};
         bufferInfo.buffer = buffer->bufferHandle;
         bufferInfo.offset = 0;
@@ -1134,22 +1148,19 @@ int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<Resource
         writes.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes.descriptorCount = 1;
         writes.pBufferInfo = &bufferInfo;
-        //writes.descriptorType = descriptorType;
-        writes.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        writes.descriptorType = descriptorType;
         writes.dstArrayElement = buffer->bindlessIndex;
 
-        /*if (writes.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+        if (writes.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
         {
-            writes.dstSet = bindlessDescriptors[uniformBinding].descriptorSet;
+            writes.dstSet = uniformDescriptor.descriptorSet;
             writes.dstBinding = 0;
         }
-        if (writes.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+        else if (writes.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
         {
             writes.dstSet = bindlessDescriptors[storageBufferBinding].descriptorSet;
             writes.dstBinding = 0;
-        }*/
-        writes.dstSet = bindlessDescriptors[storageBufferBinding].descriptorSet;
-        writes.dstBinding = 0;
+        }
 
         vkUpdateDescriptorSets(device->getLogicalDevice(), 1, &writes, 0, nullptr);
     }
