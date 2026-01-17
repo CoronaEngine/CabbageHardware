@@ -3,10 +3,19 @@
 
 layout(push_constant) uniform PushConsts
 {
+    uint storageBufferIndex;
     uint uniformBufferIndex;
-}pushConsts;
+} pushConsts;
 
-layout(set = 0, binding = 0) uniform UniformBufferObject
+layout(set = 3, binding = 0) uniform GlobalUniformParam
+{
+    float globalTime;
+    float globalScale;
+    uint frameCount;
+    uint padding;
+} globalParams[];
+
+layout(set = 1, binding = 0) readonly buffer StorageBufferObject
 {
     uint textureIndex;
     mat4 model;
@@ -15,7 +24,9 @@ layout(set = 0, binding = 0) uniform UniformBufferObject
     vec3 viewPos;
     vec3 lightColor;
     vec3 lightPos;
-}uniformBufferObjects[];
+} storageBufferObjects[];
+
+layout(set = 0, binding = 0) uniform sampler2D textures[];
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
@@ -23,8 +34,6 @@ layout(location = 2) in vec2 fragTexCoord;
 layout(location = 3) in vec3 inColor;
 
 layout(location = 0) out vec4 outColor;
-
-layout(set = 1, binding = 0) uniform sampler2D textures[];
 
 // ----------------------------------------------------------------------------
 float DistributionGGX(vec3 N, vec3 H, float roughness)
@@ -40,6 +49,7 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
 
     return nom / denom;
 }
+
 // ----------------------------------------------------------------------------
 float GeometrySchlickGGX(float NdotV, float roughness)
 {
@@ -51,6 +61,7 @@ float GeometrySchlickGGX(float NdotV, float roughness)
 
     return nom / denom;
 }
+
 // ----------------------------------------------------------------------------
 float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 {
@@ -61,17 +72,17 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 
     return ggx1 * ggx2;
 }
+
 // ----------------------------------------------------------------------------
 vec3 fresnelSchlick(float cosTheta, vec3 F0)
 {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
-
 vec3 calculateColor(vec3 WorldPos, vec3 Normal, vec3 albedo, float metallic, float roughness)
 {
     vec3 N = normalize(Normal);
-    vec3 V = normalize(uniformBufferObjects[pushConsts.uniformBufferIndex].viewPos - WorldPos);
+    vec3 V = normalize(storageBufferObjects[pushConsts.storageBufferIndex].viewPos - WorldPos);
 
     // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0 
     // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)    
@@ -83,11 +94,11 @@ vec3 calculateColor(vec3 WorldPos, vec3 Normal, vec3 albedo, float metallic, flo
     //for(int i = 0; i < 4; ++i) 
     {
         // calculate per-light radiance
-        vec3 L = normalize(uniformBufferObjects[pushConsts.uniformBufferIndex].lightPos - WorldPos);
+        vec3 L = normalize(storageBufferObjects[pushConsts.storageBufferIndex].lightPos - WorldPos);
         vec3 H = normalize(V + L);
         //float distance = length(lightPos - WorldPos);
         float attenuation = 1.0;
-        vec3 radiance = uniformBufferObjects[pushConsts.uniformBufferIndex].lightColor * attenuation;
+        vec3 radiance = storageBufferObjects[pushConsts.storageBufferIndex].lightColor * attenuation;
 
         // Cook-Torrance BRDF
         float NDF = DistributionGGX(N, H, roughness);
@@ -123,9 +134,8 @@ vec3 calculateColor(vec3 WorldPos, vec3 Normal, vec3 albedo, float metallic, flo
     return ambient + Lo;
 }
 
-
 void main()
 {
-    vec4 color = vec4(textureLod(textures[uniformBufferObjects[pushConsts.uniformBufferIndex].textureIndex], fragTexCoord, 0.0));
+    vec4 color = vec4(textureLod(textures[storageBufferObjects[pushConsts.storageBufferIndex].textureIndex], fragTexCoord, 0.0));
     outColor = vec4(calculateColor(inPosition, inNormal, color.w > 0.01 ? color.xyz : inColor, 0.5, 0.5),1.0);
 }

@@ -1,18 +1,29 @@
 #version 450
 #extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+
 layout(local_size_x = 8, local_size_y = 8) in;
 
-layout(set = 3, binding = 0, rgba16) uniform image2D inputImageRGBA16[];
+layout(set = 2, binding = 0, rgba16f) uniform image2D inputImageRGBA16[];
 
 layout(push_constant) uniform PushConsts
 {
+    uint storageBufferIndex;
     uint uniformBufferIndex;
 } pushConsts;
 
-layout(set = 0, binding = 0) uniform UniformBufferObject
+layout(set = 1, binding = 0, scalar) buffer StorageBufferObject
 {
     uint imageID;
-}uniformBufferObjects[];
+} storageBufferObjects[];
+
+layout(set = 3, binding = 0) uniform GlobalUniformParam
+{
+    float globalTime;
+    float globalScale;
+    uint frameCount;
+    uint padding;
+} globalParams[];
 
 vec3 acesFilmicToneMapCurve(vec3 x)
 {
@@ -33,10 +44,13 @@ vec3 acesFilmicToneMapInverse(vec3 x)
     return ((a - b) / c);
 }
 
-
 void main()
 {
-    uint imageID = uniformBufferObjects[pushConsts.uniformBufferIndex].imageID;
+    uint imageID = storageBufferObjects[pushConsts.storageBufferIndex].imageID;
     vec4 color = imageLoad(inputImageRGBA16[imageID], ivec2(gl_GlobalInvocationID.xy));
-    imageStore(inputImageRGBA16[imageID], ivec2(gl_GlobalInvocationID.xy), vec4(acesFilmicToneMapCurve(color.xyz), 1.0));
+
+    float effectFactor = sin(globalParams[pushConsts.uniformBufferIndex].globalTime * 2.0) * 0.5 + 0.5;
+    vec3 adjustedColor = color.xyz * (1.0 + effectFactor * 0.2);
+
+    imageStore(inputImageRGBA16[imageID], ivec2(gl_GlobalInvocationID.xy), vec4(acesFilmicToneMapCurve(adjustedColor), 1.0));
 }

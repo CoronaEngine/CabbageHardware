@@ -411,10 +411,11 @@ void RasterizerPipelineVulkan::createGraphicsPipeline(EmbeddedShader::ShaderCode
     // 获取描述符集布局
     std::vector<VkDescriptorSetLayout> setLayouts;
     setLayouts.reserve(4);
-    for (size_t i = 0; i < 4; ++i)
+    for (size_t i = 0; i < 3; ++i)
     {
         setLayouts.push_back(mainDevice->resourceManager.bindlessDescriptors[i].descriptorSetLayout);
     }
+    setLayouts.push_back(mainDevice->resourceManager.uniformDescriptor.descriptorSetLayout);
 
     // 创建管线布局
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
@@ -832,10 +833,11 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
     // 绑定描述符集
     std::vector<VkDescriptorSet> descriptorSets;
     descriptorSets.reserve(4);
-    for (size_t i = 0; i < 4; ++i)
+    for (size_t i = 0; i < 3; ++i)
     {
         descriptorSets.push_back(mainDevice->resourceManager.bindlessDescriptors[i].descriptorSet);
     }
+    descriptorSets.push_back(mainDevice->resourceManager.uniformDescriptor.descriptorSet);
 
     vkCmdBindDescriptorSets(commandBuffer,
                             VK_PIPELINE_BIND_POINT_GRAPHICS,
