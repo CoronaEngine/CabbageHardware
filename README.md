@@ -12,3 +12,4 @@
 - BUG：VMA的buffer导入导出
 - BUG：mutiview初始化黑屏
 - 图片导入导出：importImageMemory、exportImageMemory（VK_EXT_external_memory）
+- bug: usd模型导入概率性vulkan报错 device lost
