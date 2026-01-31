@@ -206,11 +206,12 @@ HardwareExecutor &HardwareExecutor::operator<<(HardwareExecutor &other)
 }
 
 // CopyCommandImpl 前向声明（定义在 HardwareCommands.cpp 中）
-struct CopyCommandImpl
-{
-    virtual ~CopyCommandImpl() = default;
-    virtual CommandRecordVulkan *getCommandRecord() = 0;
-};
+// CopyCommandImpl definition moved to HardwareExecutorVulkan.h
+// struct CopyCommandImpl
+// {
+//     virtual ~CopyCommandImpl() = default;
+//     virtual CommandRecordVulkan *getCommandRecord() = 0;
+// };
 
 HardwareExecutor &HardwareExecutor::operator<<(const CopyCommand &cmd)
 {

@@ -406,6 +406,15 @@ HardwareExecutorVulkan &HardwareExecutorVulkan::commit()
             }
             localPendingResources.clear();
 
+            // 处理在 commitCommand 期间新增的 pendingResources（例如 RasterizerPipeline 的保活资源）
+            for (auto &resource : pendingResources)
+            {
+                deferredReleaseQueue.push_back({signalValue,
+                                                std::move(resource),
+                                                currentRecordQueue->timelineSemaphore});
+            }
+            pendingResources.clear();
+
             return true;
         };
 

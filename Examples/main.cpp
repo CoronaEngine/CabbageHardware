@@ -8,7 +8,7 @@
 #include <string>
 #include <thread>
 #include <vector>
-//#include <semaphore>
+// #include <semaphore>
 
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
@@ -27,7 +27,7 @@ struct GlobalUniformParam
     float globalTime;
     float globalScale;
     uint32_t frameCount;
-    uint32_t padding;  // 为了对齐
+    uint32_t padding; // 为了对齐
 };
 
 // storage buffer
@@ -49,8 +49,8 @@ struct ComputeStorageBufferObject
 
 int main()
 {
-    //Corona::Kernel::CoronaLogger::get_logger()->set_log_level(quill::LogLevel::TraceL3);
-    // setupSignalHandlers();
+    // Corona::Kernel::CoronaLogger::get_logger()->set_log_level(quill::LogLevel::TraceL3);
+    //  setupSignalHandlers();
 
     // 运行压缩纹理测试（可选）
     // testCompressedTextures();
@@ -132,14 +132,11 @@ int main()
             createInfo.mipLevels = 1;
 
             finalOutputImages[i] = HardwareImage(createInfo);
-            
         }
 
-        HardwareBuffer vertexBuffer = HardwareBuffer(vertices, BufferUsage::VertexBuffer);
         // HardwareBuffer normalBuffer = HardwareBuffer(normals, BufferUsage::VertexBuffer);
         // HardwareBuffer uvBuffer = HardwareBuffer(uvs, BufferUsage::VertexBuffer);
         // HardwareBuffer colorBuffer = HardwareBuffer(colors, BufferUsage::VertexBuffer);
-        HardwareBuffer indexBuffer = HardwareBuffer(indices, BufferUsage::IndexBuffer);
 
         // 纹理加载 - 选择以下任一方式
         // 方式1: 加载普通纹理
@@ -171,8 +168,7 @@ int main()
 
         std::atomic_bool running = true;
 
-        auto meshThread = [&](uint32_t threadIndex)
-        {
+        auto meshThread = [&](uint32_t threadIndex) {
             CFW_LOG_INFO("Mesh thread {} started...", threadIndex);
 
             ComputeStorageBufferObject computeUniformData(windows.size());
@@ -198,7 +194,7 @@ int main()
                 /*meshSemaphores[threadIndex]->acquire();
                 if (!running.load()) break;*/
 
-                float currentTime = std::chrono::duration<float, std::chrono::seconds::period>(  std::chrono::high_resolution_clock::now() - startTime).count();
+                float currentTime = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
                 for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
                 {
@@ -229,8 +225,7 @@ int main()
             CFW_LOG_INFO("Mesh thread {} ended.", threadIndex);
         };
 
-        auto renderThread = [&](uint32_t threadIndex)
-        {
+        auto renderThread = [&](uint32_t threadIndex) {
             CFW_LOG_INFO("Render thread {} started...", threadIndex);
 
             RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
@@ -244,7 +239,8 @@ int main()
                 // 等待数据更新完成
                 // renderSemaphores[threadIndex]->acquire();
                 // if (!running.load()) break;
-
+                HardwareBuffer vertexBuffer = HardwareBuffer(vertices, BufferUsage::VertexBuffer);
+                HardwareBuffer indexBuffer = HardwareBuffer(indices, BufferUsage::IndexBuffer);
                 float currentTime = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
                 for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
@@ -275,8 +271,7 @@ int main()
             CFW_LOG_INFO("Render thread {} ended.", threadIndex);
         };
 
-        auto displayThread = [&](uint32_t threadIndex) 
-        {
+        auto displayThread = [&](uint32_t threadIndex) {
             CFW_LOG_INFO("Display thread {} started...", threadIndex);
 
             HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));

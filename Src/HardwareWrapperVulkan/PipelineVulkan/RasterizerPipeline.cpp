@@ -192,9 +192,11 @@ void RasterizerPipelineVulkan::createRenderPass(int multiviewCount)
     for (const auto &renderTarget : renderTargets)
     {
         VkAttachmentDescription attachment{};
+        VkImageUsageFlags imageUsage{};
         {
             auto const handle = globalImageStorages.acquire_read(renderTarget.getImageID());
             attachment.format = handle->imageFormat;
+            imageUsage = handle->imageUsage;
         }
         attachment.samples = VK_SAMPLE_COUNT_1_BIT;
         attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -202,7 +204,11 @@ void RasterizerPipelineVulkan::createRenderPass(int multiviewCount)
         attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        // 如果图像同时用作 storage image，渲染完成后转换为 GENERAL 布局
+        // 这样 compute shader 可以正确访问它
+        attachment.finalLayout = (imageUsage & VK_IMAGE_USAGE_STORAGE_BIT) 
+                                     ? VK_IMAGE_LAYOUT_GENERAL 
+                                     : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         attachments.push_back(attachment);
     }
 
@@ -670,10 +676,13 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
             requiredBarriers.imageBarriers.push_back(imageBarrier);
         }
 
-        // 更新图像布局
+        // 更新图像布局为 render pass 的 finalLayout
+        // 如果图像用作 storage image，finalLayout 为 GENERAL；否则为 COLOR_ATTACHMENT_OPTIMAL
         {
             auto handle = globalImageStorages.acquire_write(renderTarget.getImageID());
-            handle->imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            handle->imageLayout = (handle->imageUsage & VK_IMAGE_USAGE_STORAGE_BIT) 
+                                      ? VK_IMAGE_LAYOUT_GENERAL 
+                                      : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         }
     }
 
@@ -902,6 +911,23 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
     }
 
     vkCmdEndRenderPass(commandBuffer);
+
+    // Keep resources alive until GPU execution completes
+    if (!geomMeshesRecord.empty())
+    {
+        auto resourceHolder = std::make_shared<ResourceHolderCommand>();
+        resourceHolder->buffers.reserve(geomMeshesRecord.size() * 2);
+
+        for (const auto &mesh : geomMeshesRecord)
+        {
+            if (mesh.indexBuffer)
+                resourceHolder->buffers.push_back(mesh.indexBuffer);
+            if (mesh.vertexBuffer)
+                resourceHolder->buffers.push_back(mesh.vertexBuffer);
+        }
+
+        hardwareExecutor.pendingResources.push_back(resourceHolder);
+    }
 
     // 清空记录
     geomMeshesRecord.clear();
