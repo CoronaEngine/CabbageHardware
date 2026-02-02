@@ -924,8 +924,56 @@ void ResourceManager::destroyBuffer(BufferHardwareWrap &buffer)
 {
     if (buffer.bufferHandle != VK_NULL_HANDLE && vmaAllocator != VK_NULL_HANDLE)
     {
-        // TODO: 考虑异步销毁以避免阻塞
-        vkDeviceWaitIdle(device->getLogicalDevice());
+        // 修复2: 使用基于 timeline semaphore 的延迟销毁，避免 vkDeviceWaitIdle 阻塞
+        // vkDeviceWaitIdle 会阻塞整个设备，导致多线程场景下的竞态条件和 TDR
+        
+        // 收集所有队列的当前 timeline 值，等待所有正在进行的 GPU 操作完成
+        std::vector<VkSemaphore> semaphores;
+        std::vector<uint64_t> waitValues;
+        
+        auto collectQueueSemaphores = [&](const std::vector<DeviceManager::QueueUtils>& queues) {
+            for (const auto& queue : queues) {
+                if (queue.timelineSemaphore != VK_NULL_HANDLE && queue.timelineValue) {
+                    uint64_t currentValue = queue.timelineValue->load(std::memory_order_acquire);
+                    if (currentValue > 0) {
+                        semaphores.push_back(queue.timelineSemaphore);
+                        waitValues.push_back(currentValue);
+                    }
+                }
+            }
+        };
+        
+        collectQueueSemaphores(device->graphicsQueues);
+        collectQueueSemaphores(device->computeQueues);
+        collectQueueSemaphores(device->transferQueues);
+        
+        if (!semaphores.empty()) {
+            VkSemaphoreWaitInfo waitInfo{};
+            waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+            waitInfo.pNext = nullptr;
+            waitInfo.flags = 0;
+            waitInfo.semaphoreCount = static_cast<uint32_t>(semaphores.size());
+            waitInfo.pSemaphores = semaphores.data();
+            waitInfo.pValues = waitValues.data();
+            
+            // 设置合理的超时时间（2秒），避免无限等待
+            constexpr uint64_t timeoutNs = 2'000'000'000ULL;
+            
+            VkResult result = vkWaitSemaphores(device->getLogicalDevice(), &waitInfo, timeoutNs);
+            if (result == VK_TIMEOUT) {
+                CFW_LOG_WARNING("[ResourceManager] destroyBuffer: timeout waiting for GPU operations, forcing device wait");
+                vkDeviceWaitIdle(device->getLogicalDevice());
+            } else if (result != VK_SUCCESS && result != VK_ERROR_DEVICE_LOST) {
+                CFW_LOG_ERROR("[ResourceManager] destroyBuffer: vkWaitSemaphores failed with {}", static_cast<int>(result));
+                // 回退到 vkDeviceWaitIdle
+                vkDeviceWaitIdle(device->getLogicalDevice());
+            }
+            // 如果是 VK_ERROR_DEVICE_LOST，不再调用任何 Vulkan API，直接清理
+        } else {
+            // 没有活跃的 timeline semaphore，说明没有进行中的 GPU 操作
+            // 这种情况下可以安全地直接销毁
+        }
+        
         vmaDestroyBuffer(vmaAllocator, buffer.bufferHandle, buffer.bufferAlloc);
 
         buffer.bufferHandle = VK_NULL_HANDLE;

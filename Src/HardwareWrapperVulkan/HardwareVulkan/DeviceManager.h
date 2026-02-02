@@ -85,6 +85,7 @@ class DeviceManager
 
   private:
     friend class HardwareExecutorVulkan;
+    friend struct ResourceManager;  // 允许 ResourceManager 访问队列以进行延迟销毁同步
 
     void createDevices(const CreateCallback &createInfo, const VkInstance &vkInstance);
     void createQueueUtils();
