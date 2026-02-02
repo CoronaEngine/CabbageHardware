@@ -5,11 +5,12 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 
 // ================= CopyCommandImpl 基类 =================
-struct CopyCommandImpl
-{
-    virtual ~CopyCommandImpl() = default;
-    virtual CommandRecordVulkan *getCommandRecord() = 0;
-};
+// CopyCommandImpl definition moved to HardwareExecutorVulkan.h to allow shared usage
+// struct CopyCommandImpl
+// {
+//    virtual ~CopyCommandImpl() = default;
+//    virtual CommandRecordVulkan *getCommandRecord() = 0;
+// };
 
 // ================= Buffer 到 Buffer 拷贝命令实现 =================
 struct BufferCopyCommandImpl : CopyCommandImpl

@@ -102,6 +102,9 @@ void HardwareExecutorVulkan::cleanupCompletedResources()
     }
 
     // ========== Step 2: 批量查询每个 semaphore 的当前值 ==========
+    // 用于记录损坏的 semaphore
+    std::unordered_set<VkSemaphore> corruptedSemaphores;
+    
     for (auto &[semaphore, completedValue] : semaphoreCompletedValues)
     {
         VkResult result = vkGetSemaphoreCounterValue(
@@ -116,6 +119,15 @@ void HardwareExecutorVulkan::cleanupCompletedResources()
             // 查询失败时设为 0，不释放该 semaphore 对应的资源
             completedValue = 0;
         }
+        else if (completedValue == UINT64_MAX)
+        {
+            // ===== 修复4: 检测损坏的 semaphore =====
+            CFW_LOG_ERROR("[cleanupCompletedResources] Semaphore {} has invalid value UINT64_MAX, marking as corrupted",
+                          reinterpret_cast<uintptr_t>(semaphore));
+            corruptedSemaphores.insert(semaphore);
+            // 设为一个非常大的值以触发资源释放，防止内存泄漏
+            completedValue = UINT64_MAX - 1;
+        }
     }
 
     // ========== Step 3: 分区并移除已完成的资源 ==========
@@ -123,7 +135,12 @@ void HardwareExecutorVulkan::cleanupCompletedResources()
     auto partitionPoint = std::stable_partition(
         deferredReleaseQueue.begin(),
         deferredReleaseQueue.end(),
-        [&semaphoreCompletedValues](const DeferredRelease &entry) {
+        [&semaphoreCompletedValues, &corruptedSemaphores](const DeferredRelease &entry) {
+            // 如果 semaphore 已损坏，强制释放其资源
+            if (corruptedSemaphores.count(entry.semaphore) > 0) {
+                return false; // 移除（释放）
+            }
+            
             // 返回 true 表示保留（未完成），返回 false 表示移除（已完成）
             auto it = semaphoreCompletedValues.find(entry.semaphore);
             if (it != semaphoreCompletedValues.end())
@@ -285,6 +302,14 @@ DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
             VkResult result = vkGetSemaphoreCounterValue(queue->deviceManager->logicalDevice, queue->timelineSemaphore, &timelineCounterValue);
             if (result == VK_SUCCESS)
             {
+                // ===== 修复3&4: 检测损坏的 semaphore 值 =====
+                if (timelineCounterValue == UINT64_MAX) {
+                    queue->queueMutex->unlock();
+                    CFW_LOG_ERROR("[pickQueueAndCommit] Queue {} timeline semaphore has invalid value UINT64_MAX, skipping",
+                                  queueIndex);
+                    continue; // 跳过这个队列，尝试下一个
+                }
+                
                 if (timelineCounterValue >= queue->timelineValue->load(std::memory_order_acquire))
                 {
                     break;
@@ -380,6 +405,47 @@ HardwareExecutorVulkan &HardwareExecutorVulkan::commit()
             timelineSignalSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
             signalSemaphores.push_back(timelineSignalSemaphoreSubmitInfo);
 
+            // ===== 修复4: Semaphore 值验证 =====
+            // 在提交前验证所有 timeline semaphore 的当前值是否有效
+            // 如果 semaphore 值为 UINT64_MAX，说明 semaphore 已损坏或设备丢失
+            bool semaphoreValid = true;
+            for (const auto& waitSem : waitSemaphores) {
+                if (waitSem.semaphore != VK_NULL_HANDLE) {
+                    uint64_t currentValue = 0;
+                    VkResult queryResult = vkGetSemaphoreCounterValue(
+                        hardwareContext->deviceManager.logicalDevice,
+                        waitSem.semaphore,
+                        &currentValue);
+                    
+                    if (queryResult != VK_SUCCESS) {
+                        CFW_LOG_ERROR("[commit] Failed to query semaphore counter value, VkResult: {}", 
+                                      static_cast<int>(queryResult));
+                        semaphoreValid = false;
+                        break;
+                    }
+                    
+                    // 检查 semaphore 值是否为无效的 UINT64_MAX
+                    if (currentValue == UINT64_MAX) {
+                        CFW_LOG_ERROR("[commit] Timeline semaphore {} has invalid value UINT64_MAX, device may be lost!",
+                                      reinterpret_cast<uintptr_t>(waitSem.semaphore));
+                        semaphoreValid = false;
+                        break;
+                    }
+                    
+                    // 检查等待值是否超出合理范围（maxTimelineSemaphoreValueDifference 通常是 UINT64_MAX）
+                    // 但如果当前值和期望等待值差距过大，可能存在逻辑错误
+                    if (waitSem.value > currentValue && (waitSem.value - currentValue) > 10000) {
+                        CFW_LOG_WARNING("[commit] Semaphore wait value {} is far ahead of current value {}, potential sync issue",
+                                        waitSem.value, currentValue);
+                    }
+                }
+            }
+            
+            if (!semaphoreValid) {
+                CFW_LOG_ERROR("[commit] Aborting submit due to invalid semaphore state");
+                return false;
+            }
+
             VkSubmitInfo2 submitInfo{};
             submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
             submitInfo.waitSemaphoreInfoCount = static_cast<uint32_t>(waitSemaphores.size());
@@ -405,6 +471,15 @@ HardwareExecutorVulkan &HardwareExecutorVulkan::commit()
                                                 currentRecordQueue->timelineSemaphore});
             }
             localPendingResources.clear();
+
+            // 处理在 commitCommand 期间新增的 pendingResources（例如 RasterizerPipeline 的保活资源）
+            for (auto &resource : pendingResources)
+            {
+                deferredReleaseQueue.push_back({signalValue,
+                                                std::move(resource),
+                                                currentRecordQueue->timelineSemaphore});
+            }
+            pendingResources.clear();
 
             return true;
         };

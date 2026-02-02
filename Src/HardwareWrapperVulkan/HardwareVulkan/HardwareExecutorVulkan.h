@@ -8,9 +8,26 @@
 #include <vector>
 
 #include "HardwareWrapperVulkan/HardwareContext.h"
+#include "CabbageHardware.h"
 
 struct HardwareExecutorVulkan;
-struct CopyCommandImpl; // 前向声明
+struct CommandRecordVulkan;
+
+struct CopyCommandImpl
+{
+    virtual ~CopyCommandImpl() = default;
+    virtual CommandRecordVulkan* getCommandRecord() = 0;
+};
+
+// Generic resource holder for keeping objects alive until GPU work is done
+struct ResourceHolderCommand : public CopyCommandImpl
+{
+    std::vector<HardwareBuffer> buffers;
+    std::vector<HardwareImage> images;
+    // Add other resources if needed (e.g., PushConstants)
+
+    CommandRecordVulkan* getCommandRecord() override { return nullptr; }
+};
 
 // ========== 延迟释放条目 ==========
 struct DeferredRelease
