@@ -21,6 +21,12 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan
                              EmbeddedShader::ShaderLanguage fragmentShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
                              const std::source_location &sourceLocation = std::source_location::current());
 
+    // 从已编译的 ShaderCodeCompiler 构造
+    RasterizerPipelineVulkan(const EmbeddedShader::ShaderCodeCompiler &vertexCompiler,
+                             const EmbeddedShader::ShaderCodeCompiler &fragmentCompiler,
+                             uint32_t multiviewCount = 1,
+                             const std::source_location &sourceLocation = std::source_location::current());
+
     void setDepthImage(HardwareImage &depthImage)
     {
         this->depthImage = depthImage;

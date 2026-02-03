@@ -9,6 +9,7 @@
 #include <ktm/ktm.h>
 #include "Compiler/ShaderCodeCompiler.h"
 #include "Codegen/ComputePipelineObject.h"
+#include "Codegen/RasterizedPipelineObject.h"
 #include "HardwareCommands.h"
 
 // Forward declare platform-specific types instead of including platform headers
@@ -397,6 +398,17 @@ struct RasterizerPipeline
                        EmbeddedShader::ShaderLanguage vertexShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
                        EmbeddedShader::ShaderLanguage fragmentShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
                        const std::source_location &sourceLocation = std::source_location::current());
+
+    // 模板构造函数：接受 DSL lambda，内部完成编译
+    template <typename VF, typename FF>
+        requires std::invocable<VF> && std::invocable<FF> &&
+                 (!std::is_convertible_v<VF, std::string>) && (!std::is_convertible_v<FF, std::string>)
+    RasterizerPipeline(VF &&vertexShaderCode,
+                       FF &&fragmentShaderCode,
+                       uint32_t multiviewCount = 1,
+                       EmbeddedShader::CompilerOption compilerOption = {},
+                       std::source_location sourceLocation = std::source_location::current());
+
     RasterizerPipeline(const RasterizerPipeline &other);
     RasterizerPipeline(RasterizerPipeline &&other) noexcept;
     ~RasterizerPipeline();
@@ -560,4 +572,36 @@ ComputePipeline::ComputePipeline(F &&computeShaderCode,
 
     // 调用辅助函数完成 Vulkan 管线创建
     computePipelineInitFromCompiler(computePipelineID, *pipelineObj.compute, sourceLocation);
+}
+
+// ================= RasterizerPipeline 模板构造函数实现 =================
+void rasterizerPipelineInitFromCompiler(std::atomic<std::uintptr_t> &pipelineID,
+                                         const EmbeddedShader::ShaderCodeCompiler &vertexCompiler,
+                                         const EmbeddedShader::ShaderCodeCompiler &fragmentCompiler,
+                                         uint32_t multiviewCount,
+                                         const std::source_location &src);
+
+template <typename VF, typename FF>
+    requires std::invocable<VF> && std::invocable<FF> &&
+             (!std::is_convertible_v<VF, std::string>) && (!std::is_convertible_v<FF, std::string>)
+RasterizerPipeline::RasterizerPipeline(VF &&vertexShaderCode,
+                                        FF &&fragmentShaderCode,
+                                        uint32_t multiviewCount,
+                                        EmbeddedShader::CompilerOption compilerOption,
+                                        std::source_location sourceLocation)
+{
+    // 使用 helicon 编译 DSL lambda 到着色器代码
+    auto pipelineObj = EmbeddedShader::RasterizedPipelineObject::compile(
+        std::forward<VF>(vertexShaderCode),
+        std::forward<FF>(fragmentShaderCode),
+        compilerOption,
+        sourceLocation
+    );
+
+    // 调用辅助函数完成 Vulkan 管线创建
+    rasterizerPipelineInitFromCompiler(rasterizerPipelineID, 
+                                        *pipelineObj.vertex, 
+                                        *pipelineObj.fragment, 
+                                        multiviewCount,
+                                        sourceLocation);
 }
