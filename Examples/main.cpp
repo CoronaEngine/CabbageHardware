@@ -8,7 +8,7 @@
 #include <string>
 #include <thread>
 #include <vector>
-//#include <semaphore>
+// #include <semaphore>
 
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
@@ -21,13 +21,32 @@
 #include "TextureTest.h"
 #include "corona/kernel/core/i_logger.h"
 
+#include "Codegen/ControlFlows.h"
+
+#include "Codegen/CustomLibrary.h"
+
+#include "Compiler/ShaderCodeCompiler.h"
+#include "Compiler/ShaderLanguageConverter.h"
+
+#include <Codegen/AST/AST.hpp>
+#include <Codegen/AST/Parser.hpp>
+#include <Codegen/Generator/SlangGenerator.hpp>
+#include <ktm/type/vec.h>
+#include <utility>
+
+#include <Codegen/BuiltinVariate.h>
+#include <Codegen/ComputePipelineObject.h>
+#include <Codegen/RasterizedPipelineObject.h>
+#include <Codegen/TypeAlias.h>
+#include <Compiler/ShaderHardcodeManager.h>
+
 // uniform buffer中
 struct GlobalUniformParam
 {
     float globalTime;
     float globalScale;
     uint32_t frameCount;
-    uint32_t padding;  // 为了对齐
+    uint32_t padding; // 为了对齐
 };
 
 // storage buffer
@@ -49,8 +68,8 @@ struct ComputeStorageBufferObject
 
 int main()
 {
-    //Corona::Kernel::CoronaLogger::get_logger()->set_log_level(quill::LogLevel::TraceL3);
-    // setupSignalHandlers();
+    // Corona::Kernel::CoronaLogger::get_logger()->set_log_level(quill::LogLevel::TraceL3);
+    //  setupSignalHandlers();
 
     // 运行压缩纹理测试（可选）
     // testCompressedTextures();
@@ -132,7 +151,6 @@ int main()
             createInfo.mipLevels = 1;
 
             finalOutputImages[i] = HardwareImage(createInfo);
-            
         }
 
         HardwareBuffer vertexBuffer = HardwareBuffer(vertices, BufferUsage::VertexBuffer);
@@ -171,8 +189,7 @@ int main()
 
         std::atomic_bool running = true;
 
-        auto meshThread = [&](uint32_t threadIndex)
-        {
+        auto meshThread = [&](uint32_t threadIndex) {
             CFW_LOG_INFO("Mesh thread {} started...", threadIndex);
 
             ComputeStorageBufferObject computeUniformData(windows.size());
@@ -198,7 +215,7 @@ int main()
                 /*meshSemaphores[threadIndex]->acquire();
                 if (!running.load()) break;*/
 
-                float currentTime = std::chrono::duration<float, std::chrono::seconds::period>(  std::chrono::high_resolution_clock::now() - startTime).count();
+                float currentTime = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
                 for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
                 {
@@ -229,12 +246,53 @@ int main()
             CFW_LOG_INFO("Mesh thread {} ended.", threadIndex);
         };
 
-        auto renderThread = [&](uint32_t threadIndex)
-        {
+        auto renderThread = [&](uint32_t threadIndex) {
             CFW_LOG_INFO("Render thread {} started...", threadIndex);
 
             RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
-            ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
+             //ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
+
+            using namespace EmbeddedShader;
+
+            using namespace EmbeddedShader::Ast;
+            using namespace ktm;
+
+            Texture2D<fvec4> inputImageRGBA16;
+
+            auto acesFilmicToneMapCurve = [&](Float3 x) {
+                Float a = 2.51f;
+                Float b = 0.03f;
+                Float c = 2.43f;
+                Float d = 0.59f;
+                Float e = 0.14f;
+
+                return clamp((x * (a * x + b)) / (x * (c * x + d) + e), fvec3(0.0f), fvec3(1.0f));
+            };
+
+            auto acesFilmicToneMapInverse = [&](const Float3 &x) {
+                Float3 a = fvec3(-0.59f) * x + fvec3(0.03f);
+                Float3 b = sqrt(fvec3(-1.0127f) * x * x + fvec3(1.3702f) * x + fvec3(0.0009));
+                Float3 c = fvec3(2) * (fvec3(2.43f) * x - fvec3(2.51f));
+                return ((a - b) / c);
+            };
+
+            auto compute = [&] {
+                Float4 color = inputImageRGBA16[dispatchThreadID()->xy()];
+                inputImageRGBA16[dispatchThreadID()->xy()] = Float4(acesFilmicToneMapCurve(color->xyz()), 1.f);
+            };
+
+            CompilerOption compilerOption = {};
+            compilerOption.compileHLSL = false;
+            compilerOption.compileDXIL = true;
+            compilerOption.compileDXBC = true;
+            compilerOption.compileGLSL = true;
+            compilerOption.enableBindless = true;
+
+            auto computePipeline = ComputePipelineObject::compile(compute, uvec3(8, 8, 1), compilerOption);
+            auto computeShaderCode = computePipeline.compute->getShaderCode(ShaderLanguage::GLSL).shaderCode;
+            std::string computeShaderCodeStr = std::get<std::string>(computeShaderCode);
+
+            ComputePipeline computer(computeShaderCodeStr);
 
             auto startTime = std::chrono::high_resolution_clock::now();
             uint64_t frameCount = 0;
@@ -275,8 +333,7 @@ int main()
             CFW_LOG_INFO("Render thread {} ended.", threadIndex);
         };
 
-        auto displayThread = [&](uint32_t threadIndex) 
-        {
+        auto displayThread = [&](uint32_t threadIndex) {
             CFW_LOG_INFO("Display thread {} started...", threadIndex);
 
             HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
