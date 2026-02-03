@@ -28,6 +28,20 @@ ComputePipelineVulkan::ComputePipelineVulkan(std::string shaderCode,
     }
 }
 
+ComputePipelineVulkan::ComputePipelineVulkan(const EmbeddedShader::ShaderCodeCompiler &compiler,
+                                             const std::source_location &sourceLocation)
+    : ComputePipelineVulkan()
+{
+    this->shaderCode = compiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV, true);
+    this->shaderResource = this->shaderCode.shaderResources;
+
+    const uint32_t pushConstantSize = this->shaderCode.shaderResources.pushConstantSize;
+    if (pushConstantSize > 0)
+    {
+        this->pushConstant = HardwarePushConstant(pushConstantSize, 0);
+    }
+}
+
 ComputePipelineVulkan::~ComputePipelineVulkan()
 {
     VkDevice device = VK_NULL_HANDLE;

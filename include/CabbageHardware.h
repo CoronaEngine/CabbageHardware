@@ -6,7 +6,9 @@
 #include <type_traits>
 #include <vector>
 
+#include <ktm/ktm.h>
 #include "Compiler/ShaderCodeCompiler.h"
+#include "Codegen/ComputePipelineObject.h"
 #include "HardwareCommands.h"
 
 // Forward declare platform-specific types instead of including platform headers
@@ -347,6 +349,15 @@ struct ComputePipeline
     ComputePipeline(const std::string &shaderCode,
                     EmbeddedShader::ShaderLanguage language = EmbeddedShader::ShaderLanguage::GLSL,
                     const std::source_location &sourceLocation = std::source_location::current());
+
+    // 模板构造函数：接受 DSL lambda，内部完成编译
+    template <typename F>
+        requires std::invocable<F> && (!std::is_convertible_v<F, std::string>)
+    ComputePipeline(F &&computeShaderCode,
+                    ktm::uvec3 numthreads = ktm::uvec3(1),
+                    EmbeddedShader::CompilerOption compilerOption = {},
+                    std::source_location sourceLocation = std::source_location::current());
+
     ComputePipeline(const ComputePipeline &other);
     ComputePipeline(ComputePipeline &&other) noexcept;
     ~ComputePipeline();
@@ -524,4 +535,29 @@ inline HardwarePushConstant ResourceProxy::asPushConstant() const
     if (rasterizer_pipeline_)
         return rasterizer_pipeline_->getPushConstant(resource_name_);
     throw std::runtime_error("ResourceProxy not initialized");
+}
+
+// ================= ComputePipeline 模板构造函数实现 =================
+// 需要访问 Storage 和 ComputePipelineVulkan，通过辅助函数实现
+void computePipelineInitFromCompiler(std::atomic<std::uintptr_t> &pipelineID, 
+                                      const EmbeddedShader::ShaderCodeCompiler &compiler,
+                                      const std::source_location &src);
+
+template <typename F>
+    requires std::invocable<F> && (!std::is_convertible_v<F, std::string>)
+ComputePipeline::ComputePipeline(F &&computeShaderCode,
+                                  ktm::uvec3 numthreads,
+                                  EmbeddedShader::CompilerOption compilerOption,
+                                  std::source_location sourceLocation)
+{
+    // 使用 helicon 编译 DSL lambda 到着色器代码
+    auto pipelineObj = EmbeddedShader::ComputePipelineObject::compile(
+        std::forward<F>(computeShaderCode),
+        numthreads,
+        compilerOption,
+        sourceLocation
+    );
+
+    // 调用辅助函数完成 Vulkan 管线创建
+    computePipelineInitFromCompiler(computePipelineID, *pipelineObj.compute, sourceLocation);
 }

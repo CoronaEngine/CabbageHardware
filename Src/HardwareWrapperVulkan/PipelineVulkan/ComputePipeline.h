@@ -16,6 +16,9 @@ struct ComputePipelineVulkan : public CommandRecordVulkan
 
     ComputePipelineVulkan(std::string shaderCode, EmbeddedShader::ShaderLanguage language = EmbeddedShader::ShaderLanguage::GLSL, const std::source_location &sourceLocation = std::source_location::current());
 
+    // 新构造函数：接受已编译的 ShaderCodeCompiler，避免重复编译
+    ComputePipelineVulkan(const EmbeddedShader::ShaderCodeCompiler &compiler, const std::source_location &sourceLocation = std::source_location::current());
+
     // std::variant<HardwarePushConstant> operator[](const std::string& resourceName);
 
     void setPushConstant(const std::string &name, const void *data, size_t size);
