@@ -25,6 +25,17 @@ static bool decCompute(uint32_t id, const Corona::Kernel::Utils::Storage<Compute
     return false;
 }
 
+// 辅助函数：从已编译的 ShaderCodeCompiler 创建 ComputePipeline
+void computePipelineInitFromCompiler(std::atomic<std::uintptr_t> &pipelineID,
+                                      const EmbeddedShader::ShaderCodeCompiler &compiler,
+                                      const std::source_location &src)
+{
+    auto const id = gComputePipelineStorage.allocate();
+    pipelineID.store(id, std::memory_order_release);
+    auto const handle = gComputePipelineStorage.acquire_write(id);
+    handle->impl = new ComputePipelineVulkan(compiler, src);
+}
+
 ComputePipeline::ComputePipeline()
 {
     auto const id = gComputePipelineStorage.allocate();
