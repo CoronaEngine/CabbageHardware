@@ -20,7 +20,7 @@
 #include "Codegen/BuiltinVariate.h"
 #include "Codegen/TypeAlias.h"
 
-#define TEST_HELICON
+//#define TEST_HELICON
 
 // uniform buffer中
 struct GlobalUniformParam
