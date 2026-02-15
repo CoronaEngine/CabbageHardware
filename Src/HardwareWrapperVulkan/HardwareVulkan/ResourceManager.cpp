@@ -28,38 +28,11 @@ void ResourceManager::initResourceManager(DeviceManager &device)
     vkGetPhysicalDeviceProperties2(device.getPhysicalDevice(), &deviceProperties2);
     cachedDeviceProperties = deviceProperties2.properties;
 
-    switch (cachedDeviceProperties.deviceType)
-    {
-    case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: // 独立显卡
-        physicalDeviceType = VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
-        enableExternalMemoryPool = true;
-        break;
-    case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: // 集成显卡
-        physicalDeviceType = VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU;
-        enableExternalMemoryPool = false;
-        break;
-    case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU: // 虚拟GPU
-        physicalDeviceType = VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU;
-        enableExternalMemoryPool = false;
-        break;
-    case VK_PHYSICAL_DEVICE_TYPE_CPU: // CPU
-        physicalDeviceType = VK_PHYSICAL_DEVICE_TYPE_CPU;
-        enableExternalMemoryPool = false;
-        break;
-    default:
-        physicalDeviceType = VK_PHYSICAL_DEVICE_TYPE_MAX_ENUM;
-        break;
-    }
-
     createVmaAllocator();
     createTextureSampler();
     createUniformDescriptorSet();
     createBindlessDescriptorSet();
-
-    if (enableExternalMemoryPool)
-    {
-        createExternalBufferMemoryPool();
-    }
+    createExternalBufferMemoryPool();
 }
 
 void ResourceManager::cleanUpResourceManager()
@@ -138,10 +111,8 @@ void ResourceManager::createVmaAllocator()
     flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 
 #if _WIN32 || _WIN64
-    if (enableExternalMemoryPool)
-    {
-        flags |= VMA_ALLOCATOR_CREATE_KHR_EXTERNAL_MEMORY_WIN32_BIT;
-    }
+    // Windows 平台启用外部内存支持
+    flags |= VMA_ALLOCATOR_CREATE_KHR_EXTERNAL_MEMORY_WIN32_BIT;
 #endif
 
     allocatorInfo.flags = flags;
@@ -430,19 +401,13 @@ void ResourceManager::createBindlessDescriptorSet()
 
 void ResourceManager::createExternalBufferMemoryPool()
 {
-
-    if (!enableExternalMemoryPool)
-    {
-        CFW_LOG_WARNING("[ResourceManager] External memory pool creation skipped");
-        return;
-    }
-
 #if _WIN32 || _WIN64
     constexpr VkExternalMemoryHandleTypeFlagsKHR EXTERNAL_MEMORY_HANDLE_TYPE = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #elif __linux__
     constexpr VkExternalMemoryHandleTypeFlagsKHR EXTERNAL_MEMORY_HANDLE_TYPE = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 #elif __APPLE__
     constexpr VkExternalMemoryHandleTypeFlagsKHR EXTERNAL_MEMORY_HANDLE_TYPE = 0;
+    // macOS 不支持外部内存，但保留代码结构
 #endif
 
     VkBufferCreateInfo bufferInfo{};
@@ -481,14 +446,7 @@ void ResourceManager::createExternalBufferMemoryPool()
     allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
     uint32_t memoryTypeIndex = VK_MAX_MEMORY_TYPES;
-    VkResult result = vmaFindMemoryTypeIndexForBufferInfo(vmaAllocator, &bufferInfo, &allocInfo, &memoryTypeIndex);
-
-    // 如果无法找到支持外部内存的内存类型，跳过创建外部内存池
-    if (result != VK_SUCCESS)
-    {
-        CFW_LOG_WARNING("[ResourceManager] Could not find memory type supporting external memory, skipping external memory pool creation");
-        return;
-    }
+    coronaHardwareCheck(vmaFindMemoryTypeIndexForBufferInfo(vmaAllocator, &bufferInfo, &allocInfo, &memoryTypeIndex));
 
     VkExportMemoryAllocateInfo exportMemoryInfo{};
     exportMemoryInfo.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR;
@@ -502,24 +460,18 @@ void ResourceManager::createExternalBufferMemoryPool()
     poolInfo.maxBlockCount = 0; // 无限制，按需动态增长
     // poolInfo.flags = VMA_POOL_CREATE_IGNORE_BUFFER_IMAGE_GRANULARITY_BIT;
 
-    result = vmaCreatePool(vmaAllocator, &poolInfo, &exportBufferPool);
+    coronaHardwareCheck(vmaCreatePool(vmaAllocator, &poolInfo, &exportBufferPool));
 
-    if (result != VK_SUCCESS)
-    {
-        CFW_LOG_WARNING("[ResourceManager] Failed to create external memory pool, falling back to regular allocation");
-        exportBufferPool = VK_NULL_HANDLE;
-        return;
-    }
-
-    CFW_LOG_DEBUG("[ResourceManager] External memory pool created:\n"
-                  "  Memory Type Index: {}\n"
-                  "  Handle Type: 0x{:X}\n"
-                  "  Queue Sharing Mode: {}\n"
-                  "  Queue Family Count: {}",
-                  memoryTypeIndex,
-                  EXTERNAL_MEMORY_HANDLE_TYPE,
-                  (bufferInfo.sharingMode == VK_SHARING_MODE_CONCURRENT ? "CONCURRENT" : "EXCLUSIVE"),
-                  queueFamilyCount);
+    CFW_LOG_DEBUG(
+        "[ResourceManager] External memory pool created:\n"
+        "  Memory Type Index: {}\n"
+        "  Handle Type: 0x{:X}\n"
+        "  Queue Sharing Mode: {}\n"
+        "  Queue Family Count: {}",
+        memoryTypeIndex,
+        EXTERNAL_MEMORY_HANDLE_TYPE,
+        (bufferInfo.sharingMode == VK_SHARING_MODE_CONCURRENT ? "CONCURRENT" : "EXCLUSIVE"),
+        queueFamilyCount);
 }
 
 ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 imageSize,

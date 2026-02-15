@@ -148,11 +148,6 @@ struct ResourceManager
         return deviceMemorySize;
     }
 
-    [[nodiscard]] VkPhysicalDeviceType getPhysicalDeviceType() const
-    {
-        return physicalDeviceType;
-    }
-
     [[nodiscard]] VmaAllocator getVmaAllocator() const
     {
         return vmaAllocator;
@@ -187,12 +182,11 @@ struct ResourceManager
     void createUniformDescriptorSet();
     void createBindlessDescriptorSet();
     void createExternalBufferMemoryPool();
-
+    
     void createDedicatedBuffer(const VkBufferCreateInfo &bufferInfo, const VmaAllocationCreateInfo &allocInfo, BufferHardwareWrap &resultBuffer);
     void createPooledBuffer(const VkBufferCreateInfo &bufferInfo, const VmaAllocationCreateInfo &allocInfo, BufferHardwareWrap &resultBuffer);
     void createNonExportableBuffer(const VkBufferCreateInfo &bufferInfo, const VmaAllocationCreateInfo &allocInfo, BufferHardwareWrap &resultBuffer);
 
-    bool shouldEnableExternalMemory() const;
     // uint32_t getMipLevelsCount(uint32_t texWidth, uint32_t texHeight) const;
 
     VmaAllocator vmaAllocator{VK_NULL_HANDLE};
@@ -213,7 +207,4 @@ struct ResourceManager
     // 缓存的物理设备属性，避免重复查询
     VkPhysicalDeviceProperties cachedDeviceProperties{};
     VkPhysicalDeviceDescriptorIndexingProperties cachedIndexingProperties{};
-
-    VkPhysicalDeviceType physicalDeviceType{VK_PHYSICAL_DEVICE_TYPE_MAX_ENUM};
-    bool enableExternalMemoryPool{false};
 };
