@@ -42,6 +42,19 @@ RasterizerPipeline::RasterizerPipeline(std::string vs, std::string fs, uint32_t 
     // CFW_LOG_TRACE("RasterizerPipeline created: id={}", id);
 }
 
+// 辅助函数：从已编译的 ShaderCodeCompiler 初始化 RasterizerPipeline
+void rasterizerPipelineInitFromCompiler(std::atomic<std::uintptr_t> &pipelineID,
+                                         const EmbeddedShader::ShaderCodeCompiler &vertexCompiler,
+                                         const EmbeddedShader::ShaderCodeCompiler &fragmentCompiler,
+                                         uint32_t multiviewCount,
+                                         const std::source_location &src)
+{
+    auto id = gRasterizerPipelineStorage.allocate();
+    pipelineID.store(id, std::memory_order_release);
+    auto handle = gRasterizerPipelineStorage.acquire_write(id);
+    handle->impl = new RasterizerPipelineVulkan(vertexCompiler, fragmentCompiler, multiviewCount, src);
+}
+
 RasterizerPipeline::RasterizerPipeline(const RasterizerPipeline &other)
 {
     std::lock_guard<std::mutex> lock(other.rasterizerPipelineMutex);

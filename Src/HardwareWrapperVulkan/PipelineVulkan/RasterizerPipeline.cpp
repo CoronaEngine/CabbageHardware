@@ -138,6 +138,47 @@ RasterizerPipelineVulkan::RasterizerPipelineVulkan(std::string vertexShaderCode,
     }
 }
 
+RasterizerPipelineVulkan::RasterizerPipelineVulkan(const EmbeddedShader::ShaderCodeCompiler &vertexCompiler,
+                                                   const EmbeddedShader::ShaderCodeCompiler &fragmentCompiler,
+                                                   uint32_t multiviewCount,
+                                                   const std::source_location &sourceLocation)
+    : RasterizerPipelineVulkan()
+{
+    // 直接从已编译的 ShaderCodeCompiler 获取 SPIR-V 代码
+    vertShaderCode = vertexCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV, true);
+    fragShaderCode = fragmentCompiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV, true);
+
+    // 获取着色器资源
+    vertexResource = vertShaderCode.shaderResources;
+    fragmentResource = fragShaderCode.shaderResources;
+
+    // 提取阶段绑定信息
+    extractStageBindings(vertexResource, vertexStageInputs, vertexStageOutputs);
+    extractStageBindings(fragmentResource, fragmentStageInputs, fragmentStageOutputs);
+
+    // 初始化渲染目标
+    renderTargets.resize(fragmentStageOutputs.size());
+
+    // 设置多视图计数
+    this->multiviewCount = multiviewCount;
+
+    // 验证并计算推送常量大小
+    const uint32_t vertPushConstSize = vertShaderCode.shaderResources.pushConstantSize;
+    const uint32_t fragPushConstSize = fragShaderCode.shaderResources.pushConstantSize;
+
+    if (vertPushConstSize != 0 && fragPushConstSize != 0 && vertPushConstSize != fragPushConstSize)
+    {
+        throw std::runtime_error("Vertex and fragment shader push constant sizes mismatch");
+    }
+
+    pushConstantSize = std::max(vertPushConstSize, fragPushConstSize);
+
+    if (pushConstantSize > 0)
+    {
+        tempPushConstant = HardwarePushConstant(pushConstantSize, 0);
+    }
+}
+
 RasterizerPipelineVulkan::~RasterizerPipelineVulkan()
 {
     VkDevice device = VK_NULL_HANDLE;
