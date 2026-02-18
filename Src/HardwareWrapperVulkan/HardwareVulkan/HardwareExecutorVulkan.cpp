@@ -410,6 +410,11 @@ HardwareExecutorVulkan &HardwareExecutorVulkan::commit()
             // 如果 semaphore 值为 UINT64_MAX，说明 semaphore 已损坏或设备丢失
             bool semaphoreValid = true;
             for (const auto& waitSem : waitSemaphores) {
+                // 跳过 Binary Semaphore（Binary Semaphore 的 value 固定为 0）
+                if (waitSem.value == 0) {
+                    continue;
+                }
+                
                 if (waitSem.semaphore != VK_NULL_HANDLE) {
                     uint64_t currentValue = 0;
                     VkResult queryResult = vkGetSemaphoreCounterValue(
