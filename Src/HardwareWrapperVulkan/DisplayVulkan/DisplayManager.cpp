@@ -724,7 +724,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
                 return vkQueueSubmit2(currentRecordQueue->vkQueue, 1, &submitInfo, VK_NULL_HANDLE) == VK_SUCCESS;
             };
 
-        HardwareExecutorVulkan::pickQueueAndCommit(currentQueueIndex, presentQueues, commitToQueue, false);
+        HardwareExecutorVulkan::pickQueueAndCommit(currentQueueIndex, presentQueues, commitToQueue);
         currentFrame = (currentFrame + 1) % swapChainImages.size();
         return true;
     }

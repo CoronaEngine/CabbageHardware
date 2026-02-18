@@ -263,8 +263,7 @@ HardwareExecutorVulkan::DeferredReleaseStats HardwareExecutorVulkan::getDeferred
 
 DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomic_uint16_t &currentQueueIndex,
                                                                       std::vector<DeviceManager::QueueUtils> &currentQueues,
-                                                                      std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand,
-                                                                      bool needsCommandBuffer)
+                                                                      std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand)
 {
     DeviceManager::QueueUtils *queue;
     uint16_t queueIndex = 0;
