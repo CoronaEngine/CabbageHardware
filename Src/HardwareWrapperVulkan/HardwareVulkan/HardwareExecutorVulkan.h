@@ -143,7 +143,7 @@ struct HardwareExecutorVulkan
     }
 
     HardwareExecutorVulkan &commit();
-    HardwareExecutorVulkan &commitTest();
+    //HardwareExecutorVulkan &commitTest();
 
     // ========== 延迟释放相关接口 ==========
     void cleanupCompletedResources();
