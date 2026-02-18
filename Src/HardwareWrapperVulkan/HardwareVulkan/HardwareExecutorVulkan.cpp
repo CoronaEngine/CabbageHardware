@@ -330,7 +330,129 @@ DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
         // std::this_thread::sleep_for(std::chrono::microseconds(10000));
     }
 
+    // ===== 首先清理已完成的资源 =====
+    cleanupCompletedResources();
+
+    // 保存当前 pendingResources 的引用，在提交成功后使用
+    auto localPendingResources = std::move(pendingResources);
+    pendingResources.clear();
+    pendingResources.reserve(32);
+
+
     commitCommand(queue);
+
+
+    {
+
+        VkCommandBufferSubmitInfo commandBufferSubmitInfo{};
+        commandBufferSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        commandBufferSubmitInfo.commandBuffer = currentRecordQueue->commandBuffer;
+
+        VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
+        timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        timelineWaitSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
+        timelineWaitSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->fetch_add(1);
+        timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);
+
+        VkSemaphoreSubmitInfo timelineSignalSemaphoreSubmitInfo{};
+        timelineSignalSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        timelineSignalSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
+        timelineSignalSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->load(std::memory_order_acquire);
+        timelineSignalSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        signalSemaphores.push_back(timelineSignalSemaphoreSubmitInfo);
+
+        // ===== 修复4: Semaphore 值验证 =====
+        // 在提交前验证所有 timeline semaphore 的当前值是否有效
+        // 如果 semaphore 值为 UINT64_MAX，说明 semaphore 已损坏或设备丢失
+        bool semaphoreValid = true;
+        for (const auto &waitSem : waitSemaphores)
+        {
+            // 跳过 Binary Semaphore（Binary Semaphore 的 value 固定为 0）
+            if (waitSem.value == 0)
+            {
+                continue;
+            }
+
+            if (waitSem.semaphore != VK_NULL_HANDLE)
+            {
+                uint64_t currentValue = 0;
+                VkResult queryResult = vkGetSemaphoreCounterValue(
+                    hardwareContext->deviceManager.logicalDevice,
+                    waitSem.semaphore,
+                    &currentValue);
+
+                if (queryResult != VK_SUCCESS)
+                {
+                    CFW_LOG_ERROR("[commit] Failed to query semaphore counter value, VkResult: {}",
+                                  static_cast<int>(queryResult));
+                    semaphoreValid = false;
+                    break;
+                }
+
+                // 检查 semaphore 值是否为无效的 UINT64_MAX
+                if (currentValue == UINT64_MAX)
+                {
+                    CFW_LOG_ERROR("[commit] Timeline semaphore {} has invalid value UINT64_MAX, device may be lost!",
+                                  reinterpret_cast<uintptr_t>(waitSem.semaphore));
+                    semaphoreValid = false;
+                    break;
+                }
+
+                // 检查等待值是否超出合理范围（maxTimelineSemaphoreValueDifference 通常是 UINT64_MAX）
+                // 但如果当前值和期望等待值差距过大，可能存在逻辑错误
+                if (waitSem.value > currentValue && (waitSem.value - currentValue) > 10000)
+                {
+                    CFW_LOG_WARNING("[commit] Semaphore wait value {} is far ahead of current value {}, potential sync issue",
+                                    waitSem.value, currentValue);
+                }
+            }
+        }
+
+        if (!semaphoreValid)
+        {
+            CFW_LOG_ERROR("[commit] Aborting submit due to invalid semaphore state");
+            return nullptr;
+        }
+
+        VkSubmitInfo2 submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submitInfo.waitSemaphoreInfoCount = static_cast<uint32_t>(waitSemaphores.size());
+        submitInfo.pWaitSemaphoreInfos = waitSemaphores.data();
+        submitInfo.signalSemaphoreInfoCount = static_cast<uint32_t>(signalSemaphores.size());
+        submitInfo.pSignalSemaphoreInfos = signalSemaphores.data();
+        submitInfo.commandBufferInfoCount = 1;
+        submitInfo.pCommandBufferInfos = &commandBufferSubmitInfo;
+
+        VkResult result = vkQueueSubmit2(currentRecordQueue->vkQueue, 1, &submitInfo, waitFence);
+        if (result != VK_SUCCESS)
+        {
+            CFW_LOG_ERROR("Failed to submit command buffer! VkResult: {}", coronaHardwareResultStr(result));
+            return nullptr;
+        }
+
+        // ===== 将待释放资源绑定到此次提交的 timeline 值 =====
+        uint64_t signalValue = currentRecordQueue->timelineValue->load(std::memory_order_acquire);
+        for (auto &resource : localPendingResources)
+        {
+            deferredReleaseQueue.push_back({signalValue,
+                                            std::move(resource),
+                                            currentRecordQueue->timelineSemaphore});
+        }
+        localPendingResources.clear();
+
+        // 处理在 commitCommand 期间新增的 pendingResources（例如 RasterizerPipeline 的保活资源）
+        for (auto &resource : pendingResources)
+        {
+            deferredReleaseQueue.push_back({signalValue,
+                                            std::move(resource),
+                                            currentRecordQueue->timelineSemaphore});
+        }
+        pendingResources.clear();
+
+    }
+
+
     queue->queueMutex->unlock();
 
     return queue;
@@ -338,15 +460,8 @@ DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
 
 HardwareExecutorVulkan &HardwareExecutorVulkan::commit()
 {
-    // ===== 首先清理已完成的资源 =====
-    cleanupCompletedResources();
-
     if (commandList.size() > 0)
     {
-        // 保存当前 pendingResources 的引用，在提交成功后使用
-        auto localPendingResources = std::move(pendingResources);
-        pendingResources.clear();
-        pendingResources.reserve(32);
 
         auto commitToQueue = [&](DeviceManager::QueueUtils *currentRecordQueue) -> bool {
             this->currentRecordQueue = currentRecordQueue;
@@ -385,105 +500,6 @@ HardwareExecutorVulkan &HardwareExecutorVulkan::commit()
             }
 
             vkEndCommandBuffer(currentRecordQueue->commandBuffer);
-
-            VkCommandBufferSubmitInfo commandBufferSubmitInfo{};
-            commandBufferSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-            commandBufferSubmitInfo.commandBuffer = currentRecordQueue->commandBuffer;
-
-            VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
-            timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-            timelineWaitSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
-            timelineWaitSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->fetch_add(1);
-            timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-            waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);
-
-            VkSemaphoreSubmitInfo timelineSignalSemaphoreSubmitInfo{};
-            timelineSignalSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-            timelineSignalSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
-            timelineSignalSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->load(std::memory_order_acquire);
-            timelineSignalSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-            signalSemaphores.push_back(timelineSignalSemaphoreSubmitInfo);
-
-            // ===== 修复4: Semaphore 值验证 =====
-            // 在提交前验证所有 timeline semaphore 的当前值是否有效
-            // 如果 semaphore 值为 UINT64_MAX，说明 semaphore 已损坏或设备丢失
-            bool semaphoreValid = true;
-            for (const auto& waitSem : waitSemaphores) {
-                // 跳过 Binary Semaphore（Binary Semaphore 的 value 固定为 0）
-                if (waitSem.value == 0) {
-                    continue;
-                }
-                
-                if (waitSem.semaphore != VK_NULL_HANDLE) {
-                    uint64_t currentValue = 0;
-                    VkResult queryResult = vkGetSemaphoreCounterValue(
-                        hardwareContext->deviceManager.logicalDevice,
-                        waitSem.semaphore,
-                        &currentValue);
-                    
-                    if (queryResult != VK_SUCCESS) {
-                        CFW_LOG_ERROR("[commit] Failed to query semaphore counter value, VkResult: {}", 
-                                      static_cast<int>(queryResult));
-                        semaphoreValid = false;
-                        break;
-                    }
-                    
-                    // 检查 semaphore 值是否为无效的 UINT64_MAX
-                    if (currentValue == UINT64_MAX) {
-                        CFW_LOG_ERROR("[commit] Timeline semaphore {} has invalid value UINT64_MAX, device may be lost!",
-                                      reinterpret_cast<uintptr_t>(waitSem.semaphore));
-                        semaphoreValid = false;
-                        break;
-                    }
-                    
-                    // 检查等待值是否超出合理范围（maxTimelineSemaphoreValueDifference 通常是 UINT64_MAX）
-                    // 但如果当前值和期望等待值差距过大，可能存在逻辑错误
-                    if (waitSem.value > currentValue && (waitSem.value - currentValue) > 10000) {
-                        CFW_LOG_WARNING("[commit] Semaphore wait value {} is far ahead of current value {}, potential sync issue",
-                                        waitSem.value, currentValue);
-                    }
-                }
-            }
-            
-            if (!semaphoreValid) {
-                CFW_LOG_ERROR("[commit] Aborting submit due to invalid semaphore state");
-                return false;
-            }
-
-            VkSubmitInfo2 submitInfo{};
-            submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-            submitInfo.waitSemaphoreInfoCount = static_cast<uint32_t>(waitSemaphores.size());
-            submitInfo.pWaitSemaphoreInfos = waitSemaphores.data();
-            submitInfo.signalSemaphoreInfoCount = static_cast<uint32_t>(signalSemaphores.size());
-            submitInfo.pSignalSemaphoreInfos = signalSemaphores.data();
-            submitInfo.commandBufferInfoCount = 1;
-            submitInfo.pCommandBufferInfos = &commandBufferSubmitInfo;
-
-            VkResult result = vkQueueSubmit2(currentRecordQueue->vkQueue, 1, &submitInfo, waitFence);
-            if (result != VK_SUCCESS)
-            {
-                CFW_LOG_ERROR("Failed to submit command buffer! VkResult: {}", coronaHardwareResultStr(result));
-                return false;
-            }
-
-            // ===== 将待释放资源绑定到此次提交的 timeline 值 =====
-            uint64_t signalValue = currentRecordQueue->timelineValue->load(std::memory_order_acquire);
-            for (auto &resource : localPendingResources)
-            {
-                deferredReleaseQueue.push_back({signalValue,
-                                                std::move(resource),
-                                                currentRecordQueue->timelineSemaphore});
-            }
-            localPendingResources.clear();
-
-            // 处理在 commitCommand 期间新增的 pendingResources（例如 RasterizerPipeline 的保活资源）
-            for (auto &resource : pendingResources)
-            {
-                deferredReleaseQueue.push_back({signalValue,
-                                                std::move(resource),
-                                                currentRecordQueue->timelineSemaphore});
-            }
-            pendingResources.clear();
 
             return true;
         };

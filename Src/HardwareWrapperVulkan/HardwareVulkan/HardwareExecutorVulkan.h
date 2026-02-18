@@ -164,7 +164,7 @@ struct HardwareExecutorVulkan
     // void disposeWhenCommitCompletes(std::shared_ptr<Buffer> buffer);
     // void disposeWhenCommitCompletes(std::function<void()> &&deallocator);
 
-    static DeviceManager::QueueUtils *pickQueueAndCommit(std::atomic_uint16_t &queueIndex,
+    DeviceManager::QueueUtils *pickQueueAndCommit(std::atomic_uint16_t &queueIndex,
                                                          std::vector<DeviceManager::QueueUtils> &queues,
                                                          std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand);
 

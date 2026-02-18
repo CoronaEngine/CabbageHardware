@@ -679,7 +679,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
                 return queueResult == VK_SUCCESS || queueResult == VK_SUBOPTIMAL_KHR;
             };
 
-        HardwareExecutorVulkan::pickQueueAndCommit(currentQueueIndex, presentQueues, commitToQueue);
+        displayDeviceExecutor->pickQueueAndCommit(currentQueueIndex, presentQueues, commitToQueue);
         currentFrame = (currentFrame + 1) % swapChainImages.size();
         return true;
     }
