@@ -675,53 +675,8 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
 
         auto commitToQueue = [&](DeviceManager::QueueUtils* currentRecordQueue) -> bool 
             {
-                // 1. 执行 Present
                 VkResult queueResult = vkQueuePresentKHR(currentRecordQueue->vkQueue, &presentInfo);
-                
-                if (queueResult != VK_SUCCESS && queueResult != VK_SUBOPTIMAL_KHR)
-                {
-                    return false;
-                }
-
-                // 2. 提交空命令推进 Timeline Semaphore（解决 vkQueuePresentKHR 不支持 Timeline 导致的队列资源争抢）
-                VkCommandBuffer cmdBuffer = currentRecordQueue->commandBuffer;
-                vkResetCommandBuffer(cmdBuffer, 0);
-                
-                VkCommandBufferBeginInfo beginInfo{};
-                beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-                beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-                vkBeginCommandBuffer(cmdBuffer, &beginInfo);
-                vkEndCommandBuffer(cmdBuffer);
-
-                uint64_t waitValue = currentRecordQueue->timelineValue->load(std::memory_order_acquire);
-                uint64_t signalValue = currentRecordQueue->timelineValue->fetch_add(1, std::memory_order_acq_rel) + 1;
-
-                VkSemaphoreSubmitInfo waitSemInfo{};
-                waitSemInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-                waitSemInfo.semaphore = currentRecordQueue->timelineSemaphore;
-                waitSemInfo.value = waitValue;
-                waitSemInfo.stageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
-
-                VkSemaphoreSubmitInfo signalSemInfo{};
-                signalSemInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-                signalSemInfo.semaphore = currentRecordQueue->timelineSemaphore;
-                signalSemInfo.value = signalValue;
-                signalSemInfo.stageMask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
-
-                VkCommandBufferSubmitInfo cmdInfo{};
-                cmdInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-                cmdInfo.commandBuffer = cmdBuffer;
-
-                VkSubmitInfo2 submitInfo{};
-                submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-                submitInfo.waitSemaphoreInfoCount = 1;
-                submitInfo.pWaitSemaphoreInfos = &waitSemInfo;
-                submitInfo.commandBufferInfoCount = 1;
-                submitInfo.pCommandBufferInfos = &cmdInfo;
-                submitInfo.signalSemaphoreInfoCount = 1;
-                submitInfo.pSignalSemaphoreInfos = &signalSemInfo;
-
-                return vkQueueSubmit2(currentRecordQueue->vkQueue, 1, &submitInfo, VK_NULL_HANDLE) == VK_SUCCESS;
+                return queueResult == VK_SUCCESS || queueResult == VK_SUBOPTIMAL_KHR;
             };
 
         HardwareExecutorVulkan::pickQueueAndCommit(currentQueueIndex, presentQueues, commitToQueue);
