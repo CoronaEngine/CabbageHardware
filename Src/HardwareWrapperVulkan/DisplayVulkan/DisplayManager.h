@@ -42,7 +42,7 @@ class DisplayManager
     // 同步对象
     std::vector<VkSemaphore> imageAvailableSemaphores;
     std::vector<VkSemaphore> renderFinishedSemaphores;
-    std::vector<VkFence> presentFences;
+    std::vector<VkFence> acquireFences;
 
     // 队列和设备
     std::atomic_uint16_t currentQueueIndex{0};

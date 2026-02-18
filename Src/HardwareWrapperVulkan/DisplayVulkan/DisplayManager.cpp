@@ -68,7 +68,7 @@ void DisplayManager::cleanupSyncObjects()
     if (device == VK_NULL_HANDLE)
         return;
 
-    for (auto &fence : presentFences)
+    for (auto &fence : acquireFences)
     {
         if (fence != VK_NULL_HANDLE)
         {
@@ -76,7 +76,7 @@ void DisplayManager::cleanupSyncObjects()
             fence = VK_NULL_HANDLE;
         }
     }
-    presentFences.clear();
+    acquireFences.clear();
 
     // for (auto& fence : copyFences) {
     //     if (fence != VK_NULL_HANDLE) {
@@ -190,15 +190,14 @@ void DisplayManager::createSyncObjects()
 
     imageAvailableSemaphores.resize(imageCount);
     renderFinishedSemaphores.resize(imageCount);
-    presentFences.resize(imageCount);
-    //copyFences.resize(imageCount);
+    acquireFences.resize(imageCount);  // 用于 vkAcquireNextImageKHR 同步
 
     VkSemaphoreCreateInfo semaphoreInfo{};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
     VkFenceCreateInfo fenceInfo{};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;  // 首帧无需等待
 
     VkDevice device = displayDevice->deviceManager.getLogicalDevice();
 
@@ -206,9 +205,10 @@ void DisplayManager::createSyncObjects()
     {
         coronaHardwareCheck(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]));
         coronaHardwareCheck(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]));
-        coronaHardwareCheck(vkCreateFence(device, &fenceInfo, nullptr, &presentFences[i]));
-        //coronaHardwareCheck(vkCreateFence(device, &fenceInfo, nullptr, &copyFences[i]));
+        coronaHardwareCheck(vkCreateFence(device, &fenceInfo, nullptr, &acquireFences[i]));
     }
+
+    CFW_LOG_INFO("Using Acquire Fence for present synchronization (VK_EXT_swapchain_maintenance1 removed)");
 
     /*displayDeviceExecutors.resize(imageCount);
     for (size_t i = 0; i < imageCount; i++)
@@ -572,22 +572,24 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
             recreateSwapChain();
         }
 
-        // 等待前一帧完成
-        VkResult fenceResult = vkWaitForFences(displayDevice->deviceManager.getLogicalDevice(), 1, &presentFences[currentFrame], VK_TRUE, UINT64_MAX);
+        // 等待 Acquire Fence (替代 Present Fence，用于确保图像可用)
+        VkDevice device = displayDevice->deviceManager.getLogicalDevice();
+        
+        VkResult fenceResult = vkWaitForFences(device, 1, &acquireFences[currentFrame], VK_TRUE, UINT64_MAX);
         if (fenceResult != VK_SUCCESS)
         {
-            CFW_LOG_ERROR("Failed to wait for present fence: {}", static_cast<int>(fenceResult));
+            CFW_LOG_ERROR("Failed to wait for acquire fence: {}", static_cast<int>(fenceResult));
             return false;
         }
+        vkResetFences(device, 1, &acquireFences[currentFrame]);
 
-        vkResetFences(displayDevice->deviceManager.getLogicalDevice(), 1, &presentFences[currentFrame]);
-
+        // 获取交换链图像，传入 fence 以便下一帧等待
         uint32_t imageIndex;
-        VkResult result = vkAcquireNextImageKHR(displayDevice->deviceManager.getLogicalDevice(),
+        VkResult result = vkAcquireNextImageKHR(device,
                                                 swapChain,
                                                 UINT64_MAX,
                                                 imageAvailableSemaphores[currentFrame],
-                                                VK_NULL_HANDLE,
+                                                acquireFences[currentFrame],  // 传入 fence 进行同步
                                                 &imageIndex);
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR)
@@ -661,19 +663,19 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = &swapChain;
         presentInfo.pImageIndices = &imageIndex;
+        presentInfo.pNext = nullptr;  // 不再使用 VkSwapchainPresentFenceInfoKHR
 
-        VkSwapchainPresentFenceInfoKHR presentFenceInfo{};
-        presentFenceInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_PRESENT_FENCE_INFO_KHR;
-        presentFenceInfo.swapchainCount = 1;
-        presentFenceInfo.pFences = &presentFences[currentFrame];
-        presentFenceInfo.pNext = const_cast<void *>(presentInfo.pNext);
-        presentInfo.pNext = &presentFenceInfo;
+        // 移除: VK_EXT_swapchain_maintenance1 相关代码
+        // VkSwapchainPresentFenceInfoKHR presentFenceInfo{};
+        // presentFenceInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_PRESENT_FENCE_INFO_KHR;
+        // presentFenceInfo.swapchainCount = 1;
+        // presentFenceInfo.pFences = &presentFences[currentFrame];
+        // presentFenceInfo.pNext = const_cast<void *>(presentInfo.pNext);
+        // presentInfo.pNext = &presentFenceInfo;
 
         auto commitToQueue = [&](DeviceManager::QueueUtils* currentRecordQueue) -> bool 
             {
                 VkResult queueResult = vkQueuePresentKHR(currentRecordQueue->vkQueue, &presentInfo);
-                //currentRecordQueue->queueWaitFence = presentFences[currentFrame];
-
                 return (queueResult == VK_SUCCESS || queueResult == VK_SUBOPTIMAL_KHR);
             };
 

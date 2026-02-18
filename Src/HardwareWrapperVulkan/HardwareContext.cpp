@@ -95,11 +95,11 @@ void HardwareContext::prepareFeaturesChain()
     hardwareCreateInfos.requiredDeviceExtensions = [](const VkInstance &, const VkPhysicalDevice &) {
         return std::set<const char *>{
             VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-            VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
+            // VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,  // 移除: 部分 AMD 核显不支持
             VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
             VK_KHR_16BIT_STORAGE_EXTENSION_NAME,
             VK_KHR_MULTIVIEW_EXTENSION_NAME,
-            VK_AMD_GPU_SHADER_HALF_FLOAT_EXTENSION_NAME,
+            //VK_AMD_GPU_SHADER_HALF_FLOAT_EXTENSION_NAME,
             VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
             VK_EXT_SHADER_SUBGROUP_BALLOT_EXTENSION_NAME,
             VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
@@ -145,12 +145,12 @@ void HardwareContext::prepareFeaturesChain()
         features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
         features13.synchronization2 = VK_TRUE;
 
-        // 启用 swapchainMaintenance1 特性
-        VkPhysicalDeviceSwapchainMaintenance1FeaturesEXT features_swapchain_maintenance1{};
-        features_swapchain_maintenance1.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_EXT;
-        features_swapchain_maintenance1.swapchainMaintenance1 = VK_TRUE;
+        // 移除: swapchainMaintenance1 特性 (部分 AMD 核显不支持)
+        // VkPhysicalDeviceSwapchainMaintenance1FeaturesEXT features_swapchain_maintenance1{};
+        // features_swapchain_maintenance1.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_EXT;
+        // features_swapchain_maintenance1.swapchainMaintenance1 = VK_TRUE;
 
-        return (DeviceFeaturesChain() | features | features11 | features12 | features13 | features_swapchain_maintenance1);
+        return (DeviceFeaturesChain() | features | features11 | features12 | features13);
     };
 }
 
