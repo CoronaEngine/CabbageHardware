@@ -75,8 +75,8 @@ void HardwareContext::prepareFeaturesChain()
     hardwareCreateInfos.requiredInstanceExtensions = [](const VkInstance &, const VkPhysicalDevice &) {
         std::set<const char *> extensions{
             "VK_KHR_surface",
-            VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
-            VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
+            // VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,      // 移除: 未使用且部分设备不支持
+            // VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME, // 移除: surface_maintenance1 的依赖
             VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
             VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME};
 

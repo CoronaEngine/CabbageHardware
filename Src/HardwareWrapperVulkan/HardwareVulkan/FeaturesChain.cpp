@@ -28,11 +28,12 @@ void DeviceFeaturesChain::initializeChain()
     // accelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
     // accelerationStructureFeatures.pNext = &rayTracingPipelineFeatures;
 
-    swapchainMaintenance1Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_EXT;
-    swapchainMaintenance1Features.pNext = nullptr;
+    // 移除: swapchainMaintenance1Features (部分 AMD 核显不支持 VK_EXT_swapchain_maintenance1)
+    // swapchainMaintenance1Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_EXT;
+    // swapchainMaintenance1Features.pNext = nullptr;
 
     deviceFeatures14.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
-    deviceFeatures14.pNext = &swapchainMaintenance1Features;
+    deviceFeatures14.pNext = nullptr;  // 不再链接 swapchainMaintenance1Features
 
     deviceFeatures13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
     deviceFeatures13.pNext = &deviceFeatures14;
