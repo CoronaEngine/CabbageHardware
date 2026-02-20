@@ -277,7 +277,7 @@ void DeviceManager::createQueueUtils()
             exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
             exportInfo.pNext = nullptr;
 #if _WIN32 || _WIN64
-            exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+            exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT;
 #elif __linux__
             exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
@@ -419,7 +419,7 @@ DeviceManager::ExternalSemaphoreHandle DeviceManager::exportSemaphore(VkSemaphor
     getHandleInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_WIN32_HANDLE_INFO_KHR;
     getHandleInfo.pNext = nullptr;
     getHandleInfo.semaphore = semaphore;
-    getHandleInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+    getHandleInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT;
 
     HANDLE handle = nullptr;
     coronaHardwareCheck(vkGetSemaphoreWin32HandleKHR(logicalDevice, &getHandleInfo, &handle));
@@ -511,7 +511,7 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
             importInfo.pNext = nullptr;
             importInfo.semaphore = localSemaphore;
             importInfo.flags = 0;
-            importInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+            importInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT;
             importInfo.handle = handle.handle;
             importInfo.name = nullptr;
 
@@ -561,12 +561,18 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
             continue;
         }
 
-        // 检查本设备是否支持导入该 handle 类型的外部 semaphore
+        VkSemaphoreTypeCreateInfo timelineTypeInfo{};
+        timelineTypeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+        timelineTypeInfo.pNext = nullptr;
+        timelineTypeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+        timelineTypeInfo.initialValue = 0; 
+
         VkPhysicalDeviceExternalSemaphoreInfo localExternalSemInfo{};
         localExternalSemInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO;
-        localExternalSemInfo.pNext = nullptr;
+        localExternalSemInfo.pNext = &timelineTypeInfo;
+
 #if _WIN32 || _WIN64
-        localExternalSemInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+        localExternalSemInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT;
 #elif __linux__
         localExternalSemInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
@@ -578,7 +584,6 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
 
         bool localCanImport = (localExternalSemProps.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT) != 0;
 
-        // 检查对端设备是否支持导出该 handle 类型的外部 semaphore
         VkExternalSemaphoreProperties foreignExternalSemProps{};
         foreignExternalSemProps.sType = VK_STRUCTURE_TYPE_EXTERNAL_SEMAPHORE_PROPERTIES;
         foreignExternalSemProps.pNext = nullptr;
