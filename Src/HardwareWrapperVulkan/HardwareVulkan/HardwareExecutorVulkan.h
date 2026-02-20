@@ -131,6 +131,32 @@ struct HardwareExecutorVulkan
             VkSemaphore resolvedSemaphore = hardwareContext->deviceManager.getOrImportTimelineSemaphore(
                 *other.currentRecordQueue);
 
+            if (resolvedSemaphore == VK_NULL_HANDLE)
+            {
+                // CPU-bridge fallback：跨设备 semaphore 导入不可用（不同架构 GPU），
+                // 回退到 host 侧等待外部设备完成，再让本地 GPU 继续
+                uint64_t waitValue = other.currentRecordQueue->timelineValue->load(std::memory_order_acquire);
+                VkSemaphore foreignSem = other.currentRecordQueue->timelineSemaphore;
+                VkDevice foreignDevice = other.currentRecordQueue->deviceManager->getLogicalDevice();
+
+                VkSemaphoreWaitInfo cpuWaitInfo{};
+                cpuWaitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+                cpuWaitInfo.pNext = nullptr;
+                cpuWaitInfo.flags = 0;
+                cpuWaitInfo.semaphoreCount = 1;
+                cpuWaitInfo.pSemaphores = &foreignSem;
+                cpuWaitInfo.pValues = &waitValue;
+
+                VkResult r = vkWaitSemaphores(foreignDevice, &cpuWaitInfo, 5'000'000'000ULL);
+                if (r != VK_SUCCESS)
+                {
+                    CFW_LOG_ERROR("[wait] CPU-bridge fallback: vkWaitSemaphores on foreign device failed, VkResult={}",
+                                  static_cast<int>(r));
+                }
+                // 外部 GPU 工作已在 CPU 时间线上确认完成，无需添加 GPU 侧 wait semaphore
+                return *this;
+            }
+
             VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
             timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             timelineWaitSemaphoreSubmitInfo.semaphore = resolvedSemaphore;
