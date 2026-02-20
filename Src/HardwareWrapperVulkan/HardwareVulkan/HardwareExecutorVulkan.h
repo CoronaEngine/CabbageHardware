@@ -143,7 +143,7 @@ struct HardwareExecutorVulkan
 
     explicit operator bool() const
     {
-        return (!commandList.empty()) && (currentRecordQueue != nullptr);
+        return currentRecordQueue != nullptr;
     }
 
     HardwareExecutorVulkan &commit();

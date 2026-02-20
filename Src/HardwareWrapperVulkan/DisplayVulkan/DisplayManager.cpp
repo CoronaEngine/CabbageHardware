@@ -1,12 +1,13 @@
 ﻿#include "DisplayManager.h"
 
 #include <algorithm>
+#include <optional>
 
 #include "HardwareWrapperVulkan/HardwareVulkan/ResourceCommand.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/memory/cache_aligned_allocator.h"
 
-#define USE_SAME_DEVICE
+//#define USE_SAME_DEVICE
 
 DisplayManager::DisplayManager() = default;
 
@@ -484,12 +485,17 @@ void DisplayManager::setupCrossDeviceTransfer(const ResourceManager::ImageHardwa
         requiredAlign = std::max(requiredAlign, hostProps.minImportedHostPointerAlignment);
     }
 
+    // P0 修复：将缓冲区大小向上对齐到 minImportedHostPointerAlignment
+    // Vulkan spec 要求 VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT 导入的
+    // 宿主内存区域大小必须是 minImportedHostPointerAlignment 的整数倍
+    VkDeviceSize alignedSize = (imageSizeBytes + requiredAlign - 1) & ~(requiredAlign - 1);
+
     // 分配宿主内存
     if (hostBufferPtr != nullptr)
     {
         Corona::Kernal::Memory::aligned_free(hostBufferPtr);
     }
-    hostBufferPtr = Corona::Kernal::Memory::aligned_malloc(imageSizeBytes, requiredAlign);
+    hostBufferPtr = Corona::Kernal::Memory::aligned_malloc(alignedSize, requiredAlign);
 
     if (hostBufferPtr == nullptr)
     {
@@ -499,8 +505,8 @@ void DisplayManager::setupCrossDeviceTransfer(const ResourceManager::ImageHardwa
     // 创建源和目标暂存缓冲区
     cleanupStagingBuffers();
 
-    srcStaging = globalHardwareContext.getMainDevice()->resourceManager.importHostBuffer(hostBufferPtr, imageSizeBytes);
-    dstStaging = displayDevice->resourceManager.importHostBuffer(hostBufferPtr, imageSizeBytes);
+    srcStaging = globalHardwareContext.getMainDevice()->resourceManager.importHostBuffer(hostBufferPtr, alignedSize);
+    dstStaging = displayDevice->resourceManager.importHostBuffer(hostBufferPtr, alignedSize);
 
     /*srcStaging = globalHardwareContext.getMainDevice()->resourceManager.createBuffer(imageSizeBytes, 1, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, true, true);
     ResourceManager::ExternalMemoryHandle memHandle = globalHardwareContext.getMainDevice()->resourceManager.exportBufferMemory(srcStaging);
@@ -603,6 +609,8 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         }
 
         // 跨设备传输（如果需要）
+        // copyCmd2 必须在 commit() 之前保持存活，提升到外层作用域
+        std::optional<CopyBufferToImageCommand> copyCmd2;
         if (auto const handle = globalImageStorages.acquire_write(displayImage.getImageID());
             globalHardwareContext.getMainDevice() != displayDevice)
         // if (true)
@@ -613,8 +621,8 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
             // GPU B 等待 GPU A 的拷贝完成（通过 imported timeline semaphore，纯 GPU 端同步）
             displayDeviceExecutor->wait(*mainDeviceExecutor);
 
-            CopyBufferToImageCommand copyCmd2(dstStaging, this->displayImage);
-            (*displayDeviceExecutor) << &copyCmd2;
+            copyCmd2.emplace(dstStaging, this->displayImage);
+            (*displayDeviceExecutor) << &copyCmd2.value();
         }
 
         std::vector<VkSemaphoreSubmitInfo> waitSemaphoreInfos;
@@ -654,6 +662,13 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
                                << displayDeviceExecutor->wait(waitSemaphoreInfos, signalSemaphoreInfos)
                                << displayDeviceExecutor->commit();
 
+        // P0 修复：清除 commit() 尾部残留的 graphics queue self-wait
+        // commit() 在 waitSemaphores 中预填了 graphics queue 的 timeline 自等待，
+        // 但 present 的 pickQueueAndCommit 应独立管理 present queue 的 timeline，
+        // 不应继承 graphics queue 的同步状态。present 排序由 renderFinishedSemaphore 保证。
+        displayDeviceExecutor->waitSemaphores.clear();
+        displayDeviceExecutor->signalSemaphores.clear();
+
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         presentInfo.waitSemaphoreCount = 1;
@@ -672,6 +687,9 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         // presentInfo.pNext = &presentFenceInfo;
 
         auto commitToQueue = [&](DeviceManager::QueueUtils *currentRecordQueue) -> bool {
+            // 让 pickQueueAndCommit 后续提交使用正确的 present 队列
+            displayDeviceExecutor->currentRecordQueue = currentRecordQueue;
+
             // 1. 先执行 Present（只依赖 binary semaphore）
             VkResult presentResult = vkQueuePresentKHR(currentRecordQueue->vkQueue, &presentInfo);
 

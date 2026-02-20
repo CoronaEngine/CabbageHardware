@@ -1112,7 +1112,25 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *host
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size;
     bufferInfo.usage = bufferWrap.bufferUsage;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    // P0 修复：与 createBuffer 保持一致，多队列族时使用 CONCURRENT 模式
+    // 跨设备传输场景下 host buffer 可能在 transfer/graphics 不同队列族间使用
+    std::vector<uint32_t> queueFamilyIndices;
+    const uint32_t queueFamilyCount = device->getQueueFamilyNumber();
+
+    if (queueFamilyCount > 1)
+    {
+        queueFamilyIndices.resize(queueFamilyCount);
+        std::iota(queueFamilyIndices.begin(), queueFamilyIndices.end(), 0u);
+
+        bufferInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        bufferInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueFamilyIndices.size());
+        bufferInfo.pQueueFamilyIndices = queueFamilyIndices.data();
+    }
+    else
+    {
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
 
     VkImportMemoryHostPointerInfoEXT importInfo{};
     importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT;
