@@ -485,14 +485,12 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
         {
             if (importedTimelineSemaphores.count(foreignQueue.timelineSemaphore))
             {
-                continue; // 已导入（同一 semaphore 可能出现在多个队列分类中）
+                continue;
             }
 
-            // 1. 从外部设备 export handle
             VkSemaphore foreignSem = foreignQueue.timelineSemaphore;
             ExternalSemaphoreHandle handle = foreignDevice->exportSemaphore(foreignSem);
 
-            // 2. 在本设备创建 timeline semaphore
             VkSemaphoreTypeCreateInfo typeInfo{};
             typeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
             typeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
@@ -507,13 +505,12 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
             VkSemaphore localSemaphore = VK_NULL_HANDLE;
             coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &createInfo, nullptr, &localSemaphore));
 
-            // 3. 导入外部 handle
 #if _WIN32 || _WIN64
             VkImportSemaphoreWin32HandleInfoKHR importInfo{};
             importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR;
             importInfo.pNext = nullptr;
             importInfo.semaphore = localSemaphore;
-            importInfo.flags = 0; // 永久导入，timeline 值持续共享
+            importInfo.flags = 0;
             importInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
             importInfo.handle = handle.handle;
             importInfo.name = nullptr;
@@ -528,7 +525,6 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
                 continue;
             }
 
-            // 4. 关闭已消费的 Win32 handle，避免泄漏
             CloseHandle(handle.handle);
 #elif __linux__
             VkImportSemaphoreFdInfoKHR importInfo{};
@@ -547,7 +543,6 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
                 CFW_LOG_ERROR("[DeviceManager] Failed to import foreign timeline semaphore fd");
                 continue;
             }
-            // fd 在成功 import 后所有权已转移给驱动，无需 close
 #endif
 
             importedTimelineSemaphores[foreignQueue.timelineSemaphore] = localSemaphore;
