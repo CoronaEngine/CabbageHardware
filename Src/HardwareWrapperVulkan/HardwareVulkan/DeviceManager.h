@@ -2,6 +2,7 @@
 
 #include <mutex>
 #include <set>
+#include <unordered_map>
 
 #include "FeaturesChain.h"
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
@@ -54,6 +55,10 @@ class DeviceManager
 
     ExternalSemaphoreHandle exportSemaphore(VkSemaphore &semaphore);
     VkSemaphore importSemaphore(const ExternalSemaphoreHandle &memHandle, const VkSemaphore &semaphore);
+
+    /// 获取可在本设备上使用的 timeline semaphore。
+    /// 同设备直接返回原 semaphore；跨设备则 export+import 并缓存。
+    VkSemaphore getOrImportTimelineSemaphore(QueueUtils &foreignQueue);
 
     std::vector<QueueUtils> pickAvailableQueues(std::function<bool(const QueueUtils &)> predicate) const;
 
@@ -109,4 +114,7 @@ class DeviceManager
 
     // 用于追踪已销毁的资源，避免共享队列的重复释放
     std::set<VkCommandPool> destroyedPools;
+
+    // 跨设备 timeline semaphore 缓存：外部 VkSemaphore → 本设备已导入的 VkSemaphore
+    std::unordered_map<VkSemaphore, VkSemaphore> importedTimelineSemaphores;
 };

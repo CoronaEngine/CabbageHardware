@@ -127,9 +127,13 @@ struct HardwareExecutorVulkan
     {
         if (other)
         {
+            // 跨设备时自动解析为本设备可用的 imported semaphore；同设备零开销直接返回
+            VkSemaphore resolvedSemaphore = hardwareContext->deviceManager.getOrImportTimelineSemaphore(
+                *other.currentRecordQueue);
+
             VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
             timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-            timelineWaitSemaphoreSubmitInfo.semaphore = other.currentRecordQueue->timelineSemaphore;
+            timelineWaitSemaphoreSubmitInfo.semaphore = resolvedSemaphore;
             timelineWaitSemaphoreSubmitInfo.value = other.currentRecordQueue->timelineValue->load(std::memory_order_acquire);
             timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
             waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);

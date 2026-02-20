@@ -6,7 +6,7 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/memory/cache_aligned_allocator.h"
 
-#define USE_SAME_DEVICE
+//#define USE_SAME_DEVICE
 
 DisplayManager::DisplayManager() = default;
 
@@ -610,12 +610,10 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
             CopyImageToBufferCommand copyCmd(*handle, srcStaging);
             (*mainDeviceExecutor) << &copyCmd << mainDeviceExecutor->commit();
 
-            // std::vector<uint8_t> zeroData(dstStaging.bufferAllocInfo.size, 0);
-            // displayDevice->resourceManager.copyBufferToHost(dstStaging, zeroData.data(), dstStaging.bufferAllocInfo.size);
-            // vkDeviceWaitIdle(displayDevice->deviceManager.getLogicalDevice());
+            // GPU B 等待 GPU A 的拷贝完成（通过 imported timeline semaphore，纯 GPU 端同步）
+            displayDeviceExecutor->wait(*mainDeviceExecutor);
 
             CopyBufferToImageCommand copyCmd2(dstStaging, this->displayImage);
-            //(*displayDeviceExecutors[currentFrame]) << &copyCmd2;
             (*displayDeviceExecutor) << &copyCmd2;
         }
 
@@ -673,11 +671,29 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         // presentFenceInfo.pNext = const_cast<void *>(presentInfo.pNext);
         // presentInfo.pNext = &presentFenceInfo;
 
-        auto commitToQueue = [&](DeviceManager::QueueUtils* currentRecordQueue) -> bool 
+        auto commitToQueue = [&](DeviceManager::QueueUtils *currentRecordQueue) -> bool {
+            // 1. 先执行 Present（只依赖 binary semaphore）
+            VkResult presentResult = vkQueuePresentKHR(currentRecordQueue->vkQueue, &presentInfo);
+
+            if (presentResult != VK_SUCCESS && presentResult != VK_SUBOPTIMAL_KHR)
             {
-                VkResult queueResult = vkQueuePresentKHR(currentRecordQueue->vkQueue, &presentInfo);
-                return queueResult == VK_SUCCESS || queueResult == VK_SUBOPTIMAL_KHR;
-            };
+                CFW_LOG_ERROR("vkQueuePresentKHR failed: {}", static_cast<int>(presentResult));
+                return false;
+            }
+
+            // 2. 提交一个空的命令缓冲区来推进 timeline
+            // 这确保 pickQueueAndCommit 增加的 timelineValue 能被 GPU signal
+            vkResetCommandBuffer(currentRecordQueue->commandBuffer, 0);
+
+            VkCommandBufferBeginInfo beginInfo{};
+            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+            vkBeginCommandBuffer(currentRecordQueue->commandBuffer, &beginInfo);
+            vkEndCommandBuffer(currentRecordQueue->commandBuffer); // 空命令
+
+            return true;
+        };
 
         displayDeviceExecutor->pickQueueAndCommit(currentQueueIndex, presentQueues, commitToQueue);
         currentFrame = (currentFrame + 1) % swapChainImages.size();
