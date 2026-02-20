@@ -1,9 +1,6 @@
 ﻿# TODO（按优先级排序）
 - （紧急）多线程内存泄漏、多线程死锁、多线程crash
 - （紧急）shader中不同的textureSampler，分离的图像和采样器描述符
-- （紧急）多显卡：同步VK_KHR_external_semaphore
-- （紧急）多显卡：import mem崩溃
-- （兼容性）GT1030：bindless的ubo数量限制，ubo改为常规绑定（配合反射生成）
 -  加载 gltf 模型材质，vulkan 内存屏障报错
 - HardwareExecutor默认选择不同的队列家族
 - 自动判断image的layout
