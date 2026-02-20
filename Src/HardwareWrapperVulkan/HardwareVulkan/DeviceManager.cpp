@@ -469,12 +469,12 @@ VkSemaphore DeviceManager::getOrImportTimelineSemaphore(const QueueUtils &foreig
         return it->second;
     }
 
-    // 跨设备 semaphore 未预导入：可能是不兼容的设备对（如不同架构 GPU），
-    // 调用方应检查返回值并回退到 CPU 侧同步
-    CFW_LOG_WARNING("[DeviceManager] Cross-device semaphore not pre-imported (foreign={} on device={}). "
-                    "Devices may not support opaque handle sharing. Caller should fall back to CPU-side sync.",
-                    reinterpret_cast<uintptr_t>(foreignQueue.timelineSemaphore),
-                    reinterpret_cast<uintptr_t>(logicalDevice));
+    //// 跨设备 semaphore 未预导入：可能是不兼容的设备对（如不同架构 GPU），
+    //// 调用方应检查返回值并回退到 CPU 侧同步
+    //CFW_LOG_WARNING("[DeviceManager] Cross-device semaphore not pre-imported (foreign={} on device={}). "
+    //                "Devices may not support opaque handle sharing. Caller should fall back to CPU-side sync.",
+    //                reinterpret_cast<uintptr_t>(foreignQueue.timelineSemaphore),
+    //                reinterpret_cast<uintptr_t>(logicalDevice));
     return VK_NULL_HANDLE;
 }
 
@@ -593,12 +593,12 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
 
         if (!localCanImport || !foreignCanExport)
         {
-            CFW_LOG_WARNING("[DeviceManager] Cross-device semaphore sharing not supported between "
-                            "local device={} (import={}) and foreign device={} (export={}). "
-                            "Likely different GPU architectures (e.g. GTX 1080 + RTX 2080). "
-                            "Cross-device synchronization will fall back to CPU-side wait.",
-                            reinterpret_cast<uintptr_t>(physicalDevice), localCanImport,
-                            reinterpret_cast<uintptr_t>(other->physicalDevice), foreignCanExport);
+            //CFW_LOG_WARNING("[DeviceManager] Cross-device semaphore sharing not supported between "
+            //                "local device={} (import={}) and foreign device={} (export={}). "
+            //                "Likely different GPU architectures (e.g. GTX 1080 + RTX 2080). "
+            //                "Cross-device synchronization will fall back to CPU-side wait.",
+            //                reinterpret_cast<uintptr_t>(physicalDevice), localCanImport,
+            //                reinterpret_cast<uintptr_t>(other->physicalDevice), foreignCanExport);
             continue;
         }
 
@@ -607,7 +607,7 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
         importFromQueues(other->transferQueues, other);
     }
 
-    CFW_LOG_INFO("[DeviceManager] Pre-imported {} foreign timeline semaphores on device {}",
-                 importedTimelineSemaphores.size(),
-                 reinterpret_cast<uintptr_t>(logicalDevice));
+    //CFW_LOG_INFO("[DeviceManager] Pre-imported {} foreign timeline semaphores on device {}",
+    //             importedTimelineSemaphores.size(),
+    //             reinterpret_cast<uintptr_t>(logicalDevice));
 }
