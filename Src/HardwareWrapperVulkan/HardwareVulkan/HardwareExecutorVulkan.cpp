@@ -456,6 +456,10 @@ DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
 
     }
 
+    // 提交完成后清理已消费的 semaphore 状态，避免泄漏到后续的 pickQueueAndCommit 调用
+    waitSemaphores.clear();
+    signalSemaphores.clear();
+    waitFence = VK_NULL_HANDLE;
 
     queue->queueMutex->unlock();
 

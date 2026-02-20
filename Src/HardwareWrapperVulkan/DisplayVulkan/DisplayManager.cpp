@@ -662,13 +662,6 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
                                << displayDeviceExecutor->wait(waitSemaphoreInfos, signalSemaphoreInfos)
                                << displayDeviceExecutor->commit();
 
-        // P0 修复：清除 commit() 尾部残留的 graphics queue self-wait
-        // commit() 在 waitSemaphores 中预填了 graphics queue 的 timeline 自等待，
-        // 但 present 的 pickQueueAndCommit 应独立管理 present queue 的 timeline，
-        // 不应继承 graphics queue 的同步状态。present 排序由 renderFinishedSemaphore 保证。
-        displayDeviceExecutor->waitSemaphores.clear();
-        displayDeviceExecutor->signalSemaphores.clear();
-
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         presentInfo.waitSemaphoreCount = 1;
