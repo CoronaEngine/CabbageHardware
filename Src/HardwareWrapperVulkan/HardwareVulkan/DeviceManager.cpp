@@ -469,12 +469,12 @@ VkSemaphore DeviceManager::getOrImportTimelineSemaphore(const QueueUtils &foreig
         return it->second;
     }
 
-    // 不应到达此处 ——— 说明 importForeignSemaphores() 未正确执行
-    CFW_LOG_ERROR("[DeviceManager] Cross-device semaphore not pre-imported! foreign={} on device={}. "
-                  "Ensure importForeignSemaphores() was called during initialization.",
-                  reinterpret_cast<uintptr_t>(foreignQueue.timelineSemaphore),
-                  reinterpret_cast<uintptr_t>(logicalDevice));
-    assert(false && "Cross-device semaphore was not pre-imported during initialization");
+    // 跨设备 semaphore 未预导入：可能是不兼容的设备对（如不同架构 GPU），
+    // 调用方应检查返回值并回退到 CPU 侧同步
+    CFW_LOG_WARNING("[DeviceManager] Cross-device semaphore not pre-imported (foreign={} on device={}). "
+                    "Devices may not support opaque handle sharing. Caller should fall back to CPU-side sync.",
+                    reinterpret_cast<uintptr_t>(foreignQueue.timelineSemaphore),
+                    reinterpret_cast<uintptr_t>(logicalDevice));
     return VK_NULL_HANDLE;
 }
 
@@ -558,6 +558,42 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
     {
         if (other == this || other->logicalDevice == logicalDevice)
         {
+            continue;
+        }
+
+        // 检查本设备是否支持导入该 handle 类型的外部 semaphore
+        VkPhysicalDeviceExternalSemaphoreInfo localExternalSemInfo{};
+        localExternalSemInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO;
+        localExternalSemInfo.pNext = nullptr;
+#if _WIN32 || _WIN64
+        localExternalSemInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+#elif __linux__
+        localExternalSemInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+#endif
+
+        VkExternalSemaphoreProperties localExternalSemProps{};
+        localExternalSemProps.sType = VK_STRUCTURE_TYPE_EXTERNAL_SEMAPHORE_PROPERTIES;
+        localExternalSemProps.pNext = nullptr;
+        vkGetPhysicalDeviceExternalSemaphoreProperties(physicalDevice, &localExternalSemInfo, &localExternalSemProps);
+
+        bool localCanImport = (localExternalSemProps.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT) != 0;
+
+        // 检查对端设备是否支持导出该 handle 类型的外部 semaphore
+        VkExternalSemaphoreProperties foreignExternalSemProps{};
+        foreignExternalSemProps.sType = VK_STRUCTURE_TYPE_EXTERNAL_SEMAPHORE_PROPERTIES;
+        foreignExternalSemProps.pNext = nullptr;
+        vkGetPhysicalDeviceExternalSemaphoreProperties(other->physicalDevice, &localExternalSemInfo, &foreignExternalSemProps);
+
+        bool foreignCanExport = (foreignExternalSemProps.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT) != 0;
+
+        if (!localCanImport || !foreignCanExport)
+        {
+            CFW_LOG_WARNING("[DeviceManager] Cross-device semaphore sharing not supported between "
+                            "local device={} (import={}) and foreign device={} (export={}). "
+                            "Likely different GPU architectures (e.g. GTX 1080 + RTX 2080). "
+                            "Cross-device synchronization will fall back to CPU-side wait.",
+                            reinterpret_cast<uintptr_t>(physicalDevice), localCanImport,
+                            reinterpret_cast<uintptr_t>(other->physicalDevice), foreignCanExport);
             continue;
         }
 
