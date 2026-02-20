@@ -40,6 +40,7 @@ struct HardwareContext
     void prepareFeaturesChain();
     void createVkInstance(const CreateCallback &createInfo);
     void chooseMainDevice();
+    void setupCrossDeviceSemaphores();
     void setupDebugMessenger();
     void cleanupDebugMessenger();
 

@@ -1,6 +1,7 @@
 ﻿#include "DeviceManager.h"
 
 #include <algorithm>
+#include <cassert>
 
 DeviceManager::DeviceManager() = default;
 
@@ -277,6 +278,8 @@ void DeviceManager::createQueueUtils()
             exportInfo.pNext = nullptr;
 #if _WIN32 || _WIN64
             exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+#elif __linux__
+            exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
             VkSemaphoreTypeCreateInfo typeCreateInfo{};
             typeCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
@@ -427,6 +430,22 @@ DeviceManager::ExternalSemaphoreHandle DeviceManager::exportSemaphore(VkSemaphor
     }
 
     handleInfo.handle = handle;
+#elif __linux__
+    VkSemaphoreGetFdInfoKHR getFdInfo{};
+    getFdInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR;
+    getFdInfo.pNext = nullptr;
+    getFdInfo.semaphore = semaphore;
+    getFdInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+    int fd = -1;
+    coronaHardwareCheck(vkGetSemaphoreFdKHR(logicalDevice, &getFdInfo, &fd));
+
+    if (fd < 0)
+    {
+        throw std::runtime_error("Failed to export semaphore: fd is invalid");
+    }
+
+    handleInfo.fd = fd;
 #else
     throw std::runtime_error("Semaphore export not implemented for this platform");
 #endif
@@ -434,27 +453,7 @@ DeviceManager::ExternalSemaphoreHandle DeviceManager::exportSemaphore(VkSemaphor
     return handleInfo;
 }
 
-VkSemaphore DeviceManager::importSemaphore(const DeviceManager::ExternalSemaphoreHandle &memHandle, const VkSemaphore &semaphore)
-{
-#if _WIN32 || _WIN64
-    VkImportSemaphoreWin32HandleInfoKHR importInfo{};
-    importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR;
-    importInfo.pNext = nullptr;
-    importInfo.semaphore = semaphore;
-    importInfo.flags = 0;
-    importInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-    importInfo.handle = memHandle.handle;
-    importInfo.name = nullptr;
-
-    coronaHardwareCheck(vkImportSemaphoreWin32HandleKHR(logicalDevice, &importInfo));
-
-    return semaphore;
-#else
-    throw std::runtime_error("Semaphore import not implemented for this platform");
-#endif
-}
-
-VkSemaphore DeviceManager::getOrImportTimelineSemaphore(QueueUtils &foreignQueue)
+VkSemaphore DeviceManager::getOrImportTimelineSemaphore(const QueueUtils &foreignQueue) const
 {
     // 同设备：直接返回原始 semaphore，零开销
     if (foreignQueue.deviceManager == this ||
@@ -463,70 +462,116 @@ VkSemaphore DeviceManager::getOrImportTimelineSemaphore(QueueUtils &foreignQueue
         return foreignQueue.timelineSemaphore;
     }
 
-    // 查缓存
+    // 跨设备：从预导入缓存查表
     auto it = importedTimelineSemaphores.find(foreignQueue.timelineSemaphore);
     if (it != importedTimelineSemaphores.end())
     {
         return it->second;
     }
 
-    // Cache miss：从外部设备 export，在本设备 import
-    ExternalSemaphoreHandle handle = foreignQueue.deviceManager->exportSemaphore(foreignQueue.timelineSemaphore);
+    // 不应到达此处 ——— 说明 importForeignSemaphores() 未正确执行
+    CFW_LOG_ERROR("[DeviceManager] Cross-device semaphore not pre-imported! foreign={} on device={}. "
+                  "Ensure importForeignSemaphores() was called during initialization.",
+                  reinterpret_cast<uintptr_t>(foreignQueue.timelineSemaphore),
+                  reinterpret_cast<uintptr_t>(logicalDevice));
+    assert(false && "Cross-device semaphore was not pre-imported during initialization");
+    return VK_NULL_HANDLE;
+}
 
-    // 创建本地 timeline semaphore 并导入外部 handle
-    VkSemaphoreTypeCreateInfo typeInfo{};
-    typeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-    typeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-    typeInfo.initialValue = 0;
-    typeInfo.pNext = nullptr;
+void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &otherDevices)
+{
+    auto importFromQueues = [&](const std::vector<QueueUtils> &foreignQueues, DeviceManager *foreignDevice) {
+        for (const auto &foreignQueue : foreignQueues)
+        {
+            if (importedTimelineSemaphores.count(foreignQueue.timelineSemaphore))
+            {
+                continue; // 已导入（同一 semaphore 可能出现在多个队列分类中）
+            }
 
-    VkSemaphoreCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    createInfo.pNext = &typeInfo;
-    createInfo.flags = 0;
+            // 1. 从外部设备 export handle
+            VkSemaphore foreignSem = foreignQueue.timelineSemaphore;
+            ExternalSemaphoreHandle handle = foreignDevice->exportSemaphore(foreignSem);
 
-    VkSemaphore localSemaphore = VK_NULL_HANDLE;
-    coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &createInfo, nullptr, &localSemaphore));
+            // 2. 在本设备创建 timeline semaphore
+            VkSemaphoreTypeCreateInfo typeInfo{};
+            typeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+            typeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+            typeInfo.initialValue = 0;
+            typeInfo.pNext = nullptr;
 
+            VkSemaphoreCreateInfo createInfo{};
+            createInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+            createInfo.pNext = &typeInfo;
+            createInfo.flags = 0;
+
+            VkSemaphore localSemaphore = VK_NULL_HANDLE;
+            coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &createInfo, nullptr, &localSemaphore));
+
+            // 3. 导入外部 handle
 #if _WIN32 || _WIN64
-    VkImportSemaphoreWin32HandleInfoKHR importInfo{};
-    importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR;
-    importInfo.pNext = nullptr;
-    importInfo.semaphore = localSemaphore;
-    importInfo.flags = 0; // 永久导入，timeline 值持续共享
-    importInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-    importInfo.handle = handle.handle;
-    importInfo.name = nullptr;
+            VkImportSemaphoreWin32HandleInfoKHR importInfo{};
+            importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR;
+            importInfo.pNext = nullptr;
+            importInfo.semaphore = localSemaphore;
+            importInfo.flags = 0; // 永久导入，timeline 值持续共享
+            importInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+            importInfo.handle = handle.handle;
+            importInfo.name = nullptr;
 
-    VkResult result = vkImportSemaphoreWin32HandleKHR(logicalDevice, &importInfo);
-    if (result != VK_SUCCESS)
-    {
-        vkDestroySemaphore(logicalDevice, localSemaphore, nullptr);
-        throw std::runtime_error("Failed to import timeline semaphore: VkResult=" + std::to_string(result));
-    }
+            VkResult result = vkImportSemaphoreWin32HandleKHR(logicalDevice, &importInfo);
+            if (result != VK_SUCCESS)
+            {
+                vkDestroySemaphore(logicalDevice, localSemaphore, nullptr);
+                CloseHandle(handle.handle);
+                CFW_LOG_ERROR("[DeviceManager] Failed to import foreign timeline semaphore: VkResult={}",
+                              static_cast<int>(result));
+                continue;
+            }
+
+            // 4. 关闭已消费的 Win32 handle，避免泄漏
+            CloseHandle(handle.handle);
 #elif __linux__
-    VkImportSemaphoreFdInfoKHR importInfo{};
-    importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR;
-    importInfo.pNext = nullptr;
-    importInfo.semaphore = localSemaphore;
-    importInfo.flags = 0;
-    importInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
-    importInfo.fd = handle.fd;
+            VkImportSemaphoreFdInfoKHR importInfo{};
+            importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR;
+            importInfo.pNext = nullptr;
+            importInfo.semaphore = localSemaphore;
+            importInfo.flags = 0;
+            importInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+            importInfo.fd = handle.fd;
 
-    VkResult result = vkImportSemaphoreFdKHR(logicalDevice, &importInfo);
-    if (result != VK_SUCCESS)
-    {
-        vkDestroySemaphore(logicalDevice, localSemaphore, nullptr);
-        throw std::runtime_error("Failed to import timeline semaphore fd");
-    }
+            VkResult result = vkImportSemaphoreFdKHR(logicalDevice, &importInfo);
+            if (result != VK_SUCCESS)
+            {
+                vkDestroySemaphore(logicalDevice, localSemaphore, nullptr);
+                close(handle.fd);
+                CFW_LOG_ERROR("[DeviceManager] Failed to import foreign timeline semaphore fd");
+                continue;
+            }
+            // fd 在成功 import 后所有权已转移给驱动，无需 close
 #endif
 
-    importedTimelineSemaphores[foreignQueue.timelineSemaphore] = localSemaphore;
+            importedTimelineSemaphores[foreignQueue.timelineSemaphore] = localSemaphore;
 
-    CFW_LOG_DEBUG("[DeviceManager] Imported cross-device timeline semaphore: foreign={} -> local={} on device={}",
-                  reinterpret_cast<uintptr_t>(foreignQueue.timelineSemaphore),
-                  reinterpret_cast<uintptr_t>(localSemaphore),
-                  reinterpret_cast<uintptr_t>(logicalDevice));
+            CFW_LOG_DEBUG("[DeviceManager] Pre-imported cross-device timeline semaphore: foreign={} -> local={} on device={}",
+                          reinterpret_cast<uintptr_t>(foreignQueue.timelineSemaphore),
+                          reinterpret_cast<uintptr_t>(localSemaphore),
+                          reinterpret_cast<uintptr_t>(logicalDevice));
+        }
+    };
 
-    return localSemaphore;
+    for (DeviceManager *other : otherDevices)
+    {
+        if (other == this || other->logicalDevice == logicalDevice)
+        {
+            continue;
+        }
+
+        importFromQueues(other->graphicsQueues, other);
+        importFromQueues(other->computeQueues, other);
+        importFromQueues(other->transferQueues, other);
+    }
+
+    CFW_LOG_INFO("[DeviceManager] Pre-imported {} foreign timeline semaphores on device {}",
+                 importedTimelineSemaphores.size(),
+                 reinterpret_cast<uintptr_t>(logicalDevice));
 }

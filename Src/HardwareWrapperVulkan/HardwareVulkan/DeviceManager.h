@@ -54,11 +54,14 @@ class DeviceManager
     void cleanUpDeviceManager();
 
     ExternalSemaphoreHandle exportSemaphore(VkSemaphore &semaphore);
-    VkSemaphore importSemaphore(const ExternalSemaphoreHandle &memHandle, const VkSemaphore &semaphore);
 
-    /// 获取可在本设备上使用的 timeline semaphore。
-    /// 同设备直接返回原 semaphore；跨设备则 export+import 并缓存。
-    VkSemaphore getOrImportTimelineSemaphore(QueueUtils &foreignQueue);
+    /// 初始化阶段：预导入所有外部设备的 timeline semaphore。
+    /// 必须在所有 DeviceManager 完成 initDeviceManager() 之后调用。
+    void importForeignSemaphores(const std::vector<DeviceManager *> &otherDevices);
+
+    /// 运行时查表：获取本设备上可用的 timeline semaphore。
+    /// 同设备直接返回原 semaphore；跨设备从预导入缓存查表（初始化阶段已填充）。
+    VkSemaphore getOrImportTimelineSemaphore(const QueueUtils &foreignQueue) const;
 
     std::vector<QueueUtils> pickAvailableQueues(std::function<bool(const QueueUtils &)> predicate) const;
 

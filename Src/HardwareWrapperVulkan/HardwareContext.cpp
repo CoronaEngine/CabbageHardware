@@ -41,6 +41,8 @@ HardwareContext::HardwareContext()
         hardwareUtils.push_back(std::move(utils));
     }
 
+    setupCrossDeviceSemaphores();
+
     chooseMainDevice();
 
     CFW_LOG_DEBUG("Hardware Context initialized with {} device(s)", hardwareUtils.size());
@@ -78,7 +80,8 @@ void HardwareContext::prepareFeaturesChain()
             // VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,      // 移除: 未使用且部分设备不支持
             // VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME, // 移除: surface_maintenance1 的依赖
             VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
-            VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME};
+            VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME,
+            VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME};
 
 #if _WIN32 || _WIN64
         extensions.insert(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
@@ -110,6 +113,9 @@ void HardwareContext::prepareFeaturesChain()
 #if _WIN32 || _WIN64
             VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME,
             VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME
+#elif __linux__
+            VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
+            VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME
 #endif
         };
     };
@@ -266,6 +272,32 @@ void HardwareContext::cleanupDebugMessenger()
         debugMessenger = VK_NULL_HANDLE;
     }
 #endif
+}
+
+void HardwareContext::setupCrossDeviceSemaphores()
+{
+    if (hardwareUtils.size() <= 1)
+    {
+        return; // 单设备无需跨设备导入
+    }
+
+    for (size_t i = 0; i < hardwareUtils.size(); ++i)
+    {
+        std::vector<DeviceManager *> otherDevices;
+        otherDevices.reserve(hardwareUtils.size() - 1);
+
+        for (size_t j = 0; j < hardwareUtils.size(); ++j)
+        {
+            if (i != j)
+            {
+                otherDevices.push_back(&hardwareUtils[j]->deviceManager);
+            }
+        }
+
+        hardwareUtils[i]->deviceManager.importForeignSemaphores(otherDevices);
+    }
+
+    CFW_LOG_DEBUG("Cross-device timeline semaphore import completed for {} devices", hardwareUtils.size());
 }
 
 void HardwareContext::chooseMainDevice()
