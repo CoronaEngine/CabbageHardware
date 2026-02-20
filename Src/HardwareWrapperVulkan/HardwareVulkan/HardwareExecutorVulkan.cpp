@@ -524,10 +524,28 @@ HardwareExecutorVulkan &HardwareExecutorVulkan::commit()
             pickQueueAndCommit(hardwareContext->deviceManager.currentGraphicsQueueIndex, hardwareContext->deviceManager.graphicsQueues, commitToQueue);
             break;
         case CommandRecordVulkan::ExecutorType::Compute:
-            pickQueueAndCommit(hardwareContext->deviceManager.currentComputeQueueIndex, hardwareContext->deviceManager.computeQueues, commitToQueue);
+            if (!hardwareContext->deviceManager.computeQueues.empty())
+            {
+                pickQueueAndCommit(hardwareContext->deviceManager.currentComputeQueueIndex,
+                                   hardwareContext->deviceManager.computeQueues, commitToQueue);
+            }
+            else
+            {
+                pickQueueAndCommit(hardwareContext->deviceManager.currentGraphicsQueueIndex,
+                                   hardwareContext->deviceManager.graphicsQueues, commitToQueue);
+            }
             break;
         case CommandRecordVulkan::ExecutorType::Transfer:
-            pickQueueAndCommit(hardwareContext->deviceManager.currentTransferQueueIndex, hardwareContext->deviceManager.transferQueues, commitToQueue);
+            if (!hardwareContext->deviceManager.transferQueues.empty())
+            {
+                pickQueueAndCommit(hardwareContext->deviceManager.currentTransferQueueIndex,
+                                   hardwareContext->deviceManager.transferQueues, commitToQueue);
+            }
+            else
+            {
+                pickQueueAndCommit(hardwareContext->deviceManager.currentGraphicsQueueIndex,
+                                   hardwareContext->deviceManager.graphicsQueues, commitToQueue);
+            }
             break;
         case CommandRecordVulkan::ExecutorType::Invalid:
             CFW_LOG_ERROR("No valid command to commit in HardwareExecutorVulkan!");

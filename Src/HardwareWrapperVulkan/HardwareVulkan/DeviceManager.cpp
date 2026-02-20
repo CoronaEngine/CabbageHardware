@@ -359,22 +359,6 @@ void DeviceManager::createQueueUtils()
         }
     }
 
-    if (!graphicsQueues.empty())
-    {
-        if (computeQueues.empty())
-        {
-            computeQueues.push_back(graphicsQueues[0]);
-        }
-
-        if (transferQueues.empty())
-        {
-            transferQueues.push_back(graphicsQueues[0]);
-        }
-    }
-    else
-    {
-        throw std::runtime_error("No graphics queues found!");
-    }
 }
 
 // bool DeviceManager::createCommandBuffers() {
