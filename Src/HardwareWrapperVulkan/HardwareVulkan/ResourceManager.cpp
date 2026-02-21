@@ -872,13 +872,30 @@ void ResourceManager::createDedicatedBuffer(const VkBufferCreateInfo &bufferInfo
     VmaAllocationCreateInfo dedicatedAllocInfo = allocInfo;
     dedicatedAllocInfo.flags |= VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
 
-    coronaHardwareCheck(vmaCreateDedicatedBuffer(vmaAllocator,
-                                                 &bufferInfo,
-                                                 &dedicatedAllocInfo,
-                                                 &exportInfo,
-                                                 &resultBuffer.bufferHandle,
-                                                 &resultBuffer.bufferAlloc,
-                                                 &resultBuffer.bufferAllocInfo));
+    VkResult result = vmaCreateDedicatedBuffer(vmaAllocator,
+                                               &bufferInfo,
+                                               &dedicatedAllocInfo,
+                                               &exportInfo,
+                                               &resultBuffer.bufferHandle,
+                                               &resultBuffer.bufferAlloc,
+                                               &resultBuffer.bufferAllocInfo);
+
+    if (result != VK_SUCCESS)
+    {
+        CFW_LOG_WARNING("[ResourceManager] Dedicated exportable buffer failed (result={}), "
+                        "falling back to non-exportable buffer.",
+                        static_cast<int>(result));
+
+        VkBufferCreateInfo fallbackInfo = bufferInfo;
+        fallbackInfo.pNext = nullptr;
+
+        coronaHardwareCheck(vmaCreateBuffer(vmaAllocator,
+                                            &fallbackInfo,
+                                            &allocInfo,
+                                            &resultBuffer.bufferHandle,
+                                            &resultBuffer.bufferAlloc,
+                                            &resultBuffer.bufferAllocInfo));
+    }
 }
 
 void ResourceManager::createPooledBuffer(const VkBufferCreateInfo &bufferInfo,
