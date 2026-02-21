@@ -277,7 +277,7 @@ void DeviceManager::createQueueUtils()
             exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
             exportInfo.pNext = nullptr;
 #if _WIN32 || _WIN64
-            exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT;
+            exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
 #elif __linux__
             exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
@@ -419,7 +419,7 @@ DeviceManager::ExternalSemaphoreHandle DeviceManager::exportSemaphore(VkSemaphor
     getHandleInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_WIN32_HANDLE_INFO_KHR;
     getHandleInfo.pNext = nullptr;
     getHandleInfo.semaphore = semaphore;
-    getHandleInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT;
+    getHandleInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
 
     HANDLE handle = nullptr;
     coronaHardwareCheck(vkGetSemaphoreWin32HandleKHR(logicalDevice, &getHandleInfo, &handle));
@@ -511,7 +511,7 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
             importInfo.pNext = nullptr;
             importInfo.semaphore = localSemaphore;
             importInfo.flags = 0;
-            importInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT;
+            importInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
             importInfo.handle = handle.handle;
             importInfo.name = nullptr;
 
@@ -572,7 +572,7 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
         localExternalSemInfo.pNext = &timelineTypeInfo;
 
 #if _WIN32 || _WIN64
-        localExternalSemInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT;
+        localExternalSemInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
 #elif __linux__
         localExternalSemInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
