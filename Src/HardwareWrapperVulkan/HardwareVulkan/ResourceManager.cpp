@@ -83,6 +83,13 @@ void ResourceManager::cleanUpResourceManager()
         textureSampler = VK_NULL_HANDLE;
     }
 
+    // 清理外部内存池（必须在 VMA allocator 之前销毁）
+    if (exportBufferPool != VK_NULL_HANDLE)
+    {
+        vmaDestroyPool(vmaAllocator, exportBufferPool);
+        exportBufferPool = VK_NULL_HANDLE;
+    }
+
     // 清理 VMA 分配器
     if (vmaAllocator != VK_NULL_HANDLE)
     {
@@ -446,7 +453,18 @@ void ResourceManager::createExternalBufferMemoryPool()
     allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
     uint32_t memoryTypeIndex = VK_MAX_MEMORY_TYPES;
-    coronaHardwareCheck(vmaFindMemoryTypeIndexForBufferInfo(vmaAllocator, &bufferInfo, &allocInfo, &memoryTypeIndex));
+    VkResult findResult = vmaFindMemoryTypeIndexForBufferInfo(vmaAllocator, &bufferInfo, &allocInfo, &memoryTypeIndex);
+
+    if (findResult != VK_SUCCESS)
+    {
+        // AMD iGPU 等设备：不存在同时支持 host-visible + exportable 的内存类型
+        // 放弃池化，后续所有可导出 buffer 走 dedicated 路径
+        CFW_LOG_WARNING("[ResourceManager] No host-visible exportable memory type found (result={}). "
+                        "External buffer pool disabled, exportable buffers will use dedicated allocation.",
+                        static_cast<int>(findResult));
+        exportBufferPool = VK_NULL_HANDLE;
+        return;
+    }
 
     VkExportMemoryAllocateInfo exportMemoryInfo{};
     exportMemoryInfo.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR;
@@ -456,11 +474,19 @@ void ResourceManager::createExternalBufferMemoryPool()
     poolInfo.memoryTypeIndex = memoryTypeIndex;
     poolInfo.pMemoryAllocateNext = &exportMemoryInfo;
     poolInfo.blockSize = 0;     // 使用 VMA 默认块大小（通常 256MB）
-    poolInfo.minBlockCount = 1; // 至少预分配一个块
+    poolInfo.minBlockCount = 0; // 按需分配，避免在某些设备上预分配失败
     poolInfo.maxBlockCount = 0; // 无限制，按需动态增长
     // poolInfo.flags = VMA_POOL_CREATE_IGNORE_BUFFER_IMAGE_GRANULARITY_BIT;
 
-    coronaHardwareCheck(vmaCreatePool(vmaAllocator, &poolInfo, &exportBufferPool));
+    VkResult poolResult = vmaCreatePool(vmaAllocator, &poolInfo, &exportBufferPool);
+    if (poolResult != VK_SUCCESS)
+    {
+        CFW_LOG_WARNING("[ResourceManager] vmaCreatePool failed (result={}). "
+                        "External buffer pool disabled.",
+                        static_cast<int>(poolResult));
+        exportBufferPool = VK_NULL_HANDLE;
+        return;
+    }
 
     CFW_LOG_DEBUG(
         "[ResourceManager] External memory pool created:\n"
@@ -812,9 +838,9 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(uint32_t eleme
             // 回退到非导出缓冲区
             createNonExportableBuffer(bufferInfo, allocInfo, resultBuffer);
         }
-        else if (dedicatedOnly)
+        else if (dedicatedOnly || exportBufferPool == VK_NULL_HANDLE)
         {
-            // 需要专用内存
+            // 需要专用内存，或池不可用（AMD iGPU 等设备）
             createDedicatedBuffer(bufferInfo, allocInfo, resultBuffer);
         }
         else
