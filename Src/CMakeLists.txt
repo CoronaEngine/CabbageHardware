@@ -1,17 +1,23 @@
 file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
+    "${CMAKE_CURRENT_SOURCE_DIR}/HardwareWrapper/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/HardwareWrapper/*.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/HardwareWrapper/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/HardwareWrapper/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/HardwareWrapperVulkan/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/HardwareWrapperVulkan/*.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/HardwareWrapperVulkan/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/HardwareWrapperVulkan/*.h"
+)
 
 set(PUBLIC_HEADERS "${PROJECT_SOURCE_DIR}/include/CabbageHardware.h")
+
+add_subdirectory(Helicon)
 
 add_library(CabbageHardware STATIC ${SOURCE_FILES} ${PUBLIC_HEADERS})
 
 target_include_directories(CabbageHardware
     PUBLIC
     "${PROJECT_SOURCE_DIR}/include"
-    "${Helicon_SOURCE_DIR}"
     PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
 )

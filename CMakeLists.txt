@@ -30,14 +30,102 @@ add_compile_definitions(
 
 include(FetchContent)
 
+# ======================== Helicon ä¾èµ– ========================
 FetchContent_Declare(
-    Helicon
-    GIT_REPOSITORY https://github.com/CoronaEngine/Helicon.git
+    pfr
+    GIT_REPOSITORY https://github.com/boostorg/pfr.git
+    GIT_TAG develop
+    EXCLUDE_FROM_ALL
+)
+FetchContent_MakeAvailable(pfr)
+
+FetchContent_Declare(
+    ktm
+    GIT_REPOSITORY https://github.com/YGXXD/ktm.git
     GIT_TAG main
     EXCLUDE_FROM_ALL
 )
-FetchContent_MakeAvailable(Helicon)
+FetchContent_MakeAvailable(ktm)
 
+FetchContent_Declare(
+    preprocessor
+    GIT_REPOSITORY https://github.com/boostorg/preprocessor.git
+    GIT_TAG develop
+    EXCLUDE_FROM_ALL
+)
+FetchContent_MakeAvailable(preprocessor)
+
+FetchContent_Declare(
+    glslang
+    GIT_REPOSITORY https://github.com/KhronosGroup/glslang.git
+    GIT_TAG main
+    EXCLUDE_FROM_ALL
+)
+set(ENABLE_OPT OFF)
+set(ENABLE_GLSLANG_BINARIES OFF)
+FetchContent_MakeAvailable(glslang)
+
+FetchContent_Declare(
+    SPIRV-Cross
+    GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Cross.git
+    GIT_TAG main
+    EXCLUDE_FROM_ALL
+)
+set(SPIRV_CROSS_SHARED OFF)
+set(SPIRV_CROSS_STATIC ON)
+set(SPIRV_CROSS_ENABLE_TESTS OFF)
+set(SPIRV_CROSS_CLI OFF)
+FetchContent_MakeAvailable(SPIRV-Cross)
+
+FetchContent_Declare(
+    SPIRV-Headers
+    GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Headers.git
+    GIT_TAG vulkan-sdk-1.4.335.0
+    EXCLUDE_FROM_ALL
+)
+FetchContent_MakeAvailable(SPIRV-Headers)
+
+FetchContent_Declare(
+    SPIRV-Tools
+    GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Tools.git
+    GIT_TAG vulkan-sdk-1.4.335.0
+    EXCLUDE_FROM_ALL
+)
+FetchContent_MakeAvailable(SPIRV-Tools)
+
+# ä¿®å¤ SPIRV-Tools åœ¨ C++20 ä¸‹çš„è¿ç®—ç¬¦é‡å†™è­¦å‘Š (C5232)
+if(MSVC)
+    target_compile_options(SPIRV-Tools-opt PRIVATE /Wv:18)
+    target_compile_options(SPIRV-Tools-opt PRIVATE /wd4717 /wd5232)
+endif()
+
+# ======================== Helicon è¿è¡Œæ—¶ DLL éƒ¨ç½²å‡½æ•° ========================
+function(helicon_install_runtime_deps target_name)
+    get_target_property(HELICON_DEPS Helicon INTERFACE_HELICON_RUNTIME_DEPS)
+
+    if(NOT HELICON_DEPS)
+        message(WARNING "Helicon library did not specify any runtime dependencies.")
+        return()
+    endif()
+
+    message(STATUS "Scheduling runtime dependencies for ${target_name}: ${HELICON_DEPS}")
+
+    set(DESTINATION_DIR "$<TARGET_FILE_DIR:${target_name}>")
+
+    add_custom_command(
+        TARGET ${target_name} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${HELICON_DEPS}
+        "${DESTINATION_DIR}"
+        COMMENT "Copying Helicon runtime dependencies to ${target_name} output directory"
+        VERBATIM
+    )
+endfunction()
+
+# ======================== Shader è‡ªåŠ¨ç¼–è¯‘æ¨¡å— ========================
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/HeliconShaderCompile.cmake)
+
+# ======================== å…¶ä»–ä¾èµ– ========================
 FetchContent_Declare(CoronaFramework
     GIT_REPOSITORY https://github.com/CoronaEngine/CoronaFramework.git
     GIT_TAG main
@@ -72,6 +160,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(VulkanMemoryAllocator)
 
 add_subdirectory(Src)
+add_subdirectory(Scripts)
 
 if(CABBAGE_HARDWARE_BUILD_EXAMPLES)
     FetchContent_Declare(
@@ -95,13 +184,13 @@ endif()
 
 
 if (MSVC)
-    # ÆôÓÃ AddressSanitizer ±àÒëÑ¡Ïî
+    # ï¿½ï¿½ï¿½ï¿½ AddressSanitizer ï¿½ï¿½ï¿½ï¿½Ñ¡ï¿½ï¿½
     add_compile_options(/fsanitize=address)
 
-    # ±ØĞë½ûÓÃÔöÁ¿Á´½Ó (Incremental Linking)
-    # ASan ²»¼æÈİ /INCREMENTAL
+    # ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ (Incremental Linking)
+    # ASan ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ /INCREMENTAL
     add_link_options(/INCREMENTAL:NO)
     
-    # (¿ÉÑ¡) ÎªÁË»ñµÃ¸üºÃµÄ¶ÑÕ»×·×ÙĞÅÏ¢£¬¿ÉÒÔ¼ÓÉÏÕâ¸ö
+    # (ï¿½ï¿½Ñ¡) Îªï¿½Ë»ï¿½Ã¸ï¿½ï¿½ÃµÄ¶ï¿½Õ»×·ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     add_compile_options(/Zi) 
 endif()
