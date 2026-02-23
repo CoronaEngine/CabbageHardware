@@ -494,7 +494,7 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
             {
                 CFW_LOG_ERROR("[DeviceManager] Failed to export timeline semaphore from foreign device {}. Skipping import.",
                               reinterpret_cast<uintptr_t>(foreignDevice->logicalDevice));
-                continue;
+                return;
             }
 
             VkSemaphoreTypeCreateInfo typeInfo{};
@@ -528,7 +528,7 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
                 CloseHandle(handle.handle);
                 CFW_LOG_ERROR("[DeviceManager] Failed to import foreign timeline semaphore: VkResult={}",
                               static_cast<int>(result));
-                continue;
+                return;
             }
 
             CloseHandle(handle.handle);
