@@ -16,11 +16,12 @@
 #include "TextureTest.h"
 #include "corona/kernel/core/i_logger.h"
 
-#include "Codegen/CustomLibrary.h"
 #include "Codegen/BuiltinVariate.h"
+#include "Codegen/ControlFlows.h"
+#include "Codegen/CustomLibrary.h"
 #include "Codegen/TypeAlias.h"
 
-//#define TEST_HELICON
+#define TEST_HELICON
 
 // uniform buffer中
 struct GlobalUniformParam
@@ -29,6 +30,14 @@ struct GlobalUniformParam
     float globalScale;
     uint32_t frameCount;
     uint32_t padding; // 为了对齐
+};
+
+struct GlobalUniformParamProxy
+{
+    EmbeddedShader::Float globalTime;
+    EmbeddedShader::Float globalScale;
+    EmbeddedShader::Uint frameCount;
+    EmbeddedShader::Uint padding; // 为了对齐
 };
 
 // storage buffer
@@ -41,6 +50,25 @@ struct RasterizerStorageBufferObject
     ktm::fvec3 viewPos = ktm::fvec3(2.0f, 2.0f, 2.0f);
     ktm::fvec3 lightColor = ktm::fvec3(10.0f, 10.0f, 10.0f);
     ktm::fvec3 lightPos = ktm::fvec3(1.0f, 1.0f, 1.0f);
+};
+
+struct RasterizerStorageBufferObjectProxy
+{
+    EmbeddedShader::Uint textureIndex;
+    EmbeddedShader::Float4x4 model = ktm::rotate3d_axis(ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
+    EmbeddedShader::Float4x4 view = ktm::look_at_lh(ktm::fvec3(2.0f, 2.0f, 2.0f), ktm::fvec3(0.0f, 0.0f, 0.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
+    EmbeddedShader::Float4x4 proj = ktm::perspective_lh(ktm::radians(45.0f), 1920.0f / 1080.0f, 0.1f, 10.0f);
+    EmbeddedShader::Float3 viewPos = ktm::fvec3(2.0f, 2.0f, 2.0f);
+    EmbeddedShader::Float3 lightColor = ktm::fvec3(10.0f, 10.0f, 10.0f);
+    EmbeddedShader::Float3 lightPos = ktm::fvec3(1.0f, 1.0f, 1.0f);
+};
+
+struct RasterizerFragmentInputProxy
+{
+    EmbeddedShader::Float3 fragPos;
+    EmbeddedShader::Float3 fragNormal;
+    EmbeddedShader::Float2 fragTexCoord;
+    EmbeddedShader::Float3 fragColor;
 };
 
 struct ComputeStorageBufferObject
@@ -237,6 +265,7 @@ int main()
             using namespace ktm;
 
             Texture2D<fvec4> inputImageRGBA16;
+            Aggregate<GlobalUniformParamProxy> globalParams;
 
             auto acesFilmicToneMapCurve = [&](Float3 x) 
             {
@@ -260,7 +289,142 @@ int main()
             auto compute = [&] 
             {
                 Float4 color = inputImageRGBA16[dispatchThreadID()->xy()];
-                inputImageRGBA16[dispatchThreadID()->xy()] = Float4(acesFilmicToneMapCurve(color->xyz()), 1.f);
+                Float effectFactor = 1.f;
+                //Float effectFactor = sin(globalParams->globalTime * 2.0) * 0.5 + 0.5;
+                Float3 adjustedColor = color->xyz() * (1.0f + effectFactor * 0.2f);
+                inputImageRGBA16[dispatchThreadID()->xy()] = Float4(acesFilmicToneMapCurve(adjustedColor), 1.f);
+            };
+
+            Aggregate<RasterizerStorageBufferObjectProxy> storageBufferObjects;
+
+            auto vert = [&](Float3 inPosition, Float3 inNormal,Float2 inTexCoord,Float3 inColor) {
+                //Float4x4 scaledModel = Float4x4(Float4(storageBufferObjects->model[0]->xyz() * globalParams->globalScale, storageBufferObjects->model[0]->w),
+                //Float4(storageBufferObjects->model[1]->xyz() * globalParams->globalScale, storageBufferObjects->model[1]->w),
+                //Float4(storageBufferObjects->model[2]->xyz() * globalParams->globalScale, storageBufferObjects->model[2]->w),
+                //storageBufferObjects->model[3]);
+
+                position() = mul(mul(storageBufferObjects->proj,storageBufferObjects->view),
+                    //mul scaledModel
+                    Float4(inPosition, 1.f));
+
+                Aggregate<RasterizerFragmentInputProxy> fragmentInput;
+                //fragmentInput->fragPos = Float3(scaledModel * Float4(inPosition, 1.0));
+                //fragmentInput->fragNormal = normalize(Float3x3(transpose(/*inverse*/ scaledModel)) * inNormal) ;
+                fragmentInput->fragColor = inColor;
+                fragmentInput->fragTexCoord = inTexCoord;
+                return fragmentInput;
+            };
+
+            Texture2D<fvec4> textures;
+            Sampler sampler;
+
+            auto DistributionGGX = [&](Float3 N, Float3 H, Float roughness)
+            {
+                Float a = roughness * roughness;
+                Float a2 = a * a;
+                Float NdotH = max(dot(N, H), 0.0f);
+                Float NdotH2 = NdotH * NdotH;
+
+                Float nom = a2;
+                Float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+                denom = 3.14159265359f * denom * denom;
+
+                return nom / denom;
+            };
+
+            auto GeometrySchlickGGX = [&](Float NdotV, Float roughness)
+            {
+                Float r = (roughness + 1.0f);
+                Float k = (r * r) / 8.0f;
+
+                Float nom = NdotV;
+                Float denom = NdotV * (1.0f - k) + k;
+
+                return nom / denom;
+            };
+
+            auto GeometrySmith = [&](Float3 N, Float3 V, Float3 L, Float roughness)
+            {
+                Float NdotV = max(dot(N, V), 0.0f);
+                Float NdotL = max(dot(N, L), 0.0f);
+                Float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+                Float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+                return ggx1 * ggx2;
+            };
+
+            auto fresnelSchlick = [&](Float cosTheta, Float3 F0)
+            {
+                return F0 + (fvec3(1.0f) - F0) * pow(clamp(1.0f - cosTheta, 0.0f, 1.0f), 5.0f);
+            };
+
+            auto calculateColor = [&](Float3 WorldPos, Float3 Normal, Float3 albedo, Float metallic, Float roughness)
+            {
+                Float3 N = normalize(Normal);
+                Float3 V = normalize(storageBufferObjects->viewPos - WorldPos);
+
+                // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0
+                // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)
+                Float3 F0 = fvec3(0.04,0.04,0.04);
+                F0 = mix(F0, albedo, metallic);
+
+                // reflectance equation
+                Float3 Lo = fvec3(0.f,0.f,0.f);
+    //for(int i = 0; i < 4; ++i)
+                {
+                    // calculate per-light radiance
+                    Float3 L = normalize(storageBufferObjects->lightPos - WorldPos);
+                    Float3 H = normalize(V + L);
+                    //float distance = length(lightPos - WorldPos);
+                    Float attenuation = 1.0;
+                    Float3 radiance = storageBufferObjects->lightColor * attenuation;
+
+                    // Cook-Torrance BRDF
+                    Float NDF = DistributionGGX(N, H, roughness);
+                    Float G = GeometrySmith(N, V, L, roughness);
+                    Float3 F = fresnelSchlick(clamp(dot(H, V), 0.0f, 1.0f), F0);
+
+                    Float3 numerator = NDF * G * F;
+                    Float denominator = 4.0f * max(dot(N, V), 0.0f) * max(dot(N, L), 0.0f) + 0.0001f; // + 0.0001 to prevent divide by zero
+                    Float3 specular = numerator / denominator;
+
+                    // kS is equal to Fresnel
+                    Float3 kS = F;
+                    // for energy conservation, the diffuse and specular light can't
+                    // be above 1.0 (unless the surface emits light); to preserve this
+                    // relationship the diffuse component (kD) should equal 1.0 - kS.
+                    Float3 kD = fvec3(1.f,1.f,1.f) - kS;
+                    // multiply kD by the inverse metalness such that only non-metals
+                    // have diffuse lighting, or a linear blend if partly metal (pure metals
+                    // have no diffuse light).
+                    kD *= 1.0f - metallic;
+
+                    // scale light by NdotL
+                    Float NdotL = max(dot(N, L), 0.0f);
+
+                    // add to outgoing radiance Lo
+                    Lo += (kD * albedo / Float(3.14159265359f) + specular) * radiance * NdotL;  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
+                }
+
+                // ambient lighting (note that the next IBL tutorial will replace
+                // this ambient lighting with environment lighting).
+                Float3 ambient = fvec3(0.03,0.03,0.03) * albedo;
+
+                return ambient + Lo;
+            };
+
+            auto frag = [&](Aggregate<RasterizerFragmentInputProxy> input) {
+                Float4 color = Float4(textures.sample(sampler,input->fragTexCoord/*,0.0*/));
+                Float3 albedo;
+                $IF(color->w > 0.01f)
+                {
+                    albedo = color->xyz();
+                }
+                $ELSE
+                {
+                    albedo = input->fragColor;
+                }
+                Float4 outColor = Float4(calculateColor(input->fragPos, input->fragNormal, albedo, 0.5f, 0.5f),1.0f);
             };
 
             CompilerOption compilerOption = {};

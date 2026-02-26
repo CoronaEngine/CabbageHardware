@@ -426,7 +426,7 @@ DeviceManager::ExternalSemaphoreHandle DeviceManager::exportSemaphore(VkSemaphor
 
     if (handle == nullptr)
     {
-        throw std::runtime_error("Failed to export semaphore: handle is null");
+        return handleInfo;
     }
 
     handleInfo.handle = handle;
@@ -490,6 +490,12 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
 
             VkSemaphore foreignSem = foreignQueue.timelineSemaphore;
             ExternalSemaphoreHandle handle = foreignDevice->exportSemaphore(foreignSem);
+            if(handle.handle == nullptr)
+            {
+                CFW_LOG_ERROR("[DeviceManager] Failed to export timeline semaphore from foreign device {}. Skipping import.",
+                              reinterpret_cast<uintptr_t>(foreignDevice->logicalDevice));
+                return;
+            }
 
             VkSemaphoreTypeCreateInfo typeInfo{};
             typeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
@@ -522,7 +528,7 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
                 CloseHandle(handle.handle);
                 CFW_LOG_ERROR("[DeviceManager] Failed to import foreign timeline semaphore: VkResult={}",
                               static_cast<int>(result));
-                continue;
+                return;
             }
 
             CloseHandle(handle.handle);

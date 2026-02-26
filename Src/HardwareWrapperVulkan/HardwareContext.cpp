@@ -41,7 +41,7 @@ HardwareContext::HardwareContext()
         hardwareUtils.push_back(std::move(utils));
     }
 
-    setupCrossDeviceSemaphores();
+    //setupCrossDeviceSemaphores();
 
     chooseMainDevice();
 
