@@ -31,6 +31,14 @@ struct GlobalUniformParam
     uint32_t padding; // 为了对齐
 };
 
+struct GlobalUniformParamProxy
+{
+    EmbeddedShader::Float globalTime;
+    EmbeddedShader::Float globalScale;
+    EmbeddedShader::Uint frameCount;
+    EmbeddedShader::Uint padding; // 为了对齐
+};
+
 // storage buffer
 struct RasterizerStorageBufferObject
 {
@@ -237,6 +245,7 @@ int main()
             using namespace ktm;
 
             Texture2D<fvec4> inputImageRGBA16;
+            Aggregate<GlobalUniformParamProxy> globalParams;
 
             auto acesFilmicToneMapCurve = [&](Float3 x) 
             {
@@ -260,7 +269,10 @@ int main()
             auto compute = [&] 
             {
                 Float4 color = inputImageRGBA16[dispatchThreadID()->xy()];
-                inputImageRGBA16[dispatchThreadID()->xy()] = Float4(acesFilmicToneMapCurve(color->xyz()), 1.f);
+                Float effectFactor = 1.f;
+                //Float effectFactor = sin(globalParams->globalTime * 2.0) * 0.5 + 0.5;
+                Float3 adjustedColor = color->xyz() * (1.0f + effectFactor * 0.2f);
+                inputImageRGBA16[dispatchThreadID()->xy()] = Float4(acesFilmicToneMapCurve(adjustedColor), 1.f);
             };
 
             CompilerOption compilerOption = {};
