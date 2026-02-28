@@ -21,7 +21,7 @@
 #include "Codegen/CustomLibrary.h"
 #include "Codegen/TypeAlias.h"
 
-#define TEST_HELICON
+//#define TEST_HELICON
 
 // uniform buffer中
 struct GlobalUniformParam
@@ -206,7 +206,7 @@ int main()
             GlobalUniformParam globalUniformParamData(windows.size());
             globalUniformParamBuffers[threadIndex] = HardwareBuffer(sizeof(GlobalUniformParam), BufferUsage::UniformBuffer);
 
-            std::vector<ktm::fmat4x4> modelMat(20);
+            std::vector<ktm::fmat4x4> modelMat(1);
             std::vector<RasterizerStorageBufferObject> rasterizerStorageBufferObjects(modelMat.size());
             for (size_t i = 0; i < modelMat.size(); i++)
             {
@@ -257,7 +257,7 @@ int main()
         auto renderThread = [&](uint32_t threadIndex) {
             CFW_LOG_INFO("Render thread {} started...", threadIndex);
 
-            RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
+            RasterizerPipeline rasterizer(readStringFile(shaderPath + "/simpleVert.glsl"), readStringFile(shaderPath + "/simpleFrag.glsl"));
 
 #ifdef TEST_HELICON
             using namespace EmbeddedShader;
@@ -444,7 +444,7 @@ int main()
             //ComputePipeline computer(compute, uvec3(8, 8, 1));
 
 #else
-            ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
+            ComputePipeline computer(readStringFile(shaderPath + "/simpleCompute.glsl"));
 #endif
 
             auto startTime = std::chrono::high_resolution_clock::now();
@@ -461,18 +461,20 @@ int main()
 
                 for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
                 {
-                    rasterizer["pushConsts.storageBufferIndex"] = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
-                    rasterizer["pushConsts.uniformBufferIndex"] = globalUniformParamBuffers[threadIndex].storeDescriptor();
+                    //rasterizer["pushConsts.storageBufferIndex"] = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
+                    //rasterizer["pushConsts.uniformBufferIndex"] = globalUniformParamBuffers[threadIndex].storeDescriptor();
+
                     // rasterizer["inPosition"] = postionBuffer;
                     // rasterizer["inColor"] = colorBuffer;
                     // rasterizer["inTexCoord"] = uvBuffer;
                     // rasterizer["inNormal"] = normalBuffer;
-                    rasterizer["outColor"] = finalOutputImages[threadIndex];
+                    //rasterizer["outColor"] = finalOutputImages[threadIndex];
+                    rasterizer.setResource("outColor", finalOutputImages[threadIndex]);
 
                     rasterizer.record(indexBuffer, vertexBuffer);
                 }
 
-                computer["pushConsts.storageBufferIndex"] = computeStorageBuffers[threadIndex].storeDescriptor();
+                //computer["pushConsts.storageBufferIndex"] = computeStorageBuffers[threadIndex].storeDescriptor();
 
                 executors[threadIndex] << rasterizer(1920, 1080)
                                        << computer(1920 / 8, 1080 / 8, 1)
