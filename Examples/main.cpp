@@ -444,7 +444,7 @@ int main()
             //ComputePipeline computer(compute, uvec3(8, 8, 1));
 
 #else
-            ComputePipeline computer(readStringFile(shaderPath + "/simpleCompute.glsl"));
+            //ComputePipeline computer(readStringFile(shaderPath + "/simpleCompute.glsl"));
 #endif
 
             auto startTime = std::chrono::high_resolution_clock::now();
@@ -477,7 +477,7 @@ int main()
                 //computer["pushConsts.storageBufferIndex"] = computeStorageBuffers[threadIndex].storeDescriptor();
 
                 executors[threadIndex] << rasterizer(1920, 1080)
-                                       << computer(1920 / 8, 1080 / 8, 1)
+                                       //<< computer(1920 / 8, 1080 / 8, 1)
                                        << executors[threadIndex].commit();
                 ++frameCount;
 
