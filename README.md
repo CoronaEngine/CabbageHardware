@@ -1,6 +1,7 @@
 ﻿# TODO（按优先级排序）
-- （紧急）多线程内存泄漏、多线程死锁、多线程crash
+- （紧急）ubo改为非bindless形式,参考push contest的反射形式
 - （紧急）shader中不同的textureSampler，分离的图像和采样器描述符
+- 多线程内存泄漏、多线程死锁、多线程crash
 -  加载 gltf 模型材质，vulkan 内存屏障报错
 - HardwareExecutor默认选择不同的队列家族
 - 自动判断image的layout
