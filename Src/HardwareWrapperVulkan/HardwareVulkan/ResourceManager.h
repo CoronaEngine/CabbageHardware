@@ -143,20 +143,20 @@ struct ResourceManager
     BindlessDescriptorSet bindlessDescriptors[3];
     
   private:
-    enum class DescriptorBindingType : uint8_t
-    {
-       Texture = 0,
-       StorageBuffer = 1,
-       StorageImage = 2,
-       Uniform = 3
-    };
+    //enum class DescriptorBindingType : uint8_t
+    //{
+    //   Texture = 0,
+    //   StorageBuffer = 1,
+    //   StorageImage = 2,
+    //   Uniform = 3
+    //};
 
-    template <typename THandle>
-    struct BindingEntry
-    {
-        THandle handle = static_cast<THandle>(VK_NULL_HANDLE);
-        int bindingIndex = -1;
-    };
+    //template <typename THandle>
+    //struct BindingEntry
+    //{
+    //    THandle handle = static_cast<THandle>(VK_NULL_HANDLE);
+    //    int bindingIndex = -1;
+    //};
 
     void createVmaAllocator();
     void createTextureSampler();
