@@ -1,5 +1,7 @@
 ﻿#include "RasterizerPipeline.h"
 
+#include <algorithm>
+
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
 
@@ -662,11 +664,18 @@ RasterizerPipelineVulkan *RasterizerPipelineVulkan::operator()(uint16_t width, u
 
 CommandRecordVulkan *RasterizerPipelineVulkan::record(const HardwareBuffer &indexBuffer, const HardwareBuffer &vertexBuffer)
 {
+    DrawIndexedParams params;
+    return record(indexBuffer, vertexBuffer, params);
+}
+
+CommandRecordVulkan *RasterizerPipelineVulkan::record(const HardwareBuffer &indexBuffer,
+                                                      const HardwareBuffer &vertexBuffer,
+                                                      const DrawIndexedParams &params)
+{
     TriangleGeomMesh mesh;
     mesh.indexBuffer = indexBuffer;
     mesh.vertexBuffer = vertexBuffer;
-
-    mesh.vertexOffset = 0;
+    mesh.drawParams = params;
 
     mesh.pushConstant = tempPushConstant;
 
@@ -909,6 +918,27 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
     // 绘制所有几何网格
     for (const auto &mesh : geomMeshesRecord)
     {
+        if (mesh.drawParams.enableScissor)
+        {
+            const int32_t x = std::max<int32_t>(0, mesh.drawParams.scissor.x);
+            const int32_t y = std::max<int32_t>(0, mesh.drawParams.scissor.y);
+            const int32_t right = std::min<int32_t>(static_cast<int32_t>(imageSize.x),
+                                                    mesh.drawParams.scissor.x + static_cast<int32_t>(mesh.drawParams.scissor.width));
+            const int32_t bottom = std::min<int32_t>(static_cast<int32_t>(imageSize.y),
+                                                     mesh.drawParams.scissor.y + static_cast<int32_t>(mesh.drawParams.scissor.height));
+
+            if (right <= x || bottom <= y)
+            {
+                continue;
+            }
+
+            VkRect2D scissor{};
+            scissor.offset = {x, y};
+            scissor.extent.width = static_cast<uint32_t>(right - x);
+            scissor.extent.height = static_cast<uint32_t>(bottom - y);
+            vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+        }
+
         // 收集顶点缓冲区
         // std::vector<VkBuffer> vertexBuffers;
         // std::vector<VkDeviceSize> offsets;
@@ -925,7 +955,7 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
         {
             auto vertexBufferHandle = globalBufferStorages.acquire_read(mesh.vertexBuffer.getBufferID());
             VkBuffer vertexBuffers[] = {vertexBufferHandle->bufferHandle};
-            VkDeviceSize offsets[] = {mesh.vertexOffset};
+            VkDeviceSize offsets[] = {0};
             vkCmdBindVertexBuffers(commandBuffer,
                                    0,
                                    1,
@@ -936,10 +966,23 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
         {
             auto handle = globalBufferStorages.acquire_read(mesh.indexBuffer.getBufferID());
             VkIndexType index_type = VK_INDEX_TYPE_UINT16;
-            if (handle->elementSize == sizeof(uint32_t))
+            switch (mesh.drawParams.indexType)
             {
+            case IndexType::UInt16:
+                index_type = VK_INDEX_TYPE_UINT16;
+                break;
+            case IndexType::UInt32:
                 index_type = VK_INDEX_TYPE_UINT32;
+                break;
+            case IndexType::Auto:
+            default:
+                if (handle->elementSize == sizeof(uint32_t))
+                {
+                    index_type = VK_INDEX_TYPE_UINT32;
+                }
+                break;
             }
+
             vkCmdBindIndexBuffer(commandBuffer,
                                  handle->bufferHandle,
                                  0,
@@ -959,8 +1002,14 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
 
         {
             auto handle = globalBufferStorages.acquire_read(mesh.indexBuffer.getBufferID());
-            // 绘制
-            vkCmdDrawIndexed(commandBuffer, handle->elementCount, 1, 0, 0, 0);
+            const uint32_t draw_index_count =
+                mesh.drawParams.indexCount > 0 ? mesh.drawParams.indexCount : static_cast<uint32_t>(handle->elementCount);
+            vkCmdDrawIndexed(commandBuffer,
+                             draw_index_count,
+                             1,
+                             mesh.drawParams.firstIndex,
+                             mesh.drawParams.vertexOffset,
+                             0);
         }
     }
 
