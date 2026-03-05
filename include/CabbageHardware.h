@@ -279,6 +279,31 @@ struct HardwarePushConstant
 struct ComputePipeline;
 struct RasterizerPipeline;
 
+enum class IndexType : uint32_t
+{
+    Auto = 0,
+    UInt16 = 1,
+    UInt32 = 2,
+};
+
+struct ScissorRect
+{
+    int32_t x{0};
+    int32_t y{0};
+    uint32_t width{0};
+    uint32_t height{0};
+};
+
+struct DrawIndexedParams
+{
+    uint32_t indexCount{0};
+    uint32_t firstIndex{0};
+    int32_t vertexOffset{0};
+    IndexType indexType = IndexType::Auto;
+    bool enableScissor{false};
+    ScissorRect scissor{};
+};
+
 // ================= 资源代理类：ResourceProxy =================
 // 支持透明读写访问 Pipeline 内部资源
 struct ResourceProxy
@@ -422,6 +447,7 @@ struct RasterizerPipeline
     ResourceProxy operator[](const std::string &resourceName);
     RasterizerPipeline &operator()(uint16_t width, uint16_t height);
     RasterizerPipeline &record(const HardwareBuffer &indexBuffer, const HardwareBuffer &vertexBuffer);
+    RasterizerPipeline &record(const HardwareBuffer &indexBuffer, const HardwareBuffer &vertexBuffer, const DrawIndexedParams &params);
 
     void setPushConstant(const std::string &name, const void *data, size_t size);
     void setResource(const std::string &name, const HardwareBuffer &buffer);
