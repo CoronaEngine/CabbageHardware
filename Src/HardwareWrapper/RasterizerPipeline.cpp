@@ -258,7 +258,15 @@ RasterizerPipeline &RasterizerPipeline::operator()(uint16_t width, uint16_t heig
 
 RasterizerPipeline &RasterizerPipeline::record(const HardwareBuffer &indexBuffer, const HardwareBuffer &vertexBuffer)
 {
+    DrawIndexedParams params;
+    return record(indexBuffer, vertexBuffer, params);
+}
+
+RasterizerPipeline &RasterizerPipeline::record(const HardwareBuffer &indexBuffer,
+                                               const HardwareBuffer &vertexBuffer,
+                                               const DrawIndexedParams &params)
+{
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
-    handle->impl->record(indexBuffer, vertexBuffer);
+    handle->impl->record(indexBuffer, vertexBuffer, params);
     return *this;
 }
