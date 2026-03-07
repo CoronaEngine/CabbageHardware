@@ -417,13 +417,12 @@ void RasterizerPipelineVulkan::createGraphicsPipeline(EmbeddedShader::ShaderCode
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
     // 配置深度模板
-    // 对 ImGui / 2D UI 场景，深度测试与写入会导致后续 draw cmd 被前序命令遮挡，
-    // 从而出现 UI 不显示或只显示首批几何的问题。
+    // RasterizerPipeline 默认用于 3D 几何绘制，因此开启深度测试与深度写入。
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = VK_FALSE;
-    depthStencil.depthWriteEnable = VK_FALSE;
-    depthStencil.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+    depthStencil.depthTestEnable = depthTestEnabled ? VK_TRUE : VK_FALSE;
+    depthStencil.depthWriteEnable = depthWriteEnabled ? VK_TRUE : VK_FALSE;
+    depthStencil.depthCompareOp = depthTestEnabled ? VK_COMPARE_OP_LESS : VK_COMPARE_OP_ALWAYS;
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
 
@@ -844,6 +843,18 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
         createRenderPass(multiviewCount);
         createGraphicsPipeline(vertShaderCode, fragShaderCode);
         createFramebuffers(imageSize);
+        graphicsPipelineDirty = false;
+    }
+    else if (graphicsPipelineDirty)
+    {
+        if (graphicsPipeline != VK_NULL_HANDLE)
+        {
+            vkDestroyPipeline(mainDevice->deviceManager.getLogicalDevice(), graphicsPipeline, nullptr);
+            graphicsPipeline = VK_NULL_HANDLE;
+        }
+
+        createGraphicsPipeline(vertShaderCode, fragShaderCode);
+        graphicsPipelineDirty = false;
     }
 
     const VkCommandBuffer commandBuffer = hardwareExecutor.currentRecordQueue->commandBuffer;
@@ -1024,9 +1035,13 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
         for (const auto &mesh : geomMeshesRecord)
         {
             if (mesh.indexBuffer)
+            {
                 resourceHolder->buffers.push_back(mesh.indexBuffer);
+            }
             if (mesh.vertexBuffer)
+            {
                 resourceHolder->buffers.push_back(mesh.vertexBuffer);
+            }
         }
 
         hardwareExecutor.pendingResources.push_back(resourceHolder);

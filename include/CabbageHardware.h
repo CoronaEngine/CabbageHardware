@@ -441,6 +441,8 @@ struct RasterizerPipeline
     RasterizerPipeline &operator=(const RasterizerPipeline &other);
     RasterizerPipeline &operator=(RasterizerPipeline &&other) noexcept;
 
+    void setDepthTestEnabled(bool enabled);
+    void setDepthWriteEnabled(bool enabled);
     void setDepthImage(HardwareImage &depthImage);
     [[nodiscard]] HardwareImage getDepthImage();
 
