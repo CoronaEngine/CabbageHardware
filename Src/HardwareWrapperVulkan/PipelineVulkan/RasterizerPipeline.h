@@ -32,23 +32,23 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan
         this->depthImage = depthImage;
     }
 
-    void setDepthTestEnabled(bool enabled)
+    void setDepthEnabled(bool enabled)
     {
-        if (depthTestEnabled != enabled)
+        if (depthEnabled != enabled)
         {
-            depthTestEnabled = enabled;
+            depthEnabled = enabled;
             graphicsPipelineDirty = true;
         }
     }
 
-    void setDepthWriteEnabled(bool enabled)
-    {
-        if (depthWriteEnabled != enabled)
-        {
-            depthWriteEnabled = enabled;
-            graphicsPipelineDirty = true;
-        }
-    }
+    //void setDepthWriteEnabled(bool enabled)
+    //{
+    //    if (depthWriteEnabled != enabled)
+    //    {
+    //        depthWriteEnabled = enabled;
+    //        graphicsPipelineDirty = true;
+    //    }
+    //}
 
     [[nodiscard]] HardwareImage &getDepthImage()
     {
@@ -105,8 +105,9 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan
     VkPipeline graphicsPipeline{VK_NULL_HANDLE};
     VkPipelineLayout pipelineLayout{VK_NULL_HANDLE};
     VkFramebuffer frameBuffers{VK_NULL_HANDLE};
-    bool depthTestEnabled{true};
-    bool depthWriteEnabled{true};
+
+    bool depthEnabled{true};
+    //bool depthWriteEnabled{true};
     bool graphicsPipelineDirty{false};
 
     HardwareImage depthImage;
