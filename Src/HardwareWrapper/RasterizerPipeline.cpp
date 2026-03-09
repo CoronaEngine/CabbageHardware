@@ -200,17 +200,17 @@ void RasterizerPipeline::setDepthImage(HardwareImage &depthImage)
     handle->impl->setDepthImage(depthImage);
 }
 
-void RasterizerPipeline::setDepthTestEnabled(bool enabled)
+void RasterizerPipeline::setDepthEnabled(bool enabled)
 {
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
-    handle->impl->setDepthTestEnabled(enabled);
+    handle->impl->setDepthEnabled(enabled);
 }
 
-void RasterizerPipeline::setDepthWriteEnabled(bool enabled)
-{
-    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
-    handle->impl->setDepthWriteEnabled(enabled);
-}
+//void RasterizerPipeline::setDepthWriteEnabled(bool enabled)
+//{
+//    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
+//    handle->impl->setDepthEnabled(enabled);
+//}
 
 HardwareImage RasterizerPipeline::getDepthImage()
 {

@@ -420,9 +420,9 @@ void RasterizerPipelineVulkan::createGraphicsPipeline(EmbeddedShader::ShaderCode
     // RasterizerPipeline 默认用于 3D 几何绘制，因此开启深度测试与深度写入。
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = depthTestEnabled ? VK_TRUE : VK_FALSE;
-    depthStencil.depthWriteEnable = depthWriteEnabled ? VK_TRUE : VK_FALSE;
-    depthStencil.depthCompareOp = depthTestEnabled ? VK_COMPARE_OP_LESS : VK_COMPARE_OP_ALWAYS;
+    depthStencil.depthTestEnable = depthEnabled ? VK_TRUE : VK_FALSE;
+    depthStencil.depthWriteEnable = depthEnabled ? VK_TRUE : VK_FALSE;
+    depthStencil.depthCompareOp = depthEnabled ? VK_COMPARE_OP_LESS : VK_COMPARE_OP_ALWAYS;
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
 
