@@ -32,6 +32,24 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan
         this->depthImage = depthImage;
     }
 
+    void setDepthTestEnabled(bool enabled)
+    {
+        if (depthTestEnabled != enabled)
+        {
+            depthTestEnabled = enabled;
+            graphicsPipelineDirty = true;
+        }
+    }
+
+    void setDepthWriteEnabled(bool enabled)
+    {
+        if (depthWriteEnabled != enabled)
+        {
+            depthWriteEnabled = enabled;
+            graphicsPipelineDirty = true;
+        }
+    }
+
     [[nodiscard]] HardwareImage &getDepthImage()
     {
         return depthImage;
@@ -50,6 +68,9 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan
     RasterizerPipelineVulkan *operator()(uint16_t width, uint16_t height);
 
     CommandRecordVulkan *record(const HardwareBuffer &indexBuffer, const HardwareBuffer &vertexBuffer);
+    CommandRecordVulkan *record(const HardwareBuffer &indexBuffer,
+                                const HardwareBuffer &vertexBuffer,
+                                const DrawIndexedParams &params);
 
     ExecutorType getExecutorType() override
     {
@@ -64,8 +85,7 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan
     {
         HardwareBuffer indexBuffer;
         HardwareBuffer vertexBuffer;
-        VkDeviceSize vertexOffset;
-
+        DrawIndexedParams drawParams;
         HardwarePushConstant pushConstant;
     };
     std::vector<TriangleGeomMesh> geomMeshesRecord;
@@ -85,6 +105,9 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan
     VkPipeline graphicsPipeline{VK_NULL_HANDLE};
     VkPipelineLayout pipelineLayout{VK_NULL_HANDLE};
     VkFramebuffer frameBuffers{VK_NULL_HANDLE};
+    bool depthTestEnabled{true};
+    bool depthWriteEnabled{true};
+    bool graphicsPipelineDirty{false};
 
     HardwareImage depthImage;
     std::vector<HardwareImage> renderTargets;

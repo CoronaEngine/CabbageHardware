@@ -1,5 +1,7 @@
 ﻿#include "RasterizerPipeline.h"
 
+#include <algorithm>
+
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
 
@@ -415,19 +417,26 @@ void RasterizerPipelineVulkan::createGraphicsPipeline(EmbeddedShader::ShaderCode
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
     // 配置深度模板
+    // RasterizerPipeline 默认用于 3D 几何绘制，因此开启深度测试与深度写入。
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = VK_TRUE;
-    depthStencil.depthWriteEnable = VK_TRUE;
-    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthTestEnable = depthTestEnabled ? VK_TRUE : VK_FALSE;
+    depthStencil.depthWriteEnable = depthWriteEnabled ? VK_TRUE : VK_FALSE;
+    depthStencil.depthCompareOp = depthTestEnabled ? VK_COMPARE_OP_LESS : VK_COMPARE_OP_ALWAYS;
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
 
-    // 配置颜色混合
+    // 配置颜色混合（ImGui 标准 Alpha 混合）
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
     colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                                           VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_FALSE;
+    colorBlendAttachment.blendEnable = VK_TRUE;
+    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
     std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments(renderTargets.size(), colorBlendAttachment);
 
@@ -654,11 +663,18 @@ RasterizerPipelineVulkan *RasterizerPipelineVulkan::operator()(uint16_t width, u
 
 CommandRecordVulkan *RasterizerPipelineVulkan::record(const HardwareBuffer &indexBuffer, const HardwareBuffer &vertexBuffer)
 {
+    DrawIndexedParams params;
+    return record(indexBuffer, vertexBuffer, params);
+}
+
+CommandRecordVulkan *RasterizerPipelineVulkan::record(const HardwareBuffer &indexBuffer,
+                                                      const HardwareBuffer &vertexBuffer,
+                                                      const DrawIndexedParams &params)
+{
     TriangleGeomMesh mesh;
     mesh.indexBuffer = indexBuffer;
     mesh.vertexBuffer = vertexBuffer;
-
-    mesh.vertexOffset = 0;
+    mesh.drawParams = params;
 
     mesh.pushConstant = tempPushConstant;
 
@@ -827,6 +843,18 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
         createRenderPass(multiviewCount);
         createGraphicsPipeline(vertShaderCode, fragShaderCode);
         createFramebuffers(imageSize);
+        graphicsPipelineDirty = false;
+    }
+    else if (graphicsPipelineDirty)
+    {
+        if (graphicsPipeline != VK_NULL_HANDLE)
+        {
+            vkDestroyPipeline(mainDevice->deviceManager.getLogicalDevice(), graphicsPipeline, nullptr);
+            graphicsPipeline = VK_NULL_HANDLE;
+        }
+
+        createGraphicsPipeline(vertShaderCode, fragShaderCode);
+        graphicsPipelineDirty = false;
     }
 
     const VkCommandBuffer commandBuffer = hardwareExecutor.currentRecordQueue->commandBuffer;
@@ -901,6 +929,27 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
     // 绘制所有几何网格
     for (const auto &mesh : geomMeshesRecord)
     {
+        if (mesh.drawParams.enableScissor)
+        {
+            const int32_t x = std::max<int32_t>(0, mesh.drawParams.scissor.x);
+            const int32_t y = std::max<int32_t>(0, mesh.drawParams.scissor.y);
+            const int32_t right = std::min<int32_t>(static_cast<int32_t>(imageSize.x),
+                                                    mesh.drawParams.scissor.x + static_cast<int32_t>(mesh.drawParams.scissor.width));
+            const int32_t bottom = std::min<int32_t>(static_cast<int32_t>(imageSize.y),
+                                                     mesh.drawParams.scissor.y + static_cast<int32_t>(mesh.drawParams.scissor.height));
+
+            if (right <= x || bottom <= y)
+            {
+                continue;
+            }
+
+            VkRect2D scissor{};
+            scissor.offset = {x, y};
+            scissor.extent.width = static_cast<uint32_t>(right - x);
+            scissor.extent.height = static_cast<uint32_t>(bottom - y);
+            vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+        }
+
         // 收集顶点缓冲区
         // std::vector<VkBuffer> vertexBuffers;
         // std::vector<VkDeviceSize> offsets;
@@ -917,7 +966,7 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
         {
             auto vertexBufferHandle = globalBufferStorages.acquire_read(mesh.vertexBuffer.getBufferID());
             VkBuffer vertexBuffers[] = {vertexBufferHandle->bufferHandle};
-            VkDeviceSize offsets[] = {mesh.vertexOffset};
+            VkDeviceSize offsets[] = {0};
             vkCmdBindVertexBuffers(commandBuffer,
                                    0,
                                    1,
@@ -927,10 +976,28 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
         // 绑定索引缓冲区
         {
             auto handle = globalBufferStorages.acquire_read(mesh.indexBuffer.getBufferID());
+            VkIndexType index_type = VK_INDEX_TYPE_UINT16;
+            switch (mesh.drawParams.indexType)
+            {
+            case IndexType::UInt16:
+                index_type = VK_INDEX_TYPE_UINT16;
+                break;
+            case IndexType::UInt32:
+                index_type = VK_INDEX_TYPE_UINT32;
+                break;
+            case IndexType::Auto:
+            default:
+                if (handle->elementSize == sizeof(uint32_t))
+                {
+                    index_type = VK_INDEX_TYPE_UINT32;
+                }
+                break;
+            }
+
             vkCmdBindIndexBuffer(commandBuffer,
                                  handle->bufferHandle,
                                  0,
-                                 VK_INDEX_TYPE_UINT16);
+                                 index_type);
         }
 
         // 推送常量
@@ -946,8 +1013,14 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
 
         {
             auto handle = globalBufferStorages.acquire_read(mesh.indexBuffer.getBufferID());
-            // 绘制
-            vkCmdDrawIndexed(commandBuffer, handle->elementCount, 1, 0, 0, 0);
+            const uint32_t draw_index_count =
+                mesh.drawParams.indexCount > 0 ? mesh.drawParams.indexCount : static_cast<uint32_t>(handle->elementCount);
+            vkCmdDrawIndexed(commandBuffer,
+                             draw_index_count,
+                             1,
+                             mesh.drawParams.firstIndex,
+                             mesh.drawParams.vertexOffset,
+                             0);
         }
     }
 
@@ -962,9 +1035,13 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
         for (const auto &mesh : geomMeshesRecord)
         {
             if (mesh.indexBuffer)
+            {
                 resourceHolder->buffers.push_back(mesh.indexBuffer);
+            }
             if (mesh.vertexBuffer)
+            {
                 resourceHolder->buffers.push_back(mesh.vertexBuffer);
+            }
         }
 
         hardwareExecutor.pendingResources.push_back(resourceHolder);
