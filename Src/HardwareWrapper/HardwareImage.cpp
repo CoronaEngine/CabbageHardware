@@ -527,6 +527,14 @@ uint32_t HardwareImage::storeDescriptor()
     return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle);
 }
 
+void HardwareImage::setClearColor(float r, float g, float b, float a)
+{
+    auto const self_image_id = imageID.load(std::memory_order_acquire);
+    if (self_image_id == 0) return;
+    auto handle = globalImageStorages.acquire_write(self_image_id);
+    handle->clearValue.color = {{r, g, b, a}};
+}
+
 ImageCopyCommand HardwareImage::copyTo(const HardwareImage &dst,
                                        uint32_t srcLayer, uint32_t dstLayer,
                                        uint32_t srcMip, uint32_t dstMip) const

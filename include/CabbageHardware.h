@@ -199,6 +199,10 @@ struct HardwareImage
         return imageID.load(std::memory_order_acquire);
     }
 
+    /// Set the clear color used by the RasterizerPipeline render pass (LOAD_OP_CLEAR).
+    /// Default is (0, 0, 0, 1).  For transparent render targets, use (0, 0, 0, 0).
+    void setClearColor(float r, float g, float b, float a);
+
     // 流式拷贝命令（用于 HardwareExecutor << ）
     [[nodiscard]] ImageCopyCommand copyTo(const HardwareImage &dst,
                                           uint32_t srcLayer = 0, uint32_t dstLayer = 0,
