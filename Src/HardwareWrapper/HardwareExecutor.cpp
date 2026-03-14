@@ -12,18 +12,19 @@ static void incExec(uint32_t id, const Corona::Kernel::Utils::Storage<ExecutorWr
     // CFW_LOG_TRACE("HardwareExecutor ref++: id={}, count={}", id, handle->refCount);
 }
 
-static bool decExec(uint32_t id, const Corona::Kernel::Utils::Storage<ExecutorWrap>::WriteHandle &handle)
+// 返回需要在锁外 delete 的指针（避免在 slot lock 内执行 vkWaitSemaphores）
+static HardwareExecutorVulkan *decExec(uint32_t id, const Corona::Kernel::Utils::Storage<ExecutorWrap>::WriteHandle &handle)
 {
     int count = --handle->refCount;
     // CFW_LOG_TRACE("HardwareExecutor ref--: id={}, count={}", id, count);
     if (count == 0)
     {
-        delete handle->impl;
+        auto *impl = handle->impl;
         handle->impl = nullptr;
         // CFW_LOG_TRACE("HardwareExecutor destroyed: id={}", id);
-        return true;
+        return impl;
     }
-    return false;
+    return nullptr;
 }
 
 HardwareExecutor::HardwareExecutor() : executorID(gExecutorStorage.allocate())
@@ -58,12 +59,14 @@ HardwareExecutor::~HardwareExecutor()
     auto const self_id = executorID.load(std::memory_order_acquire);
     if (self_id > 0)
     {
+        HardwareExecutorVulkan *to_delete = nullptr;
         bool should_destroy_self = false;
-        if (auto const handle = gExecutorStorage.acquire_write(self_id);
-            decExec(self_id, handle))
         {
-            should_destroy_self = true;
+            auto const handle = gExecutorStorage.acquire_write(self_id);
+            to_delete = decExec(self_id, handle);
+            should_destroy_self = (to_delete != nullptr);
         }
+        delete to_delete; // ~HardwareExecutorVulkan (含 vkWaitSemaphores) 在 slot lock 外执行
         if (should_destroy_self)
         {
             gExecutorStorage.deallocate(self_id);
@@ -94,11 +97,13 @@ HardwareExecutor &HardwareExecutor::operator=(const HardwareExecutor &other)
     bool should_destroy_self = false;
     if (other_id == 0)
     {
-        if (auto const self_handle = gExecutorStorage.acquire_write(self_id);
-            decExec(self_id, self_handle))
+        HardwareExecutorVulkan *to_delete = nullptr;
         {
-            should_destroy_self = true;
+            auto const self_handle = gExecutorStorage.acquire_write(self_id);
+            to_delete = decExec(self_id, self_handle);
+            should_destroy_self = (to_delete != nullptr);
         }
+        delete to_delete;
         if (should_destroy_self)
         {
             gExecutorStorage.deallocate(self_id);
@@ -115,26 +120,25 @@ HardwareExecutor &HardwareExecutor::operator=(const HardwareExecutor &other)
         return *this;
     }
 
+    HardwareExecutorVulkan *to_delete = nullptr;
     if (self_id < other_id)
     {
         auto const self_handle = gExecutorStorage.acquire_write(self_id);
         auto const other_handle = gExecutorStorage.acquire_write(other_id);
         incExec(other_id, other_handle);
-        if (decExec(self_id, self_handle))
-        {
-            should_destroy_self = true;
-        }
+        to_delete = decExec(self_id, self_handle);
+        should_destroy_self = (to_delete != nullptr);
     }
     else
     {
         auto const other_handle = gExecutorStorage.acquire_write(other_id);
         auto const self_handle = gExecutorStorage.acquire_write(self_id);
         incExec(other_id, other_handle);
-        if (decExec(self_id, self_handle))
-        {
-            should_destroy_self = true;
-        }
+        to_delete = decExec(self_id, self_handle);
+        should_destroy_self = (to_delete != nullptr);
     }
+    // ↓ slot lock 已释放，安全 delete
+    delete to_delete;
 
     if (should_destroy_self)
     {
@@ -156,12 +160,14 @@ HardwareExecutor &HardwareExecutor::operator=(HardwareExecutor &&other) noexcept
 
     if (self_id > 0)
     {
+        HardwareExecutorVulkan *to_delete = nullptr;
         bool should_destroy_self = false;
-        if (auto const self_handle = gExecutorStorage.acquire_write(self_id);
-            decExec(self_id, self_handle))
         {
-            should_destroy_self = true;
+            auto const self_handle = gExecutorStorage.acquire_write(self_id);
+            to_delete = decExec(self_id, self_handle);
+            should_destroy_self = (to_delete != nullptr);
         }
+        delete to_delete;
         if (should_destroy_self)
         {
             gExecutorStorage.deallocate(self_id);

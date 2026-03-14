@@ -36,15 +36,11 @@ static void incrementBufferRefCount(uint64_t id, const Corona::Kernel::Utils::St
     ++handle->refCount;
 }
 
+// 返回是否需要销毁（不在锁内执行 destroyBuffer，避免在 slot lock 内 vkWaitSemaphores）
 static bool decrementBufferRefCount(uint64_t id, const Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle &handle)
 {
     uint64_t const newCount = --handle->refCount;
-    if (newCount == 0)
-    {
-        globalHardwareContext.getMainDevice()->resourceManager.destroyBuffer(*handle);
-        return true;
-    }
-    return false;
+    return newCount == 0;
 }
 
 HardwareBuffer::HardwareBuffer()
@@ -111,16 +107,23 @@ HardwareBuffer &HardwareBuffer::operator=(HardwareBuffer &&other) noexcept
     auto const self_id = bufferID.load(std::memory_order_acquire);
     auto const other_id = other.bufferID.load(std::memory_order_acquire);
 
+    ResourceManager::BufferHardwareWrap bufferToDestroy{};
+    bool shouldDestroyOld = false;
     if (self_id > 0)
     {
-        bool should_destroy_self = false;
-        if (auto const handle = globalBufferStorages.acquire_write(self_id);
-            decrementBufferRefCount(self_id, handle))
         {
-            should_destroy_self = true;
+            auto const handle = globalBufferStorages.acquire_write(self_id);
+            if (decrementBufferRefCount(self_id, handle))
+            {
+                bufferToDestroy = *handle;
+                handle->bufferHandle = VK_NULL_HANDLE;
+                handle->bufferAlloc = VK_NULL_HANDLE;
+                shouldDestroyOld = true;
+            }
         }
-        if (should_destroy_self)
+        if (shouldDestroyOld)
         {
+            globalHardwareContext.getMainDevice()->resourceManager.destroyBuffer(bufferToDestroy);
             globalBufferStorages.deallocate(self_id);
         }
     }
@@ -131,18 +134,25 @@ HardwareBuffer &HardwareBuffer::operator=(HardwareBuffer &&other) noexcept
 
 HardwareBuffer::~HardwareBuffer()
 {
-    // NOTE: 不要修改写法，避免死锁
+    // NOTE: 不要修改写法，避免死锁——destroyBuffer(含 vkWaitSemaphores) 在 slot lock 外执行
     auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
     if (self_buffer_id > 0)
     {
+        ResourceManager::BufferHardwareWrap bufferToDestroy{};
         bool destroy = false;
-        if (auto const handle = globalBufferStorages.acquire_write(self_buffer_id);
-            decrementBufferRefCount(self_buffer_id, handle))
         {
-            destroy = true;
+            auto const handle = globalBufferStorages.acquire_write(self_buffer_id);
+            if (decrementBufferRefCount(self_buffer_id, handle))
+            {
+                bufferToDestroy = *handle;
+                handle->bufferHandle = VK_NULL_HANDLE;
+                handle->bufferAlloc = VK_NULL_HANDLE;
+                destroy = true;
+            }
         }
         if (destroy)
         {
+            globalHardwareContext.getMainDevice()->resourceManager.destroyBuffer(bufferToDestroy);
             globalBufferStorages.deallocate(self_buffer_id);
         }
     }
@@ -170,14 +180,21 @@ HardwareBuffer &HardwareBuffer::operator=(const HardwareBuffer &other)
 
     if (other_buffer_id == 0)
     {
+        ResourceManager::BufferHardwareWrap bufferToDestroy{};
         bool should_destroy_self = false;
-        if (auto const self_handle = globalBufferStorages.acquire_write(self_buffer_id);
-            decrementBufferRefCount(self_buffer_id, self_handle))
         {
-            should_destroy_self = true;
+            auto const self_handle = globalBufferStorages.acquire_write(self_buffer_id);
+            if (decrementBufferRefCount(self_buffer_id, self_handle))
+            {
+                bufferToDestroy = *self_handle;
+                self_handle->bufferHandle = VK_NULL_HANDLE;
+                self_handle->bufferAlloc = VK_NULL_HANDLE;
+                should_destroy_self = true;
+            }
         }
         if (should_destroy_self)
         {
+            globalHardwareContext.getMainDevice()->resourceManager.destroyBuffer(bufferToDestroy);
             globalBufferStorages.deallocate(self_buffer_id);
         }
         bufferID.store(0, std::memory_order_release);
@@ -192,6 +209,7 @@ HardwareBuffer &HardwareBuffer::operator=(const HardwareBuffer &other)
         return *this;
     }
 
+    ResourceManager::BufferHardwareWrap bufferToDestroy{};
     bool should_destroy_self = false;
     if (self_buffer_id < other_buffer_id)
     {
@@ -200,6 +218,9 @@ HardwareBuffer &HardwareBuffer::operator=(const HardwareBuffer &other)
         incrementBufferRefCount(other_buffer_id, other_handle);
         if (decrementBufferRefCount(self_buffer_id, self_handle))
         {
+            bufferToDestroy = *self_handle;
+            self_handle->bufferHandle = VK_NULL_HANDLE;
+            self_handle->bufferAlloc = VK_NULL_HANDLE;
             should_destroy_self = true;
         }
     }
@@ -210,11 +231,16 @@ HardwareBuffer &HardwareBuffer::operator=(const HardwareBuffer &other)
         incrementBufferRefCount(other_buffer_id, other_handle);
         if (decrementBufferRefCount(self_buffer_id, self_handle))
         {
+            bufferToDestroy = *self_handle;
+            self_handle->bufferHandle = VK_NULL_HANDLE;
+            self_handle->bufferAlloc = VK_NULL_HANDLE;
             should_destroy_self = true;
         }
     }
+    // ↓ slot lock 已释放，安全执行 destroyBuffer（含 vkWaitSemaphores）
     if (should_destroy_self)
     {
+        globalHardwareContext.getMainDevice()->resourceManager.destroyBuffer(bufferToDestroy);
         globalBufferStorages.deallocate(self_buffer_id);
     }
     bufferID.store(other_buffer_id, std::memory_order_release);

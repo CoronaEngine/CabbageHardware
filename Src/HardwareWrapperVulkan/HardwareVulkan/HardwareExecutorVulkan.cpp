@@ -268,8 +268,18 @@ DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
     DeviceManager::QueueUtils *queue;
     uint16_t queueIndex = 0;
 
+    constexpr uint32_t maxSpinIterations = 100000; // 防止 GPU hang 时 CPU 无限自旋
+    uint32_t spinCount = 0;
+
     while (true)
     {
+        if (++spinCount > maxSpinIterations)
+        {
+            CFW_LOG_ERROR("[pickQueueAndCommit] Exceeded {} spin iterations — possible GPU hang or timeline stall, aborting",
+                          maxSpinIterations);
+            return nullptr;
+        }
+
         uint16_t queueIndex = currentQueueIndex.fetch_add(1) % currentQueues.size();
         queue = &currentQueues[queueIndex];
 
