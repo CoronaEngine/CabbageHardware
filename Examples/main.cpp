@@ -192,15 +192,15 @@ int main()
         HardwareImage &texture = textureResult.texture;
 
         std::vector<std::vector<HardwareBuffer>> rasterizerStorageBuffers(windows.size());
-        std::vector<HardwareBuffer> computeStorageBuffers(windows.size());
+        //std::vector<HardwareBuffer> computeStorageBuffers(windows.size());
 
         std::atomic_bool running = true;
 
         auto meshThread = [&](uint32_t threadIndex) {
             CFW_LOG_INFO("Mesh thread {} started...", threadIndex);
 
-            ComputeStorageBufferObject computeUniformData(windows.size());
-            computeStorageBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeStorageBufferObject), BufferUsage::StorageBuffer);
+            //ComputeStorageBufferObject computeUniformData(windows.size());
+            //computeStorageBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeStorageBufferObject), BufferUsage::StorageBuffer);
 
             std::vector<ktm::fmat4x4> modelMat(20);
             std::vector<RasterizerStorageBufferObject> rasterizerStorageBufferObjects(modelMat.size());
@@ -229,8 +229,8 @@ int main()
                     rasterizerStorageBuffers[threadIndex][i].copyFromData(&(rasterizerStorageBufferObjects[i]), sizeof(rasterizerStorageBufferObjects[i]));
                 }
 
-                computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
-                computeStorageBuffers[threadIndex].copyFromData(&computeUniformData, sizeof(computeUniformData));
+                //computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
+                //computeStorageBuffers[threadIndex].copyFromData(&computeUniformData, sizeof(computeUniformData));
 
                 ++frameCount;
 
@@ -465,12 +465,12 @@ int main()
                     rasterizer.record(indexBuffer, vertexBuffer);
                 }
 
-                computer["pushConsts.storageBufferIndex"] = computeStorageBuffers[threadIndex].storeDescriptor();
+                //computer["pushConsts.storageBufferIndex"] = computeStorageBuffers[threadIndex].storeDescriptor();
                 // Compute UBO 字段直接写入
-                computer["GlobalUniformParam.globalTime"] = currentTime;
-                computer["GlobalUniformParam.globalScale"] = 2.0f + sin(currentTime) * 2.0f;
-                computer["GlobalUniformParam.frameCount"] = static_cast<uint32_t>(frameCount);
-                computer["GlobalUniformParam.padding"] = 0u;
+                computer["GlobalUniformParam.imageID"] = finalOutputImages[threadIndex].storeDescriptor();
+                //computer["GlobalUniformParam.globalScale"] = 2.0f + sin(currentTime) * 2.0f;
+                //computer["GlobalUniformParam.frameCount"] = static_cast<uint32_t>(frameCount);
+                //computer["GlobalUniformParam.padding"] = 0u;
 
                 executors[threadIndex] << rasterizer(1920, 1080)
                                        << computer(1920 / 8, 1080 / 8, 1)

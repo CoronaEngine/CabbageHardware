@@ -6,22 +6,9 @@ layout(local_size_x = 8, local_size_y = 8) in;
 
 layout(set = 2, binding = 0, rgba16f) uniform image2D inputImageRGBA16[];
 
-layout(push_constant) uniform PushConsts
-{
-    uint storageBufferIndex;
-} pushConsts;
-
-layout(set = 1, binding = 0, scalar) buffer StorageBufferObject
-{
-    uint imageID;
-} storageBufferObjects[];
-
 layout(set = 3, binding = 0) uniform GlobalUniformParam
 {
-    float globalTime;
-    float globalScale;
-    uint frameCount;
-    uint padding;
+    uint imageID;
 } globalParams;
 
 vec3 acesFilmicToneMapCurve(vec3 x)
@@ -45,11 +32,8 @@ vec3 acesFilmicToneMapInverse(vec3 x)
 
 void main()
 {
-    uint imageID = storageBufferObjects[pushConsts.storageBufferIndex].imageID;
+    uint imageID = globalParams.imageID;
     vec4 color = imageLoad(inputImageRGBA16[imageID], ivec2(gl_GlobalInvocationID.xy));
 
-    float effectFactor = sin(globalParams.globalTime * 2.0) * 0.5 + 0.5;
-    vec3 adjustedColor = color.xyz * (1.0 + effectFactor * 0.2);
-
-    imageStore(inputImageRGBA16[imageID], ivec2(gl_GlobalInvocationID.xy), vec4(acesFilmicToneMapCurve(adjustedColor), 1.0));
+    imageStore(inputImageRGBA16[imageID], ivec2(gl_GlobalInvocationID.xy), vec4(acesFilmicToneMapCurve(color.xyz), 1.0));
 }
