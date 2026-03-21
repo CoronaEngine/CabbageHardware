@@ -4,7 +4,6 @@
 layout(push_constant) uniform PushConsts
 {
     uint storageBufferIndex;
-    uint uniformBufferIndex;
 } pushConsts;
 
 layout(set = 3, binding = 0) uniform GlobalUniformParam
@@ -13,7 +12,7 @@ layout(set = 3, binding = 0) uniform GlobalUniformParam
     float globalScale;
     uint frameCount;
     uint padding;
-} globalParams[];
+} globalParams;
 
 layout(set = 1, binding = 0) readonly buffer StorageBufferObject
 {

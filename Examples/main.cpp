@@ -192,7 +192,6 @@ int main()
         HardwareImage &texture = textureResult.texture;
 
         std::vector<std::vector<HardwareBuffer>> rasterizerStorageBuffers(windows.size());
-        std::vector<HardwareBuffer> globalUniformParamBuffers(windows.size());
         std::vector<HardwareBuffer> computeStorageBuffers(windows.size());
 
         std::atomic_bool running = true;
@@ -202,9 +201,6 @@ int main()
 
             ComputeStorageBufferObject computeUniformData(windows.size());
             computeStorageBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeStorageBufferObject), BufferUsage::StorageBuffer);
-
-            GlobalUniformParam globalUniformParamData(windows.size());
-            globalUniformParamBuffers[threadIndex] = HardwareBuffer(sizeof(GlobalUniformParam), BufferUsage::UniformBuffer);
 
             std::vector<ktm::fmat4x4> modelMat(20);
             std::vector<RasterizerStorageBufferObject> rasterizerStorageBufferObjects(modelMat.size());
@@ -235,13 +231,6 @@ int main()
 
                 computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
                 computeStorageBuffers[threadIndex].copyFromData(&computeUniformData, sizeof(computeUniformData));
-
-                GlobalUniformParam updatedParam{};
-                updatedParam.globalTime = currentTime;
-                updatedParam.globalScale = 2.0f + sin(currentTime) * 2.0f; // 轻微缩放动画
-                updatedParam.frameCount = static_cast<uint32_t>(frameCount);
-                updatedParam.padding = 0;
-                globalUniformParamBuffers[threadIndex].copyFromData(&updatedParam, sizeof(updatedParam));
 
                 ++frameCount;
 
@@ -462,7 +451,11 @@ int main()
                 for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
                 {
                     rasterizer["pushConsts.storageBufferIndex"] = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
-                    rasterizer["pushConsts.uniformBufferIndex"] = globalUniformParamBuffers[threadIndex].storeDescriptor();
+                    // UBO 字段直接写入
+                    rasterizer["GlobalUniformParam.globalTime"] = currentTime;
+                    rasterizer["GlobalUniformParam.globalScale"] = 2.0f + sin(currentTime) * 2.0f;
+                    rasterizer["GlobalUniformParam.frameCount"] = static_cast<uint32_t>(frameCount);
+                    rasterizer["GlobalUniformParam.padding"] = 0u;
                     // rasterizer["inPosition"] = postionBuffer;
                     // rasterizer["inColor"] = colorBuffer;
                     // rasterizer["inTexCoord"] = uvBuffer;
@@ -473,6 +466,11 @@ int main()
                 }
 
                 computer["pushConsts.storageBufferIndex"] = computeStorageBuffers[threadIndex].storeDescriptor();
+                // Compute UBO 字段直接写入
+                computer["GlobalUniformParam.globalTime"] = currentTime;
+                computer["GlobalUniformParam.globalScale"] = 2.0f + sin(currentTime) * 2.0f;
+                computer["GlobalUniformParam.frameCount"] = static_cast<uint32_t>(frameCount);
+                computer["GlobalUniformParam.padding"] = 0u;
 
                 executors[threadIndex] << rasterizer(1920, 1080)
                                        << computer(1920 / 8, 1080 / 8, 1)

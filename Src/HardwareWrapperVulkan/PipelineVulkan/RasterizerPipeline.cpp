@@ -138,6 +138,16 @@ RasterizerPipelineVulkan::RasterizerPipelineVulkan(std::string vertexShaderCode,
     {
         tempPushConstant = HardwarePushConstant(pushConstantSize, 0);
     }
+
+    // 初始化 per-pipeline UBO
+    const uint32_t vertUBOSize = vertexResource.uniformBufferSize;
+    const uint32_t fragUBOSize = fragmentResource.uniformBufferSize;
+    uboSize = std::max(vertUBOSize, fragUBOSize);
+    if (uboSize > 0)
+    {
+        tempUBO = HardwarePushConstant(uboSize, 0);
+        uboBuffer = HardwareBuffer(uboSize, BufferUsage::UniformBuffer);
+    }
 }
 
 RasterizerPipelineVulkan::RasterizerPipelineVulkan(const EmbeddedShader::ShaderCodeCompiler &vertexCompiler,
@@ -179,6 +189,16 @@ RasterizerPipelineVulkan::RasterizerPipelineVulkan(const EmbeddedShader::ShaderC
     {
         tempPushConstant = HardwarePushConstant(pushConstantSize, 0);
     }
+
+    // 初始化 per-pipeline UBO
+    const uint32_t vertUBOSize = vertexResource.uniformBufferSize;
+    const uint32_t fragUBOSize = fragmentResource.uniformBufferSize;
+    uboSize = std::max(vertUBOSize, fragUBOSize);
+    if (uboSize > 0)
+    {
+        tempUBO = HardwarePushConstant(uboSize, 0);
+        uboBuffer = HardwareBuffer(uboSize, BufferUsage::UniformBuffer);
+    }
 }
 
 RasterizerPipelineVulkan::~RasterizerPipelineVulkan()
@@ -215,6 +235,18 @@ RasterizerPipelineVulkan::~RasterizerPipelineVulkan()
         {
             vkDestroyRenderPass(device, renderPass, nullptr);
             renderPass = VK_NULL_HANDLE;
+        }
+
+        // 清理 per-pipeline UBO 描述符资源
+        if (uboDescriptorPool != VK_NULL_HANDLE)
+        {
+            vkDestroyDescriptorPool(device, uboDescriptorPool, nullptr);
+            uboDescriptorPool = VK_NULL_HANDLE;
+        }
+        if (uboDescriptorSetLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyDescriptorSetLayout(device, uboDescriptorSetLayout, nullptr);
+            uboDescriptorSetLayout = VK_NULL_HANDLE;
         }
     }
 }
@@ -465,13 +497,22 @@ void RasterizerPipelineVulkan::createGraphicsPipeline(EmbeddedShader::ShaderCode
     pushConstantRange.size = pushConstantSize;
 
     // 获取描述符集布局
+    // 创建 per-pipeline UBO 描述符（如果有 UBO）
+    if (uboSize > 0)
+    {
+        createPerPipelineUBODescriptor();
+    }
+
     std::vector<VkDescriptorSetLayout> setLayouts;
     setLayouts.reserve(4);
     for (size_t i = 0; i < 3; ++i)
     {
         setLayouts.push_back(mainDevice->resourceManager.bindlessDescriptors[i].descriptorSetLayout);
     }
-    setLayouts.push_back(mainDevice->resourceManager.uniformDescriptor.descriptorSetLayout);
+    if (uboSize > 0)
+    {
+        setLayouts.push_back(uboDescriptorSetLayout);
+    }
 
     // 创建管线布局
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
@@ -556,13 +597,19 @@ void RasterizerPipelineVulkan::setPushConstant(const std::string &name, const vo
     using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
 
     auto updatePC = [&](const auto *res) {
-        // 简单的越界检查
-        // if (size > res->typeSize) { ... }
-
         uint8_t *dst = tempPushConstant.getData();
         if (dst)
         {
             std::memcpy(dst + res->byteOffset, data, size);
+        }
+    };
+
+    auto updateUBO = [&](const auto *res) {
+        uint8_t *dst = tempUBO.getData();
+        if (dst)
+        {
+            std::memcpy(dst + res->byteOffset, data, size);
+            uboDescriptorDirty = true;
         }
     };
 
@@ -571,6 +618,11 @@ void RasterizerPipelineVulkan::setPushConstant(const std::string &name, const vo
         if (vertexRes->bindType == BindType::pushConstantMembers)
         {
             updatePC(vertexRes);
+            return;
+        }
+        if (vertexRes->bindType == BindType::uniformBufferMembers)
+        {
+            updateUBO(vertexRes);
             return;
         }
     }
@@ -582,9 +634,14 @@ void RasterizerPipelineVulkan::setPushConstant(const std::string &name, const vo
             updatePC(fragmentRes);
             return;
         }
+        if (fragmentRes->bindType == BindType::uniformBufferMembers)
+        {
+            updateUBO(fragmentRes);
+            return;
+        }
     }
 
-    throw std::runtime_error("Failed to find push constant with name: " + name);
+    throw std::runtime_error("Failed to find push constant or UBO member with name: " + name);
 }
 
 void RasterizerPipelineVulkan::setResource(const std::string &name, const HardwareBuffer &buffer)
@@ -621,6 +678,10 @@ HardwarePushConstant RasterizerPipelineVulkan::getPushConstant(const std::string
         {
             return HardwarePushConstant(vertexRes->typeSize, vertexRes->byteOffset, &tempPushConstant);
         }
+        if (vertexRes->bindType == BindType::uniformBufferMembers)
+        {
+            return HardwarePushConstant(vertexRes->typeSize, vertexRes->byteOffset, &tempUBO);
+        }
     }
 
     if (auto *fragmentRes = fragmentResource.findShaderBindInfo(name))
@@ -629,8 +690,12 @@ HardwarePushConstant RasterizerPipelineVulkan::getPushConstant(const std::string
         {
             return HardwarePushConstant(fragmentRes->typeSize, fragmentRes->byteOffset, &tempPushConstant);
         }
+        if (fragmentRes->bindType == BindType::uniformBufferMembers)
+        {
+            return HardwarePushConstant(fragmentRes->typeSize, fragmentRes->byteOffset, &tempUBO);
+        }
     }
-    throw std::runtime_error("Failed to find push constant with name: " + name);
+    throw std::runtime_error("Failed to find push constant or UBO member with name: " + name);
 }
 
 HardwareBuffer RasterizerPipelineVulkan::getBuffer(const std::string &name)
@@ -908,6 +973,17 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
     // 绑定管线
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
+    // 上传 UBO 数据并更新描述符
+    if (uboSize > 0 && tempUBO.getData())
+    {
+        uboBuffer.copyFromData(tempUBO.getData(), uboSize);
+        if (uboDescriptorDirty)
+        {
+            updateUBODescriptor();
+            uboDescriptorDirty = false;
+        }
+    }
+
     // 绑定描述符集
     std::vector<VkDescriptorSet> descriptorSets;
     descriptorSets.reserve(4);
@@ -915,7 +991,10 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
     {
         descriptorSets.push_back(mainDevice->resourceManager.bindlessDescriptors[i].descriptorSet);
     }
-    descriptorSets.push_back(mainDevice->resourceManager.uniformDescriptor.descriptorSet);
+    if (uboSize > 0)
+    {
+        descriptorSets.push_back(uboDescriptorSet);
+    }
 
     vkCmdBindDescriptorSets(commandBuffer,
                             VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -1054,4 +1133,81 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
 VkFormat RasterizerPipelineVulkan::getVkFormatFromType(const std::string &typeName, uint32_t elementCount) const
 {
     return ::getVkFormatFromType(typeName, elementCount);
+}
+
+void RasterizerPipelineVulkan::createPerPipelineUBODescriptor()
+{
+    const auto mainDevice = globalHardwareContext.getMainDevice();
+    if (!mainDevice)
+    {
+        throw std::runtime_error("No main device available");
+    }
+    const VkDevice device = mainDevice->deviceManager.getLogicalDevice();
+
+    // 创建描述符集布局 - 单个 UBO 实例
+    VkDescriptorSetLayoutBinding layoutBinding{};
+    layoutBinding.binding = 0;
+    layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    layoutBinding.descriptorCount = 1;
+    layoutBinding.stageFlags = VK_SHADER_STAGE_ALL;
+    layoutBinding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &layoutBinding;
+
+    coronaHardwareCheck(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &uboDescriptorSetLayout));
+
+    // 创建描述符池
+    VkDescriptorPoolSize poolSize{};
+    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSize.descriptorCount = 1;
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.maxSets = 1;
+
+    coronaHardwareCheck(vkCreateDescriptorPool(device, &poolInfo, nullptr, &uboDescriptorPool));
+
+    // 分配描述符集
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = uboDescriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &uboDescriptorSetLayout;
+
+    coronaHardwareCheck(vkAllocateDescriptorSets(device, &allocInfo, &uboDescriptorSet));
+
+    uboDescriptorDirty = true;
+}
+
+void RasterizerPipelineVulkan::updateUBODescriptor()
+{
+    const auto mainDevice = globalHardwareContext.getMainDevice();
+    if (!mainDevice)
+    {
+        return;
+    }
+    const VkDevice device = mainDevice->deviceManager.getLogicalDevice();
+
+    auto bufferHandle = globalBufferStorages.acquire_read(uboBuffer.getBufferID());
+
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = bufferHandle->bufferHandle;
+    bufferInfo.offset = 0;
+    bufferInfo.range = uboSize;
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = uboDescriptorSet;
+    write.dstBinding = 0;
+    write.dstArrayElement = 0;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    write.pBufferInfo = &bufferInfo;
+
+    vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
 }

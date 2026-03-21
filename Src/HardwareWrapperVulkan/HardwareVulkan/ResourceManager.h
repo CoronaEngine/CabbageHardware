@@ -67,13 +67,6 @@ struct ResourceManager
         ResourceManager *resourceManager{nullptr};
     };
 
-    struct UniformDescriptorSet
-    {
-        VkDescriptorPool descriptorPool{VK_NULL_HANDLE};
-        VkDescriptorSetLayout descriptorSetLayout{VK_NULL_HANDLE};
-        VkDescriptorSet descriptorSet{VK_NULL_HANDLE};
-    };
-
     struct BindlessDescriptorSet
     {
         VkDescriptorPool descriptorPool{VK_NULL_HANDLE};
@@ -139,7 +132,6 @@ struct ResourceManager
     [[nodiscard]] VkShaderModule createShaderModule(const std::vector<unsigned int> &code);
 
 
-    UniformDescriptorSet uniformDescriptor;
     BindlessDescriptorSet bindlessDescriptors[3];
     
   private:
@@ -160,7 +152,6 @@ struct ResourceManager
 
     void createVmaAllocator();
     void createTextureSampler();
-    void createUniformDescriptorSet();
     void createBindlessDescriptorSet();
     void createExternalBufferMemoryPool();
     
@@ -177,7 +168,6 @@ struct ResourceManager
     const uint32_t textureBinding{0};
     const uint32_t storageBufferBinding{1};
     const uint32_t storageImageBinding{2};
-    const uint32_t uniformBinding{3};
 
     uint64_t deviceMemorySize{0};
     uint64_t hostSharedMemorySize{0};

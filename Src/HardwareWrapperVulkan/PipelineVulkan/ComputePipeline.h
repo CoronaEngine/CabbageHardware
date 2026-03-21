@@ -49,5 +49,16 @@ struct ComputePipelineVulkan : public CommandRecordVulkan
     EmbeddedShader::ShaderCodeModule::ShaderResources shaderResource;
     EmbeddedShader::ShaderCodeModule shaderCode;
 
+    // Per-pipeline UBO support
+    HardwarePushConstant tempUBO;
+    HardwareBuffer uboBuffer;
+    uint32_t uboSize{0};
+    VkDescriptorPool uboDescriptorPool{VK_NULL_HANDLE};
+    VkDescriptorSetLayout uboDescriptorSetLayout{VK_NULL_HANDLE};
+    VkDescriptorSet uboDescriptorSet{VK_NULL_HANDLE};
+    bool uboDescriptorDirty{true};
+    void createPerPipelineUBODescriptor();
+    void updateUBODescriptor();
+
     ktm::uvec3 groupCount = {0, 0, 0};
 };

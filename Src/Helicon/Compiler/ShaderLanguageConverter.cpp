@@ -1068,6 +1068,26 @@ namespace EmbeddedShader
 			result.bindInfoPool.insert(
 				std::pair<std::string, ShaderCodeModule::ShaderResources::ShaderBindInfo>(
 					bindInfo.variateName, bindInfo));
+
+			// 记录 UBO 的总大小和名称
+			result.uniformBufferSize = bindInfo.typeSize;
+			result.uniformBufferName = item.name;
+
+			// 为 UBO 的每个成员生成独立的 ShaderBindInfo（类似 pushConstantMembers）
+			const auto& uboType = compiler->get_type(item.base_type_id);
+			for (size_t memberIdx = 0; memberIdx < uboType.member_types.size(); ++memberIdx)
+			{
+				ShaderCodeModule::ShaderResources::ShaderBindInfo memberInfo = {};
+				memberInfo.variateName = item.name + "." + compiler->get_member_name(item.base_type_id, memberIdx);
+				memberInfo.byteOffset = compiler->type_struct_member_offset(uboType, memberIdx);
+				memberInfo.typeSize = (uint32_t) compiler->get_declared_struct_member_size(uboType, memberIdx);
+				memberInfo.bindType = ShaderCodeModule::ShaderResources::uniformBufferMembers;
+				memberInfo.set = bindInfo.set;
+				memberInfo.binding = bindInfo.binding;
+				result.bindInfoPool.insert(
+					std::pair<std::string, ShaderCodeModule::ShaderResources::ShaderBindInfo>(
+						memberInfo.variateName, memberInfo));
+			}
 		}
 
 		for (auto& item: res.sampled_images)

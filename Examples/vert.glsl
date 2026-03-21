@@ -4,7 +4,6 @@
 layout(push_constant) uniform PushConsts
 {
     uint storageBufferIndex;
-    uint uniformBufferIndex;
 } pushConsts;
 
 layout(set = 3, binding = 0) uniform GlobalUniformParam
@@ -13,7 +12,7 @@ layout(set = 3, binding = 0) uniform GlobalUniformParam
     float globalScale;
     uint frameCount;
     uint padding;
-} globalParams[];
+} globalParams;
 
 layout(set = 1, binding = 0) readonly buffer StorageBufferObject
 {
@@ -38,9 +37,9 @@ layout(location = 3) out vec3 fragColor;
 
 void main()
 {
-    mat4 scaledModel = mat4(vec4(storageBufferObjects[pushConsts.storageBufferIndex].model[0].xyz * globalParams[pushConsts.uniformBufferIndex].globalScale, storageBufferObjects[pushConsts.storageBufferIndex].model[0].w),
-                            vec4(storageBufferObjects[pushConsts.storageBufferIndex].model[1].xyz * globalParams[pushConsts.uniformBufferIndex].globalScale, storageBufferObjects[pushConsts.storageBufferIndex].model[1].w),
-                            vec4(storageBufferObjects[pushConsts.storageBufferIndex].model[2].xyz * globalParams[pushConsts.uniformBufferIndex].globalScale, storageBufferObjects[pushConsts.storageBufferIndex].model[2].w),
+    mat4 scaledModel = mat4(vec4(storageBufferObjects[pushConsts.storageBufferIndex].model[0].xyz * globalParams.globalScale, storageBufferObjects[pushConsts.storageBufferIndex].model[0].w),
+                            vec4(storageBufferObjects[pushConsts.storageBufferIndex].model[1].xyz * globalParams.globalScale, storageBufferObjects[pushConsts.storageBufferIndex].model[1].w),
+                            vec4(storageBufferObjects[pushConsts.storageBufferIndex].model[2].xyz * globalParams.globalScale, storageBufferObjects[pushConsts.storageBufferIndex].model[2].w),
                             storageBufferObjects[pushConsts.storageBufferIndex].model[3]);   
 
     gl_Position = storageBufferObjects[pushConsts.storageBufferIndex].proj * 

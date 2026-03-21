@@ -56,6 +56,7 @@ namespace EmbeddedShader
                 rawBuffer,
                 storageTexture,
                 storageBuffer,
+                uniformBufferMembers,
             };
             struct ShaderBindInfo
             {
@@ -75,6 +76,9 @@ namespace EmbeddedShader
 
             uint32_t pushConstantSize = 0;
             std::string pushConstantName;
+
+            uint32_t uniformBufferSize = 0;
+            std::string uniformBufferName;
 
             std::unordered_map<std::string, ShaderBindInfo> bindInfoPool;
 

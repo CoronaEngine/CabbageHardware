@@ -1,6 +1,7 @@
 ﻿#include "ComputePipeline.h"
 
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
+#include "HardwareWrapperVulkan/ResourcePool.h"
 
 ComputePipelineVulkan::ComputePipelineVulkan()
 {
@@ -26,6 +27,14 @@ ComputePipelineVulkan::ComputePipelineVulkan(std::string shaderCode,
     {
         this->pushConstant = HardwarePushConstant(pushConstantSize, 0);
     }
+
+    // 初始化 per-pipeline UBO
+    uboSize = this->shaderCode.shaderResources.uniformBufferSize;
+    if (uboSize > 0)
+    {
+        tempUBO = HardwarePushConstant(uboSize, 0);
+        uboBuffer = HardwareBuffer(uboSize, BufferUsage::UniformBuffer);
+    }
 }
 
 ComputePipelineVulkan::ComputePipelineVulkan(const EmbeddedShader::ShaderCodeCompiler &compiler,
@@ -39,6 +48,14 @@ ComputePipelineVulkan::ComputePipelineVulkan(const EmbeddedShader::ShaderCodeCom
     if (pushConstantSize > 0)
     {
         this->pushConstant = HardwarePushConstant(pushConstantSize, 0);
+    }
+
+    // 初始化 per-pipeline UBO
+    uboSize = this->shaderCode.shaderResources.uniformBufferSize;
+    if (uboSize > 0)
+    {
+        tempUBO = HardwarePushConstant(uboSize, 0);
+        uboBuffer = HardwareBuffer(uboSize, BufferUsage::UniformBuffer);
     }
 }
 
@@ -65,6 +82,18 @@ ComputePipelineVulkan::~ComputePipelineVulkan()
             vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
             pipelineLayout = VK_NULL_HANDLE;
         }
+
+        // 清理 per-pipeline UBO 描述符资源
+        if (uboDescriptorPool != VK_NULL_HANDLE)
+        {
+            vkDestroyDescriptorPool(device, uboDescriptorPool, nullptr);
+            uboDescriptorPool = VK_NULL_HANDLE;
+        }
+        if (uboDescriptorSetLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyDescriptorSetLayout(device, uboDescriptorSetLayout, nullptr);
+            uboDescriptorSetLayout = VK_NULL_HANDLE;
+        }
     }
 }
 
@@ -81,7 +110,19 @@ void ComputePipelineVulkan::setPushConstant(const std::string &name, const void 
         }
         return;
     }
-    throw std::runtime_error("Failed to find push constant with name: " + name);
+
+    if (resource && resource->bindType == EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::uniformBufferMembers)
+    {
+        uint8_t *dst = tempUBO.getData();
+        if (dst)
+        {
+            std::memcpy(dst + resource->byteOffset, data, size);
+            uboDescriptorDirty = true;
+        }
+        return;
+    }
+
+    throw std::runtime_error("Failed to find push constant or UBO member with name: " + name);
 }
 
 void ComputePipelineVulkan::setResource(const std::string &name, const HardwareBuffer &buffer)
@@ -102,7 +143,11 @@ HardwarePushConstant ComputePipelineVulkan::getPushConstant(const std::string &n
     {
         return HardwarePushConstant(resource->typeSize, resource->byteOffset, &pushConstant);
     }
-    throw std::runtime_error("Failed to find push constant with name: " + name);
+    if (resource && resource->bindType == EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::uniformBufferMembers)
+    {
+        return HardwarePushConstant(resource->typeSize, resource->byteOffset, &tempUBO);
+    }
+    throw std::runtime_error("Failed to find push constant or UBO member with name: " + name);
 }
 
 HardwareBuffer ComputePipelineVulkan::getBuffer(const std::string &name)
@@ -164,13 +209,22 @@ void ComputePipelineVulkan::createComputePipeline()
     pushConstantRange.size = shaderCode.shaderResources.pushConstantSize;
 
     // 获取描述符集布局
+    // 创建 per-pipeline UBO 描述符（如果有 UBO）
+    if (uboSize > 0)
+    {
+        createPerPipelineUBODescriptor();
+    }
+
     std::vector<VkDescriptorSetLayout> setLayouts;
     setLayouts.reserve(4);
     for (size_t i = 0; i < 3; ++i)
     {
         setLayouts.push_back(mainDevice->resourceManager.bindlessDescriptors[i].descriptorSetLayout);
     }
-    setLayouts.push_back(mainDevice->resourceManager.uniformDescriptor.descriptorSetLayout);
+    if (uboSize > 0)
+    {
+        setLayouts.push_back(uboDescriptorSetLayout);
+    }
 
     // 创建管线布局
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
@@ -207,6 +261,17 @@ void ComputePipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExecut
     // 绑定管线
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
 
+    // 上传 UBO 数据并更新描述符
+    if (uboSize > 0 && tempUBO.getData())
+    {
+        uboBuffer.copyFromData(tempUBO.getData(), uboSize);
+        if (uboDescriptorDirty)
+        {
+            updateUBODescriptor();
+            uboDescriptorDirty = false;
+        }
+    }
+
     // 绑定描述符集
     std::vector<VkDescriptorSet> descriptorSets;
     descriptorSets.reserve(4);
@@ -214,7 +279,10 @@ void ComputePipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExecut
     {
         descriptorSets.push_back(globalHardwareContext.getMainDevice()->resourceManager.bindlessDescriptors[i].descriptorSet);
     }
-    descriptorSets.push_back(globalHardwareContext.getMainDevice()->resourceManager.uniformDescriptor.descriptorSet);
+    if (uboSize > 0)
+    {
+        descriptorSets.push_back(uboDescriptorSet);
+    }
 
     vkCmdBindDescriptorSets(commandBuffer,
                             VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -242,4 +310,81 @@ void ComputePipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExecut
 
     // 调度计算任务
     vkCmdDispatch(commandBuffer, groupCount.x, groupCount.y, groupCount.z);
+}
+
+void ComputePipelineVulkan::createPerPipelineUBODescriptor()
+{
+    const auto mainDevice = globalHardwareContext.getMainDevice();
+    if (!mainDevice)
+    {
+        throw std::runtime_error("No main device available");
+    }
+    const VkDevice device = mainDevice->deviceManager.getLogicalDevice();
+
+    // 创建描述符集布局 - 单个 UBO 实例
+    VkDescriptorSetLayoutBinding layoutBinding{};
+    layoutBinding.binding = 0;
+    layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    layoutBinding.descriptorCount = 1;
+    layoutBinding.stageFlags = VK_SHADER_STAGE_ALL;
+    layoutBinding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &layoutBinding;
+
+    coronaHardwareCheck(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &uboDescriptorSetLayout));
+
+    // 创建描述符池
+    VkDescriptorPoolSize poolSize{};
+    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSize.descriptorCount = 1;
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.maxSets = 1;
+
+    coronaHardwareCheck(vkCreateDescriptorPool(device, &poolInfo, nullptr, &uboDescriptorPool));
+
+    // 分配描述符集
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = uboDescriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &uboDescriptorSetLayout;
+
+    coronaHardwareCheck(vkAllocateDescriptorSets(device, &allocInfo, &uboDescriptorSet));
+
+    uboDescriptorDirty = true;
+}
+
+void ComputePipelineVulkan::updateUBODescriptor()
+{
+    const auto mainDevice = globalHardwareContext.getMainDevice();
+    if (!mainDevice)
+    {
+        return;
+    }
+    const VkDevice device = mainDevice->deviceManager.getLogicalDevice();
+
+    auto bufferHandle = globalBufferStorages.acquire_read(uboBuffer.getBufferID());
+
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = bufferHandle->bufferHandle;
+    bufferInfo.offset = 0;
+    bufferInfo.range = uboSize;
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = uboDescriptorSet;
+    write.dstBinding = 0;
+    write.dstArrayElement = 0;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    write.pBufferInfo = &bufferInfo;
+
+    vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
 }

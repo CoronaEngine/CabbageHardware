@@ -120,6 +120,17 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan
     HardwarePushConstant tempPushConstant;
     // std::vector<HardwareBuffer> tempVertexBuffers;
 
+    // Per-pipeline UBO support
+    HardwarePushConstant tempUBO;
+    HardwareBuffer uboBuffer;
+    uint32_t uboSize{0};
+    VkDescriptorPool uboDescriptorPool{VK_NULL_HANDLE};
+    VkDescriptorSetLayout uboDescriptorSetLayout{VK_NULL_HANDLE};
+    VkDescriptorSet uboDescriptorSet{VK_NULL_HANDLE};
+    bool uboDescriptorDirty{true};
+    void createPerPipelineUBODescriptor();
+    void updateUBODescriptor();
+
     std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> vertexStageInputs;
     std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> vertexStageOutputs;
     std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> fragmentStageInputs;
