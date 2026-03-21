@@ -21,8 +21,6 @@
 #include "Codegen/CustomLibrary.h"
 #include "Codegen/TypeAlias.h"
 
-#define TEST_HELICON
-
 // uniform buffer中
 struct GlobalUniformParam
 {
@@ -245,7 +243,7 @@ int main()
 
             RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
 
-#ifdef TEST_HELICON
+//#ifdef TEST_HELICON
             using namespace EmbeddedShader;
             using namespace EmbeddedShader::Ast;
             using namespace ktm;
@@ -286,18 +284,17 @@ int main()
             compilerOption.compileGLSL = true;
             compilerOption.enableBindless = true;
 
-            auto computePipeline = ComputePipelineObject::compile(compute, uvec3(8, 8, 1), compilerOption);
-            auto computeShaderCode = computePipeline.compute->getShaderCode(ShaderLanguage::GLSL).shaderCode;
-            std::string computeShaderCodeStr = std::get<std::string>(computeShaderCode);
+            //auto computePipeline = ComputePipelineObject::compile(compute, uvec3(8, 8, 1), compilerOption);
+            //auto computeShaderCode = computePipeline.compute->getShaderCode(ShaderLanguage::GLSL).shaderCode;
+            //std::string computeShaderCodeStr = std::get<std::string>(computeShaderCode);
 
-            ComputePipeline computer(computeShaderCodeStr);
+            //ComputePipeline computer(computeShaderCodeStr);
 
             // 新 API：直接传入 lambda，内部完成编译
             //ComputePipeline computer(compute, uvec3(8, 8, 1));
 
-#else
+
             ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
-#endif
 
             auto startTime = std::chrono::high_resolution_clock::now();
             uint64_t frameCount = 0;

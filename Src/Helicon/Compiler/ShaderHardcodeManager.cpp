@@ -186,6 +186,8 @@ std::unordered_map<std::string, std::variant<EmbeddedShader::ShaderCodeModule::S
 		result << "ShaderCodeModule::ShaderResources{";
 		result << shaderResources.pushConstantSize << ",";
 		result << "\"" << shaderResources.pushConstantName << "\",";
+		result << shaderResources.uniformBufferSize << ",";
+		result << "\"" << shaderResources.uniformBufferName << "\",";
 		result << "{";
 		for (const auto& [key, bindInfo]: shaderResources.bindInfoPool)
 		{
