@@ -191,12 +191,13 @@ namespace EmbeddedShader
         if (!codeSpirV.empty())
         {
             ShaderHardcodeManager::addTarget(codeSpirV, stage,ShaderHardcodeManager::getItemName(sourceLocationStr, "SpirV" + bindlessStr));
-            if (!reflections.empty()) ShaderHardcodeManager::addTarget(reflections[index++], stage, ShaderHardcodeManager::getItemName(sourceLocationStr, "SpirV_Reflection" + bindlessStr));
-            else
+            // SpirV 目标始终使用 spirv-cross 反射：Slang 反射不处理 push_constant_buffers，
+            // 导致 pushConstantSize/pushConstantName/pushConstantMembers 全部缺失
             {
                 auto shaderResource = ShaderLanguageConverter::spirvCrossReflectedBindInfo(codeSpirV, ShaderLanguage::HLSL);
                 ShaderHardcodeManager::addTarget(shaderResource, stage, ShaderHardcodeManager::getItemName(sourceLocationStr, "SpirV_Reflection" + bindlessStr));
             }
+            if (!reflections.empty()) index++;
         }
         if (!codeGLSL.empty())
         {
