@@ -146,7 +146,7 @@ std::string EmbeddedShader::Generator::SlangGenerator::getGlobalOutput(const Ast
 		if (!bindless())
 			ubo = "ConstantBuffer<" + uboStructName + "> global_ubo;\n";
 		else
-			ubo = "ConstantBuffer<" + uboStructName + ">.Handle global_ubo;\n";
+			ubo = "StructuredBuffer<" + uboStructName + ">.Handle global_ubo;\n";
 		output += uboStruct;
 		uboMembers.clear();
 	}
@@ -292,21 +292,21 @@ std::string EmbeddedShader::Generator::SlangGenerator::getParseOutput(const Ast:
 	if (node->pushConstant)
 		return "global_push_constant." + node->name;
 	if (bindless())
-		return "(*global_push_constant.global_ubo)." + node->name;
+		return "global_push_constant.global_ubo[0]." + node->name;
 	return "global_parameter_block.global_ubo." + node->name;
 }
 
 std::string EmbeddedShader::Generator::SlangGenerator::getParseOutput(const Ast::UniversalTexture2D* node)
 {
 	if (bindless())
-		return "(*global_push_constant.global_ubo)." + node->name;
+		return "global_push_constant.global_ubo[0]." + node->name;
 	return "global_parameter_block.global_ubo." + node->name;
 }
 
 std::string EmbeddedShader::Generator::SlangGenerator::getParseOutput(const Ast::UniversalArray* node)
 {
 	if (bindless())
-		return "(*global_push_constant.global_ubo)." + node->name;
+		return "global_push_constant.global_ubo[0]." + node->name;
 	return "global_parameter_block.global_ubo." + node->name;
 }
 
