@@ -9,22 +9,22 @@ std::string EmbeddedShader::Generator::SlangGenerator::getShaderOutput(const Ast
 	if (Ast::Parser::getBindless())
 	{
 		output += // Vulkan Bindless Process
-		R"([vk::binding(0, 1)]
-__DynamicResource<__DynamicResourceKind.Sampler> samplerHandles[];
+		R"([vk::binding(0, 0)]
+__DynamicResource<__DynamicResourceKind.General> combinedTextureSamplerHandles[];
+
+[vk::binding(0, 1)]
+__DynamicResource<__DynamicResourceKind.General> bufferHandles[];
 
 [vk::binding(0, 2)]
 __DynamicResource<__DynamicResourceKind.General> textureHandles[];
 
 [vk::binding(0, 3)]
-__DynamicResource<__DynamicResourceKind.General> bufferHandles[];
+__DynamicResource<__DynamicResourceKind.Sampler> samplerHandles[];
 
 [vk::binding(0, 4)]
-__DynamicResource<__DynamicResourceKind.General> combinedTextureSamplerHandles[];
-
-[vk::binding(0, 5)]
 __DynamicResource<__DynamicResourceKind.General> accelerationStructureHandles[];
 
-[vk::binding(0, 6)]
+[vk::binding(0, 5)]
 __DynamicResource<__DynamicResourceKind.General> texelBufferHandles[];
 
 export T getDescriptorFromHandle<T>(DescriptorHandle<T> handle) where T : IOpaqueDescriptor
