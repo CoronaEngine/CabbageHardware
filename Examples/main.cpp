@@ -284,17 +284,17 @@ int main()
             compilerOption.compileGLSL = true;
             compilerOption.enableBindless = true;
 
-            //auto computePipeline = ComputePipelineObject::compile(compute, uvec3(8, 8, 1), compilerOption);
-            //auto computeShaderCode = computePipeline.compute->getShaderCode(ShaderLanguage::GLSL).shaderCode;
-            //std::string computeShaderCodeStr = std::get<std::string>(computeShaderCode);
+            auto computePipeline = ComputePipelineObject::compile(compute, uvec3(8, 8, 1), compilerOption);
+            auto computeShaderCode = computePipeline.compute->getShaderCode(ShaderLanguage::GLSL, true).shaderCode;
+            std::string computeShaderCodeStr = std::get<std::string>(computeShaderCode);
 
             //ComputePipeline computer(computeShaderCodeStr);
 
             // 新 API：直接传入 lambda，内部完成编译
-            //ComputePipeline computer(compute, uvec3(8, 8, 1));
+            ComputePipeline computer(compute, uvec3(8, 8, 1));
 
 
-            ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
+            //ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
 
             auto startTime = std::chrono::high_resolution_clock::now();
             uint64_t frameCount = 0;
@@ -312,7 +312,7 @@ int main()
                 {
                     rasterizer["pushConsts.storageBufferIndex"] = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
                     // UBO 字段直接写入
-                    rasterizer["GlobalUniformParam.globalTime"] = currentTime;
+                    rasterizer["GlobalUniformParam.globalTime"] = currentTime; 
                     rasterizer["GlobalUniformParam.globalScale"] = 2.0f + sin(currentTime) * 2.0f;
                     rasterizer["GlobalUniformParam.frameCount"] = static_cast<uint32_t>(frameCount);
                     rasterizer["GlobalUniformParam.padding"] = 0u;
