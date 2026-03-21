@@ -325,12 +325,11 @@ int main()
                     rasterizer.record(indexBuffer, vertexBuffer);
                 }
 
-                //computer["pushConsts.storageBufferIndex"] = computeStorageBuffers[threadIndex].storeDescriptor();
-                // Compute UBO 字段直接写入
-                computer["GlobalUniformParam.imageID"] = finalOutputImages[threadIndex].storeDescriptor();
-                //computer["GlobalUniformParam.globalScale"] = 2.0f + sin(currentTime) * 2.0f;
-                //computer["GlobalUniformParam.frameCount"] = static_cast<uint32_t>(frameCount);
-                //computer["GlobalUniformParam.padding"] = 0u;
+                // Bindless SSBO 方式：创建 SSBO 存放 UBO 数据，通过 push constant 传递 SSBO 的 bindless index
+                uint32_t imageIdx = finalOutputImages[threadIndex].storeDescriptor();
+                HardwareBuffer globalUboSSBO(sizeof(uint32_t), BufferUsage::StorageBuffer, &imageIdx);
+                ktm::uvec2 ssboIdx = globalUboSSBO.storeDescriptor();
+                computer["global_push_constant.global_ubo"] = ssboIdx;
 
                 executors[threadIndex] << rasterizer(1920, 1080)
                                        << computer(1920 / 8, 1080 / 8, 1)
