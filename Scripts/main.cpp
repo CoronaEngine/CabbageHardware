@@ -353,6 +353,8 @@ int main(int argc, char** argv)
 	std::filesystem::path outPath = "";
 	std::string ext  = ".h";
 	ShaderLanguage inputLanguage = ShaderLanguage::GLSL;
+	ShaderStage inputStage = ShaderStage::VertexShader;
+	bool stageExplicit = false;
 
 	//main 参数解析
 	for (int i = 1; i < argc;)
@@ -378,6 +380,31 @@ int main(int argc, char** argv)
 			else
 			{
 				std::cout << "ERROR:Unrecognized Shader Language.\n";
+				return 1;
+			}
+		}
+		else if (arg == "-t")
+		{
+			++i;
+			arg = argv[i];
+			if (arg == "vert" || arg == "vertex")
+			{
+				inputStage = ShaderStage::VertexShader;
+				stageExplicit = true;
+			}
+			else if (arg == "frag" || arg == "fragment")
+			{
+				inputStage = ShaderStage::FragmentShader;
+				stageExplicit = true;
+			}
+			else if (arg == "comp" || arg == "compute")
+			{
+				inputStage = ShaderStage::ComputeShader;
+				stageExplicit = true;
+			}
+			else
+			{
+				std::cout << "ERROR:Unrecognized Shader Stage.\n";
 				return 1;
 			}
 		}
@@ -422,7 +449,38 @@ int main(int argc, char** argv)
 
 	std::string code = (std::stringstream{} << file.rdbuf()).str();
 	file.close();
-	auto spirv = ShaderLanguageConverter::glslangSpirvCompiler(code,inputLanguage,ShaderStage::VertexShader,{ path.parent_path() }, false);
+
+	// 如果未显式指定 stage，则根据文件名后缀或内容推断
+	if (!stageExplicit)
+	{
+		auto stem = path.stem().string();
+		auto extension = path.extension().string();
+		// 检查常见命名: xxx.vert, xxx.frag, xxx.comp, xxx.vert.glsl 等
+		if (extension == ".frag" || extension == ".fs" || stem.ends_with(".frag") ||
+		    stem.find("frag") != std::string::npos)
+			inputStage = ShaderStage::FragmentShader;
+		else if (extension == ".comp" || extension == ".cs" || stem.ends_with(".comp") ||
+		         stem.find("compute") != std::string::npos)
+			inputStage = ShaderStage::ComputeShader;
+		else if (extension == ".vert" || extension == ".vs" || stem.ends_with(".vert"))
+			inputStage = ShaderStage::VertexShader;
+		else
+		{
+			// 扫描代码中的 gl_FragCoord / gl_Position / gl_GlobalInvocationID 等内置变量
+			if (code.find("gl_FragCoord") != std::string::npos ||
+			    code.find("gl_SampleID") != std::string::npos ||
+			    (code.find("out vec4") != std::string::npos && code.find("gl_Position") == std::string::npos))
+				inputStage = ShaderStage::FragmentShader;
+			else if (code.find("gl_GlobalInvocationID") != std::string::npos ||
+			         code.find("gl_WorkGroupID") != std::string::npos ||
+			         code.find("gl_LocalInvocationID") != std::string::npos)
+				inputStage = ShaderStage::ComputeShader;
+			// else default remains VertexShader
+		}
+		std::cout << "INFO:Auto-detected shader stage: " << static_cast<int>(inputStage) << "\n";
+	}
+
+	auto spirv = ShaderLanguageConverter::glslangSpirvCompiler(code,inputLanguage,inputStage,{ path.parent_path() }, false);
 	if (spirv.empty())
 	{
 		std::cout << "ERROR:Cannot compile SPIR-V.\n";
@@ -476,6 +534,9 @@ int main(int argc, char** argv)
 	out << "namespace " << nsName << " {\n";
 
 	generateBinary(out, fileName, spirv);
+
+	// 稳定别名：用户可通过 vert_glsl::spirv 引用预编译 SPIR-V 二进制
+	out << "static auto& spirv = " << fileName << ";\n";
 
 	// Generate BindingKey struct declarations first, collect binding block names
 	std::cout << "INFO:Generate binding keys for namespace '" << nsName << "'...\n";

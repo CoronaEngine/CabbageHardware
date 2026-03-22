@@ -2,6 +2,7 @@
 
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
+#include "Compiler/ShaderLanguageConverter.h"
 
 ComputePipelineVulkan::ComputePipelineVulkan()
 {
@@ -52,6 +53,30 @@ ComputePipelineVulkan::ComputePipelineVulkan(const EmbeddedShader::ShaderCodeCom
 
     // 初始化 per-pipeline UBO
     uboSize = this->shaderCode.shaderResources.uniformBufferSize;
+    if (uboSize > 0)
+    {
+        tempUBO = HardwarePushConstant(uboSize, 0);
+        uboBuffer = HardwareBuffer(uboSize, BufferUsage::UniformBuffer);
+    }
+}
+
+ComputePipelineVulkan::ComputePipelineVulkan(const std::vector<uint32_t> &spirV,
+                                             const std::source_location &sourceLocation)
+    : ComputePipelineVulkan()
+{
+    // 直接使用预编译 SPIR-V + spirv-cross 反射（跳过 GLSL→SPIR-V 编译）
+    auto resources = EmbeddedShader::ShaderLanguageConverter::spirvCrossReflectedBindInfo(spirV, EmbeddedShader::ShaderLanguage::HLSL);
+
+    this->shaderCode = EmbeddedShader::ShaderCodeModule(spirV, resources);
+    this->shaderResource = resources;
+
+    const uint32_t pushConstantSize = resources.pushConstantSize;
+    if (pushConstantSize > 0)
+    {
+        this->pushConstant = HardwarePushConstant(pushConstantSize, 0);
+    }
+
+    uboSize = resources.uniformBufferSize;
     if (uboSize > 0)
     {
         tempUBO = HardwarePushConstant(uboSize, 0);

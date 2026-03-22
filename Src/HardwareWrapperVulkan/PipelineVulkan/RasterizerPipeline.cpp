@@ -4,6 +4,7 @@
 
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
+#include "Compiler/ShaderLanguageConverter.h"
 
 void extractStageBindings(const EmbeddedShader::ShaderCodeModule::ShaderResources &resources,
                           std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> &inputs,
@@ -191,6 +192,47 @@ RasterizerPipelineVulkan::RasterizerPipelineVulkan(const EmbeddedShader::ShaderC
     }
 
     // 初始化 per-pipeline UBO
+    const uint32_t vertUBOSize = vertexResource.uniformBufferSize;
+    const uint32_t fragUBOSize = fragmentResource.uniformBufferSize;
+    uboSize = std::max(vertUBOSize, fragUBOSize);
+    if (uboSize > 0)
+    {
+        tempUBO = HardwarePushConstant(uboSize, 0);
+        uboBuffer = HardwareBuffer(uboSize, BufferUsage::UniformBuffer);
+    }
+}
+
+RasterizerPipelineVulkan::RasterizerPipelineVulkan(const std::vector<uint32_t> &vertexSpirV,
+                                                   const std::vector<uint32_t> &fragmentSpirV,
+                                                   uint32_t multiviewCount,
+                                                   const std::source_location &sourceLocation)
+    : RasterizerPipelineVulkan()
+{
+    // 直接使用预编译 SPIR-V + spirv-cross 反射（跳过 glslang 编译）
+    auto vertResources = EmbeddedShader::ShaderLanguageConverter::spirvCrossReflectedBindInfo(vertexSpirV, EmbeddedShader::ShaderLanguage::HLSL);
+    auto fragResources = EmbeddedShader::ShaderLanguageConverter::spirvCrossReflectedBindInfo(fragmentSpirV, EmbeddedShader::ShaderLanguage::HLSL);
+
+    vertShaderCode = EmbeddedShader::ShaderCodeModule(vertexSpirV, vertResources);
+    fragShaderCode = EmbeddedShader::ShaderCodeModule(fragmentSpirV, fragResources);
+
+    vertexResource = vertResources;
+    fragmentResource = fragResources;
+
+    extractStageBindings(vertexResource, vertexStageInputs, vertexStageOutputs);
+    extractStageBindings(fragmentResource, fragmentStageInputs, fragmentStageOutputs);
+
+    renderTargets.resize(fragmentStageOutputs.size());
+    this->multiviewCount = multiviewCount;
+
+    const uint32_t vertPushConstSize = vertResources.pushConstantSize;
+    const uint32_t fragPushConstSize = fragResources.pushConstantSize;
+    if (vertPushConstSize != 0 && fragPushConstSize != 0 && vertPushConstSize != fragPushConstSize)
+        throw std::runtime_error("Vertex and fragment shader push constant sizes mismatch");
+
+    pushConstantSize = std::max(vertPushConstSize, fragPushConstSize);
+    if (pushConstantSize > 0)
+        tempPushConstant = HardwarePushConstant(pushConstantSize, 0);
+
     const uint32_t vertUBOSize = vertexResource.uniformBufferSize;
     const uint32_t fragUBOSize = fragmentResource.uniformBufferSize;
     uboSize = std::max(vertUBOSize, fragUBOSize);

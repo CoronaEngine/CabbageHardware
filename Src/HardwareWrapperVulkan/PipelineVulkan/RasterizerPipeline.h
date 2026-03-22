@@ -27,6 +27,12 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan
                              uint32_t multiviewCount = 1,
                              const std::source_location &sourceLocation = std::source_location::current());
 
+    // 从预编译 SPIR-V 二进制构造（跳过 GLSL→SPIR-V 编译）
+    RasterizerPipelineVulkan(const std::vector<uint32_t> &vertexSpirV,
+                             const std::vector<uint32_t> &fragmentSpirV,
+                             uint32_t multiviewCount = 1,
+                             const std::source_location &sourceLocation = std::source_location::current());
+
     void setDepthImage(HardwareImage &depthImage)
     {
         this->depthImage = depthImage;

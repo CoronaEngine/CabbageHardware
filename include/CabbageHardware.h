@@ -386,6 +386,10 @@ struct ComputePipeline
                     EmbeddedShader::ShaderLanguage language = EmbeddedShader::ShaderLanguage::GLSL,
                     const std::source_location &sourceLocation = std::source_location::current());
 
+    // 从预编译 SPIR-V 二进制构造（配合 #include GLSL(xxx) 生成的 spirv 变量使用）
+    ComputePipeline(const std::vector<uint32_t> &spirV,
+                    const std::source_location &sourceLocation = std::source_location::current());
+
     // 模板构造函数：接受 DSL lambda，内部完成编译
     template <typename F>
         requires std::invocable<F> && (!std::is_convertible_v<F, std::string>)
@@ -474,6 +478,12 @@ struct RasterizerPipeline
                        uint32_t multiviewCount = 1,
                        EmbeddedShader::ShaderLanguage vertexShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
                        EmbeddedShader::ShaderLanguage fragmentShaderLanguage = EmbeddedShader::ShaderLanguage::GLSL,
+                       const std::source_location &sourceLocation = std::source_location::current());
+
+    // 从预编译 SPIR-V 二进制构造（配合 #include GLSL(xxx) 生成的 spirv 变量使用）
+    RasterizerPipeline(const std::vector<uint32_t> &vertexSpirV,
+                       const std::vector<uint32_t> &fragmentSpirV,
+                       uint32_t multiviewCount = 1,
                        const std::source_location &sourceLocation = std::source_location::current());
 
     // 模板构造函数：接受 DSL lambda，内部完成编译

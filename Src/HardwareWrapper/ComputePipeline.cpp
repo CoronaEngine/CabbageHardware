@@ -54,6 +54,14 @@ ComputePipeline::ComputePipeline(const std::string &shaderCode, EmbeddedShader::
     // CFW_LOG_TRACE("ComputePipeline created: id={}", id);
 }
 
+ComputePipeline::ComputePipeline(const std::vector<uint32_t> &spirV, const std::source_location &src)
+{
+    auto const id = gComputePipelineStorage.allocate();
+    computePipelineID.store(id, std::memory_order_release);
+    auto const handle = gComputePipelineStorage.acquire_write(id);
+    handle->impl = new ComputePipelineVulkan(spirV, src);
+}
+
 ComputePipeline::ComputePipeline(const ComputePipeline &other)
 {
     std::lock_guard<std::mutex> lock(other.computePipelineMutex);

@@ -245,7 +245,7 @@ int main()
         auto renderThread = [&](uint32_t threadIndex) {
             CFW_LOG_INFO("Render thread {} started...", threadIndex);
 
-            RasterizerPipeline rasterizer(readStringFile(shaderPath + "/vert.glsl"), readStringFile(shaderPath + "/frag.glsl"));
+            RasterizerPipeline rasterizer(vert_glsl::spirv, frag_glsl::spirv);
 
 //#ifdef TEST_HELICON
             using namespace EmbeddedShader;

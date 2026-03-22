@@ -153,6 +153,26 @@ function(helicon_compile_shaders TARGET_NAME)
         # 转换语言参数为小写
         string(TOLOWER "${SHADER_LANG}" LANG_LOWER)
         
+        # 从文件名推断 shader stage
+        get_filename_component(SHADER_NAME_WE "${SHADER_PATH}" NAME_WE)
+        string(TOLOWER "${SHADER_NAME_WE}" SHADER_NAME_LOWER)
+        string(TOLOWER "${SHADER_EXT}" SHADER_EXT_LOWER)
+        
+        set(SHADER_STAGE_ARG "")
+        if(SHADER_EXT_LOWER MATCHES "\\.(vert|vs)")
+            set(SHADER_STAGE_ARG "-t" "vert")
+        elseif(SHADER_EXT_LOWER MATCHES "\\.(frag|fs)")
+            set(SHADER_STAGE_ARG "-t" "frag")
+        elseif(SHADER_EXT_LOWER MATCHES "\\.(comp|cs)")
+            set(SHADER_STAGE_ARG "-t" "comp")
+        elseif(SHADER_NAME_LOWER MATCHES "frag")
+            set(SHADER_STAGE_ARG "-t" "frag")
+        elseif(SHADER_NAME_LOWER MATCHES "comp|compute")
+            set(SHADER_STAGE_ARG "-t" "comp")
+        elseif(SHADER_NAME_LOWER MATCHES "vert")
+            set(SHADER_STAGE_ARG "-t" "vert")
+        endif()
+        
         message(STATUS "[Helicon]   - ${SHADER_REL_PATH} (${SHADER_LANG}) -> ${SHADER_REL_PATH}.hpp")
         
         # 添加自定义命令（增量编译）
@@ -163,6 +183,7 @@ function(helicon_compile_shaders TARGET_NAME)
                 -s "${SHADER_PATH}"
                 -o "${OUTPUT_SUBDIR}"
                 -output-file-extension "${SHADER_EXT}.hpp"
+                ${SHADER_STAGE_ARG}
             DEPENDS "${SHADER_PATH}" ShaderCompileScripts
             WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
             COMMENT "[Helicon] Compiling shader: ${SHADER_REL_PATH}"

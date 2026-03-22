@@ -19,6 +19,9 @@ struct ComputePipelineVulkan : public CommandRecordVulkan
     // 新构造函数：接受已编译的 ShaderCodeCompiler，避免重复编译
     ComputePipelineVulkan(const EmbeddedShader::ShaderCodeCompiler &compiler, const std::source_location &sourceLocation = std::source_location::current());
 
+    // 从预编译 SPIR-V 二进制构造（跳过 GLSL→SPIR-V 编译）
+    ComputePipelineVulkan(const std::vector<uint32_t> &spirV, const std::source_location &sourceLocation = std::source_location::current());
+
     // std::variant<HardwarePushConstant> operator[](const std::string& resourceName);
 
     void setPushConstant(const std::string &name, const void *data, size_t size);
