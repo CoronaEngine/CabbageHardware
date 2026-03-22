@@ -25,6 +25,11 @@ struct ComputePipelineVulkan : public CommandRecordVulkan
     void setResource(const std::string &name, const HardwareBuffer &buffer);
     void setResource(const std::string &name, const HardwareImage &image);
 
+    // Direct-access methods: bypass string lookup, use pre-resolved metadata
+    void setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType);
+    void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType);
+    void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType);
+
     [[nodiscard]] HardwarePushConstant getPushConstant(const std::string &name);
     [[nodiscard]] HardwareBuffer getBuffer(const std::string &name);
     [[nodiscard]] HardwareImage getImage(const std::string &name);

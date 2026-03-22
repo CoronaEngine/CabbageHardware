@@ -13,6 +13,11 @@ namespace EmbeddedShader
 	{
 		std::string name;          // AST name, e.g. "global_var_0"
 		void** boundResourceRef;   // → points to proxy's boundResource_ (void*)
+
+		// Direct-access metadata (resolved at compile time)
+		uint64_t byteOffset = 0;
+		uint32_t typeSize = 0;
+		int32_t  bindType = -1;    // -1 = no metadata
 	};
 
 	class ComputePipelineObject
@@ -63,9 +68,15 @@ namespace EmbeddedShader
 				{
 					if (def->texture && def->texture->boundResourceRef)
 					{
-						if (codeModule.shaderResources.findShaderBindInfo(def->texture->name))
+						if (auto* bindInfo = codeModule.shaderResources.findShaderBindInfo(def->texture->name))
 						{
-							result.autoBindEntries.push_back({def->texture->name, def->texture->boundResourceRef});
+							result.autoBindEntries.push_back({
+								def->texture->name,
+								def->texture->boundResourceRef,
+								bindInfo->byteOffset,
+								bindInfo->typeSize,
+								static_cast<int32_t>(bindInfo->bindType)
+							});
 						}
 					}
 				}

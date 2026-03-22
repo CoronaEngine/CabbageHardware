@@ -167,6 +167,66 @@ void ComputePipelineVulkan::setResource(const std::string &name, const HardwareI
     throw std::runtime_error("Image resource setting not implemented for ComputePipeline: " + name);
 }
 
+void ComputePipelineVulkan::setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType)
+{
+    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
+    if (bindType == BindType::pushConstantMembers)
+    {
+        uint8_t *dst = pushConstant.getData();
+        if (dst)
+            std::memcpy(dst + byteOffset, data, size);
+        return;
+    }
+    if (bindType == BindType::uniformBufferMembers)
+    {
+        uint8_t *dst = tempUBO.getData();
+        if (dst)
+        {
+            std::memcpy(dst + byteOffset, data, size);
+            uboDescriptorDirty = true;
+        }
+        return;
+    }
+}
+
+void ComputePipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType)
+{
+    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
+    if (bindType == BindType::pushConstantMembers)
+    {
+        uint32_t descriptorIndex = const_cast<HardwareBuffer&>(buffer).storeDescriptor();
+        uint8_t *dst = pushConstant.getData();
+        if (dst)
+        {
+            if (typeSize >= 8) {
+                uint32_t handleData[2] = { descriptorIndex, 0 };
+                std::memcpy(dst + byteOffset, handleData, 8);
+            } else {
+                std::memcpy(dst + byteOffset, &descriptorIndex, sizeof(descriptorIndex));
+            }
+        }
+    }
+}
+
+void ComputePipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType)
+{
+    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
+    if (bindType == BindType::pushConstantMembers)
+    {
+        uint32_t descriptorIndex = const_cast<HardwareImage&>(image).storeDescriptor();
+        uint8_t *dst = pushConstant.getData();
+        if (dst)
+        {
+            if (typeSize >= 8) {
+                uint32_t handleData[2] = { descriptorIndex, 0 };
+                std::memcpy(dst + byteOffset, handleData, 8);
+            } else {
+                std::memcpy(dst + byteOffset, &descriptorIndex, sizeof(descriptorIndex));
+            }
+        }
+    }
+}
+
 HardwarePushConstant ComputePipelineVulkan::getPushConstant(const std::string &name)
 {
     auto *resource = shaderResource.findShaderBindInfo(name);

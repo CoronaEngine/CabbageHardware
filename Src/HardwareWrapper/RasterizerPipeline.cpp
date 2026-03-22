@@ -243,6 +243,24 @@ void RasterizerPipeline::setResource(const std::string &name, const HardwareImag
     handle->impl->setResource(name, image);
 }
 
+void RasterizerPipeline::setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType)
+{
+    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
+    handle->impl->setPushConstantDirect(byteOffset, data, size, bindType);
+}
+
+void RasterizerPipeline::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType)
+{
+    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
+    handle->impl->setResourceDirect(byteOffset, typeSize, buffer, bindType);
+}
+
+void RasterizerPipeline::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType, uint32_t location)
+{
+    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
+    handle->impl->setResourceDirect(byteOffset, typeSize, image, bindType, location);
+}
+
 HardwarePushConstant RasterizerPipeline::getPushConstant(const std::string &name) const
 {
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));

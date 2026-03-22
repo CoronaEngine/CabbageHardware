@@ -911,6 +911,14 @@ namespace EmbeddedShader
 	struct BindingKey
 	{
 		std::string bindingName;
+
+		// Direct-access metadata (populated by generated .hpp at compile time)
+		uint64_t byteOffset = ~0ULL;
+		uint32_t typeSize = 0;
+		int32_t  bindType = -1;   // mirrors ShaderResources::BindType; -1 = no metadata
+		uint32_t location = 0;
+
+		bool hasMetadata() const { return bindType >= 0; }
 		std::string getAstName() const { return bindingName; }
 
 		// --- Level 2: Resource binding ---

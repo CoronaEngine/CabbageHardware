@@ -224,6 +224,24 @@ void ComputePipeline::setResource(const std::string &name, const HardwareImage &
     handle->impl->setResource(name, image);
 }
 
+void ComputePipeline::setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType)
+{
+    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
+    handle->impl->setPushConstantDirect(byteOffset, data, size, bindType);
+}
+
+void ComputePipeline::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType)
+{
+    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
+    handle->impl->setResourceDirect(byteOffset, typeSize, buffer, bindType);
+}
+
+void ComputePipeline::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType)
+{
+    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
+    handle->impl->setResourceDirect(byteOffset, typeSize, image, bindType);
+}
+
 HardwarePushConstant ComputePipeline::getPushConstant(const std::string &name) const
 {
     auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
@@ -249,7 +267,10 @@ ComputePipeline &ComputePipeline::operator()(uint16_t x, uint16_t y, uint16_t z)
     {
         if (void* res = *entry.boundResourceRef)
         {
-            setResource(entry.name, *static_cast<HardwareImage*>(res));
+            if (entry.bindType >= 0)
+                setResourceDirect(entry.byteOffset, entry.typeSize, *static_cast<HardwareImage*>(res), entry.bindType);
+            else
+                setResource(entry.name, *static_cast<HardwareImage*>(res));
         }
     }
     auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));

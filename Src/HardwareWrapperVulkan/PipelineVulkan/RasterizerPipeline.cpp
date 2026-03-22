@@ -720,6 +720,76 @@ void RasterizerPipelineVulkan::setResource(const std::string &name, const Hardwa
     throw std::runtime_error("Failed to find image resource with name: " + name);
 }
 
+void RasterizerPipelineVulkan::setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType)
+{
+    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
+    if (bindType == BindType::pushConstantMembers)
+    {
+        uint8_t *dst = tempPushConstant.getData();
+        if (dst)
+            std::memcpy(dst + byteOffset, data, size);
+        return;
+    }
+    if (bindType == BindType::uniformBufferMembers)
+    {
+        uint8_t *dst = tempUBO.getData();
+        if (dst)
+        {
+            std::memcpy(dst + byteOffset, data, size);
+            uboDescriptorDirty = true;
+        }
+        return;
+    }
+}
+
+void RasterizerPipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType)
+{
+    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
+    if (bindType == BindType::pushConstantMembers)
+    {
+        uint32_t descriptorIndex = const_cast<HardwareBuffer&>(buffer).storeDescriptor();
+        uint8_t *dst = tempPushConstant.getData();
+        if (dst)
+        {
+            if (typeSize >= 8) {
+                uint32_t handleData[2] = { descriptorIndex, 0 };
+                std::memcpy(dst + byteOffset, handleData, 8);
+            } else {
+                std::memcpy(dst + byteOffset, &descriptorIndex, sizeof(descriptorIndex));
+            }
+        }
+    }
+}
+
+void RasterizerPipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType, uint32_t location)
+{
+    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
+
+    // stageOutputs → render target
+    if (bindType == BindType::stageOutputs)
+    {
+        if (location < renderTargets.size())
+            renderTargets[location] = image;
+        return;
+    }
+
+    // push constant bindless handle
+    if (bindType == BindType::pushConstantMembers)
+    {
+        uint32_t descriptorIndex = const_cast<HardwareImage&>(image).storeDescriptor();
+        uint8_t *dst = tempPushConstant.getData();
+        if (dst)
+        {
+            if (typeSize >= 8) {
+                uint32_t handleData[2] = { descriptorIndex, 0 };
+                std::memcpy(dst + byteOffset, handleData, 8);
+            } else {
+                std::memcpy(dst + byteOffset, &descriptorIndex, sizeof(descriptorIndex));
+            }
+        }
+    }
+}
+
 HardwarePushConstant RasterizerPipelineVulkan::getPushConstant(const std::string &name)
 {
     using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;

@@ -299,10 +299,6 @@ int main()
             // 新 API：直接传入 lambda，内部完成编译
             ComputePipeline computer(compute, uvec3(8, 8, 1));
 
-            // BindingKey 仍然用 operator= 绑定（声明在全局 namespace，不支持构造时绑定）
-            frag_glsl::outColor = finalOutputImages[threadIndex];
-
-
             //ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
 
             auto startTime = std::chrono::high_resolution_clock::now();
@@ -331,8 +327,7 @@ int main()
                     // rasterizer[vert::inTexCoord] = uvBuffer;
                     // rasterizer[vert::inNormal] = normalBuffer;
 
-                    // Level 2: auto-bind pre-bound BindingKey resource
-                    rasterizer.bind(frag_glsl::outColor);
+                    rasterizer[frag_glsl::outColor] = finalOutputImages[threadIndex];
 
                     rasterizer.record(indexBuffer, vertexBuffer);
                 }
