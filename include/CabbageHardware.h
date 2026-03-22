@@ -10,6 +10,7 @@
 #include "Compiler/ShaderCodeCompiler.h"
 #include "Codegen/ComputePipelineObject.h"
 #include "Codegen/RasterizedPipelineObject.h"
+#include "Codegen/VariateProxy.h"
 #include "HardwareCommands.h"
 
 // Forward declare platform-specific types instead of including platform headers
@@ -404,6 +405,35 @@ struct ComputePipeline
         return ResourceProxy(this, proxy.getAstName());
     }
 
+    // --- Level 2: Auto-bind resource from proxy ---
+    template<typename ProxyType>
+        requires requires(const ProxyType& p) {
+            { p.getAstName() } -> std::convertible_to<std::string>;
+            { p.resource() } -> std::convertible_to<HardwareImage*>;
+        }
+    void bind(const ProxyType& proxy)
+    {
+        if (auto* img = proxy.resource()) setResource(proxy.getAstName(), *img);
+    }
+
+    template<typename KeyType>
+        requires requires(const KeyType& k) {
+            { k.getAstName() } -> std::convertible_to<std::string>;
+            { k.boundImage() } -> std::convertible_to<HardwareImage*>;
+            { k.boundBuffer() } -> std::convertible_to<HardwareBuffer*>;
+        }
+    void bind(const KeyType& key)
+    {
+        if (auto* img = key.boundImage()) setResource(key.getAstName(), *img);
+        else if (auto* buf = key.boundBuffer()) setResource(key.getAstName(), *buf);
+    }
+
+    template<typename... ProxyTypes>
+    void bindAll(const ProxyTypes&... proxies)
+    {
+        (bind(proxies), ...);
+    }
+
     ComputePipeline &operator()(uint16_t x, uint16_t y, uint16_t z);
 
     void setPushConstant(const std::string &name, const void *data, size_t size);
@@ -422,6 +452,7 @@ struct ComputePipeline
   private:
     mutable std::mutex computePipelineMutex;
     std::atomic<std::uintptr_t> computePipelineID;
+    std::vector<EmbeddedShader::AutoBindEntry> autoBindEntries_;
 };
 
 // ================= 对外封装：RasterizerPipeline =================
@@ -465,6 +496,35 @@ struct RasterizerPipeline
     ResourceProxy operator[](const ProxyType& proxy)
     {
         return ResourceProxy(this, proxy.getAstName());
+    }
+
+    // --- Level 2: Auto-bind resource from proxy ---
+    template<typename ProxyType>
+        requires requires(const ProxyType& p) {
+            { p.getAstName() } -> std::convertible_to<std::string>;
+            { p.resource() } -> std::convertible_to<HardwareImage*>;
+        }
+    void bind(const ProxyType& proxy)
+    {
+        if (auto* img = proxy.resource()) setResource(proxy.getAstName(), *img);
+    }
+
+    template<typename KeyType>
+        requires requires(const KeyType& k) {
+            { k.getAstName() } -> std::convertible_to<std::string>;
+            { k.boundImage() } -> std::convertible_to<HardwareImage*>;
+            { k.boundBuffer() } -> std::convertible_to<HardwareBuffer*>;
+        }
+    void bind(const KeyType& key)
+    {
+        if (auto* img = key.boundImage()) setResource(key.getAstName(), *img);
+        else if (auto* buf = key.boundBuffer()) setResource(key.getAstName(), *buf);
+    }
+
+    template<typename... ProxyTypes>
+    void bindAll(const ProxyTypes&... proxies)
+    {
+        (bind(proxies), ...);
     }
 
     RasterizerPipeline &operator()(uint16_t width, uint16_t height);
@@ -618,6 +678,9 @@ ComputePipeline::ComputePipeline(F &&computeShaderCode,
         sourceLocation
     );
 
+    // 保存自动绑定条目（从 EDSL proxy 回溯指针收集）
+    autoBindEntries_ = std::move(pipelineObj.autoBindEntries);
+
     // 调用辅助函数完成 Vulkan 管线创建
     computePipelineInitFromCompiler(computePipelineID, *pipelineObj.compute, sourceLocation);
 }
@@ -653,3 +716,14 @@ RasterizerPipeline::RasterizerPipeline(VF &&vertexShaderCode,
                                         multiviewCount,
                                         sourceLocation);
 }
+
+// ================= Texture2DProxy::createResource 实现 =================
+// 此处 HardwareImage 和 HardwareImageCreateInfo 已经完整定义
+namespace EmbeddedShader {
+template<typename Type>
+void Texture2DProxy<Type>::createResource(const ::HardwareImageCreateInfo& createInfo)
+{
+    ownedResource_ = std::make_unique<::HardwareImage>(createInfo);
+    boundResource_ = ownedResource_.get();
+}
+} // namespace EmbeddedShader

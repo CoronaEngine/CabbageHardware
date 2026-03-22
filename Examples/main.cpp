@@ -252,7 +252,9 @@ int main()
             using namespace EmbeddedShader::Ast;
             using namespace ktm;
 
-            Texture2D<fvec4> inputImageRGBA16;
+            // 声明时直接绑定已有资源: Texture2D<fvec4> proxy = existingImage;
+            // 或声明时创建并拥有资源: Texture2D<fvec4> proxy = HardwareImage(createInfo);
+            Texture2D<fvec4> inputImageRGBA16 = finalOutputImages[threadIndex];
             Aggregate<GlobalUniformParamProxy> globalParams;
 
             auto acesFilmicToneMapCurve = [&](Float3 x) 
@@ -297,6 +299,9 @@ int main()
             // 新 API：直接传入 lambda，内部完成编译
             ComputePipeline computer(compute, uvec3(8, 8, 1));
 
+            // BindingKey 仍然用 operator= 绑定（声明在全局 namespace，不支持构造时绑定）
+            frag_glsl::outColor = finalOutputImages[threadIndex];
+
 
             //ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
 
@@ -325,14 +330,15 @@ int main()
                     // rasterizer[vert::inColor] = colorBuffer;
                     // rasterizer[vert::inTexCoord] = uvBuffer;
                     // rasterizer[vert::inNormal] = normalBuffer;
-                    rasterizer[frag_glsl::outColor] = finalOutputImages[threadIndex];
+
+                    // Level 2: auto-bind pre-bound BindingKey resource
+                    rasterizer.bind(frag_glsl::outColor);
 
                     rasterizer.record(indexBuffer, vertexBuffer);
                 }
 
-                // Proxy-as-key：直接用 EDSL 变量作为 key 绑定资源
-                computer[inputImageRGBA16] = finalOutputImages[threadIndex];
-
+                // Level 3: auto-bind — 不再需要手动 computer.bind(inputImageRGBA16)
+                // pipeline 的 operator() 在 dispatch 时自动从 proxy 的 boundResource_ 读取当前资源
                 executors[threadIndex] << rasterizer(1920, 1080)
                                        << computer(1920 / 8, 1080 / 8, 1)
                                        << executors[threadIndex].commit();

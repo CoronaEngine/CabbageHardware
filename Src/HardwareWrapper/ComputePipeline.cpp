@@ -59,6 +59,7 @@ ComputePipeline::ComputePipeline(const ComputePipeline &other)
     std::lock_guard<std::mutex> lock(other.computePipelineMutex);
     auto const other_id = other.computePipelineID.load(std::memory_order_acquire);
     computePipelineID.store(other_id, std::memory_order_release);
+    autoBindEntries_ = other.autoBindEntries_;
     if (other_id > 0)
     {
         auto const write_handle = gComputePipelineStorage.acquire_write(other_id);
@@ -72,6 +73,7 @@ ComputePipeline::ComputePipeline(ComputePipeline &&other) noexcept
     auto const other_id = other.computePipelineID.load(std::memory_order_acquire);
     computePipelineID.store(other_id, std::memory_order_release);
     other.computePipelineID.store(0, std::memory_order_release);
+    autoBindEntries_ = std::move(other.autoBindEntries_);
 }
 
 ComputePipeline::~ComputePipeline()
@@ -126,12 +128,14 @@ ComputePipeline &ComputePipeline::operator=(const ComputePipeline &other)
             gComputePipelineStorage.deallocate(self_id);
         }
         computePipelineID.store(0, std::memory_order_release);
+        autoBindEntries_.clear();
         return *this;
     }
 
     if (self_id == 0)
     {
         computePipelineID.store(other_id, std::memory_order_release);
+        autoBindEntries_ = other.autoBindEntries_;
         auto const other_handle = gComputePipelineStorage.acquire_write(other_id);
         incCompute(other_id, other_handle);
         return *this;
@@ -164,6 +168,7 @@ ComputePipeline &ComputePipeline::operator=(const ComputePipeline &other)
         gComputePipelineStorage.deallocate(self_id);
     }
     computePipelineID.store(other_id, std::memory_order_release);
+    autoBindEntries_ = other.autoBindEntries_;
     return *this;
 }
 
@@ -192,6 +197,7 @@ ComputePipeline &ComputePipeline::operator=(ComputePipeline &&other) noexcept
     }
     computePipelineID.store(other_id, std::memory_order_release);
     other.computePipelineID.store(0, std::memory_order_release);
+    autoBindEntries_ = std::move(other.autoBindEntries_);
     return *this;
 }
 
@@ -238,6 +244,14 @@ HardwareImage ComputePipeline::getImage(const std::string &name) const
 
 ComputePipeline &ComputePipeline::operator()(uint16_t x, uint16_t y, uint16_t z)
 {
+    // Auto-bind: read current resource from each EDSL proxy's back-pointer
+    for (const auto& entry : autoBindEntries_)
+    {
+        if (void* res = *entry.boundResourceRef)
+        {
+            setResource(entry.name, *static_cast<HardwareImage*>(res));
+        }
+    }
     auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
     (*handle->impl)(x, y, z);
     return *this;

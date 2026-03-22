@@ -217,6 +217,10 @@ namespace EmbeddedShader::Ast
         AccessPermissions permissions = AccessPermissions::None;
         void access(AccessPermissions permissions) override;
     	std::string parse() override;
+
+        // Back-pointer to the C++ proxy's boundResource_ (void*).
+        // Used by auto-bind to read the current resource at dispatch time.
+        void** boundResourceRef = nullptr;
     };
 
     struct DefineUniversalTexture2D : Statement

@@ -15,6 +15,10 @@
 #include <Codegen/ParseHelper.h>
 #include <Codegen/MathProxy.h>
 
+// Forward declarations for Level 2 resource binding (defined in CabbageHardware.h)
+struct HardwareImage;
+struct HardwareBuffer;
+struct HardwareImageCreateInfo;
 
 namespace EmbeddedShader
 {
@@ -712,6 +716,27 @@ namespace EmbeddedShader
 			}
 
 			node = Ast::AST::defineUniversalTexture2D<Type>();
+			// Set back-pointer so auto-bind can read current resource at dispatch time
+			if (auto tex = std::dynamic_pointer_cast<Ast::UniversalTexture2D>(node)) {
+				tex->boundResourceRef = &boundResource_;
+			}
+		}
+
+		// Owning constructor: creates proxy + GPU resource in one step.
+		// Definition is in CabbageHardware.h (after HardwareImage is complete).
+		void createResource(const ::HardwareImageCreateInfo& createInfo);
+
+		// Bind existing HardwareImage at construction: Texture2D<fvec4> img = existingImage;
+		Texture2DProxy(::HardwareImage& img) : Texture2DProxy()
+		{
+			boundResource_ = &img;
+		}
+
+		// Own a new HardwareImage at construction: Texture2D<fvec4> img = HardwareImage(createInfo);
+		Texture2DProxy(::HardwareImage&& img) : Texture2DProxy()
+		{
+			ownedResource_ = std::make_unique<::HardwareImage>(std::move(img));
+			boundResource_ = ownedResource_.get();
 		}
 
 		// Texture2DProxy(SamplerProxy&& sampler)
@@ -790,8 +815,17 @@ namespace EmbeddedShader
 			return "";
 		}
 
+		// --- Level 2/3: Resource binding ---
+		Texture2DProxy& operator=(::HardwareImage& img) { boundResource_ = &img; return *this; }
+		::HardwareImage* resource() const { return static_cast<::HardwareImage*>(boundResource_); }
+
+		// Access the owned HardwareImage (only valid if constructed with HardwareImageCreateInfo)
+		::HardwareImage& image() const { return *static_cast<::HardwareImage*>(ownedResource_.get()); }
+
 		std::shared_ptr<Ast::Value> node;
 		bool isHybrid = false;
+		void* boundResource_ = nullptr;
+		std::unique_ptr<::HardwareImage> ownedResource_;
 	};
 
 	template<typename T>
@@ -878,5 +912,14 @@ namespace EmbeddedShader
 	{
 		std::string bindingName;
 		std::string getAstName() const { return bindingName; }
+
+		// --- Level 2: Resource binding ---
+		BindingKey& operator=(::HardwareImage& img) { boundImage_ = &img; boundBuffer_ = nullptr; return *this; }
+		BindingKey& operator=(::HardwareBuffer& buf) { boundBuffer_ = &buf; boundImage_ = nullptr; return *this; }
+		::HardwareImage* boundImage() const { return boundImage_; }
+		::HardwareBuffer* boundBuffer() const { return boundBuffer_; }
+
+		::HardwareImage* boundImage_ = nullptr;
+		::HardwareBuffer* boundBuffer_ = nullptr;
 	};
 }

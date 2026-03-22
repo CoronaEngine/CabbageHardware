@@ -59,5 +59,6 @@ namespace EmbeddedShader::Ast
 		static std::string getUniqueVariateName();
 		static std::string getUniqueAggregateTypeName();
 		static std::string getUniqueGlobalVariateName();
+		static const std::vector<std::shared_ptr<Statement>>& getGlobalStatements();
 	};
 }

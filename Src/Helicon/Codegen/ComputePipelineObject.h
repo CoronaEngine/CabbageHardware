@@ -3,15 +3,24 @@
 #include <Codegen/ParseHelper.h>
 #include <Codegen/AST/AST.hpp>
 #include <Codegen/AST/Parser.hpp>
+#include <Codegen/AST/Node.hpp>
 #include <Compiler/ShaderCodeCompiler.h>
 
 namespace EmbeddedShader
 {
+	// Entry for auto-binding: maps an AST variable name to the proxy's resource pointer.
+	struct AutoBindEntry
+	{
+		std::string name;          // AST name, e.g. "global_var_0"
+		void** boundResourceRef;   // → points to proxy's boundResource_ (void*)
+	};
+
 	class ComputePipelineObject
 	{
 	public:
 		static ComputePipelineObject compile(auto&& computeShaderCode, ktm::uvec3 numthreads = ktm::uvec3(1), CompilerOption compilerOption = {}, std::source_location sourceLocation = std::source_location::current());
 		std::unique_ptr<ShaderCodeCompiler> compute;
+		std::vector<AutoBindEntry> autoBindEntries;
 	private:
 		static std::vector<Ast::ParseOutput> parse(auto&& computeShaderCode);
 	};
@@ -41,6 +50,28 @@ namespace EmbeddedShader
 			outputs = parse(std::forward<decltype(computeShaderCode)>(computeShaderCode));
 			result.compute->compile(outputs[0].output, ShaderStage::ComputeShader, ShaderLanguage::Slang,compilerOption);
 		}
+
+		// Collect auto-bind entries from globalStatements:
+		// Walk all globally-defined textures and check if they have a back-pointer
+		// to a proxy's boundResource_. Filter by membership in the compiled shader's bindInfoPool.
+		{
+			auto codeModule = result.compute->getShaderCode(ShaderLanguage::SpirV, compilerOption.enableBindless);
+			auto& globals = Ast::Parser::getGlobalStatements();
+			for (auto& stmt : globals)
+			{
+				if (auto* def = dynamic_cast<Ast::DefineUniversalTexture2D*>(stmt.get()))
+				{
+					if (def->texture && def->texture->boundResourceRef)
+					{
+						if (codeModule.shaderResources.findShaderBindInfo(def->texture->name))
+						{
+							result.autoBindEntries.push_back({def->texture->name, def->texture->boundResourceRef});
+						}
+					}
+				}
+			}
+		}
+
 		return result;
 	}
 

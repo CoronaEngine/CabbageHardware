@@ -106,3 +106,8 @@ std::string EmbeddedShader::Ast::Parser::getUniqueGlobalVariateName()
 {
 	return "global_var_" + std::to_string(currentParser->currentGlobalVariateIndex++);
 }
+
+const std::vector<std::shared_ptr<EmbeddedShader::Ast::Statement>>& EmbeddedShader::Ast::Parser::getGlobalStatements()
+{
+	return currentParser->structure.globalStatements;
+}
