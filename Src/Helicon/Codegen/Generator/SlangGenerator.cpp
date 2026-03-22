@@ -8,7 +8,7 @@ std::string EmbeddedShader::Generator::SlangGenerator::getShaderOutput(const Ast
 
 	if (Ast::Parser::getBindless())
 	{
-		output += // Vulkan Bindless Process
+		output += // Vulkan Bindless Process - sets 0-2 match CabbageHardware bindless descriptors, set 3 reserved for UBO
 		R"([vk::binding(0, 0)]
 __DynamicResource<__DynamicResourceKind.General> combinedTextureSamplerHandles[];
 
@@ -18,33 +18,18 @@ __DynamicResource<__DynamicResourceKind.General> bufferHandles[];
 [vk::binding(0, 2)]
 __DynamicResource<__DynamicResourceKind.General> textureHandles[];
 
-[vk::binding(0, 3)]
-__DynamicResource<__DynamicResourceKind.Sampler> samplerHandles[];
-
-[vk::binding(0, 4)]
-__DynamicResource<__DynamicResourceKind.General> accelerationStructureHandles[];
-
-[vk::binding(0, 5)]
-__DynamicResource<__DynamicResourceKind.General> texelBufferHandles[];
-
 export T getDescriptorFromHandle<T>(DescriptorHandle<T> handle) where T : IOpaqueDescriptor
 {
 	__target_switch
 	{
 		case spirv:
 		case glsl:
-		if (T.kind == DescriptorKind.Sampler)
-			return samplerHandles[((uint2)handle).x].asOpaqueDescriptor<T>();
-		else if (T.kind == DescriptorKind.Texture)
-			return textureHandles[((uint2)handle).x].asOpaqueDescriptor<T>();
+		if (T.kind == DescriptorKind.CombinedTextureSampler)
+			return combinedTextureSamplerHandles[((uint2)handle).x].asOpaqueDescriptor<T>();
 		else if (T.kind == DescriptorKind.Buffer)
 			return bufferHandles[((uint2)handle).x].asOpaqueDescriptor<T>();
-		else if (T.kind == DescriptorKind.CombinedTextureSampler)
-			return combinedTextureSamplerHandles[((uint2)handle).x].asOpaqueDescriptor<T>();
-		else if (T.kind == DescriptorKind.AccelerationStructure)
-			return accelerationStructureHandles[((uint2)handle).x].asOpaqueDescriptor<T>();
-		else if (T.kind == DescriptorKind.TexelBuffer)
-			return texelBufferHandles[((uint2)handle).x].asOpaqueDescriptor<T>();
+		else if (T.kind == DescriptorKind.Texture)
+			return textureHandles[((uint2)handle).x].asOpaqueDescriptor<T>();
 		else
 			return defaultGetDescriptorFromHandle(handle);
 		default:
@@ -138,38 +123,35 @@ std::string EmbeddedShader::Generator::SlangGenerator::getGlobalOutput(const Ast
 			output += std::move(statementContent) + '\n';
 	}
 
-	std::string ubo;
+	// ① UBO — 始终生成为 ConstantBuffer，bindless 模式下显式绑定到 set=3
 	if (!uboMembers.empty())
 	{
 		std::string uboStructName = "global_ubo_struct";
-		auto uboStruct = "struct " + uboStructName + " {\n" + uboMembers + "}\n";
-		if (!bindless())
-			ubo = "ConstantBuffer<" + uboStructName + "> global_ubo;\n";
+		output += "struct " + uboStructName + " {\n" + uboMembers + "}\n";
+		if (bindless())
+			output += "[[vk::binding(0, 3)]] ConstantBuffer<" + uboStructName + "> global_ubo;\n";
 		else
-			ubo = "StructuredBuffer<" + uboStructName + ">.Handle global_ubo;\n";
-		output += uboStruct;
+			output += "ConstantBuffer<" + uboStructName + "> global_ubo;\n";
 		uboMembers.clear();
 	}
 
-	if (!pushConstantMembers.empty() || (bindless() && !ubo.empty()))
+	// ② Push Constant — 仅包含用户显式 pushConstant 成员 + bindless handle 成员
+	if (!pushConstantMembers.empty() || !bindlessHandleMembers.empty())
 	{
 		std::string pushConstantStructName = "global_push_constant_struct";
-		auto pushConstantStruct = "struct " + pushConstantStructName + " {\n" + pushConstantMembers;
-		if (bindless())
-			pushConstantStruct += "\t" + ubo;
-		pushConstantStruct += "}\n";
+		auto pushConstantStruct = "struct " + pushConstantStructName + " {\n"
+			+ pushConstantMembers + bindlessHandleMembers + "}\n";
 		auto pushConstant = "[[vk::push_constant]] ConstantBuffer<" + pushConstantStructName + "> global_push_constant;\n";
 		output += pushConstantStruct + pushConstant;
 		pushConstantMembers.clear();
+		bindlessHandleMembers.clear();
 	}
 
-	if (!parameterBlockMembers.empty() || !ubo.empty())
+	// ③ ParameterBlock — non-bindless 模式下的资源容器
+	if (!parameterBlockMembers.empty())
 	{
 		std::string parameterBlockStructName = "parameter_block_struct";
-		auto parameterBlockStruct = "struct " + parameterBlockStructName + " {\n" + parameterBlockMembers;
-		if (!ubo.empty() && !bindless())
-			parameterBlockStruct += "\t" + ubo;
-		parameterBlockStruct += "}\n";
+		auto parameterBlockStruct = "struct " + parameterBlockStructName + " {\n" + parameterBlockMembers + "}\n";
 		auto parameterBlock = "ParameterBlock<" + parameterBlockStructName + "> global_parameter_block;\n";
 		output += parameterBlockStruct + parameterBlock;
 		parameterBlockMembers.clear();
@@ -270,7 +252,10 @@ std::string EmbeddedShader::Generator::SlangGenerator::getParseOutput(const Ast:
 	if (node->array->permissions != Ast::AccessPermissions::ReadOnly)
 		result = "RW" + result;
 
-	uboMembers += (bindless() ? "\t""uniform " : "\t") + result + "\n";
+	if (bindless())
+		bindlessHandleMembers += "\t" + result + "\n";
+	else
+		parameterBlockMembers += "\t" + result + "\n";
 	return "";
 }
 
@@ -283,6 +268,12 @@ std::string EmbeddedShader::Generator::SlangGenerator::getParseOutput(const Ast:
 		pushConstantMembers += "\t" + node->variate->type->parse() + " " + node->variate->name + ";\n";
 		return "";
 	}
+	// bindless 模式下，资源类型 (Sampler) 走 push constant handle
+	if (bindless() && std::dynamic_pointer_cast<Ast::SamplerType>(node->variate->type))
+	{
+		bindlessHandleMembers += "\t" + node->variate->type->parse() + " " + node->variate->name + ";\n";
+		return "";
+	}
 	uboMembers += "\t" + node->variate->type->parse() + " " + node->variate->name + ";\n";
 	return "";
 }
@@ -291,23 +282,24 @@ std::string EmbeddedShader::Generator::SlangGenerator::getParseOutput(const Ast:
 {
 	if (node->pushConstant)
 		return "global_push_constant." + node->name;
-	if (bindless())
-		return "global_push_constant.global_ubo[0]." + node->name;
-	return "global_parameter_block.global_ubo." + node->name;
+	// bindless 模式下 SamplerType 在 push constant 中
+	if (bindless() && std::dynamic_pointer_cast<Ast::SamplerType>(node->type))
+		return "global_push_constant." + node->name;
+	return "global_ubo." + node->name;
 }
 
 std::string EmbeddedShader::Generator::SlangGenerator::getParseOutput(const Ast::UniversalTexture2D* node)
 {
 	if (bindless())
-		return "global_push_constant.global_ubo[0]." + node->name;
-	return "global_parameter_block.global_ubo." + node->name;
+		return "global_push_constant." + node->name;
+	return "global_parameter_block." + node->name;
 }
 
 std::string EmbeddedShader::Generator::SlangGenerator::getParseOutput(const Ast::UniversalArray* node)
 {
 	if (bindless())
-		return "global_push_constant.global_ubo[0]." + node->name;
-	return "global_parameter_block.global_ubo." + node->name;
+		return "global_push_constant." + node->name;
+	return "global_parameter_block." + node->name;
 }
 
 std::string EmbeddedShader::Generator::SlangGenerator::getParseOutput(const Ast::DefineAggregateType* node)
@@ -350,9 +342,11 @@ std::string EmbeddedShader::Generator::SlangGenerator::getParseOutput(const Ast:
         result = "RW" + result;
     }
 
-	uboMembers += (bindless() ? "\t""uniform " : "\t") + result + "\n";
+	if (bindless())
+		bindlessHandleMembers += "\t" + result + "\n";
+	else
+		parameterBlockMembers += "\t" + result + "\n";
 	return "";
-    return (bindless() ? "uniform " : "") + result;
 }
 
 std::string EmbeddedShader::Generator::SlangGenerator::getParseOutput(const Ast::UnaryOperator* node)

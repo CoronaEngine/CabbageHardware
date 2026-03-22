@@ -646,7 +646,32 @@ void RasterizerPipelineVulkan::setPushConstant(const std::string &name, const vo
 
 void RasterizerPipelineVulkan::setResource(const std::string &name, const HardwareBuffer &buffer)
 {
-    // 目前 RasterizerPipeline 尚未完全支持 Buffer 绑定 (如 VertexBuffer 通过 record 绑定)
+    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
+
+    auto trySetHandle = [&](const auto *res) -> bool {
+        if (res && res->bindType == BindType::pushConstantMembers)
+        {
+            uint32_t descriptorIndex = const_cast<HardwareBuffer&>(buffer).storeDescriptor();
+            uint8_t *dst = tempPushConstant.getData();
+            if (dst)
+            {
+                if (res->typeSize >= 8) {
+                    uint32_t handleData[2] = { descriptorIndex, 0 };
+                    std::memcpy(dst + res->byteOffset, handleData, 8);
+                } else {
+                    std::memcpy(dst + res->byteOffset, &descriptorIndex, sizeof(descriptorIndex));
+                }
+            }
+            return true;
+        }
+        return false;
+    };
+
+    if (trySetHandle(vertexResource.findShaderBindInfo(name)))
+        return;
+    if (trySetHandle(fragmentResource.findShaderBindInfo(name)))
+        return;
+
     throw std::runtime_error("Buffer resource setting not implemented for RasterizerPipeline: " + name);
 }
 
@@ -654,6 +679,7 @@ void RasterizerPipelineVulkan::setResource(const std::string &name, const Hardwa
 {
     using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
 
+    // fragment output (render target)
     if (auto *fragmentRes = fragmentResource.findShaderBindInfo(name))
     {
         if (fragmentRes->bindType == BindType::stageOutputs)
@@ -665,6 +691,32 @@ void RasterizerPipelineVulkan::setResource(const std::string &name, const Hardwa
             }
         }
     }
+
+    // push constant 中的 bindless handle
+    auto trySetHandle = [&](const auto *res) -> bool {
+        if (res && res->bindType == BindType::pushConstantMembers)
+        {
+            uint32_t descriptorIndex = const_cast<HardwareImage&>(image).storeDescriptor();
+            uint8_t *dst = tempPushConstant.getData();
+            if (dst)
+            {
+                if (res->typeSize >= 8) {
+                    uint32_t handleData[2] = { descriptorIndex, 0 };
+                    std::memcpy(dst + res->byteOffset, handleData, 8);
+                } else {
+                    std::memcpy(dst + res->byteOffset, &descriptorIndex, sizeof(descriptorIndex));
+                }
+            }
+            return true;
+        }
+        return false;
+    };
+
+    if (trySetHandle(vertexResource.findShaderBindInfo(name)))
+        return;
+    if (trySetHandle(fragmentResource.findShaderBindInfo(name)))
+        return;
+
     throw std::runtime_error("Failed to find image resource with name: " + name);
 }
 

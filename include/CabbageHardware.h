@@ -396,6 +396,14 @@ struct ComputePipeline
     ComputePipeline &operator=(ComputePipeline &&other) noexcept;
 
     ResourceProxy operator[](const std::string &resourceName);
+
+    template<typename ProxyType>
+        requires requires(const ProxyType& p) { { p.getAstName() } -> std::convertible_to<std::string>; }
+    ResourceProxy operator[](const ProxyType& proxy)
+    {
+        return ResourceProxy(this, proxy.getAstName());
+    }
+
     ComputePipeline &operator()(uint16_t x, uint16_t y, uint16_t z);
 
     void setPushConstant(const std::string &name, const void *data, size_t size);
@@ -451,6 +459,14 @@ struct RasterizerPipeline
     [[nodiscard]] HardwareImage getDepthImage();
 
     ResourceProxy operator[](const std::string &resourceName);
+
+    template<typename ProxyType>
+        requires requires(const ProxyType& p) { { p.getAstName() } -> std::convertible_to<std::string>; }
+    ResourceProxy operator[](const ProxyType& proxy)
+    {
+        return ResourceProxy(this, proxy.getAstName());
+    }
+
     RasterizerPipeline &operator()(uint16_t width, uint16_t height);
     RasterizerPipeline &record(const HardwareBuffer &indexBuffer, const HardwareBuffer &vertexBuffer);
     RasterizerPipeline &record(const HardwareBuffer &indexBuffer, const HardwareBuffer &vertexBuffer, const DrawIndexedParams &params);

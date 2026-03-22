@@ -94,6 +94,12 @@ namespace EmbeddedShader
 		friend class RasterizedPipelineObject;
 		friend class Generator::SlangGenerator;
 		using value_type = Type;
+
+		std::string getAstName() const
+		{
+			if (auto v = std::dynamic_pointer_cast<Ast::Variate>(node)) return v->name;
+			return "";
+		}
 		VariateProxy()
 		{
             value = std::make_unique<Type>();
@@ -647,6 +653,12 @@ namespace EmbeddedShader
 		}
 
 		ArrayProxy(std::shared_ptr<Ast::Value> node) : node(std::move(node)) {}
+
+		std::string getAstName() const
+		{
+			if (auto v = std::dynamic_pointer_cast<Ast::Variate>(node)) return v->name;
+			return "";
+		}
 	private:
 		std::shared_ptr<Ast::Value> node;
 	};
@@ -672,6 +684,11 @@ namespace EmbeddedShader
 			auto type = std::make_shared<Ast::SamplerType>();
 			type->name = std::move(name);
 			node = Ast::AST::defineUniformVariate(std::move(type));
+		}
+		std::string getAstName() const
+		{
+			if (auto v = std::dynamic_pointer_cast<Ast::Variate>(node)) return v->name;
+			return "";
 		}
 		std::shared_ptr<Ast::Value> node;
 	};
@@ -766,6 +783,12 @@ namespace EmbeddedShader
 		// }
 
 		Texture2DProxy(std::shared_ptr<Ast::Value> node) : node(std::move(node)) {}
+
+		std::string getAstName() const
+		{
+			if (auto v = std::dynamic_pointer_cast<Ast::Variate>(node)) return v->name;
+			return "";
+		}
 
 		std::shared_ptr<Ast::Value> node;
 		bool isHybrid = false;

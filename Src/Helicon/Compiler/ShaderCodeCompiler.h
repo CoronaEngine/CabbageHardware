@@ -89,6 +89,19 @@ namespace EmbeddedShader
                 {
                     return &it->second;
                 }
+                // Prefix fallback: resolve short AST names like "global_var_0"
+                if (!pushConstantName.empty())
+                {
+                    it = bindInfoPool.find(pushConstantName + "." + resourceName);
+                    if (it != bindInfoPool.end())
+                        return &it->second;
+                }
+                if (!uniformBufferName.empty())
+                {
+                    it = bindInfoPool.find(uniformBufferName + "." + resourceName);
+                    if (it != bindInfoPool.end())
+                        return &it->second;
+                }
                 return nullptr;
             }
         } shaderResources;

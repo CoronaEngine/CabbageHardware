@@ -127,11 +127,43 @@ void ComputePipelineVulkan::setPushConstant(const std::string &name, const void 
 
 void ComputePipelineVulkan::setResource(const std::string &name, const HardwareBuffer &buffer)
 {
+    auto *resource = shaderResource.findShaderBindInfo(name);
+    if (resource && resource->bindType == EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::pushConstantMembers)
+    {
+        uint32_t descriptorIndex = const_cast<HardwareBuffer&>(buffer).storeDescriptor();
+        uint8_t *dst = pushConstant.getData();
+        if (dst)
+        {
+            if (resource->typeSize >= 8) {
+                uint32_t handleData[2] = { descriptorIndex, 0 };
+                std::memcpy(dst + resource->byteOffset, handleData, 8);
+            } else {
+                std::memcpy(dst + resource->byteOffset, &descriptorIndex, sizeof(descriptorIndex));
+            }
+        }
+        return;
+    }
     throw std::runtime_error("Buffer resource setting not implemented for ComputePipeline: " + name);
 }
 
 void ComputePipelineVulkan::setResource(const std::string &name, const HardwareImage &image)
 {
+    auto *resource = shaderResource.findShaderBindInfo(name);
+    if (resource && resource->bindType == EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::pushConstantMembers)
+    {
+        uint32_t descriptorIndex = const_cast<HardwareImage&>(image).storeDescriptor();
+        uint8_t *dst = pushConstant.getData();
+        if (dst)
+        {
+            if (resource->typeSize >= 8) {
+                uint32_t handleData[2] = { descriptorIndex, 0 };
+                std::memcpy(dst + resource->byteOffset, handleData, 8);
+            } else {
+                std::memcpy(dst + resource->byteOffset, &descriptorIndex, sizeof(descriptorIndex));
+            }
+        }
+        return;
+    }
     throw std::runtime_error("Image resource setting not implemented for ComputePipeline: " + name);
 }
 
