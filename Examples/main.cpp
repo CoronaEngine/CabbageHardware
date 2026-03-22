@@ -21,6 +21,10 @@
 #include "Codegen/CustomLibrary.h"
 #include "Codegen/TypeAlias.h"
 
+// 通过 CMake helicon_compile_shaders 自动编译生成的 shader 反射头文件
+#include GLSL(vert.glsl)
+#include GLSL(frag.glsl)
+
 // uniform buffer中
 struct GlobalUniformParam
 {
@@ -310,17 +314,18 @@ int main()
 
                 for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
                 {
-                    rasterizer["pushConsts.storageBufferIndex"] = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
+                    // Proxy-as-key：通过 shader 反射生成的 BindingKey 绑定资源
+                    rasterizer[vert::pushConsts_storageBufferIndex] = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
                     // UBO 字段直接写入
-                    rasterizer["GlobalUniformParam.globalTime"] = currentTime; 
-                    rasterizer["GlobalUniformParam.globalScale"] = 2.0f + sin(currentTime) * 2.0f;
-                    rasterizer["GlobalUniformParam.frameCount"] = static_cast<uint32_t>(frameCount);
-                    rasterizer["GlobalUniformParam.padding"] = 0u;
-                    // rasterizer["inPosition"] = postionBuffer;
-                    // rasterizer["inColor"] = colorBuffer;
-                    // rasterizer["inTexCoord"] = uvBuffer;
-                    // rasterizer["inNormal"] = normalBuffer;
-                    rasterizer["outColor"] = finalOutputImages[threadIndex];
+                    rasterizer[vert::GlobalUniformParam_globalTime] = currentTime; 
+                    rasterizer[vert::GlobalUniformParam_globalScale] = 2.0f + sin(currentTime) * 2.0f;
+                    rasterizer[vert::GlobalUniformParam_frameCount] = static_cast<uint32_t>(frameCount);
+                    rasterizer[vert::GlobalUniformParam_padding] = 0u;
+                    // rasterizer[vert_glsl::inPosition] = postionBuffer;
+                    // rasterizer[vert_glsl::inColor] = colorBuffer;
+                    // rasterizer[vert_glsl::inTexCoord] = uvBuffer;
+                    // rasterizer[vert_glsl::inNormal] = normalBuffer;
+                    rasterizer[frag::outColor] = finalOutputImages[threadIndex];
 
                     rasterizer.record(indexBuffer, vertexBuffer);
                 }

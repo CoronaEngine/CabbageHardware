@@ -3,6 +3,7 @@
 #include <Helicon.h>
 #include <sstream>
 #include <fstream>
+#include <algorithm>
 using namespace EmbeddedShader;
 
 void generateBinary(std::stringstream& out, std::string_view name, const std::vector<uint32_t>& shaderCode)
@@ -262,6 +263,66 @@ void buildStruct(const StructInfo& structInfo, std::stringstream& out)
 	out << "};";
 }
 
+std::string sanitizeToIdentifier(const std::filesystem::path& p)
+{
+	auto s = p.stem().string();
+	for (auto& c : s)
+	{
+		if (!std::isalnum(static_cast<unsigned char>(c)))
+			c = '_';
+	}
+	if (!s.empty() && std::isdigit(static_cast<unsigned char>(s[0])))
+		s = "_" + s;
+	return s;
+}
+
+std::string extractMemberName(const std::string& qualifiedKey)
+{
+	auto pos = qualifiedKey.rfind('.');
+	if (pos != std::string::npos)
+		return qualifiedKey.substr(pos + 1);
+	return qualifiedKey;
+}
+
+void generateBindingKeys(std::stringstream& out, const std::vector<uint32_t>& spirv, ShaderLanguage lang)
+{
+	auto resources = ShaderLanguageConverter::spirvCrossReflectedBindInfo(spirv, lang);
+
+	// Push constant members — flat naming: blockName_memberName
+	for (auto& [key, info] : resources.bindInfoPool)
+	{
+		if (info.bindType == ShaderCodeModule::ShaderResources::pushConstantMembers)
+		{
+			std::string flatName = resources.pushConstantName + "_" + extractMemberName(key);
+			out << "inline ::EmbeddedShader::BindingKey " << flatName << "{\"" << key << "\"};\n";
+		}
+	}
+
+	// UBO members — flat naming: blockName_memberName
+	for (auto& [key, info] : resources.bindInfoPool)
+	{
+		if (info.bindType == ShaderCodeModule::ShaderResources::uniformBufferMembers)
+		{
+			std::string flatName = resources.uniformBufferName + "_" + extractMemberName(key);
+			out << "inline ::EmbeddedShader::BindingKey " << flatName << "{\"" << key << "\"};\n";
+		}
+	}
+
+	// Stage inputs
+	for (auto& [key, info] : resources.bindInfoPool)
+	{
+		if (info.bindType == ShaderCodeModule::ShaderResources::stageInputs)
+			out << "inline ::EmbeddedShader::BindingKey " << info.variateName << "{\"" << key << "\"};\n";
+	}
+
+	// Stage outputs
+	for (auto& [key, info] : resources.bindInfoPool)
+	{
+		if (info.bindType == ShaderCodeModule::ShaderResources::stageOutputs)
+			out << "inline ::EmbeddedShader::BindingKey " << info.variateName << "{\"" << key << "\"};\n";
+	}
+}
+
 int main(int argc, char** argv)
 {
 	std::cout << "Helicon Shader Compile Scripts\n";
@@ -384,13 +445,17 @@ int main(int argc, char** argv)
 
 	std::cout << "INFO:Generate the final C++ shader...\n";
 	std::stringstream out;
-	out << "#pragma once\n#include <Codegen/VariateProxy.h>\n";
+	out << "#pragma once\n#include <Codegen/VariateProxy.h>\n#include <Codegen/BindingKey.h>\n";
 
 	auto fileName = path.string();
 	std::ranges::replace(fileName, '\\', '_');
 	std::ranges::replace(fileName, '/', '_');
 	std::ranges::replace(fileName, '.', '_');
 	std::ranges::replace(fileName, ':', '_');
+
+	// Wrap everything in a per-shader namespace to avoid redefinition across .hpp files
+	auto nsName = sanitizeToIdentifier(path);
+	out << "namespace " << nsName << " {\n";
 
 	generateBinary(out, fileName, spirv);
 	for (auto& irReflection : irReflections)
@@ -410,6 +475,12 @@ int main(int argc, char** argv)
 			out << "\n";
 		}
 	}
+
+	// Generate BindingKey declarations from resource reflection
+	std::cout << "INFO:Generate binding keys for namespace '" << nsName << "'...\n";
+	generateBindingKeys(out, spirv, inputLanguage);
+
+	out << "} // namespace " << nsName << "\n";
 
 	//std::cout << out.str();
 
