@@ -873,4 +873,10 @@ namespace EmbeddedShader
 		bool isBuildDeclaration = false;
 	    std::vector<uint32_t>* sourceSpv = nullptr;
 	};
+
+	struct BindingKey
+	{
+		std::string bindingName;
+		std::string getAstName() const { return bindingName; }
+	};
 }

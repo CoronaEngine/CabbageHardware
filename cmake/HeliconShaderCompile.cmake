@@ -82,14 +82,14 @@ endfunction()
 # 
 # 参数:
 #   TARGET      - 目标名称 (必需)
-#   OUTPUT_DIR  - 输出目录 (可选, 默认: ${CMAKE_BINARY_DIR}/generated_shaders/${TARGET})
+#   OUTPUT_DIR  - 输出目录 (可选, 默认: ${PROJECT_SOURCE_DIR}/Src/Helicon/Compiler/HardcodeShaders)
 # ============================================================================
 function(helicon_compile_shaders TARGET_NAME)
     # 解析可选参数
     cmake_parse_arguments(ARG "" "OUTPUT_DIR" "" ${ARGN})
     
     if(NOT ARG_OUTPUT_DIR)
-        set(ARG_OUTPUT_DIR "${CMAKE_BINARY_DIR}/generated_shaders/${TARGET_NAME}")
+        set(ARG_OUTPUT_DIR "${PROJECT_SOURCE_DIR}/Src/Helicon/Compiler/HardcodeShaders")
     endif()
     
     # 确保输出目录存在

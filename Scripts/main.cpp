@@ -4,6 +4,7 @@
 #include <sstream>
 #include <fstream>
 #include <algorithm>
+#include <set>
 using namespace EmbeddedShader;
 
 void generateBinary(std::stringstream& out, std::string_view name, const std::vector<uint32_t>& shaderCode)
@@ -265,7 +266,7 @@ void buildStruct(const StructInfo& structInfo, std::stringstream& out)
 
 std::string sanitizeToIdentifier(const std::filesystem::path& p)
 {
-	auto s = p.stem().string();
+	auto s = p.filename().string();
 	for (auto& c : s)
 	{
 		if (!std::isalnum(static_cast<unsigned char>(c)))
@@ -284,28 +285,35 @@ std::string extractMemberName(const std::string& qualifiedKey)
 	return qualifiedKey;
 }
 
-void generateBindingKeys(std::stringstream& out, const std::vector<uint32_t>& spirv, ShaderLanguage lang)
+std::set<std::string> generateBindingKeys(std::stringstream& out, const std::vector<uint32_t>& spirv, ShaderLanguage lang)
 {
 	auto resources = ShaderLanguageConverter::spirvCrossReflectedBindInfo(spirv, lang);
+	std::set<std::string> bindingBlockNames;
 
-	// Push constant members — flat naming: blockName_memberName
-	for (auto& [key, info] : resources.bindInfoPool)
+	// Push constant block -> struct with static inline BindingKey members
+	if (!resources.pushConstantName.empty())
 	{
-		if (info.bindType == ShaderCodeModule::ShaderResources::pushConstantMembers)
+		bindingBlockNames.insert(resources.pushConstantName);
+		out << "struct " << resources.pushConstantName << "\n{\n";
+		for (auto& [key, info] : resources.bindInfoPool)
 		{
-			std::string flatName = resources.pushConstantName + "_" + extractMemberName(key);
-			out << "inline ::EmbeddedShader::BindingKey " << flatName << "{\"" << key << "\"};\n";
+			if (info.bindType == ShaderCodeModule::ShaderResources::pushConstantMembers)
+				out << "\tstatic inline ::EmbeddedShader::BindingKey " << extractMemberName(key) << "{\"" << key << "\"};\n";
 		}
+		out << "};\n";
 	}
 
-	// UBO members — flat naming: blockName_memberName
-	for (auto& [key, info] : resources.bindInfoPool)
+	// UBO block -> struct with static inline BindingKey members
+	if (!resources.uniformBufferName.empty())
 	{
-		if (info.bindType == ShaderCodeModule::ShaderResources::uniformBufferMembers)
+		bindingBlockNames.insert(resources.uniformBufferName);
+		out << "struct " << resources.uniformBufferName << "\n{\n";
+		for (auto& [key, info] : resources.bindInfoPool)
 		{
-			std::string flatName = resources.uniformBufferName + "_" + extractMemberName(key);
-			out << "inline ::EmbeddedShader::BindingKey " << flatName << "{\"" << key << "\"};\n";
+			if (info.bindType == ShaderCodeModule::ShaderResources::uniformBufferMembers)
+				out << "\tstatic inline ::EmbeddedShader::BindingKey " << extractMemberName(key) << "{\"" << key << "\"};\n";
 		}
+		out << "};\n";
 	}
 
 	// Stage inputs
@@ -321,6 +329,8 @@ void generateBindingKeys(std::stringstream& out, const std::vector<uint32_t>& sp
 		if (info.bindType == ShaderCodeModule::ShaderResources::stageOutputs)
 			out << "inline ::EmbeddedShader::BindingKey " << info.variateName << "{\"" << key << "\"};\n";
 	}
+
+	return bindingBlockNames;
 }
 
 int main(int argc, char** argv)
@@ -445,7 +455,7 @@ int main(int argc, char** argv)
 
 	std::cout << "INFO:Generate the final C++ shader...\n";
 	std::stringstream out;
-	out << "#pragma once\n#include <Codegen/VariateProxy.h>\n#include <Codegen/BindingKey.h>\n";
+	out << "#pragma once\n#include <Codegen/VariateProxy.h>\n";
 
 	auto fileName = path.string();
 	std::ranges::replace(fileName, '\\', '_');
@@ -458,6 +468,12 @@ int main(int argc, char** argv)
 	out << "namespace " << nsName << " {\n";
 
 	generateBinary(out, fileName, spirv);
+
+	// Generate BindingKey struct declarations first, collect binding block names
+	std::cout << "INFO:Generate binding keys for namespace '" << nsName << "'...\n";
+	auto bindingBlockNames = generateBindingKeys(out, spirv, inputLanguage);
+
+	// Generate IR reflection (skip structs that overlap with BindingKey structs)
 	for (auto& irReflection : irReflections)
 	{
 		if (irReflection.type == IRReflection::Type::FunctionSignature)
@@ -471,14 +487,12 @@ int main(int argc, char** argv)
 		if (irReflection.type == IRReflection::Type::Struct)
 		{
 			auto& structInfo = std::get<StructInfo>(irReflection.info);
+			// Skip structs already generated as BindingKey structs
+			if (bindingBlockNames.contains(structInfo.name)) continue;
 			buildStruct(structInfo,out);
 			out << "\n";
 		}
 	}
-
-	// Generate BindingKey declarations from resource reflection
-	std::cout << "INFO:Generate binding keys for namespace '" << nsName << "'...\n";
-	generateBindingKeys(out, spirv, inputLanguage);
 
 	out << "} // namespace " << nsName << "\n";
 

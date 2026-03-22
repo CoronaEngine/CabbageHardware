@@ -315,17 +315,17 @@ int main()
                 for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
                 {
                     // Proxy-as-key：通过 shader 反射生成的 BindingKey 绑定资源
-                    rasterizer[vert::pushConsts_storageBufferIndex] = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
+                    rasterizer[vert_glsl::pushConsts::storageBufferIndex] = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
                     // UBO 字段直接写入
-                    rasterizer[vert::GlobalUniformParam_globalTime] = currentTime; 
-                    rasterizer[vert::GlobalUniformParam_globalScale] = 2.0f + sin(currentTime) * 2.0f;
-                    rasterizer[vert::GlobalUniformParam_frameCount] = static_cast<uint32_t>(frameCount);
-                    rasterizer[vert::GlobalUniformParam_padding] = 0u;
-                    // rasterizer[vert_glsl::inPosition] = postionBuffer;
-                    // rasterizer[vert_glsl::inColor] = colorBuffer;
-                    // rasterizer[vert_glsl::inTexCoord] = uvBuffer;
-                    // rasterizer[vert_glsl::inNormal] = normalBuffer;
-                    rasterizer[frag::outColor] = finalOutputImages[threadIndex];
+                    rasterizer[vert_glsl::GlobalUniformParam::globalTime] = currentTime; 
+                    rasterizer[vert_glsl::GlobalUniformParam::globalScale] = 2.0f + sin(currentTime) * 2.0f;
+                    rasterizer[vert_glsl::GlobalUniformParam::frameCount] = static_cast<uint32_t>(frameCount);
+                    rasterizer[vert_glsl::GlobalUniformParam::padding] = 0u;
+                    // rasterizer[vert::inPosition] = postionBuffer;
+                    // rasterizer[vert::inColor] = colorBuffer;
+                    // rasterizer[vert::inTexCoord] = uvBuffer;
+                    // rasterizer[vert::inNormal] = normalBuffer;
+                    rasterizer[frag_glsl::outColor] = finalOutputImages[threadIndex];
 
                     rasterizer.record(indexBuffer, vertexBuffer);
                 }
