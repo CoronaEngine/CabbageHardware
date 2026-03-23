@@ -37,7 +37,7 @@ executor << vertexBuffer.copyTo(indexBuffer)
 
 ### 构建要求
 
-- CMake 3.20+
+- CMake 4.0+
 - Vulkan SDK
 - 支持 C++20 的编译器
 - Windows/Linux
@@ -72,4 +72,4 @@ cmake --build .
 
 ### 许可证
 
-本项目使用 MIT 许可证,详见 [LICENSE](LICENSE) 文件。
+待补充
