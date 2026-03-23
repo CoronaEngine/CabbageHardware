@@ -33,9 +33,6 @@ struct ResourceManager
 
         int32_t bindlessIndex{-1};
 
-        /// Queue family that last accessed this buffer (for cross-queue barriers).
-        uint32_t lastQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED};
-
         DeviceManager *device{nullptr};
         ResourceManager *resourceManager{nullptr};
     };
@@ -65,9 +62,6 @@ struct ResourceManager
         VmaAllocationInfo imageAllocInfo{};
 
         int32_t bindlessIndex{-1};
-
-        /// Queue family that last accessed this image (for cross-queue barriers).
-        uint32_t lastQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED};
 
         DeviceManager *device{nullptr};
         ResourceManager *resourceManager{nullptr};

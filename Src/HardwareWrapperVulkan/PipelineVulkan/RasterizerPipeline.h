@@ -6,7 +6,6 @@
 #include "Compiler/ShaderCodeCompiler.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/DeviceManager.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
-#include "HardwareWrapperVulkan/HardwareVulkan/ResourceAccessTracker.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/ResourceManager.h"
 
 struct RasterizerPipelineVulkan : public CommandRecordVulkan
@@ -150,7 +149,4 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan
 
     EmbeddedShader::ShaderCodeModule::ShaderResources vertexResource;
     EmbeddedShader::ShaderCodeModule::ShaderResources fragmentResource;
-
-    /// Tracks bindless resources bound via push-constant handles for precise barriers.
-    ResourceAccessTracker bindlessTracker_;
 };

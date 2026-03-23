@@ -6,7 +6,6 @@
 #include "Compiler/ShaderCodeCompiler.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/DeviceManager.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
-#include "HardwareWrapperVulkan/HardwareVulkan/ResourceAccessTracker.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/ResourceManager.h"
 
 struct ComputePipelineVulkan : public CommandRecordVulkan
@@ -70,7 +69,4 @@ struct ComputePipelineVulkan : public CommandRecordVulkan
     void updateUBODescriptor();
 
     ktm::uvec3 groupCount = {0, 0, 0};
-
-    /// Tracks bindless resources bound via push-constant handles for precise barriers.
-    ResourceAccessTracker bindlessTracker_;
 };
