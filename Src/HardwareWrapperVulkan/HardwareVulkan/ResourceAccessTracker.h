@@ -7,8 +7,6 @@
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 
 /// Per-resource access descriptor collected during setResource / setResourceDirect.
-/// Keyed by push-constant byte-offset so that re-binding the same slot
-/// replaces the old entry (persistent across frames, no manual clear needed).
 struct ResourceAccess
 {
     uintptr_t resourceID{0};
@@ -22,18 +20,21 @@ struct ResourceAccess
 };
 
 /// Holds the set of bindless resources a pipeline accesses via push-constant handles.
-/// Entries are keyed by push-constant byte-offset, so re-setting a slot replaces
-/// the previous resource.  The map persists across frames: resources set once
-/// remain tracked until overwritten — matching the persistent push-constant semantics.
+///
+/// Keyed by **resourceID** so that N different resources bound at the same
+/// push-constant byte-offset (across multiple record() calls) each get their
+/// own barrier.  Re-binding the same resource (same ID) is automatically
+/// deduplicated.
 struct ResourceAccessTracker
 {
-    /// Record a buffer access bound at the given push-constant byte offset.
-    void trackBuffer(uint64_t byteOffset,
+    /// Record a buffer access.  byteOffset is kept for API compatibility but
+    /// the map key is bufferID so every unique buffer is tracked.
+    void trackBuffer(uint64_t /*byteOffset*/,
                      uintptr_t bufferID,
                      VkPipelineStageFlags2 stageMask,
                      VkAccessFlags2 accessMask)
     {
-        accesses_[byteOffset] = ResourceAccess{
+        accesses_[bufferID] = ResourceAccess{
             .resourceID = bufferID,
             .isImage = false,
             .dstStageMask = stageMask,
@@ -42,14 +43,15 @@ struct ResourceAccessTracker
         };
     }
 
-    /// Record an image access bound at the given push-constant byte offset.
-    void trackImage(uint64_t byteOffset,
+    /// Record an image access.  byteOffset is kept for API compatibility but
+    /// the map key is imageID so every unique image is tracked.
+    void trackImage(uint64_t /*byteOffset*/,
                     uintptr_t imageID,
                     VkPipelineStageFlags2 stageMask,
                     VkAccessFlags2 accessMask,
                     VkImageLayout requiredLayout)
     {
-        accesses_[byteOffset] = ResourceAccess{
+        accesses_[imageID] = ResourceAccess{
             .resourceID = imageID,
             .isImage = true,
             .dstStageMask = stageMask,
@@ -68,6 +70,6 @@ struct ResourceAccessTracker
     [[nodiscard]] bool empty() const { return accesses_.empty(); }
     void clear() { accesses_.clear(); }
 
-    /// Key = push-constant byte offset where the resource handle is stored.
-    std::unordered_map<uint64_t, ResourceAccess> accesses_;
+    /// Key = resourceID (uintptr_t).  One entry per unique resource.
+    std::unordered_map<uintptr_t, ResourceAccess> accesses_;
 };

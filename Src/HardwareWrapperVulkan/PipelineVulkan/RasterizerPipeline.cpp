@@ -767,8 +767,7 @@ void RasterizerPipelineVulkan::setResource(const std::string &name, const Hardwa
                     VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
                     isStorage ? (VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT)
                               : VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-                    isStorage ? VK_IMAGE_LAYOUT_GENERAL
-                              : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                    VK_IMAGE_LAYOUT_GENERAL);
             }
             return true;
         }
@@ -866,8 +865,7 @@ void RasterizerPipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t t
                 VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
                 isStorage ? (VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT)
                           : VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-                isStorage ? VK_IMAGE_LAYOUT_GENERAL
-                          : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                VK_IMAGE_LAYOUT_GENERAL);
         }
     }
 }
@@ -983,6 +981,21 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
         requiredBarriers.imageBarriers.insert(requiredBarriers.imageBarriers.end(),
                                               bindlessBarriers.imageBarriers.begin(),
                                               bindlessBarriers.imageBarriers.end());
+        bindlessTracker_.clear();
+    }
+    else
+    {
+        // Fallback: global memory barrier for resources bound via
+        // storeDescriptor() + plain uint32 push constant, which bypasses
+        // setResource/setResourceDirect and thus the tracker.
+        VkMemoryBarrier2 globalBarrier{};
+        globalBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+        globalBarrier.pNext = nullptr;
+        globalBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+        globalBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+        globalBarrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        globalBarrier.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+        requiredBarriers.memoryBarriers.push_back(globalBarrier);
     }
 
     // ── Render target image barriers (explicit, kept as-is) ──

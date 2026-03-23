@@ -206,8 +206,7 @@ void ComputePipelineVulkan::setResource(const std::string &name, const HardwareI
                 VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
                 isStorage ? (VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT)
                           : VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-                isStorage ? VK_IMAGE_LAYOUT_GENERAL
-                          : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                VK_IMAGE_LAYOUT_GENERAL);
         }
         return;
     }
@@ -287,8 +286,7 @@ void ComputePipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t type
                 VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
                 isStorage ? (VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT)
                           : VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-                isStorage ? VK_IMAGE_LAYOUT_GENERAL
-                          : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                VK_IMAGE_LAYOUT_GENERAL);
         }
     }
 }
@@ -330,7 +328,9 @@ CommandRecordVulkan::RequiredBarriers ComputePipelineVulkan::getRequiredBarriers
     // Otherwise fall back to the conservative global memory barrier.
     if (!bindlessTracker_.empty())
     {
-        return bindlessTracker_.buildBarriers();
+        auto barriers = bindlessTracker_.buildBarriers();
+        bindlessTracker_.clear();
+        return barriers;
     }
 
     // Fallback: global memory barrier (previous behavior, safety net)
