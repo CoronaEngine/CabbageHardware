@@ -412,10 +412,11 @@ struct ComputePipeline
         return computePipelineID.load(std::memory_order_acquire);
     }
 
+    ResourceProxy operator[](const std::string &resourceName);
+
   private:
     friend struct ResourceProxy;
 
-    ResourceProxy operator[](const std::string &resourceName);
 
     template<typename ProxyType>
         requires requires(const ProxyType& p) { { p.getAstName() } -> std::convertible_to<std::string>; }
@@ -532,10 +533,10 @@ struct RasterizerPipeline
         return rasterizerPipelineID.load(std::memory_order_acquire);
     }
 
+    ResourceProxy operator[](const std::string &resourceName);
+
   private:
     friend struct ResourceProxy;
-
-    ResourceProxy operator[](const std::string &resourceName);
 
     void setPushConstant(const std::string &name, const void *data, size_t size);
     void setResource(const std::string &name, const HardwareBuffer &buffer);
