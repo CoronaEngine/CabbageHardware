@@ -19,47 +19,47 @@ void DeviceManager::initDeviceManager(const CreateCallback &createCallback, cons
     // createCommandBuffers();
     // createTimelineSemaphore();
 
-    for (auto &queue : graphicsQueues)
-    {
-        CFW_LOG_INFO("Graphics Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
-                     queue.queueFamilyIndex,
-                     reinterpret_cast<std::uintptr_t>(&queue),
-                     reinterpret_cast<std::uintptr_t>(queue.vkQueue),
-                     reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
-                     reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
-                     reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
-                     reinterpret_cast<std::uintptr_t>(queue.commandPool),
-                     reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
-                     reinterpret_cast<std::uintptr_t>(queue.deviceManager));
-    }
+    // for (auto &queue : graphicsQueues)
+    // {
+    //     CFW_LOG_INFO("Graphics Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
+    //                  queue.queueFamilyIndex,
+    //                  reinterpret_cast<std::uintptr_t>(&queue),
+    //                  reinterpret_cast<std::uintptr_t>(queue.vkQueue),
+    //                  reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
+    //                  reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
+    //                  reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
+    //                  reinterpret_cast<std::uintptr_t>(queue.commandPool),
+    //                  reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
+    //                  reinterpret_cast<std::uintptr_t>(queue.deviceManager));
+    // }
 
-    for (auto &queue : computeQueues)
-    {
-        CFW_LOG_INFO("Compute Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
-                     queue.queueFamilyIndex,
-                     reinterpret_cast<std::uintptr_t>(&queue),
-                     reinterpret_cast<std::uintptr_t>(queue.vkQueue),
-                     reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
-                     reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
-                     reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
-                     reinterpret_cast<std::uintptr_t>(queue.commandPool),
-                     reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
-                     reinterpret_cast<std::uintptr_t>(queue.deviceManager));
-    }
+    // for (auto &queue : computeQueues)
+    // {
+    //     CFW_LOG_INFO("Compute Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
+    //                  queue.queueFamilyIndex,
+    //                  reinterpret_cast<std::uintptr_t>(&queue),
+    //                  reinterpret_cast<std::uintptr_t>(queue.vkQueue),
+    //                  reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
+    //                  reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
+    //                  reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
+    //                  reinterpret_cast<std::uintptr_t>(queue.commandPool),
+    //                  reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
+    //                  reinterpret_cast<std::uintptr_t>(queue.deviceManager));
+    // }
 
-    for (auto &queue : transferQueues)
-    {
-        CFW_LOG_INFO("Transfer Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
-                     queue.queueFamilyIndex,
-                     reinterpret_cast<std::uintptr_t>(&queue),
-                     reinterpret_cast<std::uintptr_t>(queue.vkQueue),
-                     reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
-                     reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
-                     reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
-                     reinterpret_cast<std::uintptr_t>(queue.commandPool),
-                     reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
-                     reinterpret_cast<std::uintptr_t>(queue.deviceManager));
-    }
+    // for (auto &queue : transferQueues)
+    // {
+    //     CFW_LOG_INFO("Transfer Queue - Family Index: {}, Queue Address: {}, VkQueue: {}, Timeline Semaphore: {}, Timeline Value Addr: {}, Mutex Addr: {}, Command Pool: {}, Command Buffer: {}, Device Manager: {}",
+    //                  queue.queueFamilyIndex,
+    //                  reinterpret_cast<std::uintptr_t>(&queue),
+    //                  reinterpret_cast<std::uintptr_t>(queue.vkQueue),
+    //                  reinterpret_cast<std::uintptr_t>(queue.timelineSemaphore),
+    //                  reinterpret_cast<std::uintptr_t>(queue.timelineValue.get()),
+    //                  reinterpret_cast<std::uintptr_t>(queue.queueMutex.get()),
+    //                  reinterpret_cast<std::uintptr_t>(queue.commandPool),
+    //                  reinterpret_cast<std::uintptr_t>(queue.commandBuffer),
+    //                  reinterpret_cast<std::uintptr_t>(queue.deviceManager));
+    // }
 
     CFW_LOG_INFO("Graphics Queue Count: {}", graphicsQueues.size());
     CFW_LOG_INFO("Compute Queue Count: {}", computeQueues.size());

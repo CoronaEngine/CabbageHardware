@@ -158,7 +158,7 @@ inline TextureLoadResult loadTexture(const std::string &texturePath)
     result.success = true;
 
     stbi_image_free(data);
-    CFW_LOG_INFO("Texture loaded successfully, descriptor ID: {}", result.descriptorID);
+    // CFW_LOG_INFO("Texture loaded successfully, descriptor ID: {}", result.descriptorID);
 
     return result;
 }
@@ -200,7 +200,7 @@ inline TextureLoadResult loadCompressedTexture(const std::string &texturePath, b
     result.descriptorID = result.texture.storeDescriptor();
     result.success = true;
 
-    CFW_LOG_INFO("Compressed texture loaded successfully, descriptor ID: {}", result.descriptorID);
+    //CFW_LOG_INFO("Compressed texture loaded successfully, descriptor ID: {}", result.descriptorID);
 
     return result;
 }

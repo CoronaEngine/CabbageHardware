@@ -209,7 +209,7 @@ void DisplayManager::createSyncObjects()
         coronaHardwareCheck(vkCreateFence(device, &fenceInfo, nullptr, &acquireFences[i]));
     }
 
-    CFW_LOG_INFO("Using Acquire Fence for present synchronization (VK_EXT_swapchain_maintenance1 removed)");
+    // CFW_LOG_INFO("Using Acquire Fence for present synchronization (VK_EXT_swapchain_maintenance1 removed)");
 
     /*displayDeviceExecutors.resize(imageCount);
     for (size_t i = 0; i < imageCount; i++)

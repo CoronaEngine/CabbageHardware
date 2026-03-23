@@ -83,14 +83,14 @@ int main()
     // 运行压缩纹理测试（可选）
     // testCompressedTextures();
 
-    CFW_LOG_INFO("Starting main application...");
+    //CFW_LOG_INFO("Starting main application...");
 
     if (glfwInit() < 0)
     {
         return -1;
     }
 
-    CFW_LOG_INFO("Main thread started...");
+    //CFW_LOG_INFO("Main thread started...");
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
     // GLFWwindow* window = glfwCreateWindow(800, 600, "Window Title", NULL, NULL);
@@ -178,7 +178,7 @@ int main()
 
         if (!textureResult.success)
         {
-            CFW_LOG_ERROR("Failed to load texture, exiting...");
+            //CFW_LOG_ERROR("Failed to load texture, exiting...");
             for (size_t i = 0; i < windows.size(); i++)
             {
                 glfwDestroyWindow(windows[i]);
@@ -196,7 +196,7 @@ int main()
         std::atomic_bool running = true;
 
         auto meshThread = [&](uint32_t threadIndex) {
-            CFW_LOG_INFO("Mesh thread {} started...", threadIndex);
+            //CFW_LOG_INFO("Mesh thread {} started...", threadIndex);
 
             //ComputeStorageBufferObject computeUniformData(windows.size());
             //computeStorageBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeStorageBufferObject), BufferUsage::StorageBuffer);
@@ -239,11 +239,11 @@ int main()
             // 退出时释放后续信号量，防止死锁
             // renderSemaphores[threadIndex]->release();
 
-            CFW_LOG_INFO("Mesh thread {} ended.", threadIndex);
+            //CFW_LOG_INFO("Mesh thread {} ended.", threadIndex);
         };
 
         auto renderThread = [&](uint32_t threadIndex) {
-            CFW_LOG_INFO("Render thread {} started...", threadIndex);
+            //CFW_LOG_INFO("Render thread {} started...", threadIndex);
 
             RasterizerPipeline rasterizer(vert_glsl::spirv, frag_glsl::spirv);
 
@@ -344,11 +344,11 @@ int main()
             }
             // displaySemaphores[threadIndex]->release();
 
-            CFW_LOG_INFO("Render thread {} ended.", threadIndex);
+            //CFW_LOG_INFO("Render thread {} ended.", threadIndex);
         };
 
         auto displayThread = [&](uint32_t threadIndex) {
-            CFW_LOG_INFO("Display thread {} started...", threadIndex);
+            //CFW_LOG_INFO("Display thread {} started...", threadIndex);
 
             HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
 
@@ -372,7 +372,7 @@ int main()
             }
             // meshSemaphores[threadIndex]->release();
 
-            CFW_LOG_INFO("Display thread {} ended.", threadIndex);
+            //CFW_LOG_INFO("Display thread {} ended.", threadIndex);
         };
 
         std::vector<std::thread> meshThreads;
