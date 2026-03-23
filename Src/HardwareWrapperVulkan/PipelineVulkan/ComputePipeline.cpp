@@ -166,6 +166,13 @@ void ComputePipelineVulkan::setResource(const std::string &name, const HardwareB
                 std::memcpy(dst + resource->byteOffset, &descriptorIndex, sizeof(descriptorIndex));
             }
         }
+
+        // Track bindless buffer access for precise barriers
+        bindlessTracker_.trackBuffer(
+            resource->byteOffset,
+            buffer.getBufferID(),
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+            VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
         return;
     }
     throw std::runtime_error("Buffer resource setting not implemented for ComputePipeline: " + name);
@@ -186,6 +193,21 @@ void ComputePipelineVulkan::setResource(const std::string &name, const HardwareI
             } else {
                 std::memcpy(dst + resource->byteOffset, &descriptorIndex, sizeof(descriptorIndex));
             }
+        }
+
+        // Track bindless image access for precise barriers
+        // Determine read-only vs read-write based on image usage
+        {
+            auto handle = globalImageStorages.acquire_read(image.getImageID());
+            bool isStorage = (handle->imageUsage & VK_IMAGE_USAGE_STORAGE_BIT) != 0;
+            bindlessTracker_.trackImage(
+                resource->byteOffset,
+                image.getImageID(),
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                isStorage ? (VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT)
+                          : VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                isStorage ? VK_IMAGE_LAYOUT_GENERAL
+                          : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
         return;
     }
@@ -230,6 +252,12 @@ void ComputePipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t type
                 std::memcpy(dst + byteOffset, &descriptorIndex, sizeof(descriptorIndex));
             }
         }
+
+        bindlessTracker_.trackBuffer(
+            byteOffset,
+            buffer.getBufferID(),
+            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+            VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
     }
 }
 
@@ -248,6 +276,19 @@ void ComputePipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t type
             } else {
                 std::memcpy(dst + byteOffset, &descriptorIndex, sizeof(descriptorIndex));
             }
+        }
+
+        {
+            auto handle = globalImageStorages.acquire_read(image.getImageID());
+            bool isStorage = (handle->imageUsage & VK_IMAGE_USAGE_STORAGE_BIT) != 0;
+            bindlessTracker_.trackImage(
+                byteOffset,
+                image.getImageID(),
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                isStorage ? (VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT)
+                          : VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                isStorage ? VK_IMAGE_LAYOUT_GENERAL
+                          : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
     }
 }
@@ -285,6 +326,14 @@ ComputePipelineVulkan *ComputePipelineVulkan::operator()(uint16_t x, uint16_t y,
 
 CommandRecordVulkan::RequiredBarriers ComputePipelineVulkan::getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor)
 {
+    // If we have tracked bindless resources, generate precise per-resource barriers.
+    // Otherwise fall back to the conservative global memory barrier.
+    if (!bindlessTracker_.empty())
+    {
+        return bindlessTracker_.buildBarriers();
+    }
+
+    // Fallback: global memory barrier (previous behavior, safety net)
     RequiredBarriers requiredBarriers;
     requiredBarriers.memoryBarriers.resize(1);
 

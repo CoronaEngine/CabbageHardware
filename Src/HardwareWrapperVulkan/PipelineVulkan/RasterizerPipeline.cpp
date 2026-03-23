@@ -704,6 +704,13 @@ void RasterizerPipelineVulkan::setResource(const std::string &name, const Hardwa
                     std::memcpy(dst + res->byteOffset, &descriptorIndex, sizeof(descriptorIndex));
                 }
             }
+
+            // Track bindless buffer access for precise barriers
+            bindlessTracker_.trackBuffer(
+                res->byteOffset,
+                buffer.getBufferID(),
+                VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
             return true;
         }
         return false;
@@ -748,6 +755,20 @@ void RasterizerPipelineVulkan::setResource(const std::string &name, const Hardwa
                 } else {
                     std::memcpy(dst + res->byteOffset, &descriptorIndex, sizeof(descriptorIndex));
                 }
+            }
+
+            // Track bindless image access for precise barriers
+            {
+                auto handle = globalImageStorages.acquire_read(image.getImageID());
+                bool isStorage = (handle->imageUsage & VK_IMAGE_USAGE_STORAGE_BIT) != 0;
+                bindlessTracker_.trackImage(
+                    res->byteOffset,
+                    image.getImageID(),
+                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                    isStorage ? (VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT)
+                              : VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                    isStorage ? VK_IMAGE_LAYOUT_GENERAL
+                              : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             }
             return true;
         }
@@ -800,6 +821,12 @@ void RasterizerPipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t t
                 std::memcpy(dst + byteOffset, &descriptorIndex, sizeof(descriptorIndex));
             }
         }
+
+        bindlessTracker_.trackBuffer(
+            byteOffset,
+            buffer.getBufferID(),
+            VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+            VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
     }
 }
 
@@ -828,6 +855,19 @@ void RasterizerPipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t t
             } else {
                 std::memcpy(dst + byteOffset, &descriptorIndex, sizeof(descriptorIndex));
             }
+        }
+
+        {
+            auto handle = globalImageStorages.acquire_read(image.getImageID());
+            bool isStorage = (handle->imageUsage & VK_IMAGE_USAGE_STORAGE_BIT) != 0;
+            bindlessTracker_.trackImage(
+                byteOffset,
+                image.getImageID(),
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                isStorage ? (VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT)
+                          : VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                isStorage ? VK_IMAGE_LAYOUT_GENERAL
+                          : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
     }
 }
@@ -922,18 +962,30 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
 {
     RequiredBarriers requiredBarriers;
 
-    // 内存屏障
-    requiredBarriers.memoryBarriers.resize(1);
-    auto &memoryBarrier = requiredBarriers.memoryBarriers[0];
-    memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
-    memoryBarrier.pNext = nullptr;
-    memoryBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-    memoryBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-    memoryBarrier.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT;
-    memoryBarrier.dstStageMask = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT |
-                                 VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    // ── Precise bindless resource barriers (replaces the old global VkMemoryBarrier2) ──
+    // Build a skip-set of image IDs that already have dedicated barriers below
+    // (render targets + depth), so the tracker won't emit duplicate barriers.
+    std::unordered_set<uintptr_t> dedicatedImageIDs;
+    for (const auto &rt : renderTargets)
+    {
+        if (rt)
+            dedicatedImageIDs.insert(rt.getImageID());
+    }
+    if (depthImage)
+        dedicatedImageIDs.insert(depthImage.getImageID());
 
-    // 图像屏障
+    if (!bindlessTracker_.empty())
+    {
+        auto bindlessBarriers = bindlessTracker_.buildBarriers(dedicatedImageIDs);
+        requiredBarriers.bufferBarriers.insert(requiredBarriers.bufferBarriers.end(),
+                                               bindlessBarriers.bufferBarriers.begin(),
+                                               bindlessBarriers.bufferBarriers.end());
+        requiredBarriers.imageBarriers.insert(requiredBarriers.imageBarriers.end(),
+                                              bindlessBarriers.imageBarriers.begin(),
+                                              bindlessBarriers.imageBarriers.end());
+    }
+
+    // ── Render target image barriers (explicit, kept as-is) ──
     VkImageMemoryBarrier2 imageBarrierTemplate{};
     imageBarrierTemplate.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
     imageBarrierTemplate.pNext = nullptr;
