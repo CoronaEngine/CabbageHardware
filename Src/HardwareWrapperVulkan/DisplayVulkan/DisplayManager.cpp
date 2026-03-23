@@ -589,13 +589,13 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         }
         vkResetFences(device, 1, &acquireFences[currentFrame]);
 
-        // 获取交换链图像，传入 fence 以便下一帧等待
+        // 获取交换链图像（fence 不再传给 acquire，改为绑定到 queue submit 以保证 binary semaphore 的 wait 完成）
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(device,
                                                 swapChain,
                                                 UINT64_MAX,
                                                 imageAvailableSemaphores[currentFrame],
-                                                acquireFences[currentFrame],  // 传入 fence 进行同步
+                                                VK_NULL_HANDLE,
                                                 &imageIndex);
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR)
@@ -658,6 +658,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
                                               << displayDeviceExecutors[currentFrame]->wait(waitSemaphoreInfos, signalSemaphoreInfos)
                                               << displayDeviceExecutors[currentFrame]->commit();*/
 
+        displayDeviceExecutor->waitFence = acquireFences[currentFrame];
         *displayDeviceExecutor << &blitCmd << &transitionCmd
                                << displayDeviceExecutor->wait(waitSemaphoreInfos, signalSemaphoreInfos)
                                << displayDeviceExecutor->commit();
