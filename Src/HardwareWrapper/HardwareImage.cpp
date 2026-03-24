@@ -194,7 +194,7 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo &createInfo)
             createInfo.mipLevels);
     }
 
-    CFW_LOG_TRACE("HardwareImage created: id={}", self_image_id);
+    //CFW_LOG_TRACE("HardwareImage created: id={}", self_image_id);
 
     // if (createInfo.initialData != nullptr)
     // {
@@ -260,7 +260,7 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
             arrayLayers);
     }
 
-    CFW_LOG_TRACE("HardwareImage created: id={}", self_image_id);
+    //CFW_LOG_TRACE("HardwareImage created: id={}", self_image_id);
 
     if (imageData != nullptr)
     {
@@ -405,7 +405,7 @@ HardwareImage HardwareImage::operator[](const uint32_t index)
                 subImageHandle->mipLevels = imageHandle->mipLevels;
             }
         }
-        CFW_LOG_TRACE("HardwareImage sub-image created: id={}, parent_id={}", subImageId, selfImageId);
+        //CFW_LOG_TRACE("HardwareImage sub-image created: id={}, parent_id={}", subImageId, selfImageId);
 
         return subImage;
     }

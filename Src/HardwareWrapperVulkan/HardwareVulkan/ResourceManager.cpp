@@ -191,19 +191,19 @@ void ResourceManager::createBindlessDescriptorSet()
     };
 
     #ifdef CABBAGE_ENGINE_DEBUG
-    CFW_LOG_DEBUG("[ResourceManager] Descriptor Indexing Properties:\n"
-                  "  maxUpdateAfterBindDescriptorsInAllPools: {}\n"
-                  "  maxPerStageUpdateAfterBindResources: {}\n"
-                  "  maxPerStageDescriptorUpdateAfterBindUniformBuffers: {}\n"
-                  "  maxPerStageDescriptorUpdateAfterBindSampledImages: {}\n"
-                  "  maxPerStageDescriptorUpdateAfterBindStorageBuffers: {}\n"
-                  "  maxPerStageDescriptorUpdateAfterBindStorageImages: {}",
-                  cachedIndexingProperties.maxUpdateAfterBindDescriptorsInAllPools,
-                  cachedIndexingProperties.maxPerStageUpdateAfterBindResources,
-                  cachedIndexingProperties.maxPerStageDescriptorUpdateAfterBindUniformBuffers,
-                  cachedIndexingProperties.maxPerStageDescriptorUpdateAfterBindSampledImages,
-                  cachedIndexingProperties.maxPerStageDescriptorUpdateAfterBindStorageBuffers,
-                  cachedIndexingProperties.maxPerStageDescriptorUpdateAfterBindStorageImages);
+    // CFW_LOG_DEBUG("[ResourceManager] Descriptor Indexing Properties:\n"
+    //               "  maxUpdateAfterBindDescriptorsInAllPools: {}\n"
+    //               "  maxPerStageUpdateAfterBindResources: {}\n"
+    //               "  maxPerStageDescriptorUpdateAfterBindUniformBuffers: {}\n"
+    //               "  maxPerStageDescriptorUpdateAfterBindSampledImages: {}\n"
+    //               "  maxPerStageDescriptorUpdateAfterBindStorageBuffers: {}\n"
+    //               "  maxPerStageDescriptorUpdateAfterBindStorageImages: {}",
+    //               cachedIndexingProperties.maxUpdateAfterBindDescriptorsInAllPools,
+    //               cachedIndexingProperties.maxPerStageUpdateAfterBindResources,
+    //               cachedIndexingProperties.maxPerStageDescriptorUpdateAfterBindUniformBuffers,
+    //               cachedIndexingProperties.maxPerStageDescriptorUpdateAfterBindSampledImages,
+    //               cachedIndexingProperties.maxPerStageDescriptorUpdateAfterBindStorageBuffers,
+    //               cachedIndexingProperties.maxPerStageDescriptorUpdateAfterBindStorageImages);
 #endif
 
     constexpr uint32_t PREFERRED_MAX_RESOURCES = 10000u;
@@ -404,16 +404,16 @@ void ResourceManager::createExternalBufferMemoryPool()
         return;
     }
 
-    CFW_LOG_DEBUG(
-        "[ResourceManager] External memory pool created:\n"
-        "  Memory Type Index: {}\n"
-        "  Handle Type: 0x{:X}\n"
-        "  Queue Sharing Mode: {}\n"
-        "  Queue Family Count: {}",
-        memoryTypeIndex,
-        EXTERNAL_MEMORY_HANDLE_TYPE,
-        (bufferInfo.sharingMode == VK_SHARING_MODE_CONCURRENT ? "CONCURRENT" : "EXCLUSIVE"),
-        queueFamilyCount);
+    // CFW_LOG_DEBUG(
+    //     "[ResourceManager] External memory pool created:\n"
+    //     "  Memory Type Index: {}\n"
+    //     "  Handle Type: 0x{:X}\n"
+    //     "  Queue Sharing Mode: {}\n"
+    //     "  Queue Family Count: {}",
+    //     memoryTypeIndex,
+    //     EXTERNAL_MEMORY_HANDLE_TYPE,
+    //     (bufferInfo.sharingMode == VK_SHARING_MODE_CONCURRENT ? "CONCURRENT" : "EXCLUSIVE"),
+    //     queueFamilyCount);
 }
 
 ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 imageSize,
@@ -500,8 +500,8 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     resultImage.imageView = createImageView(resultImage);
 
     deviceMemorySize += resultImage.imageAllocInfo.size;
-    CFW_LOG_DEBUG("Image created: {}x{} Format: 0x{:X} Layers: {} Mips: {} Size: {:.2f} MB",
-                  imageSize.x, imageSize.y, static_cast<uint32_t>(imageFormat), arrayLayers, mipLevels, (resultImage.imageAllocInfo.size / 1024.0 / 1024.0));
+    // CFW_LOG_DEBUG("Image created: {}x{} Format: 0x{:X} Layers: {} Mips: {} Size: {:.2f} MB",
+    //               imageSize.x, imageSize.y, static_cast<uint32_t>(imageFormat), arrayLayers, mipLevels, (resultImage.imageAllocInfo.size / 1024.0 / 1024.0));
 
     return resultImage;
 }

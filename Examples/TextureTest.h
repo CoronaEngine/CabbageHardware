@@ -140,7 +140,7 @@ inline TextureLoadResult loadTexture(const std::string &texturePath)
         return result;
     }
 
-    CFW_LOG_DEBUG("Loaded texture: {}x{}, channels: {}", width, height, channels);
+    //CFW_LOG_DEBUG("Loaded texture: {}x{}, channels: {}", width, height, channels);
 
     HardwareImageCreateInfo createInfo;
     createInfo.width = width;
@@ -222,8 +222,8 @@ inline TextureLoadResult loadTextureWithMipmapAndLayers(const std::string &textu
         return result;
     }
 
-    CFW_LOG_DEBUG("Loaded texture: {}x{}, creating {} layers with {} mip levels",
-                  width, height, arrayLayers, mipLevels);
+    // CFW_LOG_DEBUG("Loaded texture: {}x{}, creating {} layers with {} mip levels",
+    //               width, height, arrayLayers, mipLevels);
 
     std::vector<unsigned char> layerData;
     size_t layerSize = width * height * 4;
