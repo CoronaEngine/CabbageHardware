@@ -352,17 +352,21 @@ DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
         commandBufferSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
         commandBufferSubmitInfo.commandBuffer = currentRecordQueue->commandBuffer;
 
+        // 用单次 fetch_add 同时获取 wait 和 signal 值，消除两次原子操作间的竞态窗口
+        uint64_t waitValue = currentRecordQueue->timelineValue->fetch_add(1);
+        uint64_t signalValue = waitValue + 1;
+
         VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
         timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
         timelineWaitSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
-        timelineWaitSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->fetch_add(1);
+        timelineWaitSemaphoreSubmitInfo.value = waitValue;
         timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);
 
         VkSemaphoreSubmitInfo timelineSignalSemaphoreSubmitInfo{};
         timelineSignalSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
         timelineSignalSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
-        timelineSignalSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->load(std::memory_order_acquire);
+        timelineSignalSemaphoreSubmitInfo.value = signalValue;
         timelineSignalSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         signalSemaphores.push_back(timelineSignalSemaphoreSubmitInfo);
 
@@ -416,6 +420,13 @@ DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
         if (!semaphoreValid)
         {
             CFW_LOG_ERROR("[commit] Aborting submit due to invalid semaphore state");
+            // 回滚 fetch_add：提交未发生，timeline 值不应递增，
+            // 否则 semaphore counter 永远无法追上 timelineValue 导致死锁
+            currentRecordQueue->timelineValue->fetch_sub(1);
+            waitSemaphores.clear();
+            signalSemaphores.clear();
+            waitFence = VK_NULL_HANDLE;
+            queue->queueMutex->unlock();
             return nullptr;
         }
 
@@ -432,11 +443,19 @@ DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
         if (result != VK_SUCCESS)
         {
             CFW_LOG_ERROR("Failed to submit command buffer! VkResult: {}", coronaHardwareResultStr(result));
+            // 提交失败：回滚 timeline 值，解锁 mutex，避免死锁
+            currentRecordQueue->timelineValue->fetch_sub(1);
+            waitSemaphores.clear();
+            signalSemaphores.clear();
+            waitFence = VK_NULL_HANDLE;
+            queue->queueMutex->unlock();
             return nullptr;
         }
 
+        // 记录本次提交的 signal 值，供 commit() 尾部和 wait() 使用
+        this->lastSignalValue = signalValue;
+
         // ===== 将待释放资源绑定到此次提交的 timeline 值 =====
-        uint64_t signalValue = currentRecordQueue->timelineValue->load(std::memory_order_acquire);
         for (auto &resource : localPendingResources)
         {
             deferredReleaseQueue.push_back({signalValue,
@@ -576,7 +595,9 @@ HardwareExecutorVulkan &HardwareExecutorVulkan::commit()
             VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
             timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             timelineWaitSemaphoreSubmitInfo.semaphore = currentRecordQueue->timelineSemaphore;
-            timelineWaitSemaphoreSubmitInfo.value = currentRecordQueue->timelineValue->load(std::memory_order_acquire);
+            // 使用 pickQueueAndCommit 中记录的确切 signal 值，
+            // 避免在 mutex 释放后读取可能已被其他线程递增的 timelineValue
+            timelineWaitSemaphoreSubmitInfo.value = this->lastSignalValue;
             timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
             waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);
         }

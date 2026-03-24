@@ -135,7 +135,7 @@ struct HardwareExecutorVulkan
             {
                 // CPU-bridge fallback：跨设备 semaphore 导入不可用（不同架构 GPU），
                 // 回退到 host 侧等待外部设备完成，再让本地 GPU 继续
-                uint64_t waitValue = other.currentRecordQueue->timelineValue->load(std::memory_order_acquire);
+                uint64_t waitValue = other.lastSignalValue;
                 VkSemaphore foreignSem = other.currentRecordQueue->timelineSemaphore;
                 VkDevice foreignDevice = other.currentRecordQueue->deviceManager->getLogicalDevice();
 
@@ -160,7 +160,7 @@ struct HardwareExecutorVulkan
             VkSemaphoreSubmitInfo timelineWaitSemaphoreSubmitInfo{};
             timelineWaitSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             timelineWaitSemaphoreSubmitInfo.semaphore = resolvedSemaphore;
-            timelineWaitSemaphoreSubmitInfo.value = other.currentRecordQueue->timelineValue->load(std::memory_order_acquire);
+            timelineWaitSemaphoreSubmitInfo.value = other.lastSignalValue;
             timelineWaitSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
             waitSemaphores.push_back(timelineWaitSemaphoreSubmitInfo);
         }
@@ -199,6 +199,7 @@ struct HardwareExecutorVulkan
                                                          std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand);
 
     DeviceManager::QueueUtils *currentRecordQueue{nullptr};
+    uint64_t lastSignalValue{0}; // 记录最近一次提交的 signal timeline 值，避免跨原子操作竞态
     std::shared_ptr<HardwareContext::HardwareUtils> hardwareContext;
     std::vector<CommandRecordVulkan *> commandList;
     std::vector<VkSemaphoreSubmitInfo> waitSemaphores;
