@@ -573,6 +573,11 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         ktm::uvec2 newSize{std::clamp(capabilities.currentExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
                            std::clamp(capabilities.currentExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)};
 
+        if (newSize.x == 0u || newSize.y == 0u)
+        {
+            return false;
+        }
+
         if (needsSwapChainRecreation(newSize))
         {
             recreateSwapChain();
