@@ -67,8 +67,20 @@ cmake --build .
 - [构建系统配置](3-build-system-and-cmake-setup) 后续完善
 
 ### 待办事项
+- （紧急）shader中不同的textureSampler，分离的图像和采样器描述符
+- 多线程内存泄漏、多线程死锁、多线程crash
+-  加载 gltf 模型材质，vulkan 内存屏障报错
+- HardwareExecutor默认选择不同的队列家族
+- 移除display中的空命令提交
+- 自动判断image的layout
+- 交换链逻辑错误
+- 解决命令行的Warning
+- BUG：VMA的buffer导入导出
+- BUG：mutiview初始化黑屏
+- 图片导入导出：importImageMemory、exportImageMemory（VK_EXT_external_memory）
+- bug: usd模型导入概率性vulkan报错 device lost
+- bug：intel核显 内存屏障会寄
 
-当前项目正在积极开发中,已知问题包括 UBO bindless 优化、多线程内存泄漏、Intel 核显兼容性等。详见 [README.md](README.md#L1-L15) 完整列表。
 
 ### 许可证
 
