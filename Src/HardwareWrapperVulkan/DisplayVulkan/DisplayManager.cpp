@@ -646,7 +646,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
             VkSemaphoreSubmitInfo signalInfo{};
             signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             signalInfo.pNext = nullptr;
-            signalInfo.semaphore = renderFinishedSemaphores[currentFrame];
+            signalInfo.semaphore = renderFinishedSemaphores[imageIndex];
             signalInfo.value = 0;
             signalInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
             signalSemaphoreInfos.push_back(signalInfo);
@@ -671,7 +671,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = &renderFinishedSemaphores[currentFrame];
+        presentInfo.pWaitSemaphores = &renderFinishedSemaphores[imageIndex];
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = &swapChain;
         presentInfo.pImageIndices = &imageIndex;
