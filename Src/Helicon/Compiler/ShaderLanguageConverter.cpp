@@ -1064,10 +1064,7 @@ namespace EmbeddedShader
 			bindInfo.location = compiler->get_decoration(item.id, spv::DecorationLocation);
 
 			bindInfo.bindType = ShaderCodeModule::ShaderResources::uniformBuffers;
-			// result.bindInfoPool.push_back(bindInfo);
-			result.bindInfoPool.insert(
-				std::pair<std::string, ShaderCodeModule::ShaderResources::ShaderBindInfo>(
-					bindInfo.variateName, bindInfo));
+			result.bindInfoPool.push_back(bindInfo);
 
 			// 记录 UBO 的总大小和名称
 			result.uniformBufferSize = bindInfo.typeSize;
@@ -1078,15 +1075,13 @@ namespace EmbeddedShader
 			for (size_t memberIdx = 0; memberIdx < uboType.member_types.size(); ++memberIdx)
 			{
 				ShaderCodeModule::ShaderResources::ShaderBindInfo memberInfo = {};
-				memberInfo.variateName = item.name + "." + compiler->get_member_name(item.base_type_id, memberIdx);
+				memberInfo.variateName = compiler->get_member_name(item.base_type_id, memberIdx);
 				memberInfo.byteOffset = compiler->type_struct_member_offset(uboType, memberIdx);
 				memberInfo.typeSize = (uint32_t) compiler->get_declared_struct_member_size(uboType, memberIdx);
 				memberInfo.bindType = ShaderCodeModule::ShaderResources::uniformBufferMembers;
 				memberInfo.set = bindInfo.set;
 				memberInfo.binding = bindInfo.binding;
-				result.bindInfoPool.insert(
-					std::pair<std::string, ShaderCodeModule::ShaderResources::ShaderBindInfo>(
-						memberInfo.variateName, memberInfo));
+				result.bindInfoPool.push_back(memberInfo);
 			}
 		}
 
@@ -1103,10 +1098,7 @@ namespace EmbeddedShader
 
 			bindInfo.bindType = ShaderCodeModule::ShaderResources::sampledImages;
 
-			// result.bindInfoPool.push_back(bindInfo);
-			result.bindInfoPool.insert(
-				std::pair<std::string, ShaderCodeModule::ShaderResources::ShaderBindInfo>(
-					bindInfo.variateName, bindInfo));
+			result.bindInfoPool.push_back(bindInfo);
 		}
 
 		for (auto& item: res.stage_inputs)
@@ -1140,9 +1132,7 @@ namespace EmbeddedShader
 
 			bindInfo.bindType = ShaderCodeModule::ShaderResources::stageInputs;
 
-			result.bindInfoPool.insert(
-				std::pair<std::string, ShaderCodeModule::ShaderResources::ShaderBindInfo>(
-					bindInfo.variateName, bindInfo));
+			result.bindInfoPool.push_back(bindInfo);
 		}
 
 		for (auto& item: res.stage_outputs)
@@ -1176,9 +1166,7 @@ namespace EmbeddedShader
 
 			bindInfo.bindType = ShaderCodeModule::ShaderResources::stageOutputs;
 
-			result.bindInfoPool.insert(
-				std::pair<std::string, ShaderCodeModule::ShaderResources::ShaderBindInfo>(
-					bindInfo.variateName, bindInfo));
+			result.bindInfoPool.push_back(bindInfo);
 		}
 
 		for (auto& item: res.push_constant_buffers)
@@ -1198,9 +1186,7 @@ namespace EmbeddedShader
 
 				bindInfo.bindType = ShaderCodeModule::ShaderResources::pushConstantMembers;
 
-				result.bindInfoPool.insert(
-					std::pair<std::string, ShaderCodeModule::ShaderResources::ShaderBindInfo>(
-						result.pushConstantName + "." + bindInfo.variateName, bindInfo));
+				result.bindInfoPool.push_back(bindInfo);
 			}
 		}
 
@@ -1295,7 +1281,7 @@ namespace EmbeddedShader
 				case slang::BindingType::Unknown:
 				default: return;
 			}
-			resource.bindInfoPool.insert({name.data(), bindInfo});
+			resource.bindInfoPool.push_back(bindInfo);
 			return;
 		}
 
@@ -1307,6 +1293,6 @@ namespace EmbeddedShader
 		bindInfo.variateName = var->getName();
 		bindInfo.location = var->getSemanticName() ? var->getSemanticIndex() : 0;
 		bindInfo.semantic = var->getSemanticName() ? var->getSemanticName() : "";
-		resource.bindInfoPool.insert({name.data(), bindInfo});
+		resource.bindInfoPool.push_back(bindInfo);
 	}
 }

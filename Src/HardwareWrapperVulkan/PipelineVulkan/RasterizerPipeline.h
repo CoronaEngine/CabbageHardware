@@ -63,18 +63,10 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan
 
     // std::variant<HardwarePushConstant, HardwareBuffer*, HardwareImage*> operator[](const std::string& resourceName);
 
-    void setPushConstant(const std::string &name, const void *data, size_t size);
-    void setResource(const std::string &name, const HardwareBuffer &buffer);
-    void setResource(const std::string &name, const HardwareImage &image);
-
     // Direct-access methods: bypass string lookup, use pre-resolved metadata
     void setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType);
     void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType);
     void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType, uint32_t location = 0);
-
-    [[nodiscard]] HardwarePushConstant getPushConstant(const std::string &name);
-    [[nodiscard]] HardwareBuffer getBuffer(const std::string &name);
-    [[nodiscard]] HardwareImage getImage(const std::string &name);
 
     RasterizerPipelineVulkan *operator()(uint16_t width, uint16_t height);
 
@@ -146,7 +138,4 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan
     std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> vertexStageOutputs;
     std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> fragmentStageInputs;
     std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> fragmentStageOutputs;
-
-    EmbeddedShader::ShaderCodeModule::ShaderResources vertexResource;
-    EmbeddedShader::ShaderCodeModule::ShaderResources fragmentResource;
 };

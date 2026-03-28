@@ -80,27 +80,15 @@ namespace EmbeddedShader
             uint32_t uniformBufferSize = 0;
             std::string uniformBufferName;
 
-            std::unordered_map<std::string, ShaderBindInfo> bindInfoPool;
+            std::vector<ShaderBindInfo> bindInfoPool;
 
+            // 仅在编译期使用：按 variateName 线性搜索
             ShaderBindInfo *findShaderBindInfo(const std::string &resourceName)
             {
-                auto it = bindInfoPool.find(resourceName);
-                if (it != bindInfoPool.end())
+                for (auto &info : bindInfoPool)
                 {
-                    return &it->second;
-                }
-                // Prefix fallback: resolve short AST names like "global_var_0"
-                if (!pushConstantName.empty())
-                {
-                    it = bindInfoPool.find(pushConstantName + "." + resourceName);
-                    if (it != bindInfoPool.end())
-                        return &it->second;
-                }
-                if (!uniformBufferName.empty())
-                {
-                    it = bindInfoPool.find(uniformBufferName + "." + resourceName);
-                    if (it != bindInfoPool.end())
-                        return &it->second;
+                    if (info.variateName == resourceName)
+                        return &info;
                 }
                 return nullptr;
             }
@@ -168,5 +156,9 @@ namespace EmbeddedShader
     private:
         std::string sourceLocationStr;
         std::string stage;
+
+        // Per-instance compiled output storage (replaces debugHardcodeShaders)
+        using CompiledVariant = std::variant<ShaderCodeModule::ShaderResources, std::variant<std::vector<uint32_t>, std::string>>;
+        mutable std::unordered_map<std::string, CompiledVariant> compiledOutputs_;
     };
 }

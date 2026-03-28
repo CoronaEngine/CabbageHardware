@@ -35,9 +35,5 @@ namespace EmbeddedShader
 		static inline std::unordered_map<std::string, TargetInfo> targetInfos;
         static inline std::filesystem::path hardcodePath = std::string(HELICON_ROOT_PATH) + "/Src/Helicon/Compiler/HardcodeShaders/";
 		static inline bool isClearOldHardcodeFiles = false;
-
-#ifdef CABBAGE_ENGINE_DEBUG
-		static inline std::unordered_map<std::string, std::unordered_map<std::string, std::variant<ShaderCodeModule::ShaderResources,std::variant<std::vector<uint32_t>,std::string>>>> debugHardcodeShaders;
-#endif
 	};
 }

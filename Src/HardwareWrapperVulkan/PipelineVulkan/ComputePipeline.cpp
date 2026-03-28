@@ -21,7 +21,6 @@ ComputePipelineVulkan::ComputePipelineVulkan(std::string shaderCode,
                                                 sourceLocation);
 
     this->shaderCode = compiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV);
-    this->shaderResource = this->shaderCode.shaderResources;
 
     const uint32_t pushConstantSize = this->shaderCode.shaderResources.pushConstantSize;
     if (pushConstantSize > 0)
@@ -43,7 +42,6 @@ ComputePipelineVulkan::ComputePipelineVulkan(const EmbeddedShader::ShaderCodeCom
     : ComputePipelineVulkan()
 {
     this->shaderCode = compiler.getShaderCode(EmbeddedShader::ShaderLanguage::SpirV, true);
-    this->shaderResource = this->shaderCode.shaderResources;
 
     const uint32_t pushConstantSize = this->shaderCode.shaderResources.pushConstantSize;
     if (pushConstantSize > 0)
@@ -68,7 +66,6 @@ ComputePipelineVulkan::ComputePipelineVulkan(const std::vector<uint32_t> &spirV,
     auto resources = EmbeddedShader::ShaderLanguageConverter::spirvCrossReflectedBindInfo(spirV, EmbeddedShader::ShaderLanguage::HLSL);
 
     this->shaderCode = EmbeddedShader::ShaderCodeModule(spirV, resources);
-    this->shaderResource = resources;
 
     const uint32_t pushConstantSize = resources.pushConstantSize;
     if (pushConstantSize > 0)
@@ -120,76 +117,6 @@ ComputePipelineVulkan::~ComputePipelineVulkan()
             uboDescriptorSetLayout = VK_NULL_HANDLE;
         }
     }
-}
-
-void ComputePipelineVulkan::setPushConstant(const std::string &name, const void *data, size_t size)
-{
-    auto *resource = shaderResource.findShaderBindInfo(name);
-
-    if (resource && resource->bindType == EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::pushConstantMembers)
-    {
-        uint8_t *dst = pushConstant.getData();
-        if (dst)
-        {
-            std::memcpy(dst + resource->byteOffset, data, size);
-        }
-        return;
-    }
-
-    if (resource && resource->bindType == EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::uniformBufferMembers)
-    {
-        uint8_t *dst = tempUBO.getData();
-        if (dst)
-        {
-            std::memcpy(dst + resource->byteOffset, data, size);
-            uboDescriptorDirty = true;
-        }
-        return;
-    }
-
-    throw std::runtime_error("Failed to find push constant or UBO member with name: " + name);
-}
-
-void ComputePipelineVulkan::setResource(const std::string &name, const HardwareBuffer &buffer)
-{
-    auto *resource = shaderResource.findShaderBindInfo(name);
-    if (resource && resource->bindType == EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::pushConstantMembers)
-    {
-        uint32_t descriptorIndex = const_cast<HardwareBuffer&>(buffer).storeDescriptor();
-        uint8_t *dst = pushConstant.getData();
-        if (dst)
-        {
-            if (resource->typeSize >= 8) {
-                uint32_t handleData[2] = { descriptorIndex, 0 };
-                std::memcpy(dst + resource->byteOffset, handleData, 8);
-            } else {
-                std::memcpy(dst + resource->byteOffset, &descriptorIndex, sizeof(descriptorIndex));
-            }
-        }
-        return;
-    }
-    throw std::runtime_error("Buffer resource setting not implemented for ComputePipeline: " + name);
-}
-
-void ComputePipelineVulkan::setResource(const std::string &name, const HardwareImage &image)
-{
-    auto *resource = shaderResource.findShaderBindInfo(name);
-    if (resource && resource->bindType == EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::pushConstantMembers)
-    {
-        uint32_t descriptorIndex = const_cast<HardwareImage&>(image).storeDescriptor();
-        uint8_t *dst = pushConstant.getData();
-        if (dst)
-        {
-            if (resource->typeSize >= 8) {
-                uint32_t handleData[2] = { descriptorIndex, 0 };
-                std::memcpy(dst + resource->byteOffset, handleData, 8);
-            } else {
-                std::memcpy(dst + resource->byteOffset, &descriptorIndex, sizeof(descriptorIndex));
-            }
-        }
-        return;
-    }
-    throw std::runtime_error("Image resource setting not implemented for ComputePipeline: " + name);
 }
 
 void ComputePipelineVulkan::setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType)
@@ -250,31 +177,6 @@ void ComputePipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t type
             }
         }
     }
-}
-
-HardwarePushConstant ComputePipelineVulkan::getPushConstant(const std::string &name)
-{
-    auto *resource = shaderResource.findShaderBindInfo(name);
-
-    if (resource && resource->bindType == EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::pushConstantMembers)
-    {
-        return HardwarePushConstant(resource->typeSize, resource->byteOffset, &pushConstant);
-    }
-    if (resource && resource->bindType == EmbeddedShader::ShaderCodeModule::ShaderResources::BindType::uniformBufferMembers)
-    {
-        return HardwarePushConstant(resource->typeSize, resource->byteOffset, &tempUBO);
-    }
-    throw std::runtime_error("Failed to find push constant or UBO member with name: " + name);
-}
-
-HardwareBuffer ComputePipelineVulkan::getBuffer(const std::string &name)
-{
-    throw std::runtime_error("Buffer resource getting not implemented for ComputePipeline: " + name);
-}
-
-HardwareImage ComputePipelineVulkan::getImage(const std::string &name)
-{
-    throw std::runtime_error("Image resource getting not implemented for ComputePipeline: " + name);
 }
 
 ComputePipelineVulkan *ComputePipelineVulkan::operator()(uint16_t x, uint16_t y, uint16_t z)
