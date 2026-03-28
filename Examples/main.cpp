@@ -245,7 +245,7 @@ int main()
         auto renderThread = [&](uint32_t threadIndex) {
             //CFW_LOG_INFO("Render thread {} started...", threadIndex);
 
-            RasterizerPipeline rasterizer(vert_glsl::spirv, frag_glsl::spirv);
+            //RasterizerPipeline rasterizer(vert_glsl::spirv, frag_glsl::spirv);
 
 //#ifdef TEST_HELICON
             using namespace EmbeddedShader;
@@ -290,6 +290,20 @@ int main()
             compilerOption.compileGLSL = true;
             compilerOption.enableBindless = true;
 
+            // 最小 Raster EDSL：VS 仅输出 position，FS 输出固定颜色
+            auto vsLambda = [&](Float3 inPosition, Float3 inNormal, Float2 inTexCoord, Float3 inColor) -> Float4
+            {
+                position() = Float4(inPosition, 1.0f);
+                return Float4(inColor, 1.0f);
+            };
+
+            auto fsLambda = [&](Float4 interpolatedColor) -> Float4
+            {
+                return Float4(0.18f, 0.72f, 0.35f, 1.0f);
+            };
+
+            RasterizerPipeline rasterizer(vsLambda, fsLambda);
+
             auto computePipeline = ComputePipelineObject::compile(compute, uvec3(8, 8, 1), compilerOption);
             auto computeShaderCode = computePipeline.compute->getShaderCode(ShaderLanguage::GLSL, true).shaderCode;
             std::string computeShaderCodeStr = std::get<std::string>(computeShaderCode);
@@ -316,12 +330,12 @@ int main()
                 for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
                 {
                     // Proxy-as-key：通过 shader 反射生成的 BindingKey 绑定资源
-                    rasterizer[vert_glsl::pushConsts::storageBufferIndex] = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
+                    //rasterizer[vert_glsl::pushConsts::storageBufferIndex] = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
                     // UBO 字段直接写入
-                    rasterizer[vert_glsl::GlobalUniformParam::globalTime] = currentTime; 
-                    rasterizer[vert_glsl::GlobalUniformParam::globalScale] = 2.0f + sin(currentTime) * 2.0f;
-                    rasterizer[vert_glsl::GlobalUniformParam::frameCount] = static_cast<uint32_t>(frameCount);
-                    rasterizer[vert_glsl::GlobalUniformParam::padding] = 0u;
+                    //rasterizer[vert_glsl::GlobalUniformParam::globalTime] = currentTime; 
+                    //rasterizer[vert_glsl::GlobalUniformParam::globalScale] = 2.0f + sin(currentTime) * 2.0f;
+                    //rasterizer[vert_glsl::GlobalUniformParam::frameCount] = static_cast<uint32_t>(frameCount);
+                    //rasterizer[vert_glsl::GlobalUniformParam::padding] = 0u;
                     // rasterizer[vert::inPosition] = postionBuffer;
                     // rasterizer[vert::inColor] = colorBuffer;
                     // rasterizer[vert::inTexCoord] = uvBuffer;
