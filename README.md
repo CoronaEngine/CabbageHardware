@@ -8,7 +8,7 @@
 - 后端实现：`Src/HardwareWrapperVulkan`
 - 着色器工具链：`Src/Helicon` + `Scripts/ShaderCompileScripts`
 - 构建系统：CMake + CMake Presets + FetchContent
-- 现状：可开发，但仍处于稳定性迭代期（见 `docs/troubleshooting/known-issues.md`）
+- 现状：可开发，但仍处于稳定性迭代期
 
 ## 待办事项
 
