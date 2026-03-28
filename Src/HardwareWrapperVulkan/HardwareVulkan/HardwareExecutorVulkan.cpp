@@ -266,7 +266,6 @@ DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
                                                                       std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand)
 {
     DeviceManager::QueueUtils *queue;
-    uint16_t queueIndex = 0;
 
     while (true)
     {
