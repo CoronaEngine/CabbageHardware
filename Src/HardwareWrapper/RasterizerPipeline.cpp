@@ -228,29 +228,6 @@ HardwareImage RasterizerPipeline::getDepthImage()
     return img;
 }
 
-ResourceProxy RasterizerPipeline::operator[](const std::string &resourceName)
-{
-    return ResourceProxy(this, resourceName);
-}
-
-void RasterizerPipeline::setPushConstant(const std::string &name, const void *data, size_t size)
-{
-    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
-    handle->impl->setPushConstant(name, data, size);
-}
-
-void RasterizerPipeline::setResource(const std::string &name, const HardwareBuffer &buffer)
-{
-    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
-    handle->impl->setResource(name, buffer);
-}
-
-void RasterizerPipeline::setResource(const std::string &name, const HardwareImage &image)
-{
-    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
-    handle->impl->setResource(name, image);
-}
-
 void RasterizerPipeline::setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType)
 {
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
@@ -267,24 +244,6 @@ void RasterizerPipeline::setResourceDirect(uint64_t byteOffset, uint32_t typeSiz
 {
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
     handle->impl->setResourceDirect(byteOffset, typeSize, image, bindType, location);
-}
-
-HardwarePushConstant RasterizerPipeline::getPushConstant(const std::string &name) const
-{
-    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
-    return handle->impl->getPushConstant(name);
-}
-
-HardwareBuffer RasterizerPipeline::getBuffer(const std::string &name) const
-{
-    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
-    return handle->impl->getBuffer(name);
-}
-
-HardwareImage RasterizerPipeline::getImage(const std::string &name) const
-{
-    auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
-    return handle->impl->getImage(name);
 }
 
 RasterizerPipeline &RasterizerPipeline::operator()(uint16_t width, uint16_t height)

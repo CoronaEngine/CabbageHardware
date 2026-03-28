@@ -8,10 +8,9 @@
 
 namespace EmbeddedShader
 {
-	// Entry for auto-binding: maps an AST variable name to the proxy's resource pointer.
+	// Entry for auto-binding: maps an EDSL proxy's resource pointer to pre-resolved bind metadata.
 	struct AutoBindEntry
 	{
-		std::string name;          // AST name, e.g. "global_var_0"
 		void** boundResourceRef;   // → points to proxy's boundResource_ (void*)
 
 		// Direct-access metadata (resolved at compile time)
@@ -71,7 +70,6 @@ namespace EmbeddedShader
 						if (auto* bindInfo = codeModule.shaderResources.findShaderBindInfo(def->texture->name))
 						{
 							result.autoBindEntries.push_back({
-								def->texture->name,
 								def->texture->boundResourceRef,
 								bindInfo->byteOffset,
 								bindInfo->typeSize,

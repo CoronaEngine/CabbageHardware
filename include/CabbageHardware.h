@@ -316,35 +316,23 @@ struct ResourceProxy
   private:
     ComputePipeline *compute_pipeline_{nullptr};
     RasterizerPipeline *rasterizer_pipeline_{nullptr};
-    std::string resource_name_;
 
     // Direct-access metadata (from BindingKey)
     uint64_t byte_offset_{0};
     uint32_t type_size_{0};
     int32_t  bind_type_{-1};
     uint32_t location_{0};
-    bool has_metadata_{false};
 
   public:
-    ResourceProxy(ComputePipeline *p, std::string name)
-        : compute_pipeline_(p), resource_name_(std::move(name))
+    ResourceProxy(ComputePipeline *p, uint64_t offset, uint32_t size, int32_t type, uint32_t loc)
+        : compute_pipeline_(p),
+          byte_offset_(offset), type_size_(size), bind_type_(type), location_(loc)
     {
     }
 
-    ResourceProxy(RasterizerPipeline *p, std::string name)
-        : rasterizer_pipeline_(p), resource_name_(std::move(name))
-    {
-    }
-
-    ResourceProxy(ComputePipeline *p, std::string name, uint64_t offset, uint32_t size, int32_t type, uint32_t loc)
-        : compute_pipeline_(p), resource_name_(std::move(name)),
-          byte_offset_(offset), type_size_(size), bind_type_(type), location_(loc), has_metadata_(true)
-    {
-    }
-
-    ResourceProxy(RasterizerPipeline *p, std::string name, uint64_t offset, uint32_t size, int32_t type, uint32_t loc)
-        : rasterizer_pipeline_(p), resource_name_(std::move(name)),
-          byte_offset_(offset), type_size_(size), bind_type_(type), location_(loc), has_metadata_(true)
+    ResourceProxy(RasterizerPipeline *p, uint64_t offset, uint32_t size, int32_t type, uint32_t loc)
+        : rasterizer_pipeline_(p),
+          byte_offset_(offset), type_size_(size), bind_type_(type), location_(loc)
     {
     }
 
@@ -412,57 +400,20 @@ struct ComputePipeline
         return computePipelineID.load(std::memory_order_acquire);
     }
 
-    ResourceProxy operator[](const std::string &resourceName);
-
   private:
     friend struct ResourceProxy;
 
 
     template<typename ProxyType>
-        requires requires(const ProxyType& p) { { p.getAstName() } -> std::convertible_to<std::string>; }
+        requires requires(const ProxyType& t) { t.byteOffset; t.typeSize; t.bindType; t.location; }
     ResourceProxy operator[](const ProxyType& proxy)
     {
-        if constexpr (requires(const ProxyType& t) { { t.hasMetadata() } -> std::convertible_to<bool>; t.byteOffset; t.typeSize; t.bindType; t.location; })
-        {
-            if (proxy.hasMetadata())
-                return ResourceProxy(this, proxy.getAstName(), proxy.byteOffset, proxy.typeSize, proxy.bindType, proxy.location);
-        }
-        return ResourceProxy(this, proxy.getAstName());
+        return ResourceProxy(this, proxy.byteOffset, proxy.typeSize, proxy.bindType, proxy.location);
     }
-
-    template<typename ProxyType>
-        requires requires(const ProxyType& p) {
-            { p.getAstName() } -> std::convertible_to<std::string>;
-            { p.resource() } -> std::convertible_to<HardwareImage*>;
-        }
-    void bind(const ProxyType& proxy)
-    {
-        if (auto* img = proxy.resource()) setResource(proxy.getAstName(), *img);
-    }
-
-    template<typename KeyType>
-        requires requires(const KeyType& k) {
-            { k.getAstName() } -> std::convertible_to<std::string>;
-            { k.boundImage() } -> std::convertible_to<HardwareImage*>;
-            { k.boundBuffer() } -> std::convertible_to<HardwareBuffer*>;
-        }
-    void bind(const KeyType& key)
-    {
-        if (auto* img = key.boundImage()) setResource(key.getAstName(), *img);
-        else if (auto* buf = key.boundBuffer()) setResource(key.getAstName(), *buf);
-    }
-
-    void setPushConstant(const std::string &name, const void *data, size_t size);
-    void setResource(const std::string &name, const HardwareBuffer &buffer);
-    void setResource(const std::string &name, const HardwareImage &image);
 
     void setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType);
     void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType);
     void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType);
-
-    [[nodiscard]] HardwarePushConstant getPushConstant(const std::string &name) const;
-    [[nodiscard]] HardwareBuffer getBuffer(const std::string &name) const;
-    [[nodiscard]] HardwareImage getImage(const std::string &name) const;
 
     mutable std::mutex computePipelineMutex;
     std::atomic<std::uintptr_t> computePipelineID;
@@ -512,15 +463,10 @@ struct RasterizerPipeline
     // 用法: rasterizer[vert_glsl::GlobalUniformParam::globalTime] = currentTime;
     //       rasterizer[frag_glsl::outColor] = finalOutputImage;
     template<typename ProxyType>
-        requires requires(const ProxyType& p) { { p.getAstName() } -> std::convertible_to<std::string>; }
+        requires requires(const ProxyType& t) { t.byteOffset; t.typeSize; t.bindType; t.location; }
     ResourceProxy operator[](const ProxyType& proxy)
     {
-        if constexpr (requires(const ProxyType& t) { { t.hasMetadata() } -> std::convertible_to<bool>; t.byteOffset; t.typeSize; t.bindType; t.location; })
-        {
-            if (proxy.hasMetadata())
-                return ResourceProxy(this, proxy.getAstName(), proxy.byteOffset, proxy.typeSize, proxy.bindType, proxy.location);
-        }
-        return ResourceProxy(this, proxy.getAstName());
+        return ResourceProxy(this, proxy.byteOffset, proxy.typeSize, proxy.bindType, proxy.location);
     }
 
     RasterizerPipeline &operator()(uint16_t width, uint16_t height);
@@ -532,22 +478,12 @@ struct RasterizerPipeline
         return rasterizerPipelineID.load(std::memory_order_acquire);
     }
 
-    ResourceProxy operator[](const std::string &resourceName);
-
   private:
     friend struct ResourceProxy;
-
-    void setPushConstant(const std::string &name, const void *data, size_t size);
-    void setResource(const std::string &name, const HardwareBuffer &buffer);
-    void setResource(const std::string &name, const HardwareImage &image);
 
     void setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType);
     void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType);
     void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType, uint32_t location = 0);
-
-    [[nodiscard]] HardwarePushConstant getPushConstant(const std::string &name) const;
-    [[nodiscard]] HardwareBuffer getBuffer(const std::string &name) const;
-    [[nodiscard]] HardwareImage getImage(const std::string &name) const;
 
     mutable std::mutex rasterizerPipelineMutex;
     std::atomic<std::uintptr_t> rasterizerPipelineID;
@@ -597,54 +533,24 @@ ResourceProxy &ResourceProxy::operator=(const T &value)
 {
     if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareImage>)
     {
-        if (has_metadata_)
-        {
-            if (compute_pipeline_)
-                compute_pipeline_->setResourceDirect(byte_offset_, type_size_, value, bind_type_);
-            if (rasterizer_pipeline_)
-                rasterizer_pipeline_->setResourceDirect(byte_offset_, type_size_, value, bind_type_, location_);
-        }
-        else
-        {
-            if (compute_pipeline_)
-                compute_pipeline_->setResource(resource_name_, value);
-            if (rasterizer_pipeline_)
-                rasterizer_pipeline_->setResource(resource_name_, value);
-        }
+        if (compute_pipeline_)
+            compute_pipeline_->setResourceDirect(byte_offset_, type_size_, value, bind_type_);
+        if (rasterizer_pipeline_)
+            rasterizer_pipeline_->setResourceDirect(byte_offset_, type_size_, value, bind_type_, location_);
     }
     else if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareBuffer>)
     {
-        if (has_metadata_)
-        {
-            if (compute_pipeline_)
-                compute_pipeline_->setResourceDirect(byte_offset_, type_size_, value, bind_type_);
-            if (rasterizer_pipeline_)
-                rasterizer_pipeline_->setResourceDirect(byte_offset_, type_size_, value, bind_type_);
-        }
-        else
-        {
-            if (compute_pipeline_)
-                compute_pipeline_->setResource(resource_name_, value);
-            if (rasterizer_pipeline_)
-                rasterizer_pipeline_->setResource(resource_name_, value);
-        }
+        if (compute_pipeline_)
+            compute_pipeline_->setResourceDirect(byte_offset_, type_size_, value, bind_type_);
+        if (rasterizer_pipeline_)
+            rasterizer_pipeline_->setResourceDirect(byte_offset_, type_size_, value, bind_type_);
     }
     else if constexpr (!std::is_same_v<std::remove_cvref_t<T>, ResourceProxy>)
     {
-        if (has_metadata_)
-        {
-            if (compute_pipeline_)
-                compute_pipeline_->setPushConstantDirect(byte_offset_, &value, sizeof(T), bind_type_);
-            if (rasterizer_pipeline_)
-                rasterizer_pipeline_->setPushConstantDirect(byte_offset_, &value, sizeof(T), bind_type_);
-        }
-        else
-        {
-            if (compute_pipeline_)
-                compute_pipeline_->setPushConstant(resource_name_, &value, sizeof(T));
-            if (rasterizer_pipeline_)
-                rasterizer_pipeline_->setPushConstant(resource_name_, &value, sizeof(T));
-        }
+        if (compute_pipeline_)
+            compute_pipeline_->setPushConstantDirect(byte_offset_, &value, sizeof(T), bind_type_);
+        if (rasterizer_pipeline_)
+            rasterizer_pipeline_->setPushConstantDirect(byte_offset_, &value, sizeof(T), bind_type_);
     }
     return *this;
 }

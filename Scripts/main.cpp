@@ -295,11 +295,11 @@ std::set<std::string> generateBindingKeys(std::stringstream& out, const std::vec
 	{
 		bindingBlockNames.insert(resources.pushConstantName);
 		out << "struct " << resources.pushConstantName << "\n{\n";
-		for (auto& [key, info] : resources.bindInfoPool)
+		for (auto& info : resources.bindInfoPool)
 		{
 			if (info.bindType == ShaderCodeModule::ShaderResources::pushConstantMembers)
-				out << "\tstatic inline ::EmbeddedShader::BindingKey " << extractMemberName(key)
-				    << "{\"" << key << "\", " << info.byteOffset << ", " << info.typeSize
+				out << "\tstatic inline ::EmbeddedShader::BindingKey " << info.variateName
+				    << "{" << info.byteOffset << ", " << info.typeSize
 				    << ", " << static_cast<int32_t>(info.bindType) << ", " << info.location << "};\n";
 		}
 		out << "};\n";
@@ -310,31 +310,31 @@ std::set<std::string> generateBindingKeys(std::stringstream& out, const std::vec
 	{
 		bindingBlockNames.insert(resources.uniformBufferName);
 		out << "struct " << resources.uniformBufferName << "\n{\n";
-		for (auto& [key, info] : resources.bindInfoPool)
+		for (auto& info : resources.bindInfoPool)
 		{
 			if (info.bindType == ShaderCodeModule::ShaderResources::uniformBufferMembers)
-				out << "\tstatic inline ::EmbeddedShader::BindingKey " << extractMemberName(key)
-				    << "{\"" << key << "\", " << info.byteOffset << ", " << info.typeSize
+				out << "\tstatic inline ::EmbeddedShader::BindingKey " << info.variateName
+				    << "{" << info.byteOffset << ", " << info.typeSize
 				    << ", " << static_cast<int32_t>(info.bindType) << ", " << info.location << "};\n";
 		}
 		out << "};\n";
 	}
 
 	// Stage inputs
-	for (auto& [key, info] : resources.bindInfoPool)
+	for (auto& info : resources.bindInfoPool)
 	{
 		if (info.bindType == ShaderCodeModule::ShaderResources::stageInputs)
 			out << "inline ::EmbeddedShader::BindingKey " << info.variateName
-			    << "{\"" << key << "\", " << info.byteOffset << ", " << info.typeSize
+			    << "{" << info.byteOffset << ", " << info.typeSize
 			    << ", " << static_cast<int32_t>(info.bindType) << ", " << info.location << "};\n";
 	}
 
 	// Stage outputs
-	for (auto& [key, info] : resources.bindInfoPool)
+	for (auto& info : resources.bindInfoPool)
 	{
 		if (info.bindType == ShaderCodeModule::ShaderResources::stageOutputs)
 			out << "inline ::EmbeddedShader::BindingKey " << info.variateName
-			    << "{\"" << key << "\", " << info.byteOffset << ", " << info.typeSize
+			    << "{" << info.byteOffset << ", " << info.typeSize
 			    << ", " << static_cast<int32_t>(info.bindType) << ", " << info.location << "};\n";
 	}
 
