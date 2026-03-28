@@ -68,6 +68,7 @@ RasterizerPipeline::RasterizerPipeline(const RasterizerPipeline &other)
     std::lock_guard<std::mutex> lock(other.rasterizerPipelineMutex);
     auto const other_id = other.rasterizerPipelineID.load(std::memory_order_acquire);
     rasterizerPipelineID.store(other_id, std::memory_order_release);
+    autoBindEntries_ = other.autoBindEntries_;
     if (other_id > 0)
     {
         auto const handle = gRasterizerPipelineStorage.acquire_write(other_id);
@@ -81,6 +82,7 @@ RasterizerPipeline::RasterizerPipeline(RasterizerPipeline &&other) noexcept
     auto const other_id = other.rasterizerPipelineID.load(std::memory_order_acquire);
     rasterizerPipelineID.store(other_id, std::memory_order_release);
     other.rasterizerPipelineID.store(0, std::memory_order_release);
+    autoBindEntries_ = std::move(other.autoBindEntries_);
 }
 
 RasterizerPipeline::~RasterizerPipeline()
@@ -133,12 +135,14 @@ RasterizerPipeline &RasterizerPipeline::operator=(const RasterizerPipeline &othe
             gRasterizerPipelineStorage.deallocate(self_id);
         }
         rasterizerPipelineID.store(0, std::memory_order_release);
+        autoBindEntries_.clear();
         return *this;
     }
 
     if (self_id == 0)
     {
         rasterizerPipelineID.store(other_id, std::memory_order_release);
+        autoBindEntries_ = other.autoBindEntries_;
         auto const other_handle = gRasterizerPipelineStorage.acquire_write(other_id);
         incRaster(other_id, other_handle);
         return *this;
@@ -170,6 +174,7 @@ RasterizerPipeline &RasterizerPipeline::operator=(const RasterizerPipeline &othe
         gRasterizerPipelineStorage.deallocate(self_id);
     }
     rasterizerPipelineID.store(other_id, std::memory_order_release);
+    autoBindEntries_ = other.autoBindEntries_;
     return *this;
 }
 
@@ -199,6 +204,7 @@ RasterizerPipeline &RasterizerPipeline::operator=(RasterizerPipeline &&other) no
     }
     rasterizerPipelineID.store(other_id, std::memory_order_release);
     other.rasterizerPipelineID.store(0, std::memory_order_release);
+    autoBindEntries_ = std::move(other.autoBindEntries_);
     return *this;
 }
 
@@ -248,6 +254,14 @@ void RasterizerPipeline::setResourceDirect(uint64_t byteOffset, uint32_t typeSiz
 
 RasterizerPipeline &RasterizerPipeline::operator()(uint16_t width, uint16_t height)
 {
+    // Auto-bind: read current resource from each EDSL proxy's back-pointer
+    for (const auto& entry : autoBindEntries_)
+    {
+        if (void* res = *entry.boundResourceRef)
+        {
+            setResourceDirect(entry.byteOffset, entry.typeSize, *static_cast<HardwareImage*>(res), entry.bindType, entry.location);
+        }
+    }
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
     (*handle->impl)(width, height);
     return *this;

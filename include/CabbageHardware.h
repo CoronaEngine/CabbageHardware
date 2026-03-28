@@ -473,6 +473,20 @@ struct RasterizerPipeline
     RasterizerPipeline &record(const HardwareBuffer &indexBuffer, const HardwareBuffer &vertexBuffer);
     RasterizerPipeline &record(const HardwareBuffer &indexBuffer, const HardwareBuffer &vertexBuffer, const DrawIndexedParams &params);
 
+    // 将 Texture2D proxy 注册为渲染目标（render target），在 dispatch 时自动绑定
+    // 用法: rasterizer.bindRenderTarget(0, outputProxy);
+    template<typename T>
+    RasterizerPipeline& bindRenderTarget(uint32_t location, EmbeddedShader::Texture2DProxy<T>& proxy)
+    {
+        autoBindEntries_.push_back({
+            &proxy.boundResource_,
+            0, 0,
+            static_cast<int32_t>(EmbeddedShader::ShaderCodeModule::ShaderResources::stageOutputs),
+            location
+        });
+        return *this;
+    }
+
     [[nodiscard]] uintptr_t getRasterizerPipelineID() const
     {
         return rasterizerPipelineID.load(std::memory_order_acquire);
@@ -487,6 +501,7 @@ struct RasterizerPipeline
 
     mutable std::mutex rasterizerPipelineMutex;
     std::atomic<std::uintptr_t> rasterizerPipelineID;
+    std::vector<EmbeddedShader::AutoBindEntry> autoBindEntries_;
 };
 
 // ================= 对外封装：HardwareExecutor =================
@@ -605,6 +620,9 @@ RasterizerPipeline::RasterizerPipeline(VF &&vertexShaderCode,
         compilerOption,
         sourceLocation
     );
+
+    // 保存自动绑定条目（从 EDSL proxy 回溯指针收集）
+    autoBindEntries_ = std::move(pipelineObj.autoBindEntries);
 
     // 调用辅助函数完成 Vulkan 管线创建
     rasterizerPipelineInitFromCompiler(rasterizerPipelineID, 

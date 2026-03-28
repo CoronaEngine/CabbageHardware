@@ -87,6 +87,7 @@ void EmbeddedShader::Ast::Parser::reset()
 	structure.outputStatements.clear();
 	structure.shaderOnlyStatements.clear();
 	currentVariateIndex = 0;
+	nextRenderTargetLocation = 0;
 	positionOutput.reset();
 	dispatchThreadIDInput.reset();
     structure.spvSource.clear();
@@ -110,4 +111,9 @@ std::string EmbeddedShader::Ast::Parser::getUniqueGlobalVariateName()
 const std::vector<std::shared_ptr<EmbeddedShader::Ast::Statement>>& EmbeddedShader::Ast::Parser::getGlobalStatements()
 {
 	return currentParser->structure.globalStatements;
+}
+
+size_t EmbeddedShader::Ast::Parser::getNextRenderTargetLocation()
+{
+	return currentParser->nextRenderTargetLocation++;
 }

@@ -22,6 +22,7 @@
 #include "Codegen/TypeAlias.h"
 
 // 通过 CMake helicon_compile_shaders 自动编译生成的 shader 反射头文件
+// eDSL 路径不再依赖 GLSL 反射头文件，render target 通过 bindRenderTarget 自动绑定
 #include GLSL(vert.glsl)
 #include GLSL(frag.glsl)
 
@@ -73,6 +74,14 @@ struct RasterizerFragmentInputProxy
 struct ComputeStorageBufferObject
 {
     uint32_t imageID;
+};
+
+// MRT demo: VS→FS interpolation struct (struct 用于跨阶段传参)
+struct MRTInterpolantsProxy
+{
+    EmbeddedShader::Float4 color;
+    EmbeddedShader::Float3 worldNormal;
+    EmbeddedShader::Float2 uv;
 };
 
 int main()
@@ -290,19 +299,55 @@ int main()
             compilerOption.compileGLSL = true;
             compilerOption.enableBindless = true;
 
-            // 最小 Raster EDSL：VS 仅输出 position，FS 输出固定颜色
+            // 最小 Raster EDSL：VS 仅输出 position，FS 通过 struct 返回支持 MRT
             auto vsLambda = [&](Float3 inPosition, Float3 inNormal, Float2 inTexCoord, Float3 inColor) -> Float4
             {
                 position() = Float4(inPosition, 1.0f);
                 return Float4(inColor, 1.0f);
             };
 
-            auto fsLambda = [&](Float4 interpolatedColor) -> Float4
+            // FS 通过 operator<< 将结果写入 render target（自动绑定，无需手动 bindRenderTarget）
+            auto fsLambda = [&](Float4 interpolatedColor)
             {
-                return Float4(0.18f, 0.72f, 0.35f, 1.0f);
+                inputImageRGBA16 << Float4(0.18f, 0.72f, 0.35f, 1.0f);
             };
 
             RasterizerPipeline rasterizer(vsLambda, fsLambda);
+            // render target 已通过 operator() 自动绑定，不再需要 bindRenderTarget
+
+            // === MRT demo: struct VS→FS 传参 + 多 render target via operator() ===
+            HardwareImageCreateInfo mrtCreateInfo;
+            mrtCreateInfo.width = 1920;
+            mrtCreateInfo.height = 1080;
+            mrtCreateInfo.format = ImageFormat::RGBA16_FLOAT;
+            mrtCreateInfo.usage = ImageUsage::StorageImage;
+            mrtCreateInfo.arrayLayers = 1;
+            mrtCreateInfo.mipLevels = 1;
+
+            Texture2D<fvec4> albedoRT = HardwareImage(mrtCreateInfo);
+            Texture2D<fvec4> normalRT = HardwareImage(mrtCreateInfo);
+
+            // VS 返回 struct，FS 接收 struct（跨阶段传参）
+            auto vsLambdaMRT = [&](Float3 inPosition, Float3 inNormal, Float2 inTexCoord, Float3 inColor) -> Aggregate<MRTInterpolantsProxy>
+            {
+                position() = Float4(inPosition, 1.0f);
+                Aggregate<MRTInterpolantsProxy> out;
+                out->color = Float4(inColor, 1.0f);
+                out->worldNormal = inNormal;
+                out->uv = inTexCoord;
+                return out;
+            };
+
+            // FS 通过 operator<< 写入多个 render target（自动分配 SV_TARGET location）
+            auto fsLambdaMRT = [&](Aggregate<MRTInterpolantsProxy> input)
+            {
+                // SV_TARGET0: albedo
+                albedoRT << input->color;
+                // SV_TARGET1: world-space normal
+                normalRT << Float4(input->worldNormal, 1.0f);
+            };
+
+            RasterizerPipeline rasterizerMRT(vsLambdaMRT, fsLambdaMRT);
 
             auto computePipeline = ComputePipelineObject::compile(compute, uvec3(8, 8, 1), compilerOption);
             auto computeShaderCode = computePipeline.compute->getShaderCode(ShaderLanguage::GLSL, true).shaderCode;
@@ -341,8 +386,7 @@ int main()
                     // rasterizer[vert::inTexCoord] = uvBuffer;
                     // rasterizer[vert::inNormal] = normalBuffer;
 
-                    rasterizer[frag_glsl::outColor] = finalOutputImages[threadIndex];
-
+                    // render target 已通过 bindRenderTarget 注册，dispatch 时自动绑定
                     rasterizer.record(indexBuffer, vertexBuffer);
                 }
 

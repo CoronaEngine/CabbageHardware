@@ -221,6 +221,10 @@ namespace EmbeddedShader::Ast
         // Back-pointer to the C++ proxy's boundResource_ (void*).
         // Used by auto-bind to read the current resource at dispatch time.
         void** boundResourceRef = nullptr;
+
+        // Render target location assigned by Texture2DProxy::operator().
+        // -1 means this texture is NOT used as a render target output.
+        int32_t renderTargetLocation = -1;
     };
 
     struct DefineUniversalTexture2D : Statement
