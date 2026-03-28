@@ -22,6 +22,7 @@
 #include "Codegen/TypeAlias.h"
 
 // 通过 CMake helicon_compile_shaders 自动编译生成的 shader 反射头文件
+// eDSL 路径不再依赖 GLSL 反射头文件，render target 通过 bindRenderTarget 自动绑定
 #include GLSL(vert.glsl)
 #include GLSL(frag.glsl)
 
@@ -73,6 +74,32 @@ struct RasterizerFragmentInputProxy
 struct ComputeStorageBufferObject
 {
     uint32_t imageID;
+};
+
+// Vertex attribute proxy: 统一定义顶点属性布局（字段顺序与 CPU 端 Vertex struct 一致）
+// VS 使用 Aggregate<VertexAttributeProxy> 作为输入参数，
+// 内部自动展开为独立的 LOCATION 属性，与传统 vertex input 等价
+struct VertexAttributeProxy
+{
+    EmbeddedShader::Float3 position;
+    EmbeddedShader::Float3 normal;
+    EmbeddedShader::Float2 texCoord;
+    EmbeddedShader::Float3 color;
+};
+
+// MRT demo: VS→FS interpolation struct (struct 用于跨阶段传参)
+struct MRTInterpolantsProxy
+{
+    EmbeddedShader::Float4 color;
+    EmbeddedShader::Float3 worldNormal;
+    EmbeddedShader::Float2 uv;
+};
+
+// MRT demo: FS output struct (字段顺序对应 SV_TARGET0, SV_TARGET1, ...)
+struct MRTOutputProxy
+{
+    EmbeddedShader::Float4 albedo;
+    EmbeddedShader::Float4 normal;
 };
 
 int main()
@@ -245,7 +272,7 @@ int main()
         auto renderThread = [&](uint32_t threadIndex) {
             //CFW_LOG_INFO("Render thread {} started...", threadIndex);
 
-            RasterizerPipeline rasterizer(vert_glsl::spirv, frag_glsl::spirv);
+            //RasterizerPipeline rasterizer(vert_glsl::spirv, frag_glsl::spirv);
 
 //#ifdef TEST_HELICON
             using namespace EmbeddedShader;
@@ -290,6 +317,59 @@ int main()
             compilerOption.compileGLSL = true;
             compilerOption.enableBindless = true;
 
+            // 最小 Raster EDSL：VS 使用 Aggregate 输入（与 FS 输出的 Aggregate 对称）
+            auto vsLambda = [&](Aggregate<VertexAttributeProxy> vertex) -> Float4
+            {
+                position() = Float4(vertex->position, 1.0f);
+                return Float4(vertex->color, 1.0f);
+            };
+
+            // FS return Float4 → 自动映射到 SV_TARGET0，资源绑定通过 bindOutputTargets 完成
+            auto fsLambda = [&](Float4 interpolatedColor) -> Float4
+            {
+                return Float4(0.18f, 0.72f, 0.35f, 1.0f);
+            };
+
+            RasterizerPipeline rasterizer(vsLambda, fsLambda);
+            rasterizer.bindOutputTargets(inputImageRGBA16);
+
+            // === MRT demo: struct VS→FS 传参 + 多 render target via operator() ===
+            HardwareImageCreateInfo mrtCreateInfo;
+            mrtCreateInfo.width = 1920;
+            mrtCreateInfo.height = 1080;
+            mrtCreateInfo.format = ImageFormat::RGBA16_FLOAT;
+            mrtCreateInfo.usage = ImageUsage::StorageImage;
+            mrtCreateInfo.arrayLayers = 1;
+            mrtCreateInfo.mipLevels = 1;
+
+            Texture2D<fvec4> albedoRT = HardwareImage(mrtCreateInfo);
+            Texture2D<fvec4> normalRT = HardwareImage(mrtCreateInfo);
+
+            // VS 返回 struct，FS 接收 struct（跨阶段传参）
+            // VS 输入也使用 Aggregate<VertexAttributeProxy>，与 FS 输出 Aggregate<MRTOutputProxy> 完全对称
+            auto vsLambdaMRT = [&](Aggregate<VertexAttributeProxy> vertex) -> Aggregate<MRTInterpolantsProxy>
+            {
+                position() = Float4(vertex->position, 1.0f);
+                Aggregate<MRTInterpolantsProxy> out;
+                out->color = Float4(vertex->color, 1.0f);
+                out->worldNormal = vertex->normal;
+                out->uv = vertex->texCoord;
+                return out;
+            };
+
+            // FS return Aggregate → 字段按顺序映射到 SV_TARGET0, SV_TARGET1, ...
+            // 资源绑定通过 bindOutputTargets，顺序与 struct 字段一致
+            auto fsLambdaMRT = [&](Aggregate<MRTInterpolantsProxy> input) -> Aggregate<MRTOutputProxy>
+            {
+                Aggregate<MRTOutputProxy> out;
+                out->albedo = input->color;
+                out->normal = Float4(input->worldNormal, 1.0f);
+                return out;
+            };
+
+            RasterizerPipeline rasterizerMRT(vsLambdaMRT, fsLambdaMRT);
+            rasterizerMRT.bindOutputTargets(albedoRT, normalRT);
+
             auto computePipeline = ComputePipelineObject::compile(compute, uvec3(8, 8, 1), compilerOption);
             auto computeShaderCode = computePipeline.compute->getShaderCode(ShaderLanguage::GLSL, true).shaderCode;
             std::string computeShaderCodeStr = std::get<std::string>(computeShaderCode);
@@ -316,19 +396,18 @@ int main()
                 for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
                 {
                     // Proxy-as-key：通过 shader 反射生成的 BindingKey 绑定资源
-                    rasterizer[vert_glsl::pushConsts::storageBufferIndex] = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
+                    //rasterizer[vert_glsl::pushConsts::storageBufferIndex] = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
                     // UBO 字段直接写入
-                    rasterizer[vert_glsl::GlobalUniformParam::globalTime] = currentTime; 
-                    rasterizer[vert_glsl::GlobalUniformParam::globalScale] = 2.0f + sin(currentTime) * 2.0f;
-                    rasterizer[vert_glsl::GlobalUniformParam::frameCount] = static_cast<uint32_t>(frameCount);
-                    rasterizer[vert_glsl::GlobalUniformParam::padding] = 0u;
+                    //rasterizer[vert_glsl::GlobalUniformParam::globalTime] = currentTime; 
+                    //rasterizer[vert_glsl::GlobalUniformParam::globalScale] = 2.0f + sin(currentTime) * 2.0f;
+                    //rasterizer[vert_glsl::GlobalUniformParam::frameCount] = static_cast<uint32_t>(frameCount);
+                    //rasterizer[vert_glsl::GlobalUniformParam::padding] = 0u;
                     // rasterizer[vert::inPosition] = postionBuffer;
                     // rasterizer[vert::inColor] = colorBuffer;
                     // rasterizer[vert::inTexCoord] = uvBuffer;
                     // rasterizer[vert::inNormal] = normalBuffer;
 
-                    rasterizer[frag_glsl::outColor] = finalOutputImages[threadIndex];
-
+                    // render target 已通过 bindRenderTarget 注册，dispatch 时自动绑定
                     rasterizer.record(indexBuffer, vertexBuffer);
                 }
 

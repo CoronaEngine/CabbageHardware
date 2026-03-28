@@ -440,8 +440,7 @@ struct RasterizerPipeline
 
     // 模板构造函数：接受 DSL lambda，内部完成编译
     template <typename VF, typename FF>
-        requires std::invocable<VF> && std::invocable<FF> &&
-                 (!std::is_convertible_v<VF, std::string>) && (!std::is_convertible_v<FF, std::string>)
+        requires (!std::is_convertible_v<VF, std::string>) && (!std::is_convertible_v<FF, std::string>)
     RasterizerPipeline(VF &&vertexShaderCode,
                        FF &&fragmentShaderCode,
                        uint32_t multiviewCount = 1,
@@ -474,6 +473,31 @@ struct RasterizerPipeline
     RasterizerPipeline &record(const HardwareBuffer &indexBuffer, const HardwareBuffer &vertexBuffer);
     RasterizerPipeline &record(const HardwareBuffer &indexBuffer, const HardwareBuffer &vertexBuffer, const DrawIndexedParams &params);
 
+    // 将 Texture2D proxy 注册为渲染目标（render target），在 dispatch 时自动绑定
+    // 用法: rasterizer.bindRenderTarget(0, outputProxy);
+    template<typename T>
+    RasterizerPipeline& bindRenderTarget(uint32_t location, EmbeddedShader::Texture2DProxy<T>& proxy)
+    {
+        autoBindEntries_.push_back({
+            &proxy.boundResource_,
+            0, 0,
+            static_cast<int32_t>(EmbeddedShader::ShaderCodeModule::ShaderResources::stageOutputs),
+            location
+        });
+        return *this;
+    }
+
+    // 批量绑定 render target，location 按参数顺序自动递增（0, 1, 2, ...）
+    // 与 FS return Aggregate<T> 时 struct 字段顺序一一对应
+    // 用法: rasterizer.bindOutputTargets(albedoRT, normalRT);
+    template<typename... Ts>
+    RasterizerPipeline& bindOutputTargets(EmbeddedShader::Texture2DProxy<Ts>&... targets)
+    {
+        uint32_t location = 0;
+        (bindRenderTarget(location++, targets), ...);
+        return *this;
+    }
+
     [[nodiscard]] uintptr_t getRasterizerPipelineID() const
     {
         return rasterizerPipelineID.load(std::memory_order_acquire);
@@ -488,6 +512,7 @@ struct RasterizerPipeline
 
     mutable std::mutex rasterizerPipelineMutex;
     std::atomic<std::uintptr_t> rasterizerPipelineID;
+    std::vector<EmbeddedShader::AutoBindEntry> autoBindEntries_;
 };
 
 // ================= 对外封装：HardwareExecutor =================
@@ -592,8 +617,7 @@ void rasterizerPipelineInitFromCompiler(std::atomic<std::uintptr_t> &pipelineID,
                                          const std::source_location &src);
 
 template <typename VF, typename FF>
-    requires std::invocable<VF> && std::invocable<FF> &&
-             (!std::is_convertible_v<VF, std::string>) && (!std::is_convertible_v<FF, std::string>)
+    requires (!std::is_convertible_v<VF, std::string>) && (!std::is_convertible_v<FF, std::string>)
 RasterizerPipeline::RasterizerPipeline(VF &&vertexShaderCode,
                                         FF &&fragmentShaderCode,
                                         uint32_t multiviewCount,
@@ -607,6 +631,9 @@ RasterizerPipeline::RasterizerPipeline(VF &&vertexShaderCode,
         compilerOption,
         sourceLocation
     );
+
+    // 保存自动绑定条目（从 EDSL proxy 回溯指针收集）
+    autoBindEntries_ = std::move(pipelineObj.autoBindEntries);
 
     // 调用辅助函数完成 Vulkan 管线创建
     rasterizerPipelineInitFromCompiler(rasterizerPipelineID, 

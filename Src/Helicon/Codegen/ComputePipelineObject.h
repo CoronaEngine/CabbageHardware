@@ -17,6 +17,7 @@ namespace EmbeddedShader
 		uint64_t byteOffset = 0;
 		uint32_t typeSize = 0;
 		int32_t  bindType = -1;    // -1 = no metadata
+		uint32_t location = 0;
 	};
 
 	class ComputePipelineObject
@@ -73,7 +74,8 @@ namespace EmbeddedShader
 								def->texture->boundResourceRef,
 								bindInfo->byteOffset,
 								bindInfo->typeSize,
-								static_cast<int32_t>(bindInfo->bindType)
+								static_cast<int32_t>(bindInfo->bindType),
+								bindInfo->location
 							});
 						}
 					}

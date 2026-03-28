@@ -1,87 +1,90 @@
-﻿## CabbageHardware
+﻿# CabbageHardware
 
-一个现代化的跨平台图形硬件抽象层,提供流式 API 设计和 Helicon 着色器 DSL。
+一个基于 Vulkan 的图形硬件抽象层，提供面向资源与管线的 C++ API，并集成 Helicon Shader DSL（AST + 代码生成 + 编译反射）。
 
-### 特性
+## 当前状态
 
-- **简洁的 API**: 流式命令执行器设计,让 GPU 编程变得直观
-- **Vulkan 后端**: 充分利用现代图形硬件性能
-- **Helicon DSL**: 类型安全的着色器语言,支持 AST 编译和多后端代码生成
-- **资源代理系统**: 统一的资源绑定和管理
-- **多线程支持**: 完整的多线程执行模型和同步机制
-- **外部内存**: 支持导入导出外部内存,便于跨进程共享
+- 核心 API：`include/CabbageHardware.h`、`include/HardwareCommands.h`
+- 后端实现：`Src/HardwareWrapperVulkan`
+- 着色器工具链：`Src/Helicon` + `Scripts/ShaderCompileScripts`
+- 构建系统：CMake + CMake Presets + FetchContent
+- 现状：可开发，但仍处于稳定性迭代期
 
-### 快速开始
+## 待办事项
 
-```cpp
-#include "CabbageHardware.h"
+- (紧急) shader 中不同的 textureSampler，分离的图像和采样器描述符
+- 多线程内存泄漏、多线程死锁、多线程 crash
+- 加载 gltf 模型材质，vulkan 内存屏障报错
+- HardwareExecutor 默认选择不同的队列家族
+- 移除 display 中的空命令提交
+- 自动判断 image 的 layout
+- 交换链逻辑错误
+- 解决命令行的 Warning
+- BUG: VMA 的 buffer 导入导出
+- BUG: mutiview 初始化黑屏
+- 图片导入导出：importImageMemory、exportImageMemory（VK_EXT_external_memory）
+- bug: usd 模型导入概率性 vulkan 报错 device lost
+- bug：intel 核显 内存屏障会寄
 
-// 创建缓冲区
-HardwareBuffer vertexBuffer(vertices, BufferUsage::VertexBuffer);
+## 目录速览
 
-// 创建图像
-HardwareImage image(width, height, ImageFormat::RGBA8_SRGB, ImageUsage::SampledImage);
+- `include/`：对外 API
+- `Src/HardwareWrapper/`：对外对象包装层（RAII、引用计数与存储池）
+- `Src/HardwareWrapperVulkan/`：Vulkan 设备、资源、执行与显示
+- `Src/Helicon/`：DSL、AST、代码生成、编译与反射
+- `Examples/`：示例程序与 shader 资源
+- `Scripts/`：`ShaderCompileScripts`（shader -> C++ 头文件）
+- `third-party/`：预置 `slang`、`dxc` 二进制与头库
+- `docs/`：项目文档
+- `tests/`：测试脚手架（已接入 CMake）
 
-// 流式命令执行
-executor << vertexBuffer.copyTo(indexBuffer)
-         << dispatchCompute(128, 128, 1)
-         << execute();
-```
-
-### 核心组件
-
-- **HardwareBuffer**: GPU 缓冲区,支持顶点、索引、uniform、storage 等多种用途
-- **HardwareImage**: GPU 图像资源,支持多种格式和用途
-- **HardwareExecutor**: 流式命令执行器,支持链式操作
-- **ComputePipelineObject / RasterizedPipelineObject**: 计算和光栅化管线抽象
-
-### 构建要求
+## 构建要求
 
 - CMake 4.0+
-- Vulkan SDK
+- Visual Studio 2022 或等效 MSVC 工具链（Windows 推荐）
+- Vulkan SDK / Vulkan Runtime 环境
 - 支持 C++20 的编译器
-- Windows/Linux
 
-### 构建步骤
+## 推荐构建方式（Windows）
 
-```bash
-git clone https://github.com/CoronaEngine/CabbageHardware.git
-cd CabbageHardware
-mkdir build && cd build
-cmake ..
-cmake --build .
+### Ninja Multi-Config + MSVC（默认推荐）
+
+```powershell
+cmake --preset ninja-msvc
+cmake --build --preset msvc-debug --target CabbageHardwareExamples
 ```
 
-### 示例代码
+### Visual Studio 2022 Generator
 
-查看 [Examples](Examples/) 目录获取完整示例:
-- `baseline.cpp` - 基础渲染示例
-- `multithreading.cpp` - 多线程使用示例
-- 各种 GLSL 着色器文件
+```powershell
+cmake --preset vs2022
+cmake --build --preset vs2022-debug --target CabbageHardwareExamples
+```
 
-### 架构文档
+### 重要注意
 
-完整文档请参考:
-- [架构概述](4-architecture-overview) 正在编写
-- [快速开始](2-quick-start) 正在编写
-- [构建系统配置](3-build-system-and-cmake-setup) 后续完善
+- 所有 configure preset 共享同一个 `binaryDir=${sourceDir}/build`。
+- 在 `ninja-msvc` 和 `vs2022` 之间切换前，请清理/重建 `build/`，避免生成器冲突。
 
-### 待办事项
-- （紧急）shader中不同的textureSampler，分离的图像和采样器描述符
-- 多线程内存泄漏、多线程死锁、多线程crash
--  加载 gltf 模型材质，vulkan 内存屏障报错
-- HardwareExecutor默认选择不同的队列家族
-- 移除display中的空命令提交
-- 自动判断image的layout
-- 交换链逻辑错误
-- 解决命令行的Warning
-- BUG：VMA的buffer导入导出
-- BUG：mutiview初始化黑屏
-- 图片导入导出：importImageMemory、exportImageMemory（VK_EXT_external_memory）
-- bug: usd模型导入概率性vulkan报错 device lost
-- bug：intel核显 内存屏障会寄
+## 示例程序
 
+- 当前主示例入口为 `Examples/main.cpp`（目标：`CabbageHardwareExamples`）。
 
-### 许可证
+## 最小 API 示例（与当前代码一致）
 
-待补充
+```cpp
+HardwareExecutor executor;
+ComputePipeline compute(embeddedSpirv);
+compute(8, 8, 1);
+
+executor << compute
+         << executor.commit();
+```
+
+## 文档索引
+
+待补充。
+
+## 许可证
+
+待补充。

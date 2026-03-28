@@ -2,6 +2,7 @@
 #include <Codegen/ParseHelper.h>
 #include <Codegen/AST/AST.hpp>
 #include <Codegen/AST/Parser.hpp>
+#include <Codegen/ComputePipelineObject.h>
 #include <source_location>
 #include <Compiler/ShaderCodeCompiler.h>
 #include <spirv-tools/linker.hpp>
@@ -15,6 +16,7 @@ namespace EmbeddedShader
 		static RasterizedPipelineObject compile(auto&& vertexShaderCode, auto&& fragmentShaderCode, CompilerOption compilerOption = {}, std::source_location sourceLocation = std::source_location::current());
 		std::unique_ptr<ShaderCodeCompiler> vertex;
 		std::unique_ptr<ShaderCodeCompiler> fragment;
+		std::vector<AutoBindEntry> autoBindEntries;
 	private:
 		static std::vector<Ast::ParseOutput> parse(auto&& vertexShaderCode, auto&& fragmentShaderCode);
 	};
@@ -56,7 +58,101 @@ namespace EmbeddedShader
 			result.fragment->compile(outputs[1].output, ShaderStage::FragmentShader, ShaderLanguage::Slang, compilerOption);
 		}
 
+		// Collect auto-bind entries from globalStatements (shared across VS/FS):
+		// Walk all globally-defined textures and check if they have a back-pointer
+		// to a proxy's boundResource_. Match against both vertex and fragment shader's bindInfoPool.
+		{
+			auto vsCodeModule = result.vertex->getShaderCode(ShaderLanguage::SpirV, compilerOption.enableBindless);
+			auto fsCodeModule = result.fragment->getShaderCode(ShaderLanguage::SpirV, compilerOption.enableBindless);
+			auto& globals = Ast::Parser::getGlobalStatements();
+			for (auto& stmt : globals)
+			{
+				if (auto* def = dynamic_cast<Ast::DefineUniversalTexture2D*>(stmt.get()))
+				{
+					if (def->texture && def->texture->boundResourceRef)
+					{
+						if (auto* bindInfo = vsCodeModule.shaderResources.findShaderBindInfo(def->texture->name))
+						{
+							result.autoBindEntries.push_back({
+								def->texture->boundResourceRef,
+								bindInfo->byteOffset,
+								bindInfo->typeSize,
+								static_cast<int32_t>(bindInfo->bindType),
+								bindInfo->location
+							});
+						}
+						if (auto* bindInfo = fsCodeModule.shaderResources.findShaderBindInfo(def->texture->name))
+						{
+							result.autoBindEntries.push_back({
+								def->texture->boundResourceRef,
+								bindInfo->byteOffset,
+								bindInfo->typeSize,
+								static_cast<int32_t>(bindInfo->bindType),
+								bindInfo->location
+							});
+						}
+					}
+				}
+			}
+
+			// Collect render target auto-bind entries from operator() calls in FS.
+			// Textures with renderTargetLocation >= 0 were used as render target outputs.
+			for (auto& stmt : globals)
+			{
+				if (auto* def = dynamic_cast<Ast::DefineUniversalTexture2D*>(stmt.get()))
+				{
+					if (def->texture && def->texture->renderTargetLocation >= 0 && def->texture->boundResourceRef)
+					{
+						result.autoBindEntries.push_back({
+							def->texture->boundResourceRef,
+							0, 0,
+							static_cast<int32_t>(ShaderCodeModule::ShaderResources::stageOutputs),
+							static_cast<uint32_t>(def->texture->renderTargetLocation)
+						});
+					}
+				}
+			}
+		}
+
 		return result;
+	}
+
+	// Helper: emit output variates for a fragment shader return value.
+	// If the return type is an AggregateType, flatten its members into individual
+	// DefineOutputVariate entries with incrementing SV_TARGET locations (MRT).
+	// If Texture2DType member, extract the texelType as the output type.
+	// Otherwise, emit a single DefineOutputVariate at location 0.
+	template<typename FsOutput>
+	static void handleFragmentOutput(FsOutput& fsOutput)
+	{
+		auto* variate = reinterpret_cast<Ast::Variate*>(fsOutput.node.get());
+		auto type = variate->type;
+
+		if (auto aggregateType = std::dynamic_pointer_cast<Ast::AggregateType>(type))
+		{
+			// MRT: flatten each member to an individual output with SV_TARGET{location}
+			size_t location = 0;
+			for (auto& member : aggregateType->members)
+			{
+				// For Texture2DType members, the output type is the texel type (e.g., float4)
+				std::shared_ptr<Ast::Type> outputType;
+				if (auto tex2dType = std::dynamic_pointer_cast<Ast::Texture2DType>(member->type))
+					outputType = tex2dType->texelType;
+				else
+					outputType = member->type;
+
+				auto outputVar = Ast::AST::defineOutputVariate(outputType, location);
+				auto memberAccess = Ast::AST::access(fsOutput.node, member->name, member->type);
+				Ast::AST::assign(outputVar, memberAccess);
+				++location;
+			}
+		}
+		else
+		{
+			// Single output (existing behavior)
+			auto outputVar = Ast::AST::defineOutputVariate(type, 0);
+			Ast::AST::assign(outputVar, fsOutput.node);
+		}
 	}
 
 	std::vector<Ast::ParseOutput> RasterizedPipelineObject::parse(auto&& vertexShaderCode, auto&& fragmentShaderCode)
@@ -76,21 +172,15 @@ namespace EmbeddedShader
 			auto outputVar = Ast::AST::defineOutputVariate(reinterpret_cast<Ast::Variate*>(vsOutput.node.get())->type,0);
 			Ast::AST::assign(outputVar,vsOutput.node);
 
-			Ast::Parser::beginShaderParse(Ast::ShaderStage::Fragment); //记得处理Fragment的返回值
+			Ast::Parser::beginShaderParse(Ast::ShaderStage::Fragment);
 			auto fsParam = ParseHelper::createParam(fsFunc);
 			if constexpr (!ParseHelper::hasReturnValue(fsFunc))
 				ParseHelper::callLambda(fsFunc, std::move(fsParam));
 			else
 			{
 				auto fsOutput = ParseHelper::callLambda(fsFunc, std::move(fsParam));
-				static_assert(ParseHelper::isReturnVariateProxy(fsFunc) /*or struct*/, "The output of the shader must be a proxy!");
-				//1.proxy
-				if constexpr (ParseHelper::isReturnVariateProxy(fsFunc))
-				{
-					auto fsOutputVar = Ast::AST::defineOutputVariate(
-						reinterpret_cast<Ast::Variate*>(fsOutput.node.get())->type, 0);
-					Ast::AST::assign(fsOutputVar, fsOutput.node);
-				}
+				static_assert(ParseHelper::isReturnVariateProxy(fsFunc), "The output of the shader must be a proxy!");
+				handleFragmentOutput(fsOutput);
 			}
 		}
 		else
@@ -103,8 +193,7 @@ namespace EmbeddedShader
 			{
 				auto fsOutput = ParseHelper::callLambda(fsFunc);
 				static_assert(ParseHelper::isReturnVariateProxy(fsFunc), "The output of the shader must be a proxy!");
-				auto outputVar = Ast::AST::defineOutputVariate(reinterpret_cast<Ast::Variate*>(fsOutput.node.get())->type,0);
-				Ast::AST::assign(outputVar,fsOutput.node);
+				handleFragmentOutput(fsOutput);
 			}
 		}
 		return Ast::Parser::endPipelineParse();

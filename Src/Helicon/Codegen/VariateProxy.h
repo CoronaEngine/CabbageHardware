@@ -161,7 +161,26 @@ namespace EmbeddedShader
 		    }
 		    else if (ParseHelper::isInInputParameter())
 		    {
-		        node = Ast::AST::defineInputVariate<Type>(ParseHelper::getCurrentInputIndex());
+		        // Vertex stage: expand aggregate into individual InputVariates per member,
+		        // reconstruct via local variable + assignments (mirrors handleFragmentOutput in reverse).
+		        // Fragment/other stage: keep as single aggregate InputVariate (inter-stage IO supports structs).
+		        if (Ast::AST::getEmbeddedShaderStructure().stage == Ast::ShaderStage::Vertex)
+		        {
+		            auto aggregateType = Ast::AST::createType<Type>();
+		            node = Ast::AST::defineLocalVariate(
+		                std::static_pointer_cast<Ast::Type>(aggregateType), nullptr);
+		            for (size_t loc = 0; loc < aggregateType->members.size(); ++loc)
+		            {
+		                auto& member = aggregateType->members[loc];
+		                auto inputVar = Ast::AST::defineInputVariate(member->type, loc);
+		                auto memberAccess = Ast::AST::access(node, member->name, member->type);
+		                Ast::AST::assign(memberAccess, inputVar);
+		            }
+		        }
+		        else
+		        {
+		            node = Ast::AST::defineInputVariate<Type>(ParseHelper::getCurrentInputIndex());
+		        }
 		    }
 		    else if (ParseHelper::isInShaderCodeLambda())
 		    {
@@ -818,6 +837,18 @@ namespace EmbeddedShader
 		// --- Level 2/3: Resource binding ---
 		Texture2DProxy& operator=(::HardwareImage& img) { boundResource_ = &img; return *this; }
 		::HardwareImage* resource() const { return static_cast<::HardwareImage*>(boundResource_); }
+
+		// --- Render target output via operator<< ---
+		// Usage in FS lambda: outputImage << Float4(r, g, b, a);
+		// Emits DefineOutputVariate + assign at incremental SV_TARGET location.
+		void operator<<(const VariateProxy<Type>& value)
+		{
+			auto tex = std::dynamic_pointer_cast<Ast::UniversalTexture2D>(node);
+			size_t location = Ast::Parser::getNextRenderTargetLocation();
+			auto outputVar = Ast::AST::defineOutputVariate<Type>(location);
+			Ast::AST::assign(outputVar, value.node);
+			if (tex) tex->renderTargetLocation = static_cast<int32_t>(location);
+		}
 
 		// Access the owned HardwareImage (only valid if constructed with HardwareImageCreateInfo)
 		::HardwareImage& image() const { return *static_cast<::HardwareImage*>(ownedResource_.get()); }
