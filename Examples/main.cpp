@@ -76,6 +76,17 @@ struct ComputeStorageBufferObject
     uint32_t imageID;
 };
 
+// Vertex attribute proxy: 统一定义顶点属性布局（字段顺序与 CPU 端 Vertex struct 一致）
+// VS 使用 Aggregate<VertexAttributeProxy> 作为输入参数，
+// 内部自动展开为独立的 LOCATION 属性，与传统 vertex input 等价
+struct VertexAttributeProxy
+{
+    EmbeddedShader::Float3 position;
+    EmbeddedShader::Float3 normal;
+    EmbeddedShader::Float2 texCoord;
+    EmbeddedShader::Float3 color;
+};
+
 // MRT demo: VS→FS interpolation struct (struct 用于跨阶段传参)
 struct MRTInterpolantsProxy
 {
@@ -306,11 +317,11 @@ int main()
             compilerOption.compileGLSL = true;
             compilerOption.enableBindless = true;
 
-            // 最小 Raster EDSL：VS 仅输出 position，FS 通过 return 输出到 render target
-            auto vsLambda = [&](Float3 inPosition, Float3 inNormal, Float2 inTexCoord, Float3 inColor) -> Float4
+            // 最小 Raster EDSL：VS 使用 Aggregate 输入（与 FS 输出的 Aggregate 对称）
+            auto vsLambda = [&](Aggregate<VertexAttributeProxy> vertex) -> Float4
             {
-                position() = Float4(inPosition, 1.0f);
-                return Float4(inColor, 1.0f);
+                position() = Float4(vertex->position, 1.0f);
+                return Float4(vertex->color, 1.0f);
             };
 
             // FS return Float4 → 自动映射到 SV_TARGET0，资源绑定通过 bindOutputTargets 完成
@@ -335,13 +346,14 @@ int main()
             Texture2D<fvec4> normalRT = HardwareImage(mrtCreateInfo);
 
             // VS 返回 struct，FS 接收 struct（跨阶段传参）
-            auto vsLambdaMRT = [&](Float3 inPosition, Float3 inNormal, Float2 inTexCoord, Float3 inColor) -> Aggregate<MRTInterpolantsProxy>
+            // VS 输入也使用 Aggregate<VertexAttributeProxy>，与 FS 输出 Aggregate<MRTOutputProxy> 完全对称
+            auto vsLambdaMRT = [&](Aggregate<VertexAttributeProxy> vertex) -> Aggregate<MRTInterpolantsProxy>
             {
-                position() = Float4(inPosition, 1.0f);
+                position() = Float4(vertex->position, 1.0f);
                 Aggregate<MRTInterpolantsProxy> out;
-                out->color = Float4(inColor, 1.0f);
-                out->worldNormal = inNormal;
-                out->uv = inTexCoord;
+                out->color = Float4(vertex->color, 1.0f);
+                out->worldNormal = vertex->normal;
+                out->uv = vertex->texCoord;
                 return out;
             };
 

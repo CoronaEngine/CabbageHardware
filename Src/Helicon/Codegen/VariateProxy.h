@@ -161,7 +161,26 @@ namespace EmbeddedShader
 		    }
 		    else if (ParseHelper::isInInputParameter())
 		    {
-		        node = Ast::AST::defineInputVariate<Type>(ParseHelper::getCurrentInputIndex());
+		        // Vertex stage: expand aggregate into individual InputVariates per member,
+		        // reconstruct via local variable + assignments (mirrors handleFragmentOutput in reverse).
+		        // Fragment/other stage: keep as single aggregate InputVariate (inter-stage IO supports structs).
+		        if (Ast::AST::getEmbeddedShaderStructure().stage == Ast::ShaderStage::Vertex)
+		        {
+		            auto aggregateType = Ast::AST::createType<Type>();
+		            node = Ast::AST::defineLocalVariate(
+		                std::static_pointer_cast<Ast::Type>(aggregateType), nullptr);
+		            for (size_t loc = 0; loc < aggregateType->members.size(); ++loc)
+		            {
+		                auto& member = aggregateType->members[loc];
+		                auto inputVar = Ast::AST::defineInputVariate(member->type, loc);
+		                auto memberAccess = Ast::AST::access(node, member->name, member->type);
+		                Ast::AST::assign(memberAccess, inputVar);
+		            }
+		        }
+		        else
+		        {
+		            node = Ast::AST::defineInputVariate<Type>(ParseHelper::getCurrentInputIndex());
+		        }
 		    }
 		    else if (ParseHelper::isInShaderCodeLambda())
 		    {
