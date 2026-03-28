@@ -487,6 +487,17 @@ struct RasterizerPipeline
         return *this;
     }
 
+    // 批量绑定 render target，location 按参数顺序自动递增（0, 1, 2, ...）
+    // 与 FS return Aggregate<T> 时 struct 字段顺序一一对应
+    // 用法: rasterizer.bindOutputTargets(albedoRT, normalRT);
+    template<typename... Ts>
+    RasterizerPipeline& bindOutputTargets(EmbeddedShader::Texture2DProxy<Ts>&... targets)
+    {
+        uint32_t location = 0;
+        (bindRenderTarget(location++, targets), ...);
+        return *this;
+    }
+
     [[nodiscard]] uintptr_t getRasterizerPipelineID() const
     {
         return rasterizerPipelineID.load(std::memory_order_acquire);

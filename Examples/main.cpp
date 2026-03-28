@@ -84,6 +84,13 @@ struct MRTInterpolantsProxy
     EmbeddedShader::Float2 uv;
 };
 
+// MRT demo: FS output struct (字段顺序对应 SV_TARGET0, SV_TARGET1, ...)
+struct MRTOutputProxy
+{
+    EmbeddedShader::Float4 albedo;
+    EmbeddedShader::Float4 normal;
+};
+
 int main()
 {
     // Corona::Kernel::CoronaLogger::get_logger()->set_log_level(quill::LogLevel::TraceL3);
@@ -299,21 +306,21 @@ int main()
             compilerOption.compileGLSL = true;
             compilerOption.enableBindless = true;
 
-            // 最小 Raster EDSL：VS 仅输出 position，FS 通过 struct 返回支持 MRT
+            // 最小 Raster EDSL：VS 仅输出 position，FS 通过 return 输出到 render target
             auto vsLambda = [&](Float3 inPosition, Float3 inNormal, Float2 inTexCoord, Float3 inColor) -> Float4
             {
                 position() = Float4(inPosition, 1.0f);
                 return Float4(inColor, 1.0f);
             };
 
-            // FS 通过 operator<< 将结果写入 render target（自动绑定，无需手动 bindRenderTarget）
-            auto fsLambda = [&](Float4 interpolatedColor)
+            // FS return Float4 → 自动映射到 SV_TARGET0，资源绑定通过 bindOutputTargets 完成
+            auto fsLambda = [&](Float4 interpolatedColor) -> Float4
             {
-                inputImageRGBA16 << Float4(0.18f, 0.72f, 0.35f, 1.0f);
+                return Float4(0.18f, 0.72f, 0.35f, 1.0f);
             };
 
             RasterizerPipeline rasterizer(vsLambda, fsLambda);
-            // render target 已通过 operator() 自动绑定，不再需要 bindRenderTarget
+            rasterizer.bindOutputTargets(inputImageRGBA16);
 
             // === MRT demo: struct VS→FS 传参 + 多 render target via operator() ===
             HardwareImageCreateInfo mrtCreateInfo;
@@ -338,16 +345,18 @@ int main()
                 return out;
             };
 
-            // FS 通过 operator<< 写入多个 render target（自动分配 SV_TARGET location）
-            auto fsLambdaMRT = [&](Aggregate<MRTInterpolantsProxy> input)
+            // FS return Aggregate → 字段按顺序映射到 SV_TARGET0, SV_TARGET1, ...
+            // 资源绑定通过 bindOutputTargets，顺序与 struct 字段一致
+            auto fsLambdaMRT = [&](Aggregate<MRTInterpolantsProxy> input) -> Aggregate<MRTOutputProxy>
             {
-                // SV_TARGET0: albedo
-                albedoRT << input->color;
-                // SV_TARGET1: world-space normal
-                normalRT << Float4(input->worldNormal, 1.0f);
+                Aggregate<MRTOutputProxy> out;
+                out->albedo = input->color;
+                out->normal = Float4(input->worldNormal, 1.0f);
+                return out;
             };
 
             RasterizerPipeline rasterizerMRT(vsLambdaMRT, fsLambdaMRT);
+            rasterizerMRT.bindOutputTargets(albedoRT, normalRT);
 
             auto computePipeline = ComputePipelineObject::compile(compute, uvec3(8, 8, 1), compilerOption);
             auto computeShaderCode = computePipeline.compute->getShaderCode(ShaderLanguage::GLSL, true).shaderCode;
