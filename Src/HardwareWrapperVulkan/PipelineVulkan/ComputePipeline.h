@@ -24,18 +24,10 @@ struct ComputePipelineVulkan : public CommandRecordVulkan
 
     // std::variant<HardwarePushConstant> operator[](const std::string& resourceName);
 
-    void setPushConstant(const std::string &name, const void *data, size_t size);
-    void setResource(const std::string &name, const HardwareBuffer &buffer);
-    void setResource(const std::string &name, const HardwareImage &image);
-
     // Direct-access methods: bypass string lookup, use pre-resolved metadata
     void setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType);
     void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType);
     void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType);
-
-    [[nodiscard]] HardwarePushConstant getPushConstant(const std::string &name);
-    [[nodiscard]] HardwareBuffer getBuffer(const std::string &name);
-    [[nodiscard]] HardwareImage getImage(const std::string &name);
 
     ComputePipelineVulkan *operator()(uint16_t x, uint16_t y, uint16_t z);
 
@@ -54,7 +46,6 @@ struct ComputePipelineVulkan : public CommandRecordVulkan
     VkPipeline pipeline{VK_NULL_HANDLE};
 
     HardwarePushConstant pushConstant;
-    EmbeddedShader::ShaderCodeModule::ShaderResources shaderResource;
     EmbeddedShader::ShaderCodeModule shaderCode;
 
     // Per-pipeline UBO support

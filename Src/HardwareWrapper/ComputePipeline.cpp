@@ -209,29 +209,6 @@ ComputePipeline &ComputePipeline::operator=(ComputePipeline &&other) noexcept
     return *this;
 }
 
-ResourceProxy ComputePipeline::operator[](const std::string &resourceName)
-{
-    return ResourceProxy(this, resourceName);
-}
-
-void ComputePipeline::setPushConstant(const std::string &name, const void *data, size_t size)
-{
-    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
-    handle->impl->setPushConstant(name, data, size);
-}
-
-void ComputePipeline::setResource(const std::string &name, const HardwareBuffer &buffer)
-{
-    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
-    handle->impl->setResource(name, buffer);
-}
-
-void ComputePipeline::setResource(const std::string &name, const HardwareImage &image)
-{
-    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
-    handle->impl->setResource(name, image);
-}
-
 void ComputePipeline::setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType)
 {
     auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
@@ -250,24 +227,6 @@ void ComputePipeline::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, 
     handle->impl->setResourceDirect(byteOffset, typeSize, image, bindType);
 }
 
-HardwarePushConstant ComputePipeline::getPushConstant(const std::string &name) const
-{
-    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
-    return handle->impl->getPushConstant(name);
-}
-
-HardwareBuffer ComputePipeline::getBuffer(const std::string &name) const
-{
-    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
-    return handle->impl->getBuffer(name);
-}
-
-HardwareImage ComputePipeline::getImage(const std::string &name) const
-{
-    auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
-    return handle->impl->getImage(name);
-}
-
 ComputePipeline &ComputePipeline::operator()(uint16_t x, uint16_t y, uint16_t z)
 {
     // Auto-bind: read current resource from each EDSL proxy's back-pointer
@@ -275,10 +234,7 @@ ComputePipeline &ComputePipeline::operator()(uint16_t x, uint16_t y, uint16_t z)
     {
         if (void* res = *entry.boundResourceRef)
         {
-            if (entry.bindType >= 0)
-                setResourceDirect(entry.byteOffset, entry.typeSize, *static_cast<HardwareImage*>(res), entry.bindType);
-            else
-                setResource(entry.name, *static_cast<HardwareImage*>(res));
+            setResourceDirect(entry.byteOffset, entry.typeSize, *static_cast<HardwareImage*>(res), entry.bindType);
         }
     }
     auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));

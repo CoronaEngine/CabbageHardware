@@ -41,7 +41,6 @@ namespace EmbeddedShader
 		hardcodeShaderFile << "{\"" + itemName + "\", R\"(" + shaderCode + ")\"}," << std::endl;
 		hardcodeShaderFile << "};";
 
-		debugHardcodeShaders[targetName][itemName] = shaderCode;
 	}
 
 	void ShaderHardcodeManager::addTarget(const std::vector<uint32_t>& shaderCode, const std::string& targetName, const std::string& itemName)
@@ -58,7 +57,6 @@ namespace EmbeddedShader
 		hardcodeShaderFile << "}}," << std::endl;
 		hardcodeShaderFile << "};";
 
-		debugHardcodeShaders[targetName][itemName] = shaderCode;
 	}
 
 	void ShaderHardcodeManager::addTarget(const ShaderCodeModule::ShaderResources& shaderResource,
@@ -70,28 +68,12 @@ namespace EmbeddedShader
 		hardcodeShaderFile.seekg(-static_cast<int>(sizeof("};")), std::ios::end);
 		hardcodeShaderFile << "{\"" + itemName + "\", " + getShaderResourceOutput(shaderResource) + "}," << std::endl;
 		hardcodeShaderFile << "};";
-
-		debugHardcodeShaders[targetName][itemName] = shaderResource;
 	}
 #endif
 
 	std::variant<ShaderCodeModule::ShaderResources,std::variant<std::vector<uint32_t>,std::string>> ShaderHardcodeManager::getHardcodeShader(const std::string& targetName, const std::string& itemName)
 	{
-#ifdef CABBAGE_ENGINE_DEBUG
-		auto target = debugHardcodeShaders.find(targetName);
-		if (target == debugHardcodeShaders.end())
-		{
-			throw std::runtime_error("Target " + targetName + " not found in hardcoded shaders.");
-		}
-
-		auto item = target->second.find(itemName);
-		if (item == target->second.end())
-		{
-			throw std::runtime_error("Item " + itemName + " not found in hardcoded shaders for target " + targetName + ".");
-		}
-
-		return item->second;
-#else
+#ifndef CABBAGE_ENGINE_DEBUG
 		auto target = HardcodeShaders::hardcodeShaders.find(targetName);
 		if (target == HardcodeShaders::hardcodeShaders.end())
 		{
@@ -105,6 +87,8 @@ namespace EmbeddedShader
 		}
 
 		return item->second;
+#else
+		throw std::runtime_error("getHardcodeShader should not be called in debug mode - use ShaderCodeCompiler's per-instance storage");
 #endif
 	}
 
@@ -189,10 +173,8 @@ std::unordered_map<std::string, std::variant<EmbeddedShader::ShaderCodeModule::S
 		result << shaderResources.uniformBufferSize << ",";
 		result << "\"" << shaderResources.uniformBufferName << "\",";
 		result << "{";
-		for (const auto& [key, bindInfo]: shaderResources.bindInfoPool)
+		for (const auto& bindInfo: shaderResources.bindInfoPool)
 		{
-			result << "{";
-			result << "\"" << key << "\",";
 			result << "{";
 			result << bindInfo.set << ",";
 			result << bindInfo.binding << ",";
@@ -204,7 +186,6 @@ std::unordered_map<std::string, std::variant<EmbeddedShader::ShaderCodeModule::S
 			result << bindInfo.typeSize << ",";
 			result << bindInfo.byteOffset << ",";
 			result << "static_cast<EmbeddedShader::ShaderCodeModule::ShaderResources::BindType>(" << bindInfo.bindType << ")";
-			result << "}";
 			result << "},";
 		}
 		result << "}";
