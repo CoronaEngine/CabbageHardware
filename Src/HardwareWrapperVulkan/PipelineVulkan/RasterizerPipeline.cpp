@@ -670,6 +670,21 @@ void RasterizerPipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t t
             }
         }
     }
+    else if (bindType == BindType::uniformBufferMembers)
+    {
+        uint32_t descriptorIndex = const_cast<HardwareBuffer&>(buffer).storeDescriptor();
+        uint8_t *dst = tempUBO.getData();
+        if (dst)
+        {
+            if (typeSize >= 8) {
+                uint32_t handleData[2] = { descriptorIndex, 0 };
+                std::memcpy(dst + byteOffset, handleData, 8);
+            } else {
+                std::memcpy(dst + byteOffset, &descriptorIndex, sizeof(descriptorIndex));
+            }
+            uboDescriptorDirty = true;
+        }
+    }
 }
 
 void RasterizerPipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType, uint32_t location)
@@ -697,6 +712,21 @@ void RasterizerPipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t t
             } else {
                 std::memcpy(dst + byteOffset, &descriptorIndex, sizeof(descriptorIndex));
             }
+        }
+    }
+    else if (bindType == BindType::uniformBufferMembers)
+    {
+        uint32_t descriptorIndex = const_cast<HardwareImage&>(image).storeDescriptor();
+        uint8_t *dst = tempUBO.getData();
+        if (dst)
+        {
+            if (typeSize >= 8) {
+                uint32_t handleData[2] = { descriptorIndex, 0 };
+                std::memcpy(dst + byteOffset, handleData, 8);
+            } else {
+                std::memcpy(dst + byteOffset, &descriptorIndex, sizeof(descriptorIndex));
+            }
+            uboDescriptorDirty = true;
         }
     }
 }

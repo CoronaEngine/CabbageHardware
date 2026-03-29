@@ -4,7 +4,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-// #include <semaphore>
 
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
@@ -25,6 +24,7 @@
 // eDSL 路径不再依赖 GLSL 反射头文件，render target 通过 bindRenderTarget 自动绑定
 #include GLSL(vert.glsl)
 #include GLSL(frag.glsl)
+#include GLSL(compute.glsl)
 
 // uniform buffer中
 struct GlobalUniformParam
@@ -33,11 +33,6 @@ struct GlobalUniformParam
     float globalScale;
     uint32_t frameCount;
     uint32_t padding; // 为了对齐
-};
-
-struct GlobalUniformParamProxy
-{
-    EmbeddedShader::Uint imageID; // 为了对齐
 };
 
 // storage buffer
@@ -52,30 +47,6 @@ struct RasterizerStorageBufferObject
     ktm::fvec3 lightPos = ktm::fvec3(1.0f, 1.0f, 1.0f);
 };
 
-struct RasterizerStorageBufferObjectProxy
-{
-    EmbeddedShader::Uint textureIndex;
-    EmbeddedShader::Float4x4 model = ktm::rotate3d_axis(ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
-    EmbeddedShader::Float4x4 view = ktm::look_at_lh(ktm::fvec3(2.0f, 2.0f, 2.0f), ktm::fvec3(0.0f, 0.0f, 0.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
-    EmbeddedShader::Float4x4 proj = ktm::perspective_lh(ktm::radians(45.0f), 1920.0f / 1080.0f, 0.1f, 10.0f);
-    EmbeddedShader::Float3 viewPos = ktm::fvec3(2.0f, 2.0f, 2.0f);
-    EmbeddedShader::Float3 lightColor = ktm::fvec3(10.0f, 10.0f, 10.0f);
-    EmbeddedShader::Float3 lightPos = ktm::fvec3(1.0f, 1.0f, 1.0f);
-};
-
-struct RasterizerFragmentInputProxy
-{
-    EmbeddedShader::Float3 fragPos;
-    EmbeddedShader::Float3 fragNormal;
-    EmbeddedShader::Float2 fragTexCoord;
-    EmbeddedShader::Float3 fragColor;
-};
-
-struct ComputeStorageBufferObject
-{
-    uint32_t imageID;
-};
-
 // Vertex attribute proxy: 统一定义顶点属性布局（字段顺序与 CPU 端 Vertex struct 一致）
 // VS 使用 Aggregate<VertexAttributeProxy> 作为输入参数，
 // 内部自动展开为独立的 LOCATION 属性，与传统 vertex input 等价
@@ -85,21 +56,6 @@ struct VertexAttributeProxy
     EmbeddedShader::Float3 normal;
     EmbeddedShader::Float2 texCoord;
     EmbeddedShader::Float3 color;
-};
-
-// MRT demo: VS→FS interpolation struct (struct 用于跨阶段传参)
-struct MRTInterpolantsProxy
-{
-    EmbeddedShader::Float4 color;
-    EmbeddedShader::Float3 worldNormal;
-    EmbeddedShader::Float2 uv;
-};
-
-// MRT demo: FS output struct (字段顺序对应 SV_TARGET0, SV_TARGET1, ...)
-struct MRTOutputProxy
-{
-    EmbeddedShader::Float4 albedo;
-    EmbeddedShader::Float4 normal;
 };
 
 int main()
@@ -120,58 +76,15 @@ int main()
     //CFW_LOG_INFO("Main thread started...");
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-    // GLFWwindow* window = glfwCreateWindow(800, 600, "Window Title", NULL, NULL);
-    // if (!window) {
-    //     glfwTerminate();
-    //     return -1;
-    // }
-    // const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-
-    // int windowedX, windowedY, windowedWidth, windowedHeight;
-    // glfwGetWindowPos(window, &windowedX, &windowedY);
-    // glfwGetWindowSize(window, &windowedWidth, &windowedHeight);
-
-    // auto lastF11Toggle = std::chrono::steady_clock::now();
-    // constexpr auto f11Cooldown = std::chrono::milliseconds(100);
-
-    // while (!glfwWindowShouldClose(window)) {
-    //     glfwPollEvents();
-    //     if (glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS) {
-    //         auto now = std::chrono::steady_clock::now();
-    //         if (now - lastF11Toggle > f11Cooldown) {
-    //             lastF11Toggle = now;
-    //             static bool isFullscreen = false;
-    //             if (isFullscreen) {
-    //                 glfwSetWindowMonitor(window, NULL, windowedX, windowedY, windowedWidth, windowedHeight, 0);
-    //             } else {
-    //                 glfwGetWindowPos(window, &windowedX, &windowedY);
-    //                 glfwGetWindowSize(window, &windowedWidth, &windowedHeight);
-    //                 glfwSetWindowMonitor(window, glfwGetPrimaryMonitor(), 0, 0, mode->width, mode->height, mode->refreshRate);
-    //             }
-    //             isFullscreen = !isFullscreen;
-    //         }
-    //     }
-    //     glfwSwapBuffers(window);
-    // }
-
-    constexpr std::size_t WINDOW_COUNT = 1;
-    std::vector<GLFWwindow *> windows(WINDOW_COUNT);
+    // 每个 pair 创建 2 个窗口: 偶数索引 = EDSL, 奇数索引 = GLSL
+    constexpr std::size_t DEMO_PAIR_COUNT = 1;
+    constexpr std::size_t TOTAL_WINDOWS = DEMO_PAIR_COUNT * 2;
+    std::vector<GLFWwindow *> windows(TOTAL_WINDOWS);
     for (size_t i = 0; i < windows.size(); i++)
     {
-        windows[i] = glfwCreateWindow(1920, 1080, "Cabbage Engine ", nullptr, nullptr);
+        std::string title = (i % 2 == 0) ? "Cabbage Engine [EDSL]" : "Cabbage Engine [GLSL]";
+        windows[i] = glfwCreateWindow(1920, 1080, title.c_str(), nullptr, nullptr);
     }
-
-    // 同步原语：每个窗口一套信号量，控制流水线 Mesh -> Render -> Display -> Mesh
-    /*std::vector<std::unique_ptr<std::binary_semaphore>> meshSemaphores;
-    std::vector<std::unique_ptr<std::binary_semaphore>> renderSemaphores;
-    std::vector<std::unique_ptr<std::binary_semaphore>> displaySemaphores;*/
-
-    // for (size_t i = 0; i < WINDOW_COUNT; ++i) {
-    //     // 初始状态：允许 Mesh 线程开始，Render 和 Display 等待
-    //     meshSemaphores.push_back(std::make_unique<std::binary_semaphore>(1));
-    //     renderSemaphores.push_back(std::make_unique<std::binary_semaphore>(0));
-    //     displaySemaphores.push_back(std::make_unique<std::binary_semaphore>(0));
-    // }
 
     {
         std::vector<HardwareImage> finalOutputImages(windows.size());
@@ -269,21 +182,18 @@ int main()
             //CFW_LOG_INFO("Mesh thread {} ended.", threadIndex);
         };
 
-        auto renderThread = [&](uint32_t threadIndex) {
-            //CFW_LOG_INFO("Render thread {} started...", threadIndex);
-
-            //RasterizerPipeline rasterizer(vert_glsl::spirv, frag_glsl::spirv);
-
-//#ifdef TEST_HELICON
+        // =====================================================================
+        // renderThreadEDSL: EDSL 路径 — C++ lambda 定义 shader，自动绑定资源
+        // =====================================================================
+        auto renderThreadEDSL = [&](uint32_t threadIndex) {
             using namespace EmbeddedShader;
             using namespace EmbeddedShader::Ast;
             using namespace ktm;
 
-            // 声明时直接绑定已有资源: Texture2D<fvec4> proxy = existingImage;
-            // 或声明时创建并拥有资源: Texture2D<fvec4> proxy = HardwareImage(createInfo);
+            // Texture2D proxy 声明时直接绑定已有 HardwareImage
             Texture2D<fvec4> inputImageRGBA16 = finalOutputImages[threadIndex];
-            Aggregate<GlobalUniformParamProxy> globalParams;
 
+            // EDSL compute shader: ACES filmic tone mapping
             auto acesFilmicToneMapCurve = [&](Float3 x) 
             {
                 Float a = 2.51f;
@@ -295,135 +205,100 @@ int main()
                 return clamp((x * (a * x + b)) / (x * (c * x + d) + e), fvec3(0.0f), fvec3(1.0f));
             };
 
-            auto acesFilmicToneMapInverse = [&](const Float3 &x) 
-            {
-                Float3 a = fvec3(-0.59f) * x + fvec3(0.03f);
-                Float3 b = sqrt(fvec3(-1.0127f) * x * x + fvec3(1.3702f) * x + fvec3(0.0009));
-                Float3 c = fvec3(2) * (fvec3(2.43f) * x - fvec3(2.51f));
-                return ((a - b) / c);
-            };
-
             auto compute = [&] 
             {
                 Float4 color = inputImageRGBA16[dispatchThreadID()->xy()];
                 inputImageRGBA16[dispatchThreadID()->xy()] = Float4(acesFilmicToneMapCurve(color->xyz()), 1.f);
             };
 
-
-            CompilerOption compilerOption = {};
-            compilerOption.compileHLSL = false;
-            compilerOption.compileDXIL = true;
-            compilerOption.compileDXBC = true;
-            compilerOption.compileGLSL = true;
-            compilerOption.enableBindless = true;
-
-            // 最小 Raster EDSL：VS 使用 Aggregate 输入（与 FS 输出的 Aggregate 对称）
+            // EDSL vertex shader: Aggregate<VertexAttributeProxy> 自动展开为顶点属性
             auto vsLambda = [&](Aggregate<VertexAttributeProxy> vertex) -> Float4
             {
                 position() = Float4(vertex->position, 1.0f);
                 return Float4(vertex->color, 1.0f);
             };
 
-            // FS return Float4 → 自动映射到 SV_TARGET0，资源绑定通过 bindOutputTargets 完成
+            // EDSL fragment shader: return Float4 → 自动映射到 SV_TARGET0
             auto fsLambda = [&](Float4 interpolatedColor) -> Float4
             {
                 return Float4(0.18f, 0.72f, 0.35f, 1.0f);
             };
 
+            // 从 lambda 创建管线，bindOutputTargets 自动绑定 render target
             RasterizerPipeline rasterizer(vsLambda, fsLambda);
             rasterizer.bindOutputTargets(inputImageRGBA16);
 
-            // === MRT demo: struct VS→FS 传参 + 多 render target via operator() ===
-            HardwareImageCreateInfo mrtCreateInfo;
-            mrtCreateInfo.width = 1920;
-            mrtCreateInfo.height = 1080;
-            mrtCreateInfo.format = ImageFormat::RGBA16_FLOAT;
-            mrtCreateInfo.usage = ImageUsage::StorageImage;
-            mrtCreateInfo.arrayLayers = 1;
-            mrtCreateInfo.mipLevels = 1;
-
-            Texture2D<fvec4> albedoRT = HardwareImage(mrtCreateInfo);
-            Texture2D<fvec4> normalRT = HardwareImage(mrtCreateInfo);
-
-            // VS 返回 struct，FS 接收 struct（跨阶段传参）
-            // VS 输入也使用 Aggregate<VertexAttributeProxy>，与 FS 输出 Aggregate<MRTOutputProxy> 完全对称
-            auto vsLambdaMRT = [&](Aggregate<VertexAttributeProxy> vertex) -> Aggregate<MRTInterpolantsProxy>
-            {
-                position() = Float4(vertex->position, 1.0f);
-                Aggregate<MRTInterpolantsProxy> out;
-                out->color = Float4(vertex->color, 1.0f);
-                out->worldNormal = vertex->normal;
-                out->uv = vertex->texCoord;
-                return out;
-            };
-
-            // FS return Aggregate → 字段按顺序映射到 SV_TARGET0, SV_TARGET1, ...
-            // 资源绑定通过 bindOutputTargets，顺序与 struct 字段一致
-            auto fsLambdaMRT = [&](Aggregate<MRTInterpolantsProxy> input) -> Aggregate<MRTOutputProxy>
-            {
-                Aggregate<MRTOutputProxy> out;
-                out->albedo = input->color;
-                out->normal = Float4(input->worldNormal, 1.0f);
-                return out;
-            };
-
-            RasterizerPipeline rasterizerMRT(vsLambdaMRT, fsLambdaMRT);
-            rasterizerMRT.bindOutputTargets(albedoRT, normalRT);
-
-            auto computePipeline = ComputePipelineObject::compile(compute, uvec3(8, 8, 1), compilerOption);
-            auto computeShaderCode = computePipeline.compute->getShaderCode(ShaderLanguage::GLSL, true).shaderCode;
-            std::string computeShaderCodeStr = std::get<std::string>(computeShaderCode);
-
-            //ComputePipeline computer(computeShaderCodeStr);
-
-            // 新 API：直接传入 lambda，内部完成编译
+            // 从 lambda 创建 compute 管线，auto-bind 资源
             ComputePipeline computer(compute, uvec3(8, 8, 1));
 
-            //ComputePipeline computer(readStringFile(shaderPath + "/compute.glsl"));
+            uint64_t frameCount = 0;
+
+            while (running.load())
+            {
+                HardwareBuffer vertexBuffer = HardwareBuffer(vertices, BufferUsage::VertexBuffer);
+                HardwareBuffer indexBuffer = HardwareBuffer(indices, BufferUsage::IndexBuffer);
+
+                for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
+                {
+                    // EDSL 路径: 无需手动绑定，render target 已通过 bindOutputTargets 注册
+                    rasterizer.record(indexBuffer, vertexBuffer);
+                }
+
+                // auto-bind: proxy 的 boundResource_ 自动传递给 pipeline
+                executors[threadIndex] << rasterizer(1920, 1080)
+                                       << computer(1920 / 8, 1080 / 8, 1)
+                                       << executors[threadIndex].commit();
+                ++frameCount;
+            }
+        };
+
+        // =====================================================================
+        // renderThreadGLSL: 手写 GLSL 路径 — 预编译 SPIR-V + 手动 BindingKey 绑定
+        // =====================================================================
+        auto renderThreadGLSL = [&](uint32_t threadIndex) {
+            // 从预编译 SPIR-V 二进制创建光栅化管线（vert.glsl + frag.glsl）
+            RasterizerPipeline rasterizer(vert_glsl::spirv, frag_glsl::spirv);
+
+            // 手动绑定 render target: frag shader 的 outColor (stageOutputs)
+            // stageOutputs 存入 renderTargets[]，不会被 record() 重置，只需绑定一次
+            rasterizer[frag_glsl::outColor] = finalOutputImages[threadIndex];
+
+            // 从预编译 SPIR-V 创建 compute 管线（与 rasterizer 对齐，避免运行时 glslang 编译）
+            ComputePipeline computer(compute_glsl::spirv);
+
+            // compute shader 的 storage image 描述符索引在帧间不变，仅需获取一次
+            uint32_t computeImageDescriptorID = finalOutputImages[threadIndex].storeDescriptor();
+            computer[compute_glsl::GlobalUniformParam::imageID] = computeImageDescriptorID;
 
             auto startTime = std::chrono::high_resolution_clock::now();
             uint64_t frameCount = 0;
 
             while (running.load())
             {
-                // 等待数据更新完成
-                // renderSemaphores[threadIndex]->acquire();
-                // if (!running.load()) break;
                 HardwareBuffer vertexBuffer = HardwareBuffer(vertices, BufferUsage::VertexBuffer);
                 HardwareBuffer indexBuffer = HardwareBuffer(indices, BufferUsage::IndexBuffer);
                 float currentTime = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
 
+                // UBO 字段在整帧内共享，不随 draw call 变化
+                // record() 只快照 tempPushConstant（并重置），不重置 tempUBO
+                // 因此 UBO 只需在 for 循环外设置一次
+                rasterizer[vert_glsl::GlobalUniformParam::globalTime] = currentTime;
+                rasterizer[vert_glsl::GlobalUniformParam::globalScale] = 2.0f + sin(currentTime) * 2.0f;
+                rasterizer[vert_glsl::GlobalUniformParam::frameCount] = static_cast<uint32_t>(frameCount);
+                rasterizer[vert_glsl::GlobalUniformParam::padding] = 0u;
+
                 for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
                 {
-                    // Proxy-as-key：通过 shader 反射生成的 BindingKey 绑定资源
-                    //rasterizer[vert_glsl::pushConsts::storageBufferIndex] = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
-                    // UBO 字段直接写入
-                    //rasterizer[vert_glsl::GlobalUniformParam::globalTime] = currentTime; 
-                    //rasterizer[vert_glsl::GlobalUniformParam::globalScale] = 2.0f + sin(currentTime) * 2.0f;
-                    //rasterizer[vert_glsl::GlobalUniformParam::frameCount] = static_cast<uint32_t>(frameCount);
-                    //rasterizer[vert_glsl::GlobalUniformParam::padding] = 0u;
-                    // rasterizer[vert::inPosition] = postionBuffer;
-                    // rasterizer[vert::inColor] = colorBuffer;
-                    // rasterizer[vert::inTexCoord] = uvBuffer;
-                    // rasterizer[vert::inNormal] = normalBuffer;
-
-                    // render target 已通过 bindRenderTarget 注册，dispatch 时自动绑定
+                    // push constant 每次 record() 后被重置，必须在每次 record() 前重新设置
+                    rasterizer[vert_glsl::pushConsts::storageBufferIndex] = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
                     rasterizer.record(indexBuffer, vertexBuffer);
                 }
 
-                // Level 3: auto-bind — 不再需要手动 computer.bind(inputImageRGBA16)
-                // pipeline 的 operator() 在 dispatch 时自动从 proxy 的 boundResource_ 读取当前资源
                 executors[threadIndex] << rasterizer(1920, 1080)
                                        << computer(1920 / 8, 1080 / 8, 1)
                                        << executors[threadIndex].commit();
                 ++frameCount;
-
-                // 通知显示线程可以开始
-                // displaySemaphores[threadIndex]->release();
             }
-            // displaySemaphores[threadIndex]->release();
-
-            //CFW_LOG_INFO("Render thread {} ended.", threadIndex);
         };
 
         auto displayThread = [&](uint32_t threadIndex) {
@@ -461,7 +336,10 @@ int main()
         for (size_t i = 0; i < windows.size(); i++)
         {
             meshThreads.emplace_back(meshThread, i);
-            renderThreads.emplace_back(renderThread, i);
+            if (i % 2 == 0)
+                renderThreads.emplace_back(renderThreadEDSL, i);
+            else
+                renderThreads.emplace_back(renderThreadGLSL, i);
             displayThreads.emplace_back(displayThread, i);
         }
 
@@ -473,13 +351,6 @@ int main()
                 if (glfwWindowShouldClose(windows[i]))
                 {
                     running.store(false);
-                    // 释放所有信号量以唤醒等待的线程
-                    /*for (size_t j = 0; j < WINDOW_COUNT; ++j)
-                    {
-                        meshSemaphores[j]->release();
-                        renderSemaphores[j]->release();
-                        displaySemaphores[j]->release();
-                    }*/
                     break;
                 }
             }

@@ -400,16 +400,16 @@ struct ComputePipeline
         return computePipelineID.load(std::memory_order_acquire);
     }
 
-  private:
-    friend struct ResourceProxy;
-
-
     template<typename ProxyType>
         requires requires(const ProxyType& t) { t.byteOffset; t.typeSize; t.bindType; t.location; }
     ResourceProxy operator[](const ProxyType& proxy)
     {
         return ResourceProxy(this, proxy.byteOffset, proxy.typeSize, proxy.bindType, proxy.location);
     }
+
+  private:
+    friend struct ResourceProxy;
+
 
     void setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType);
     void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType);
