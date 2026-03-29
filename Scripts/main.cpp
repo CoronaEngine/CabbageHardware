@@ -9,7 +9,7 @@ using namespace EmbeddedShader;
 
 void generateBinary(std::stringstream& out, std::string_view name, const std::vector<uint32_t>& shaderCode)
 {
-	out << "static std::vector<uint32_t> " << name <<" {";
+	out << "static inline std::vector<uint32_t> " << name <<" {";
 	for (uint32_t code : shaderCode)
 	{
 		out << code << ",";
@@ -233,7 +233,7 @@ void buildFunctionSignature(FunctionSignature &signature, std::stringstream &out
 	// {
 	// 	out << ");";
 	// }
-	out << "static ::EmbeddedShader::FunctionProxy<";
+	out << "static inline ::EmbeddedShader::FunctionProxy<";
 	if (signature.returnTypeName == "void")
 	{
 		out << "void";
@@ -324,7 +324,7 @@ std::set<std::string> generateBindingKeys(std::stringstream& out, const std::vec
 	for (auto& info : resources.bindInfoPool)
 	{
 		if (info.bindType == ShaderCodeModule::ShaderResources::stageInputs)
-			out << "inline ::EmbeddedShader::BindingKey " << info.variateName
+			out << "static inline ::EmbeddedShader::BindingKey " << info.variateName
 			    << "{" << info.byteOffset << ", " << info.typeSize
 			    << ", " << static_cast<int32_t>(info.bindType) << ", " << info.location << "};\n";
 	}
@@ -333,7 +333,7 @@ std::set<std::string> generateBindingKeys(std::stringstream& out, const std::vec
 	for (auto& info : resources.bindInfoPool)
 	{
 		if (info.bindType == ShaderCodeModule::ShaderResources::stageOutputs)
-			out << "inline ::EmbeddedShader::BindingKey " << info.variateName
+			out << "static inline ::EmbeddedShader::BindingKey " << info.variateName
 			    << "{" << info.byteOffset << ", " << info.typeSize
 			    << ", " << static_cast<int32_t>(info.bindType) << ", " << info.location << "};\n";
 	}
@@ -529,17 +529,17 @@ int main(int argc, char** argv)
 	std::ranges::replace(fileName, '.', '_');
 	std::ranges::replace(fileName, ':', '_');
 
-	// Wrap everything in a per-shader namespace to avoid redefinition across .hpp files
+	// Wrap everything in a per-shader struct to avoid redefinition across .hpp files
 	auto nsName = sanitizeToIdentifier(path);
-	out << "namespace " << nsName << " {\n";
+	out << "struct " << nsName << " {\n";
 
 	generateBinary(out, fileName, spirv);
 
 	// 稳定别名：用户可通过 vert_glsl::spirv 引用预编译 SPIR-V 二进制
-	out << "static auto& spirv = " << fileName << ";\n";
+	out << "static inline auto& spirv = " << fileName << ";\n";
 
 	// Generate BindingKey struct declarations first, collect binding block names
-	std::cout << "INFO:Generate binding keys for namespace '" << nsName << "'...\n";
+	std::cout << "INFO:Generate binding keys for struct '" << nsName << "'...\n";
 	auto bindingBlockNames = generateBindingKeys(out, spirv, inputLanguage);
 
 	// Generate IR reflection (skip structs that overlap with BindingKey structs)
@@ -563,7 +563,7 @@ int main(int argc, char** argv)
 		}
 	}
 
-	out << "} // namespace " << nsName << "\n";
+	out << "}; // struct " << nsName << "\n";
 
 	//std::cout << out.str();
 
