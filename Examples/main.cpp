@@ -26,16 +26,7 @@
 #include GLSL(frag.glsl)
 #include GLSL(compute.glsl)
 
-// uniform buffer中
-struct GlobalUniformParam
-{
-    float globalTime;
-    float globalScale;
-    uint32_t frameCount;
-    uint32_t padding; // 为了对齐
-};
-
-// storage buffer
+// storage buffer (used by mesh thread, retained for compatibility)
 struct RasterizerStorageBufferObject
 {
     uint32_t textureIndex;
@@ -47,14 +38,17 @@ struct RasterizerStorageBufferObject
     ktm::fvec3 lightPos = ktm::fvec3(1.0f, 1.0f, 1.0f);
 };
 
-// Vertex attribute proxy: 统一定义顶点属性布局（字段顺序与 CPU 端 Vertex struct 一致）
-// VS 使用 Aggregate<VertexAttributeProxy> 作为输入参数，
-// 内部自动展开为独立的 LOCATION 属性，与传统 vertex input 等价
+// 精简顶点：只保留 VS 实际使用的 position 和 color
+struct SimpleVertex
+{
+    std::array<float, 3> position;
+    std::array<float, 3> color;
+};
+
+// Vertex attribute proxy: 与 SimpleVertex 一一对应
 struct VertexAttributeProxy
 {
     EmbeddedShader::Float3 position;
-    EmbeddedShader::Float3 normal;
-    EmbeddedShader::Float2 texCoord;
     EmbeddedShader::Float3 color;
 };
 
@@ -185,6 +179,54 @@ int main()
         // =====================================================================
         // renderThreadEDSL: EDSL 路径 — C++ lambda 定义 shader，自动绑定资源
         // =====================================================================
+        // CPU-side MVP pre-transform helper (shared by EDSL and GLSL paths)
+        // Replicates the same model matrices as the mesh thread, applies
+        // view/proj and perspective divide so that the VS just does:
+        //   gl_Position = vec4(inPosition, 1.0);
+        // =====================================================================
+        // 从 CubeData 中提取 position+color
+        std::vector<SimpleVertex> simpleVertices(vertices.size());
+        for (size_t i = 0; i < vertices.size(); i++)
+        {
+            simpleVertices[i].position = vertices[i].position;
+            simpleVertices[i].color = vertices[i].color;
+        }
+
+        auto transformVerticesForObject = [](const std::vector<SimpleVertex>& src,
+                                             const ktm::fmat4x4& mvp) -> std::vector<SimpleVertex>
+        {
+            auto dst = src;
+            for (auto& v : dst)
+            {
+                ktm::fvec4 clip = mvp * ktm::fvec4(v.position[0], v.position[1], v.position[2], 1.0f);
+                float invW = 1.0f / clip[3];
+                v.position = {clip[0] * invW, clip[1] * invW, clip[2] * invW};
+            }
+            return dst;
+        };
+
+        // Shared camera constants (same as RasterizerStorageBufferObject defaults)
+        auto viewMat = ktm::look_at_lh(ktm::fvec3(2.0f, 2.0f, 2.0f),
+                                        ktm::fvec3(0.0f, 0.0f, 0.0f),
+                                        ktm::fvec3(0.0f, 0.0f, 1.0f));
+        auto projMat = ktm::perspective_lh(ktm::radians(45.0f), 1920.0f / 1080.0f, 0.1f, 10.0f);
+        auto vpMat = projMat * viewMat;
+
+        // Base model matrices (same formula as mesh thread)
+        constexpr size_t OBJECT_COUNT = 20;
+        std::vector<ktm::fmat4x4> baseModelMat(OBJECT_COUNT);
+        for (size_t i = 0; i < OBJECT_COUNT; i++)
+        {
+            baseModelMat[i] = ktm::translate3d(ktm::fvec3(static_cast<float>(i % 5) - 2.0f,
+                                                           static_cast<float>(i / 5) - 0.5f, 0.0f))
+                            * ktm::scale3d(ktm::fvec3(0.1f, 0.1f, 0.1f))
+                            * ktm::rotate3d_axis(ktm::radians(static_cast<float>(i) * 30.0f),
+                                                 ktm::fvec3(0.0f, 0.0f, 1.0f));
+        }
+
+        // =====================================================================
+        // renderThreadEDSL: EDSL 路径 — C++ lambda 定义 shader，自动绑定资源
+        // =====================================================================
         auto renderThreadEDSL = [&](uint32_t threadIndex) {
             using namespace EmbeddedShader;
             using namespace EmbeddedShader::Ast;
@@ -194,7 +236,7 @@ int main()
             Texture2D<fvec4> inputImageRGBA16 = finalOutputImages[threadIndex];
 
             // EDSL compute shader: ACES filmic tone mapping
-            auto acesFilmicToneMapCurve = [&](Float3 x) 
+            auto acesFilmicToneMapCurve = [&](Float3 x)
             {
                 Float a = 2.51f;
                 Float b = 0.03f;
@@ -205,23 +247,23 @@ int main()
                 return clamp((x * (a * x + b)) / (x * (c * x + d) + e), fvec3(0.0f), fvec3(1.0f));
             };
 
-            auto compute = [&] 
+            auto compute = [&]
             {
                 Float4 color = inputImageRGBA16[dispatchThreadID()->xy()];
                 inputImageRGBA16[dispatchThreadID()->xy()] = Float4(acesFilmicToneMapCurve(color->xyz()), 1.f);
             };
 
-            // EDSL vertex shader: Aggregate<VertexAttributeProxy> 自动展开为顶点属性
+            // EDSL vertex shader: pass-through (MVP 已在 CPU 端完成)
             auto vsLambda = [&](Aggregate<VertexAttributeProxy> vertex) -> Float4
             {
                 position() = Float4(vertex->position, 1.0f);
                 return Float4(vertex->color, 1.0f);
             };
 
-            // EDSL fragment shader: return Float4 → 自动映射到 SV_TARGET0
+            // EDSL fragment shader: 直接输出插值后的顶点颜色
             auto fsLambda = [&](Float4 interpolatedColor) -> Float4
             {
-                return Float4(0.18f, 0.72f, 0.35f, 1.0f);
+                return interpolatedColor;
             };
 
             // 从 lambda 创建管线，bindOutputTargets 自动绑定 render target
@@ -231,74 +273,64 @@ int main()
             // 从 lambda 创建 compute 管线，auto-bind 资源
             ComputePipeline computer(compute, uvec3(8, 8, 1));
 
-            uint64_t frameCount = 0;
+            auto startTime = std::chrono::high_resolution_clock::now();
 
             while (running.load())
             {
-                HardwareBuffer vertexBuffer = HardwareBuffer(vertices, BufferUsage::VertexBuffer);
+                float currentTime = std::chrono::duration<float, std::chrono::seconds::period>(
+                    std::chrono::high_resolution_clock::now() - startTime).count();
                 HardwareBuffer indexBuffer = HardwareBuffer(indices, BufferUsage::IndexBuffer);
 
                 for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
                 {
-                    // EDSL 路径: 无需手动绑定，render target 已通过 bindOutputTargets 注册
+                    auto model = baseModelMat[i] * ktm::rotate3d_axis(
+                        currentTime * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
+                    auto transformed = transformVerticesForObject(simpleVertices, vpMat * model);
+                    HardwareBuffer vertexBuffer(transformed, BufferUsage::VertexBuffer);
                     rasterizer.record(indexBuffer, vertexBuffer);
                 }
 
-                // auto-bind: proxy 的 boundResource_ 自动传递给 pipeline
                 executors[threadIndex] << rasterizer(1920, 1080)
                                        << computer(1920 / 8, 1080 / 8, 1)
                                        << executors[threadIndex].commit();
-                ++frameCount;
             }
         };
 
         // =====================================================================
-        // renderThreadGLSL: 手写 GLSL 路径 — 预编译 SPIR-V + 手动 BindingKey 绑定
+        // renderThreadGLSL: 手写 GLSL 路径 — 预编译 SPIR-V + CPU MVP 预变换
         // =====================================================================
         auto renderThreadGLSL = [&](uint32_t threadIndex) {
-            // 从预编译 SPIR-V 二进制创建光栅化管线（vert.glsl + frag.glsl）
-            // TypedRasterizerPipeline 通过模板参数自动构造，并暴露 binding block 为直接成员
+            // 简化后的 shader 无需 push constant / UBO，仅做 pass-through
             TypedRasterizerPipeline<vert_glsl, frag_glsl> rasterizer;
 
-            // 直接成员访问绑定 render target: frag shader 的 outColor (stageOutputs)
-            // stageOutputs 存入 renderTargets[]，不会被 record() 重置，只需绑定一次
+            // 绑定 render target
             rasterizer.outColor = finalOutputImages[threadIndex];
 
-            // 从预编译 SPIR-V 创建 compute 管线（TypedComputePipeline 自动构造）
+            // compute 管线保持不变
             TypedComputePipeline<compute_glsl> computer;
-
-            // compute shader 的 storage image 描述符索引在帧间不变，仅需获取一次
             uint32_t computeImageDescriptorID = finalOutputImages[threadIndex].storeDescriptor();
             computer.GlobalUniformParam.imageID = computeImageDescriptorID;
 
             auto startTime = std::chrono::high_resolution_clock::now();
-            uint64_t frameCount = 0;
 
             while (running.load())
             {
-                HardwareBuffer vertexBuffer = HardwareBuffer(vertices, BufferUsage::VertexBuffer);
+                float currentTime = std::chrono::duration<float, std::chrono::seconds::period>(
+                    std::chrono::high_resolution_clock::now() - startTime).count();
                 HardwareBuffer indexBuffer = HardwareBuffer(indices, BufferUsage::IndexBuffer);
-                float currentTime = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
-
-                // UBO 字段在整帧内共享，不随 draw call 变化
-                // record() 只快照 tempPushConstant（并重置），不重置 tempUBO
-                // 因此 UBO 只需在 for 循环外设置一次
-                rasterizer.GlobalUniformParam.globalTime = currentTime;
-                rasterizer.GlobalUniformParam.globalScale = 2.0f + sin(currentTime) * 2.0f;
-                rasterizer.GlobalUniformParam.frameCount = static_cast<uint32_t>(frameCount);
-                rasterizer.GlobalUniformParam.padding = 0u;
 
                 for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
                 {
-                    // push constant 每次 record() 后被重置，必须在每次 record() 前重新设置
-                    rasterizer.pushConsts.storageBufferIndex = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
+                    auto model = baseModelMat[i] * ktm::rotate3d_axis(
+                        currentTime * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
+                    auto transformed = transformVerticesForObject(simpleVertices, vpMat * model);
+                    HardwareBuffer vertexBuffer(transformed, BufferUsage::VertexBuffer);
                     rasterizer.record(indexBuffer, vertexBuffer);
                 }
 
                 executors[threadIndex] << rasterizer(1920, 1080)
                                        << computer(1920 / 8, 1080 / 8, 1)
                                        << executors[threadIndex].commit();
-                ++frameCount;
             }
         };
 
