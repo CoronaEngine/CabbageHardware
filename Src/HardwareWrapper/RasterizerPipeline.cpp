@@ -24,25 +24,25 @@ static bool decRaster(uint32_t id, const Corona::Kernel::Utils::Storage<Rasteriz
     return false;
 }
 
-RasterizerPipeline::RasterizerPipeline()
+RasterizerPipelineBase::RasterizerPipelineBase()
 {
     auto id = gRasterizerPipelineStorage.allocate();
     rasterizerPipelineID.store(id, std::memory_order_release);
     auto handle = gRasterizerPipelineStorage.acquire_write(id);
     handle->impl = new RasterizerPipelineVulkan();
-    // CFW_LOG_TRACE("RasterizerPipeline created: id={}", id);
+    // CFW_LOG_TRACE("RasterizerPipelineBase created: id={}", id);
 }
 
-RasterizerPipeline::RasterizerPipeline(std::string vs, std::string fs, uint32_t multiviewCount, EmbeddedShader::ShaderLanguage vlang, EmbeddedShader::ShaderLanguage flang, const std::source_location &src)
+RasterizerPipelineBase::RasterizerPipelineBase(std::string vs, std::string fs, uint32_t multiviewCount, EmbeddedShader::ShaderLanguage vlang, EmbeddedShader::ShaderLanguage flang, const std::source_location &src)
 {
     auto id = gRasterizerPipelineStorage.allocate();
     rasterizerPipelineID.store(id, std::memory_order_release);
     auto handle = gRasterizerPipelineStorage.acquire_write(id);
     handle->impl = new RasterizerPipelineVulkan(vs, fs, multiviewCount, vlang, flang, src);
-    // CFW_LOG_TRACE("RasterizerPipeline created: id={}", id);
+    // CFW_LOG_TRACE("RasterizerPipelineBase created: id={}", id);
 }
 
-RasterizerPipeline::RasterizerPipeline(const std::vector<uint32_t> &vertexSpirV, const std::vector<uint32_t> &fragmentSpirV, uint32_t multiviewCount, const std::source_location &src)
+RasterizerPipelineBase::RasterizerPipelineBase(const std::vector<uint32_t> &vertexSpirV, const std::vector<uint32_t> &fragmentSpirV, uint32_t multiviewCount, const std::source_location &src)
 {
     auto id = gRasterizerPipelineStorage.allocate();
     rasterizerPipelineID.store(id, std::memory_order_release);
@@ -63,7 +63,7 @@ void rasterizerPipelineInitFromCompiler(std::atomic<std::uintptr_t> &pipelineID,
     handle->impl = new RasterizerPipelineVulkan(vertexCompiler, fragmentCompiler, multiviewCount, src);
 }
 
-RasterizerPipeline::RasterizerPipeline(const RasterizerPipeline &other)
+RasterizerPipelineBase::RasterizerPipelineBase(const RasterizerPipelineBase &other)
 {
     std::lock_guard<std::mutex> lock(other.rasterizerPipelineMutex);
     auto const other_id = other.rasterizerPipelineID.load(std::memory_order_acquire);
@@ -76,7 +76,7 @@ RasterizerPipeline::RasterizerPipeline(const RasterizerPipeline &other)
     }
 }
 
-RasterizerPipeline::RasterizerPipeline(RasterizerPipeline &&other) noexcept
+RasterizerPipelineBase::RasterizerPipelineBase(RasterizerPipelineBase &&other) noexcept
 {
     std::lock_guard<std::mutex> lock(other.rasterizerPipelineMutex);
     auto const other_id = other.rasterizerPipelineID.load(std::memory_order_acquire);
@@ -85,7 +85,7 @@ RasterizerPipeline::RasterizerPipeline(RasterizerPipeline &&other) noexcept
     autoBindEntries_ = std::move(other.autoBindEntries_);
 }
 
-RasterizerPipeline::~RasterizerPipeline()
+RasterizerPipelineBase::~RasterizerPipelineBase()
 {
     auto const self_id = rasterizerPipelineID.load(std::memory_order_acquire);
     if (self_id > 0)
@@ -103,7 +103,7 @@ RasterizerPipeline::~RasterizerPipeline()
     }
 }
 
-RasterizerPipeline &RasterizerPipeline::operator=(const RasterizerPipeline &other)
+RasterizerPipelineBase &RasterizerPipelineBase::operator=(const RasterizerPipelineBase &other)
 {
     if (this == &other)
     {
@@ -178,7 +178,7 @@ RasterizerPipeline &RasterizerPipeline::operator=(const RasterizerPipeline &othe
     return *this;
 }
 
-RasterizerPipeline &RasterizerPipeline::operator=(RasterizerPipeline &&other) noexcept
+RasterizerPipelineBase &RasterizerPipelineBase::operator=(RasterizerPipelineBase &&other) noexcept
 {
     if (this == &other)
     {
@@ -208,13 +208,13 @@ RasterizerPipeline &RasterizerPipeline::operator=(RasterizerPipeline &&other) no
     return *this;
 }
 
-void RasterizerPipeline::setDepthImage(HardwareImage &depthImage)
+void RasterizerPipelineBase::setDepthImage(HardwareImage &depthImage)
 {
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
     handle->impl->setDepthImage(depthImage);
 }
 
-void RasterizerPipeline::setDepthEnabled(bool enabled)
+void RasterizerPipelineBase::setDepthEnabled(bool enabled)
 {
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
     handle->impl->setDepthEnabled(enabled);
@@ -226,7 +226,7 @@ void RasterizerPipeline::setDepthEnabled(bool enabled)
 //    handle->impl->setDepthEnabled(enabled);
 //}
 
-HardwareImage RasterizerPipeline::getDepthImage()
+HardwareImage RasterizerPipelineBase::getDepthImage()
 {
     HardwareImage img;
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
@@ -234,25 +234,25 @@ HardwareImage RasterizerPipeline::getDepthImage()
     return img;
 }
 
-void RasterizerPipeline::setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType)
+void RasterizerPipelineBase::setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType)
 {
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
     handle->impl->setPushConstantDirect(byteOffset, data, size, bindType);
 }
 
-void RasterizerPipeline::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType)
+void RasterizerPipelineBase::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType)
 {
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
     handle->impl->setResourceDirect(byteOffset, typeSize, buffer, bindType);
 }
 
-void RasterizerPipeline::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType, uint32_t location)
+void RasterizerPipelineBase::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType, uint32_t location)
 {
     auto handle = gRasterizerPipelineStorage.acquire_read(rasterizerPipelineID.load(std::memory_order_acquire));
     handle->impl->setResourceDirect(byteOffset, typeSize, image, bindType, location);
 }
 
-RasterizerPipeline &RasterizerPipeline::operator()(uint16_t width, uint16_t height)
+RasterizerPipelineBase &RasterizerPipelineBase::operator()(uint16_t width, uint16_t height)
 {
     // Auto-bind: read current resource from each EDSL proxy's back-pointer
     for (const auto& entry : autoBindEntries_)
@@ -267,13 +267,13 @@ RasterizerPipeline &RasterizerPipeline::operator()(uint16_t width, uint16_t heig
     return *this;
 }
 
-RasterizerPipeline &RasterizerPipeline::record(const HardwareBuffer &indexBuffer, const HardwareBuffer &vertexBuffer)
+RasterizerPipelineBase &RasterizerPipelineBase::record(const HardwareBuffer &indexBuffer, const HardwareBuffer &vertexBuffer)
 {
     DrawIndexedParams params;
     return record(indexBuffer, vertexBuffer, params);
 }
 
-RasterizerPipeline &RasterizerPipeline::record(const HardwareBuffer &indexBuffer,
+RasterizerPipelineBase &RasterizerPipelineBase::record(const HardwareBuffer &indexBuffer,
                                                const HardwareBuffer &vertexBuffer,
                                                const DrawIndexedParams &params)
 {

@@ -36,25 +36,25 @@ void computePipelineInitFromCompiler(std::atomic<std::uintptr_t> &pipelineID,
     handle->impl = new ComputePipelineVulkan(compiler, src);
 }
 
-ComputePipeline::ComputePipeline()
+ComputePipelineBase::ComputePipelineBase()
 {
     auto const id = gComputePipelineStorage.allocate();
     computePipelineID.store(id, std::memory_order_release);
     auto const handle = gComputePipelineStorage.acquire_write(id);
     handle->impl = new ComputePipelineVulkan();
-    // CFW_LOG_TRACE("ComputePipeline created: id={}", id);
+    // CFW_LOG_TRACE("ComputePipelineBase created: id={}", id);
 }
 
-ComputePipeline::ComputePipeline(const std::string &shaderCode, EmbeddedShader::ShaderLanguage language, const std::source_location &src)
+ComputePipelineBase::ComputePipelineBase(const std::string &shaderCode, EmbeddedShader::ShaderLanguage language, const std::source_location &src)
 {
     auto const id = gComputePipelineStorage.allocate();
     computePipelineID.store(id, std::memory_order_release);
     auto const handle = gComputePipelineStorage.acquire_write(id);
     handle->impl = new ComputePipelineVulkan(shaderCode, language, src);
-    // CFW_LOG_TRACE("ComputePipeline created: id={}", id);
+    // CFW_LOG_TRACE("ComputePipelineBase created: id={}", id);
 }
 
-ComputePipeline::ComputePipeline(const std::vector<uint32_t> &spirV, const std::source_location &src)
+ComputePipelineBase::ComputePipelineBase(const std::vector<uint32_t> &spirV, const std::source_location &src)
 {
     auto const id = gComputePipelineStorage.allocate();
     computePipelineID.store(id, std::memory_order_release);
@@ -62,7 +62,7 @@ ComputePipeline::ComputePipeline(const std::vector<uint32_t> &spirV, const std::
     handle->impl = new ComputePipelineVulkan(spirV, src);
 }
 
-ComputePipeline::ComputePipeline(const ComputePipeline &other)
+ComputePipelineBase::ComputePipelineBase(const ComputePipelineBase &other)
 {
     std::lock_guard<std::mutex> lock(other.computePipelineMutex);
     auto const other_id = other.computePipelineID.load(std::memory_order_acquire);
@@ -75,7 +75,7 @@ ComputePipeline::ComputePipeline(const ComputePipeline &other)
     }
 }
 
-ComputePipeline::ComputePipeline(ComputePipeline &&other) noexcept
+ComputePipelineBase::ComputePipelineBase(ComputePipelineBase &&other) noexcept
 {
     std::lock_guard<std::mutex> lock(other.computePipelineMutex);
     auto const other_id = other.computePipelineID.load(std::memory_order_acquire);
@@ -84,7 +84,7 @@ ComputePipeline::ComputePipeline(ComputePipeline &&other) noexcept
     autoBindEntries_ = std::move(other.autoBindEntries_);
 }
 
-ComputePipeline::~ComputePipeline()
+ComputePipelineBase::~ComputePipelineBase()
 {
     auto const self_id = computePipelineID.load(std::memory_order_acquire);
     if (self_id > 0)
@@ -103,7 +103,7 @@ ComputePipeline::~ComputePipeline()
     }
 }
 
-ComputePipeline &ComputePipeline::operator=(const ComputePipeline &other)
+ComputePipelineBase &ComputePipelineBase::operator=(const ComputePipelineBase &other)
 {
     if (this == &other)
     {
@@ -180,7 +180,7 @@ ComputePipeline &ComputePipeline::operator=(const ComputePipeline &other)
     return *this;
 }
 
-ComputePipeline &ComputePipeline::operator=(ComputePipeline &&other) noexcept
+ComputePipelineBase &ComputePipelineBase::operator=(ComputePipelineBase &&other) noexcept
 {
     if (this == &other)
     {
@@ -209,25 +209,25 @@ ComputePipeline &ComputePipeline::operator=(ComputePipeline &&other) noexcept
     return *this;
 }
 
-void ComputePipeline::setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType)
+void ComputePipelineBase::setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType)
 {
     auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
     handle->impl->setPushConstantDirect(byteOffset, data, size, bindType);
 }
 
-void ComputePipeline::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType)
+void ComputePipelineBase::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType)
 {
     auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
     handle->impl->setResourceDirect(byteOffset, typeSize, buffer, bindType);
 }
 
-void ComputePipeline::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType)
+void ComputePipelineBase::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType)
 {
     auto const handle = gComputePipelineStorage.acquire_read(computePipelineID.load(std::memory_order_acquire));
     handle->impl->setResourceDirect(byteOffset, typeSize, image, bindType);
 }
 
-ComputePipeline &ComputePipeline::operator()(uint16_t x, uint16_t y, uint16_t z)
+ComputePipelineBase &ComputePipelineBase::operator()(uint16_t x, uint16_t y, uint16_t z)
 {
     // Auto-bind: read current resource from each EDSL proxy's back-pointer
     for (const auto& entry : autoBindEntries_)

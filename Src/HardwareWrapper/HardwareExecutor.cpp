@@ -172,7 +172,7 @@ HardwareExecutor &HardwareExecutor::operator=(HardwareExecutor &&other) noexcept
     return *this;
 }
 
-HardwareExecutor &HardwareExecutor::operator<<(ComputePipeline &computePipeline)
+HardwareExecutor &HardwareExecutor::operator<<(ComputePipelineBase &computePipeline)
 {
     if (auto const executor_handle = gExecutorStorage.acquire_write(executorID.load(std::memory_order_acquire));
         computePipeline.getComputePipelineID())
@@ -186,7 +186,7 @@ HardwareExecutor &HardwareExecutor::operator<<(ComputePipeline &computePipeline)
     return *this;
 }
 
-HardwareExecutor &HardwareExecutor::operator<<(RasterizerPipeline &rasterizerPipeline)
+HardwareExecutor &HardwareExecutor::operator<<(RasterizerPipelineBase &rasterizerPipeline)
 {
     if (auto const executor_handle = gExecutorStorage.acquire_write(executorID.load(std::memory_order_acquire));
         rasterizerPipeline.getRasterizerPipelineID())

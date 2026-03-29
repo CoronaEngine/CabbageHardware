@@ -301,13 +301,13 @@ int main()
         // =====================================================================
         auto renderThreadGLSL = [&](uint32_t threadIndex) {
             // 简化后的 shader 无需 push constant / UBO，仅做 pass-through
-            TypedRasterizerPipeline<vert_glsl, frag_glsl> rasterizer;
+            RasterizerPipeline<vert_glsl, frag_glsl> rasterizer;
 
             // 绑定 render target
             rasterizer.outColor = finalOutputImages[threadIndex];
 
             // compute 管线保持不变
-            TypedComputePipeline<compute_glsl> computer;
+            ComputePipeline<compute_glsl> computer;
             uint32_t computeImageDescriptorID = finalOutputImages[threadIndex].storeDescriptor();
             computer.GlobalUniformParam.imageID = computeImageDescriptorID;
 
