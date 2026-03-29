@@ -257,18 +257,19 @@ int main()
         // =====================================================================
         auto renderThreadGLSL = [&](uint32_t threadIndex) {
             // 从预编译 SPIR-V 二进制创建光栅化管线（vert.glsl + frag.glsl）
-            RasterizerPipeline rasterizer(vert_glsl::spirv, frag_glsl::spirv);
+            // TypedRasterizerPipeline 通过模板参数自动构造，并暴露 binding block 为直接成员
+            TypedRasterizerPipeline<vert_glsl, frag_glsl> rasterizer;
 
-            // 手动绑定 render target: frag shader 的 outColor (stageOutputs)
+            // 直接成员访问绑定 render target: frag shader 的 outColor (stageOutputs)
             // stageOutputs 存入 renderTargets[]，不会被 record() 重置，只需绑定一次
-            rasterizer[frag_glsl::outColor] = finalOutputImages[threadIndex];
+            rasterizer.outColor = finalOutputImages[threadIndex];
 
-            // 从预编译 SPIR-V 创建 compute 管线（与 rasterizer 对齐，避免运行时 glslang 编译）
-            ComputePipeline computer(compute_glsl::spirv);
+            // 从预编译 SPIR-V 创建 compute 管线（TypedComputePipeline 自动构造）
+            TypedComputePipeline<compute_glsl> computer;
 
             // compute shader 的 storage image 描述符索引在帧间不变，仅需获取一次
             uint32_t computeImageDescriptorID = finalOutputImages[threadIndex].storeDescriptor();
-            computer[compute_glsl::GlobalUniformParam::imageID] = computeImageDescriptorID;
+            computer.GlobalUniformParam.imageID = computeImageDescriptorID;
 
             auto startTime = std::chrono::high_resolution_clock::now();
             uint64_t frameCount = 0;
@@ -282,15 +283,15 @@ int main()
                 // UBO 字段在整帧内共享，不随 draw call 变化
                 // record() 只快照 tempPushConstant（并重置），不重置 tempUBO
                 // 因此 UBO 只需在 for 循环外设置一次
-                rasterizer[vert_glsl::GlobalUniformParam::globalTime] = currentTime;
-                rasterizer[vert_glsl::GlobalUniformParam::globalScale] = 2.0f + sin(currentTime) * 2.0f;
-                rasterizer[vert_glsl::GlobalUniformParam::frameCount] = static_cast<uint32_t>(frameCount);
-                rasterizer[vert_glsl::GlobalUniformParam::padding] = 0u;
+                rasterizer.GlobalUniformParam.globalTime = currentTime;
+                rasterizer.GlobalUniformParam.globalScale = 2.0f + sin(currentTime) * 2.0f;
+                rasterizer.GlobalUniformParam.frameCount = static_cast<uint32_t>(frameCount);
+                rasterizer.GlobalUniformParam.padding = 0u;
 
                 for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
                 {
                     // push constant 每次 record() 后被重置，必须在每次 record() 前重新设置
-                    rasterizer[vert_glsl::pushConsts::storageBufferIndex] = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
+                    rasterizer.pushConsts.storageBufferIndex = rasterizerStorageBuffers[threadIndex][i].storeDescriptor();
                     rasterizer.record(indexBuffer, vertexBuffer);
                 }
 

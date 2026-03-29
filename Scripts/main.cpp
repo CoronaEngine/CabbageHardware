@@ -341,6 +341,111 @@ std::set<std::string> generateBindingKeys(std::stringstream& out, const std::vec
 	return bindingBlockNames;
 }
 
+// Helper: emit a block proxy struct (push constants or UBO) into the output stream.
+// Returns the initializer string for the parent constructor, or empty if block is absent.
+static std::string emitBlockProxy(std::stringstream& out,
+                                   const std::string& blockName,
+                                   ShaderCodeModule::ShaderResources::BindType bindType,
+                                   const ShaderCodeModule::ShaderResources& resources)
+{
+	if (blockName.empty()) return {};
+
+	out << "struct " << blockName << "_t {\n";
+	std::vector<std::string> fieldInits;
+	for (auto& info : resources.bindInfoPool)
+	{
+		if (info.bindType == bindType)
+		{
+			out << "\t::EmbeddedShader::BoundField<P> " << info.variateName << ";\n";
+			std::stringstream ss;
+			ss << info.variateName << "(p, " << info.byteOffset << ", " << info.typeSize
+			   << ", " << static_cast<int32_t>(info.bindType) << ", " << info.location << ")";
+			fieldInits.push_back(ss.str());
+		}
+	}
+	out << "\t" << blockName << "_t(P* p)";
+	if (!fieldInits.empty())
+	{
+		out << " : ";
+		for (size_t i = 0; i < fieldInits.size(); ++i)
+		{
+			if (i > 0) out << ", ";
+			out << fieldInits[i];
+		}
+	}
+	out << " {}\n";
+	out << "} " << blockName << ";\n";
+	return blockName + "(p)";
+}
+
+static void emitCtorBody(std::stringstream& out, const std::string& className,
+                          const std::vector<std::string>& initList)
+{
+	if (initList.empty())
+	{
+		out << className << "(P* p) { (void)p; }\n";
+	}
+	else
+	{
+		out << className << "(P* p) : ";
+		for (size_t i = 0; i < initList.size(); ++i)
+		{
+			if (i > 0) out << ", ";
+			out << initList[i];
+		}
+		out << " {}\n";
+	}
+}
+
+void generateBindings(std::stringstream& out, const std::vector<uint32_t>& spirv, ShaderLanguage lang)
+{
+	auto resources = ShaderLanguageConverter::spirvCrossReflectedBindInfo(spirv, lang);
+
+	// Size metadata for cross-stage validation in TypedRasterizerPipeline
+	out << "static constexpr size_t pushConstantBlockSize = " << resources.pushConstantSize << ";\n";
+	out << "static constexpr size_t uniformBufferBlockSize = " << resources.uniformBufferSize << ";\n";
+
+	// --- ResourceBindings<P>: push constants + UBO (shared between VS and FS) ---
+	out << "template<typename P>\nstruct ResourceBindings {\n";
+	{
+		std::vector<std::string> initList;
+		auto s = emitBlockProxy(out, resources.pushConstantName,
+		                         ShaderCodeModule::ShaderResources::pushConstantMembers, resources);
+		if (!s.empty()) initList.push_back(std::move(s));
+
+		s = emitBlockProxy(out, resources.uniformBufferName,
+		                    ShaderCodeModule::ShaderResources::uniformBufferMembers, resources);
+		if (!s.empty()) initList.push_back(std::move(s));
+
+		emitCtorBody(out, "ResourceBindings", initList);
+	}
+	out << "};\n";
+
+	// --- OutputBindings<P>: stage outputs (render targets) ---
+	out << "template<typename P>\nstruct OutputBindings {\n";
+	{
+		std::vector<std::string> initList;
+		for (auto& info : resources.bindInfoPool)
+		{
+			if (info.bindType == ShaderCodeModule::ShaderResources::stageOutputs)
+			{
+				out << "::EmbeddedShader::BoundField<P> " << info.variateName << ";\n";
+				std::stringstream ss;
+				ss << info.variateName << "(p, " << info.byteOffset << ", " << info.typeSize
+				   << ", " << static_cast<int32_t>(info.bindType) << ", " << info.location << ")";
+				initList.push_back(ss.str());
+			}
+		}
+		emitCtorBody(out, "OutputBindings", initList);
+	}
+	out << "};\n";
+
+	// --- Bindings<P>: combined (for single-stage pipelines like compute) ---
+	out << "template<typename P>\nstruct Bindings : ResourceBindings<P>, OutputBindings<P> {\n";
+	out << "Bindings(P* p) : ResourceBindings<P>(p), OutputBindings<P>(p) {}\n";
+	out << "};\n";
+}
+
 int main(int argc, char** argv)
 {
 	std::cout << "Helicon Shader Compile Scripts\n";
@@ -562,6 +667,10 @@ int main(int argc, char** argv)
 			out << "\n";
 		}
 	}
+
+	// Generate Bindings<P> template for direct member access (TypedRasterizerPipeline / TypedComputePipeline)
+	std::cout << "INFO:Generate Bindings<P> for struct '" << nsName << "'...\n";
+	generateBindings(out, spirv, inputLanguage);
 
 	out << "}; // struct " << nsName << "\n";
 

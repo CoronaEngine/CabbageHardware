@@ -958,4 +958,24 @@ namespace EmbeddedShader
 		::HardwareImage* boundImage_ = nullptr;
 		::HardwareBuffer* boundBuffer_ = nullptr;
 	};
+
+	// Pipeline-bound field proxy for direct member access syntax:
+	//   rasterizer.GlobalUniformParam.globalTime = currentTime;
+	// PipelineType is RasterizerPipeline or ComputePipeline.
+	// operator= implementation is deferred to CabbageHardware.h (needs ResourceProxy).
+	template<typename PipelineType>
+	struct BoundField
+	{
+		PipelineType* pipeline_;
+		uint64_t byteOffset;
+		uint32_t typeSize;
+		int32_t  bindType;
+		uint32_t location;
+
+		BoundField(PipelineType* p, uint64_t off, uint32_t sz, int32_t bt, uint32_t loc)
+			: pipeline_(p), byteOffset(off), typeSize(sz), bindType(bt), location(loc) {}
+
+		template<typename T>
+		BoundField& operator=(const T& value);
+	};
 }

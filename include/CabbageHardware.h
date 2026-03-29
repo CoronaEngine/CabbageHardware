@@ -583,6 +583,19 @@ ResourceProxy &ResourceProxy::operator=(const T &value)
     return *this;
 }
 
+// ================= BoundField::operator= Implementation =================
+// Deferred from VariateProxy.h — now ResourceProxy is fully defined.
+namespace EmbeddedShader {
+template<typename PipelineType>
+template<typename T>
+BoundField<PipelineType>& BoundField<PipelineType>::operator=(const T& value)
+{
+    ResourceProxy proxy(pipeline_, byteOffset, typeSize, bindType, location);
+    proxy = value;
+    return *this;
+}
+} // namespace EmbeddedShader
+
 // ================= ComputePipeline 模板构造函数实现 =================
 // 需要访问 Storage 和 ComputePipelineVulkan，通过辅助函数实现
 void computePipelineInitFromCompiler(std::atomic<std::uintptr_t> &pipelineID, 
@@ -646,6 +659,97 @@ RasterizerPipeline::RasterizerPipeline(VF &&vertexShaderCode,
                                         multiviewCount,
                                         sourceLocation);
 }
+
+// ================= TypedRasterizerPipeline: GLSL path with direct member access =================
+// Usage: TypedRasterizerPipeline<vert_glsl, frag_glsl> rasterizer;
+//        rasterizer.GlobalUniformParam.globalTime = currentTime;  // shared resources via VS
+//        rasterizer.outColor = finalOutputImage;                  // FS stage outputs
+// VS::ResourceBindings provides push constants + UBO (shared between stages).
+// FS::OutputBindings provides stage outputs (render targets).
+// static_assert ensures VS and FS block layouts are consistent.
+template<typename VS, typename FS>
+struct TypedRasterizerPipeline
+    : RasterizerPipeline
+    , VS::template ResourceBindings<RasterizerPipeline>
+    , FS::template OutputBindings<RasterizerPipeline>
+{
+    static_assert(VS::pushConstantBlockSize == FS::pushConstantBlockSize,
+        "VS and FS push constant block sizes must match");
+    static_assert(VS::uniformBufferBlockSize == FS::uniformBufferBlockSize,
+        "VS and FS uniform buffer block sizes must match");
+
+    using VSRes = typename VS::template ResourceBindings<RasterizerPipeline>;
+    using FSOut = typename FS::template OutputBindings<RasterizerPipeline>;
+
+    TypedRasterizerPipeline(uint32_t multiviewCount = 1,
+                            const std::source_location& sourceLocation = std::source_location::current())
+        : RasterizerPipeline(VS::spirv, FS::spirv, multiviewCount, sourceLocation)
+        , VSRes(static_cast<RasterizerPipeline*>(this))
+        , FSOut(static_cast<RasterizerPipeline*>(this))
+    {}
+
+    TypedRasterizerPipeline(const TypedRasterizerPipeline& other)
+        : RasterizerPipeline(other)
+        , VSRes(static_cast<RasterizerPipeline*>(this))
+        , FSOut(static_cast<RasterizerPipeline*>(this))
+    {}
+
+    TypedRasterizerPipeline(TypedRasterizerPipeline&& other) noexcept
+        : RasterizerPipeline(std::move(other))
+        , VSRes(static_cast<RasterizerPipeline*>(this))
+        , FSOut(static_cast<RasterizerPipeline*>(this))
+    {}
+
+    TypedRasterizerPipeline& operator=(const TypedRasterizerPipeline& other)
+    {
+        RasterizerPipeline::operator=(other);
+        return *this;
+    }
+
+    TypedRasterizerPipeline& operator=(TypedRasterizerPipeline&& other) noexcept
+    {
+        RasterizerPipeline::operator=(std::move(other));
+        return *this;
+    }
+};
+
+// ================= TypedComputePipeline: GLSL path with direct member access =================
+// Usage: TypedComputePipeline<compute_glsl> computer;
+//        computer.GlobalUniformParam.imageID = descriptorID;
+template<typename CS>
+struct TypedComputePipeline
+    : ComputePipeline
+    , CS::template Bindings<ComputePipeline>
+{
+    using CSBindings = typename CS::template Bindings<ComputePipeline>;
+
+    TypedComputePipeline(const std::source_location& sourceLocation = std::source_location::current())
+        : ComputePipeline(CS::spirv, sourceLocation)
+        , CSBindings(static_cast<ComputePipeline*>(this))
+    {}
+
+    TypedComputePipeline(const TypedComputePipeline& other)
+        : ComputePipeline(other)
+        , CSBindings(static_cast<ComputePipeline*>(this))
+    {}
+
+    TypedComputePipeline(TypedComputePipeline&& other) noexcept
+        : ComputePipeline(std::move(other))
+        , CSBindings(static_cast<ComputePipeline*>(this))
+    {}
+
+    TypedComputePipeline& operator=(const TypedComputePipeline& other)
+    {
+        ComputePipeline::operator=(other);
+        return *this;
+    }
+
+    TypedComputePipeline& operator=(TypedComputePipeline&& other) noexcept
+    {
+        ComputePipeline::operator=(std::move(other));
+        return *this;
+    }
+};
 
 // ================= Texture2DProxy::createResource 实现 =================
 // 此处 HardwareImage 和 HardwareImageCreateInfo 已经完整定义
