@@ -441,6 +441,8 @@ struct RasterizerPipeline
     // 模板构造函数：接受 DSL lambda，内部完成编译
     template <typename VF, typename FF>
         requires (!std::is_convertible_v<VF, std::string>) && (!std::is_convertible_v<FF, std::string>)
+              && (!std::is_same_v<std::remove_cvref_t<VF>, std::vector<uint32_t>>)
+              && (!std::is_same_v<std::remove_cvref_t<FF>, std::vector<uint32_t>>)
     RasterizerPipeline(VF &&vertexShaderCode,
                        FF &&fragmentShaderCode,
                        uint32_t multiviewCount = 1,
@@ -618,6 +620,8 @@ void rasterizerPipelineInitFromCompiler(std::atomic<std::uintptr_t> &pipelineID,
 
 template <typename VF, typename FF>
     requires (!std::is_convertible_v<VF, std::string>) && (!std::is_convertible_v<FF, std::string>)
+          && (!std::is_same_v<std::remove_cvref_t<VF>, std::vector<uint32_t>>)
+          && (!std::is_same_v<std::remove_cvref_t<FF>, std::vector<uint32_t>>)
 RasterizerPipeline::RasterizerPipeline(VF &&vertexShaderCode,
                                         FF &&fragmentShaderCode,
                                         uint32_t multiviewCount,
