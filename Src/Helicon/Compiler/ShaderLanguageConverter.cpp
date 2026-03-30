@@ -260,11 +260,51 @@ namespace EmbeddedShader
 					result = "struct_" + std::to_string(type.self);
 				break;
 			case spirv_cross::SPIRType::Image:
-				result = "image";
+			{
+				const auto& imgTexelType = compiler.get_type(type.image.type);
+				std::string prefix;
+				if (imgTexelType.basetype == spirv_cross::SPIRType::Int ||
+				    imgTexelType.basetype == spirv_cross::SPIRType::Short ||
+				    imgTexelType.basetype == spirv_cross::SPIRType::SByte)
+					prefix = "i";
+				else if (imgTexelType.basetype == spirv_cross::SPIRType::UInt ||
+				         imgTexelType.basetype == spirv_cross::SPIRType::UShort ||
+				         imgTexelType.basetype == spirv_cross::SPIRType::UByte)
+					prefix = "u";
+
+				switch (type.image.dim)
+				{
+					case spv::Dim2D:   result = prefix + (type.image.arrayed ? "image2DArray" : "image2D"); break;
+					case spv::Dim3D:   result = prefix + "image3D"; break;
+					case spv::DimCube: result = prefix + (type.image.arrayed ? "imageCubeArray" : "imageCube"); break;
+					case spv::Dim1D:   result = prefix + "image1D"; break;
+					default:           result = prefix + "image2D"; break;
+				}
 				break;
+			}
 			case spirv_cross::SPIRType::SampledImage:
-				result = "sampled_image";
+			{
+				const auto& imgTexelType = compiler.get_type(type.image.type);
+				std::string prefix;
+				if (imgTexelType.basetype == spirv_cross::SPIRType::Int ||
+				    imgTexelType.basetype == spirv_cross::SPIRType::Short ||
+				    imgTexelType.basetype == spirv_cross::SPIRType::SByte)
+					prefix = "i";
+				else if (imgTexelType.basetype == spirv_cross::SPIRType::UInt ||
+				         imgTexelType.basetype == spirv_cross::SPIRType::UShort ||
+				         imgTexelType.basetype == spirv_cross::SPIRType::UByte)
+					prefix = "u";
+
+				switch (type.image.dim)
+				{
+					case spv::Dim2D:   result = prefix + (type.image.arrayed ? "sampler2DArray" : "sampler2D"); break;
+					case spv::Dim3D:   result = prefix + "sampler3D"; break;
+					case spv::DimCube: result = prefix + (type.image.arrayed ? "samplerCubeArray" : "samplerCube"); break;
+					case spv::Dim1D:   result = prefix + "sampler1D"; break;
+					default:           result = prefix + "sampler2D"; break;
+				}
 				break;
+			}
 			case spirv_cross::SPIRType::Sampler:
 				result = "sampler";
 				break;

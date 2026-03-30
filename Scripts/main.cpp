@@ -65,23 +65,39 @@ std::string typeNameToSlang(std::string_view n)
     if (n == "dmat4x4") return "double4x4";
 
     /* ---------- 纹理（GLSL → Slang） ---------- */
+    if (n == "sampler1D")         return "Texture1D";
     if (n == "sampler2D")         return "Texture2D";
     if (n == "sampler3D")         return "Texture3D";
     if (n == "samplerCube")       return "TextureCube";
     if (n == "sampler2DArray")    return "Texture2DArray";
+    if (n == "samplerCubeArray")  return "TextureCubeArray";
     if (n == "sampler2DMS")       return "Texture2DMS";
     if (n == "sampler2DShadow")   return "Texture2DShadow";
     if (n == "samplerCubeShadow") return "TextureCubeShadow";
+    // int texel sampler types
+    if (n == "isampler1D")        return "Texture1D<int4>";
+    if (n == "isampler2D")        return "Texture2D<int4>";
+    if (n == "isampler3D")        return "Texture3D<int4>";
+    if (n == "isamplerCube")      return "TextureCube<int4>";
+    if (n == "isampler2DArray")   return "Texture2DArray<int4>";
+    // uint texel sampler types
+    if (n == "usampler1D")        return "Texture1D<uint4>";
+    if (n == "usampler2D")        return "Texture2D<uint4>";
+    if (n == "usampler3D")        return "Texture3D<uint4>";
+    if (n == "usamplerCube")      return "TextureCube<uint4>";
+    if (n == "usampler2DArray")   return "Texture2DArray<uint4>";
 
     /* ---------- 缓冲（GLSL 风格 → Slang） ---------- */
     // GLSL 名字 → HLSL/Slang 名字
     if (n == "samplerBuffer")       return "Buffer";          // 只读 buffer
     if (n == "imageBuffer")         return "RWBuffer";        // 读写 buffer
     if (n == "sampler2DRect")       return "Texture2D";       // 无 normalized coord
+    if (n == "image1D")             return "RWTexture1D";
     if (n == "image2D")             return "RWTexture2D";
     if (n == "image3D")             return "RWTexture3D";
     if (n == "imageCube")           return "RWTextureCube";
     if (n == "image2DArray")        return "RWTexture2DArray";
+    if (n == "imageCubeArray")      return "RWTextureCubeArray";
     if (n == "uimage2D")            return "RWTexture2D<uint>";
     if (n == "uimage3D")            return "RWTexture3D<uint>";
     if (n == "uimageCube")          return "RWTextureCube<uint>";
@@ -207,7 +223,64 @@ std::string typeNameToCpp(std::string_view typeName)
     if (typeName == "uint") return "unsigned int";
     if (typeName == "half") return "float";      // half 降级为 float
     if (typeName == "dword") return "unsigned int";
+
+    // Opaque sampler/image types -> Texture2DProxy (EDSL proxy for GLSL sampler/image)
+    // float texel types
+    if (typeName == "sampler1D")        return "@Texture2DProxy<::ktm::fvec4>";
+    if (typeName == "sampler2D")        return "@Texture2DProxy<::ktm::fvec4>";
+    if (typeName == "sampler3D")        return "@Texture2DProxy<::ktm::fvec4>";
+    if (typeName == "samplerCube")      return "@Texture2DProxy<::ktm::fvec4>";
+    if (typeName == "sampler2DArray")   return "@Texture2DProxy<::ktm::fvec4>";
+    if (typeName == "samplerCubeArray") return "@Texture2DProxy<::ktm::fvec4>";
+    if (typeName == "sampler2DMS")      return "@Texture2DProxy<::ktm::fvec4>";
+    if (typeName == "sampler2DShadow")  return "@Texture2DProxy<::ktm::fvec4>";
+    if (typeName == "samplerCubeShadow") return "@Texture2DProxy<::ktm::fvec4>";
+    if (typeName == "sampler2DRect")    return "@Texture2DProxy<::ktm::fvec4>";
+    // int texel types
+    if (typeName == "isampler1D")       return "@Texture2DProxy<::ktm::svec4>";
+    if (typeName == "isampler2D")       return "@Texture2DProxy<::ktm::svec4>";
+    if (typeName == "isampler3D")       return "@Texture2DProxy<::ktm::svec4>";
+    if (typeName == "isamplerCube")     return "@Texture2DProxy<::ktm::svec4>";
+    if (typeName == "isampler2DArray")  return "@Texture2DProxy<::ktm::svec4>";
+    // uint texel types
+    if (typeName == "usampler1D")       return "@Texture2DProxy<::ktm::uvec4>";
+    if (typeName == "usampler2D")       return "@Texture2DProxy<::ktm::uvec4>";
+    if (typeName == "usampler3D")       return "@Texture2DProxy<::ktm::uvec4>";
+    if (typeName == "usamplerCube")     return "@Texture2DProxy<::ktm::uvec4>";
+    if (typeName == "usampler2DArray")  return "@Texture2DProxy<::ktm::uvec4>";
+    // image types (storage images)
+    if (typeName == "image1D")          return "@Texture2DProxy<::ktm::fvec4>";
+    if (typeName == "image2D")          return "@Texture2DProxy<::ktm::fvec4>";
+    if (typeName == "image3D")          return "@Texture2DProxy<::ktm::fvec4>";
+    if (typeName == "imageCube")        return "@Texture2DProxy<::ktm::fvec4>";
+    if (typeName == "image2DArray")     return "@Texture2DProxy<::ktm::fvec4>";
+    if (typeName == "iimage2D")         return "@Texture2DProxy<::ktm::svec4>";
+    if (typeName == "iimage3D")         return "@Texture2DProxy<::ktm::svec4>";
+    if (typeName == "iimageCube")       return "@Texture2DProxy<::ktm::svec4>";
+    if (typeName == "iimage2DArray")    return "@Texture2DProxy<::ktm::svec4>";
+    if (typeName == "uimage2D")         return "@Texture2DProxy<::ktm::uvec4>";
+    if (typeName == "uimage3D")         return "@Texture2DProxy<::ktm::uvec4>";
+    if (typeName == "uimageCube")       return "@Texture2DProxy<::ktm::uvec4>";
+    if (typeName == "uimage2DArray")    return "@Texture2DProxy<::ktm::uvec4>";
+
 	return std::string(typeName);
+}
+
+// Helper: check if typeNameToCpp returned an opaque proxy type (prefixed with '@')
+bool isOpaqueProxyType(const std::string& cppType)
+{
+	return !cppType.empty() && cppType[0] == '@';
+}
+
+// Helper: emit the C++ type for a parameter or return type.
+// Opaque types (prefixed '@') are emitted directly as ::EmbeddedShader::XXX,
+// normal types are wrapped in ::EmbeddedShader::VariateProxy<XXX>.
+std::string emitCppParamType(const std::string& typeName)
+{
+	auto cppType = typeNameToCpp(typeName);
+	if (isOpaqueProxyType(cppType))
+		return "::EmbeddedShader::" + cppType.substr(1);  // strip '@' prefix
+	return "::EmbeddedShader::VariateProxy<" + cppType + ">";
 }
 
 void buildFunctionParameter(FunctionSignature& signature, std::stringstream& out)
@@ -216,11 +289,11 @@ void buildFunctionParameter(FunctionSignature& signature, std::stringstream& out
 	if (!signature.parameters.empty())
 	{
 		auto& param0 = signature.parameters[0];
-		out << "::EmbeddedShader::VariateProxy<" << typeNameToCpp(param0.typeName) << "> " << param0.name;
+		out << emitCppParamType(param0.typeName) << " " << param0.name;
 		for (size_t i = 1; i < signature.parameters.size(); ++i)
 		{
 			auto& param = signature.parameters[i];
-			out << ", ::EmbeddedShader::VariateProxy<" << typeNameToCpp(param.typeName) << "> " << param.name;
+			out << ", " << emitCppParamType(param.typeName) << " " << param.name;
 		}
 	}
 	out << ")";
@@ -228,11 +301,6 @@ void buildFunctionParameter(FunctionSignature& signature, std::stringstream& out
 
 void buildFunctionSignature(FunctionSignature &signature, std::stringstream &out, std::string_view sourceSpv)
 {
-	// out << signature.returnTypeName << " " << signature.name << "(";
-	// if (signature.parameters.empty())
-	// {
-	// 	out << ");";
-	// }
 	out << "static inline ::EmbeddedShader::FunctionProxy<";
 	if (signature.returnTypeName == "void")
 	{
@@ -241,9 +309,19 @@ void buildFunctionSignature(FunctionSignature &signature, std::stringstream &out
 	}
 	else
 	{
-		out << "::EmbeddedShader::VariateProxy<" << typeNameToCpp(signature.returnTypeName);
+		auto retCppType = typeNameToCpp(signature.returnTypeName);
+		if (isOpaqueProxyType(retCppType))
+		{
+			// Opaque type: emit as full proxy type directly (e.g. Texture2DProxy<fvec4>)
+			out << "::EmbeddedShader::" << retCppType.substr(1);
+		}
+		else
+		{
+			out << "::EmbeddedShader::VariateProxy<" << retCppType;
+		}
 		buildFunctionParameter(signature,out);
-		out << ">";
+		if (!isOpaqueProxyType(retCppType))
+			out << ">";
 	}
 	out << "> " << signature.name << "{";
 	out << "\""<< signature.name << "\",\""<< typeNameToSlang(signature.returnTypeName) << "\",{";
@@ -259,7 +337,7 @@ void buildStruct(const StructInfo& structInfo, std::stringstream& out)
 	out << "struct " << structInfo.name << "\n{\n";
 	for (auto& member : structInfo.members)
 	{
-		out << "\t""::EmbeddedShader::VariateProxy<" << typeNameToCpp(member.typeName) << "> " << member.name << ";\n";
+		out << "\t" << emitCppParamType(member.typeName) << " " << member.name << ";\n";
 	}
 	out << "};";
 }
