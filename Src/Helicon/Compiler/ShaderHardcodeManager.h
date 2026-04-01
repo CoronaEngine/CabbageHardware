@@ -24,8 +24,6 @@ namespace EmbeddedShader
 		static void createTarget(const std::string& name);
 		static void clearOldHardcode();
 
-		static std::string getShaderResourceOutput(const ShaderCodeModule::ShaderResources& shaderResources);
-
 		struct TargetInfo
 		{
 			bool isExistTargetItem = false;

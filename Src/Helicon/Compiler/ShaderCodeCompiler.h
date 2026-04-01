@@ -82,6 +82,13 @@ namespace EmbeddedShader
 
             std::vector<ShaderBindInfo> bindInfoPool;
 
+            // 按 bindType 分组遍历
+            template<typename Fn>
+            void forEachBind(BindType type, Fn&& fn) const {
+                for (auto& info : bindInfoPool)
+                    if (info.bindType == type) fn(info);
+            }
+
             // 仅在编译期使用：按 variateName 线性搜索
             ShaderBindInfo *findShaderBindInfo(const std::string &resourceName)
             {

@@ -199,6 +199,11 @@ namespace EmbeddedShader
         {
             std::unique_lock<std::shared_mutex> lock(threadMutex);
 
+        // Pre-compute spirv-cross reflection once for all formats that need it
+        ShaderCodeModule::ShaderResources spirvCrossReflection;
+        if (!codeSpirV.empty())
+            spirvCrossReflection = ShaderLanguageConverter::spirvCrossReflectedBindInfo(codeSpirV, ShaderLanguage::HLSL);
+
         // Helper lambdas: store locally AND write to file for release pre-generation
         auto storeCode = [&](const auto& code, const std::string& itemName) {
             compiledOutputs_[itemName] = code;
@@ -215,62 +220,39 @@ namespace EmbeddedShader
             storeCode(codeSpirV, ShaderHardcodeManager::getItemName(sourceLocationStr, "SpirV" + bindlessStr));
             // SpirV 目标始终使用 spirv-cross 反射：Slang 反射不处理 push_constant_buffers，
             // 导致 pushConstantSize/pushConstantName/pushConstantMembers 全部缺失
-            {
-                auto shaderResource = ShaderLanguageConverter::spirvCrossReflectedBindInfo(codeSpirV, ShaderLanguage::HLSL);
-                storeReflection(shaderResource, ShaderHardcodeManager::getItemName(sourceLocationStr, "SpirV_Reflection" + bindlessStr));
-            }
+            storeReflection(spirvCrossReflection, ShaderHardcodeManager::getItemName(sourceLocationStr, "SpirV_Reflection" + bindlessStr));
             if (!reflections.empty()) index++;
         }
         if (!codeGLSL.empty())
         {
             storeCode(codeGLSL, ShaderHardcodeManager::getItemName(sourceLocationStr, "GLSL" + bindlessStr));
             if (!reflections.empty()) storeReflection(reflections[index++], ShaderHardcodeManager::getItemName(sourceLocationStr, "GLSL_Reflection" + bindlessStr));
-            else
-            {
-                auto shaderResource = ShaderLanguageConverter::spirvCrossReflectedBindInfo(codeSpirV, ShaderLanguage::HLSL);
-                storeReflection(shaderResource, ShaderHardcodeManager::getItemName(sourceLocationStr, "GLSL_Reflection" + bindlessStr));
-            }
+            else storeReflection(spirvCrossReflection, ShaderHardcodeManager::getItemName(sourceLocationStr, "GLSL_Reflection" + bindlessStr));
         }
         if (!codeHLSL.empty())
         {
             storeCode(codeHLSL, ShaderHardcodeManager::getItemName(sourceLocationStr, "HLSL" + bindlessStr));
             if (!reflections.empty()) storeReflection(reflections[index++], ShaderHardcodeManager::getItemName(sourceLocationStr, "HLSL_Reflection" + bindlessStr));
-            else
-            {
-                auto shaderResource = ShaderLanguageConverter::spirvCrossReflectedBindInfo(codeSpirV, ShaderLanguage::HLSL);
-                storeReflection(shaderResource, ShaderHardcodeManager::getItemName(sourceLocationStr, "HLSL_Reflection" + bindlessStr));
-            }
+            else storeReflection(spirvCrossReflection, ShaderHardcodeManager::getItemName(sourceLocationStr, "HLSL_Reflection" + bindlessStr));
         }
         if (!codeSlang.empty())
         {
             storeCode(codeSlang, ShaderHardcodeManager::getItemName(sourceLocationStr, "Slang" + bindlessStr));
             if (!reflections.empty()) storeReflection(reflections[0], ShaderHardcodeManager::getItemName(sourceLocationStr, "Slang_Reflection" + bindlessStr));
-            else
-            {
-                auto shaderResource = ShaderLanguageConverter::spirvCrossReflectedBindInfo(codeSpirV, ShaderLanguage::HLSL);
-                storeReflection(shaderResource, ShaderHardcodeManager::getItemName(sourceLocationStr, "Slang_Reflection" + bindlessStr));
-            }
+            else storeReflection(spirvCrossReflection, ShaderHardcodeManager::getItemName(sourceLocationStr, "Slang_Reflection" + bindlessStr));
         }
 #ifdef WIN32
         if (!codeDXIL.empty())
         {
             storeCode(codeDXIL, ShaderHardcodeManager::getItemName(sourceLocationStr, "DXIL" + bindlessStr));
             if (!reflections.empty()) storeReflection(reflections[index++], ShaderHardcodeManager::getItemName(sourceLocationStr, "DXIL_Reflection" + bindlessStr));
-            else
-            {
-                auto shaderResource = ShaderLanguageConverter::spirvCrossReflectedBindInfo(codeSpirV, ShaderLanguage::HLSL);
-                storeReflection(shaderResource, ShaderHardcodeManager::getItemName(sourceLocationStr, "DXIL_Reflection" + bindlessStr));
-            }
+            else storeReflection(spirvCrossReflection, ShaderHardcodeManager::getItemName(sourceLocationStr, "DXIL_Reflection" + bindlessStr));
         }
         if (!codeDXBC.empty())
         {
             storeCode(codeDXBC, ShaderHardcodeManager::getItemName(sourceLocationStr, "DXBC"));
             if (!reflections.empty()) storeReflection(reflections[index++], ShaderHardcodeManager::getItemName(sourceLocationStr, "DXBC_Reflection" + bindlessStr));
-            else
-            {
-                auto shaderResource = ShaderLanguageConverter::spirvCrossReflectedBindInfo(codeSpirV, ShaderLanguage::HLSL);
-                storeReflection(shaderResource, ShaderHardcodeManager::getItemName(sourceLocationStr, "DXBC_Reflection" + bindlessStr));
-            }
+            else storeReflection(spirvCrossReflection, ShaderHardcodeManager::getItemName(sourceLocationStr, "DXBC_Reflection" + bindlessStr));
         }
 #endif
         }
