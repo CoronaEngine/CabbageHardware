@@ -7,17 +7,21 @@
 #include <mutex>
 #include <optional>
 
-namespace multishader
-{
+//主要作用：
+
+//限制队列容量，避免生产者过快时内存无限增长。
+//队列满时丢弃最旧数据，保留最新帧，减少显示滞后（更适合调 shader）。
+//pop_wait() 让消费者可阻塞等待，线程协作简单。
+ //   try_pop_all_latest() 让显示线程一次拿到最新结果并清空积压。
+  //  close() 可唤醒阻塞线程，退出流程不容易死锁。
+ //   droppedCount() 可统计背压和丢帧情况，方便调优。
+
 template <typename T>
 class DropOldestQueue
 {
   public:
     // 构造队列，capacity 传 0 时自动回退为 1。
-    explicit DropOldestQueue(std::size_t capacity = 3)
-        : capacity_(capacity == 0 ? 1 : capacity)
-    {
-    }
+    explicit DropOldestQueue(std::size_t capacity = 3) : capacity_(capacity == 0 ? 1 : capacity){}
 
     // 入队：若队列已满则丢弃最旧元素，再写入新元素。
     // 返回 false 表示队列已关闭，写入失败。
@@ -115,4 +119,3 @@ class DropOldestQueue
     uint64_t droppedCount_{0};
     bool closed_{false};
 };
-} // multishader 命名空间

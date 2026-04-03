@@ -9,8 +9,6 @@
 #include "CabbageHardware.h"
 #include "RuntimeConfig.h"
 
-namespace multishader
-{
 // 全局统一时钟类型，线程间通过它计算延迟/FPS。
 using Clock = std::chrono::steady_clock;
 

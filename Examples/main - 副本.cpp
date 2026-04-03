@@ -22,8 +22,6 @@
 #include "multishader/Scenario.h"
 #include "multishader/ScenarioRegistry.h"
 
-namespace
-{
 using multishader::Backend;
 using multishader::Clock;
 using multishader::DropOldestQueue;
