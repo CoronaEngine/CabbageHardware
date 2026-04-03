@@ -1,4 +1,4 @@
-#include "RuntimeConfig.h"
+﻿#include "runtime_config.h"
 
 #include <algorithm>
 #include <cctype>
@@ -16,7 +16,7 @@ UIntType parse_unsigned_value(const std::string &value, const char *field_name)
     auto [ptr, ec] = std::from_chars(begin, end, parsed);
     if (ec != std::errc() || ptr != end)
     {
-        throw std::runtime_error("Invalid value for " + std::string(fieldName) + ": " + value);
+        throw std::runtime_error("Invalid value for " + std::string(field_name) + ": " + value);
     }
     return parsed;
 }
@@ -71,69 +71,69 @@ RuntimeConfig parse_runtime_config(int argc, char **argv)
         }
         if (argument.rfind("--scenario", 0) == 0)
         {
-            config.scenario = readValue(i, argc, argv, argument);
+            config.scenario = read_value(i, argc, argv, argument);
             continue;
         }
-        if (argument.rfind("--dataset", 0) == 0)
+        /*if (argument.rfind("--dataset", 0) == 0)
         {
             config.dataset = readValue(i, argc, argv, argument);
             continue;
-        }
+        }*/
         if (argument.rfind("--queue-depth", 0) == 0)
         {
-            config.queueDepth = parseUnsignedValue<std::size_t>(readValue(i, argc, argv, argument), "queue-depth");
+            config.queue_depth = parse_unsigned_value<std::size_t>(read_value(i, argc, argv, argument), "queue-depth");
             continue;
         }
         if (argument.rfind("--width", 0) == 0)
         {
-            config.windowWidth = parseUnsignedValue<uint32_t>(readValue(i, argc, argv, argument), "width");
+            config.window_width = parse_unsigned_value<uint32_t>(read_value(i, argc, argv, argument), "width");
             continue;
         }
         if (argument.rfind("--height", 0) == 0)
         {
-            config.windowHeight = parseUnsignedValue<uint32_t>(readValue(i, argc, argv, argument), "height");
+            config.window_height = parse_unsigned_value<uint32_t>(read_value(i, argc, argv, argument), "height");
             continue;
         }
         if (argument.rfind("--max-fps", 0) == 0)
         {
-            config.maxFps = parseUnsignedValue<uint32_t>(readValue(i, argc, argv, argument), "max-fps");
+            config.max_fps = parse_unsigned_value<uint32_t>(read_value(i, argc, argv, argument), "max-fps");
             continue;
         }
         if (argument.rfind("--compare-stats", 0) == 0)
         {
-            config.enableCompareStats = parseBoolValue(readValue(i, argc, argv, argument));
+            config.enable_compare_stats = parse_bool_value(read_value(i, argc, argv, argument));
             continue;
         }
-        if (argument.rfind("--glsl-delay-ms", 0) == 0)
+        /*if (argument.rfind("--glsl-delay-ms", 0) == 0)
         {
-            config.glslArtificialDelayMs = parseUnsignedValue<uint32_t>(readValue(i, argc, argv, argument), "glsl-delay-ms");
+            config.glsl_artificial_delay_ms = parse_Unsigned_Value<uint32_t>(read_value(i, argc, argv, argument), "glsl-delay-ms");
             continue;
-        }
+        }*/
 
         throw std::runtime_error("Unknown argument: " + argument);
     }
 
     // 做最小值归一化，保证运行阶段不出现 0 尺寸或 0 容量。
-    config.queueDepth = std::max<std::size_t>(1, config.queueDepth);
-    config.windowWidth = std::max<uint32_t>(1, config.windowWidth);
-    config.windowHeight = std::max<uint32_t>(1, config.windowHeight);
+    config.queue_depth = std::max<std::size_t>(1, config.queue_depth);
+    config.window_width = std::max<uint32_t>(1, config.window_width);
+    config.window_height = std::max<uint32_t>(1, config.window_height);
     return config;
 }
 
-std::string runtimeConfigUsage(std::string_view exeName)
+std::string runtime_config_usage(std::string_view exe_name)
 {
     std::string usage;
     usage += "Usage: ";
-    usage += exeName;
+    usage += exe_name;
     usage += " [options]\n";
     usage += "  --scenario=<name>         Scenario name (default: default)\n";
-    usage += "  --dataset=<name>          Dataset name (default: cube)\n";
+    //usage += "  --dataset=<name>          Dataset name (default: cube)\n";
     usage += "  --queue-depth=<n>         Bounded queue depth (default: 3)\n";
     usage += "  --width=<n>               Window width (default: 1920)\n";
     usage += "  --height=<n>              Window height (default: 1080)\n";
     usage += "  --max-fps=<n>             Mesh thread FPS cap, 0 uncapped (default: 0)\n";
     usage += "  --compare-stats=<bool>    Enable periodic compare stats (default: true)\n";
-    usage += "  --glsl-delay-ms=<n>       Artificial delay in GLSL render thread (default: 0)\n";
+    //usage += "  --glsl-delay-ms=<n>       Artificial delay in GLSL render thread (default: 0)\n";
     usage += "  --help                    Show this help message\n";
     return usage;
 }
