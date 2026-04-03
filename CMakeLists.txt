@@ -123,7 +123,7 @@ function(helicon_install_runtime_deps target_name)
 endfunction()
 
 # ======================== Shader 自动编译模块 ========================
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/HeliconShaderCompile.cmake)
+#include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/HeliconShaderCompile.cmake)
 
 # ======================== 其他依赖 ========================
 FetchContent_Declare(CoronaFramework
@@ -179,18 +179,11 @@ if(CABBAGE_HARDWARE_BUILD_EXAMPLES)
     )
     FetchContent_MakeAvailable(glfw)
 
-    add_subdirectory(Examples)
+    add_subdirectory(examples)
 endif()
 
-
 if (MSVC)
-    # ���� AddressSanitizer ����ѡ��
     add_compile_options(/fsanitize=address)
-
-    # ��������������� (Incremental Linking)
-    # ASan ������ /INCREMENTAL
     add_link_options(/INCREMENTAL:NO)
-    
-    # (��ѡ) Ϊ�˻�ø��õĶ�ջ׷����Ϣ�����Լ������
     add_compile_options(/Zi) 
 endif()
