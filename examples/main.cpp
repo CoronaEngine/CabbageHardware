@@ -52,29 +52,33 @@ struct RuntimeStats
 };
 
 // 基础自检：验证 drop-oldest 队列的核心行为是否符合预期。
-//bool runQueueSelfTest()
-//{
-//    DropOldestQueue<int> queue(3);
-//    for (int i = 0; i < 10; ++i)
-//    {
-//        if (!queue.push(i))
-//        {
-//            return false;
-//        }
-//    }
-//    if (queue.droppedCount() != 7)
-//    {
-//        return false;
-//    }
-//    auto latest = queue.try_pop_all_latest();
-//    if (!latest.has_value() || latest.value() != 9)
-//    {
-//        return false;
-//    }
-//    queue.close();
-//    auto maybeValue = queue.pop_wait();
-//    return !maybeValue.has_value();
-//}
+bool run_queue_self_test()
+{
+    DropOldestQueue<int> queue(3);
+    for (int i = 0; i < 10; ++i)
+    {
+        if (!queue.push(i))
+        {
+            return false;
+        }
+    }
+
+    if (queue.dropped_count() != 7)
+    {
+        return false;
+    }
+
+    auto latest = queue.try_pop_all_latest();
+
+    if (!latest.has_value() || latest.value() != 9)
+    {
+        return false;
+    }
+
+    queue.close();
+    auto maybe_value = queue.pop_wait();
+    return !maybe_value.has_value();
+}
 
 // 打印当前已注册场景列表，便于命令行选择。
 //void printAvailableScenarios()
@@ -114,11 +118,11 @@ int main(int argc, char **argv)
     //    return 0;
     //}
 
-    //if (!runQueueSelfTest())
-    //{
-    //    std::cerr << "DropOldestQueue self-test failed, aborting.\n";
-    //    return -1;
-    //}
+    if (!run_queue_self_test())
+    {
+        std::cerr << "DropOldestQueue self-test failed, aborting.\n";
+        return -1;
+    }
 
     //multishader::registerHelloTriangleScenario();
 
