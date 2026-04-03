@@ -19,9 +19,9 @@
 #include "drop_oldest_queue.h"
 //#include "multishader/HelloTriangleScenario.h"
 #include "runtime_config.h"
-//#include "multishader/Scenario.h"
-//#include "multishader/ScenarioRegistry.h"
-//
+#include "scenario.h"
+#include "scenario_registry.h"
+
 //using multishader::Backend;
 //using multishader::Clock;
 //using multishader::DropOldestQueue;
