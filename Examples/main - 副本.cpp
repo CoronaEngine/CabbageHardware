@@ -1,7 +1,12 @@
-#include <ktm/ktm.h>
-
+﻿#include <array>
 #include <atomic>
 #include <chrono>
+#include <cstdint>
+#include <exception>
+#include <iostream>
+#include <mutex>
+#include <optional>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -11,554 +16,523 @@
 #include <GLFW/glfw3native.h>
 
 #include "CabbageHardware.h"
-#include "Config.h"
-#include "CubeData.h"
-#include "TextureTest.h"
-#include "corona/kernel/core/i_logger.h"
+#include "multishader/DropOldestQueue.h"
+#include "multishader/HelloTriangleScenario.h"
+#include "multishader/RuntimeConfig.h"
+#include "multishader/Scenario.h"
+#include "multishader/ScenarioRegistry.h"
 
-#include "Codegen/BuiltinVariate.h"
-#include "Codegen/ControlFlows.h"
-#include "Codegen/CustomLibrary.h"
-#include "Codegen/TypeAlias.h"
-
-// 通过 CMake helicon_compile_shaders 自动编译生成的 shader 反射头文件
-// eDSL 路径不再依赖 GLSL 反射头文件，render target 通过 bindRenderTarget 自动绑定
-#include GLSL(vert.glsl)
-#include GLSL(frag.glsl)
-#include GLSL(compute.glsl)
-
-// storage buffer (used by mesh thread, retained for compatibility)
-struct RasterizerStorageBufferObject
+namespace
 {
-    uint32_t textureIndex;
-    ktm::fmat4x4 model = ktm::rotate3d_axis(ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
-    ktm::fmat4x4 view = ktm::look_at_lh(ktm::fvec3(2.0f, 2.0f, 2.0f), ktm::fvec3(0.0f, 0.0f, 0.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
-    ktm::fmat4x4 proj = ktm::perspective_lh(ktm::radians(45.0f), 1920.0f / 1080.0f, 0.1f, 10.0f);
-    ktm::fvec3 viewPos = ktm::fvec3(2.0f, 2.0f, 2.0f);
-    ktm::fvec3 lightColor = ktm::fvec3(10.0f, 10.0f, 10.0f);
-    ktm::fvec3 lightPos = ktm::fvec3(1.0f, 1.0f, 1.0f);
+using multishader::Backend;
+using multishader::Clock;
+using multishader::DropOldestQueue;
+using multishader::MeshFrame;
+using multishader::RenderFrame;
+
+struct RuntimeStats
+{
+    std::atomic<uint64_t> meshFramesProduced{0};
+    std::atomic<uint64_t> edslRenderFrames{0};
+    std::atomic<uint64_t> glslRenderFrames{0};
+    std::atomic<uint64_t> displayLoopTicks{0};
+    std::atomic<uint64_t> edslDisplayFrames{0};
+    std::atomic<uint64_t> glslDisplayFrames{0};
+    std::atomic<uint64_t> edslLatencyUsTotal{0};
+    std::atomic<uint64_t> glslLatencyUsTotal{0};
+    std::atomic<uint64_t> latestEdslFrameId{0};
+    std::atomic<uint64_t> latestGlslFrameId{0};
 };
 
-// 精简顶点：只保留 VS 实际使用的 position 和 color
-struct SimpleVertex
+// 基础自检：验证 drop-oldest 队列的核心行为是否符合预期。
+bool runQueueSelfTest()
 {
-    std::array<float, 3> position;
-    std::array<float, 3> color;
-};
+    DropOldestQueue<int> queue(3);
+    for (int i = 0; i < 10; ++i)
+    {
+        if (!queue.push(i))
+        {
+            return false;
+        }
+    }
+    if (queue.droppedCount() != 7)
+    {
+        return false;
+    }
+    auto latest = queue.try_pop_all_latest();
+    if (!latest.has_value() || latest.value() != 9)
+    {
+        return false;
+    }
+    queue.close();
+    auto maybeValue = queue.pop_wait();
+    return !maybeValue.has_value();
+}
 
-// Vertex attribute proxy: 与 SimpleVertex 一一对应
-struct VertexAttributeProxy
+// 打印当前已注册场景列表，便于命令行选择。
+void printAvailableScenarios()
 {
-    EmbeddedShader::Float3 position;
-    EmbeddedShader::Float3 color;
-};
+    auto names = multishader::listScenarios();
+    std::ostringstream oss;
+    oss << "Available scenarios: ";
+    for (std::size_t i = 0; i < names.size(); ++i)
+    {
+        if (i > 0)
+        {
+            oss << ", ";
+        }
+        oss << names[i];
+    }
+    std::cout << oss.str() << '\n';
+}
+} // 匿名命名空间
 
-struct MainThreadMethods
+int main(int argc, char **argv)
 {
-    std::atomic_bool& running;
-    uint32_t textureID;
-    std::vector<ktm::fmat4x4>& baseModelMat;
-    const std::vector<SimpleVertex>& simpleVertices;
-    const ktm::fmat4x4& vpMat;
-    std::vector<std::vector<HardwareBuffer>>& rasterizerStorageBuffers;
-    std::vector<HardwareImage>& finalOutputImages;
-    std::vector<HardwareExecutor>& executors;
-    const std::vector<GLFWwindow*>& windows;
-
-    ktm::fmat4x4 makeAnimatedModelMatrix(const ktm::fmat4x4& base, float t) const
+    // 1) 解析运行参数（场景、数据集、队列深度、窗口尺寸等）。
+    multishader::RuntimeConfig config;
+    try
     {
-        return base * ktm::rotate3d_axis(t * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
+        config = multishader::parseRuntimeConfig(argc, argv);
     }
-
-    std::vector<SimpleVertex> transformVerticesForObject(const std::vector<SimpleVertex>& src,
-                                                         const ktm::fmat4x4& mvp) const
+    catch (const std::exception &e)
     {
-        auto dst = src;
-        for (auto& v : dst)
-        {
-            ktm::fvec4 clip = mvp * ktm::fvec4(v.position[0], v.position[1], v.position[2], 1.0f);
-            float invW = 1.0f / clip[3];
-            v.position = {clip[0] * invW, clip[1] * invW, clip[2] * invW};
-        }
-        return dst;
-    }
-
-    void meshThread(uint32_t threadIndex)
-    {
-        std::vector<RasterizerStorageBufferObject> rasterizerStorageBufferObjects(baseModelMat.size());
-        for (size_t i = 0; i < baseModelMat.size(); i++)
-        {
-            rasterizerStorageBuffers[threadIndex].push_back(HardwareBuffer(
-                sizeof(RasterizerStorageBufferObject),
-                BufferUsage::StorageBuffer,
-                &(baseModelMat[i])));
-        }
-
-        auto startTime = std::chrono::high_resolution_clock::now();
-        while (running.load())
-        {
-            float currentTime = std::chrono::duration<float, std::chrono::seconds::period>(
-                                    std::chrono::high_resolution_clock::now() - startTime)
-                                    .count();
-
-            for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
-            {
-                rasterizerStorageBufferObjects[i].textureIndex = textureID;
-                rasterizerStorageBufferObjects[i].model =
-                    makeAnimatedModelMatrix(baseModelMat[i], currentTime);
-                rasterizerStorageBuffers[threadIndex][i].copyFromData(
-                    &(rasterizerStorageBufferObjects[i]),
-                    sizeof(rasterizerStorageBufferObjects[i]));
-            }
-        }
-    }
-
-    void renderThreadEDSL(uint32_t threadIndex)
-    {
-        using namespace EmbeddedShader;
-        using namespace EmbeddedShader::Ast;
-        using namespace ktm;
-
-        Texture2D<fvec4> inputImageRGBA16 = finalOutputImages[threadIndex];
-
-        auto acesFilmicToneMapCurve = [&](Float3 x)
-        {
-            Float a = 2.51f;
-            Float b = 0.03f;
-            Float c = 2.43f;
-            Float d = 0.59f;
-            Float e = 0.14f;
-
-            return clamp((x * (a * x + b)) / (x * (c * x + d) + e), fvec3(0.0f), fvec3(1.0f));
-        };
-
-        auto compute = [&]
-        {
-            Float4 color = inputImageRGBA16[dispatchThreadID()->xy()];
-            inputImageRGBA16[dispatchThreadID()->xy()] = Float4(acesFilmicToneMapCurve(color->xyz()), 1.f);
-        };
-
-        auto vsLambda = [&](Aggregate<VertexAttributeProxy> vertex) -> Float4
-        {
-            position() = Float4(vertex->position, 1.0f);
-            return Float4(vertex->color, 1.0f);
-        };
-
-        auto fsLambda = [&](Float4 interpolatedColor) -> Float4
-        {
-            return interpolatedColor;
-        };
-
-        RasterizerPipeline rasterizer(vsLambda, fsLambda);
-        rasterizer.bindOutputTargets(inputImageRGBA16);
-
-        ComputePipeline computer(compute, uvec3(8, 8, 1));
-        auto startTime = std::chrono::high_resolution_clock::now();
-
-        while (running.load())
-        {
-            float currentTime = std::chrono::duration<float, std::chrono::seconds::period>(
-                                    std::chrono::high_resolution_clock::now() - startTime)
-                                    .count();
-            HardwareBuffer indexBuffer = HardwareBuffer(indices, BufferUsage::IndexBuffer);
-
-            for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
-            {
-                auto model = baseModelMat[i] * ktm::rotate3d_axis(
-                    currentTime * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
-                auto transformed = transformVerticesForObject(simpleVertices, vpMat * model);
-                HardwareBuffer vertexBuffer(transformed, BufferUsage::VertexBuffer);
-                rasterizer.record(indexBuffer, vertexBuffer);
-            }
-
-            executors[threadIndex] << rasterizer(1920, 1080)
-                                   << computer(1920 / 8, 1080 / 8, 1)
-                                   << executors[threadIndex].commit();
-        }
-    }
-
-    void displayThread(uint32_t threadIndex)
-    {
-        HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
-
-        while (running.load())
-        {
-            displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
-        }
-    }
-};
-
-int main()
-{
-    // Corona::Kernel::CoronaLogger::get_logger()->set_log_level(quill::LogLevel::TraceL3);
-    //  setupSignalHandlers();
-
-    // 运行压缩纹理测试（可选）
-    // testCompressedTextures();
-
-    //CFW_LOG_INFO("Starting main application...");
-
-    if (glfwInit() < 0)
-    {
+        std::cerr << "Failed to parse runtime config: " << e.what() << '\n';
+        std::cerr << multishader::runtimeConfigUsage(argc > 0 ? argv[0] : "CabbageHardwareExamples");
         return -1;
     }
 
-    //CFW_LOG_INFO("Main thread started...");
+    if (config.showHelp)
+    {
+        std::cout << multishader::runtimeConfigUsage(argc > 0 ? argv[0] : "CabbageHardwareExamples");
+        return 0;
+    }
+
+    if (!runQueueSelfTest())
+    {
+        std::cerr << "DropOldestQueue self-test failed, aborting.\n";
+        return -1;
+    }
+
+    multishader::registerHelloTriangleScenario();
+
+    // 2) 初始化窗口与输出图像。
+    if (glfwInit() < 0)
+    {
+        std::cerr << "glfwInit failed.\n";
+        return -1;
+    }
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-    // 每个 pair 创建 2 个窗口: 偶数索引 = EDSL, 奇数索引 = GLSL
-    constexpr std::size_t DEMO_PAIR_COUNT = 1;
-    constexpr std::size_t TOTAL_WINDOWS = DEMO_PAIR_COUNT * 2;
-    std::vector<GLFWwindow *> windows(TOTAL_WINDOWS);
-    for (size_t i = 0; i < windows.size(); i++)
+    std::array<GLFWwindow *, 2> windows{nullptr, nullptr};
+    auto destroyWindowsAndTerminate = [&] {
+        for (GLFWwindow *window : windows)
+        {
+            if (window != nullptr)
+            {
+                glfwDestroyWindow(window);
+            }
+        }
+        glfwTerminate();
+    };
+
+    windows[0] = glfwCreateWindow(static_cast<int>(config.windowWidth),
+                                  static_cast<int>(config.windowHeight),
+                                  "Cabbage Engine [EDSL]",
+                                  nullptr,
+                                  nullptr);
+    windows[1] = glfwCreateWindow(static_cast<int>(config.windowWidth),
+                                  static_cast<int>(config.windowHeight),
+                                  "Cabbage Engine [GLSL]",
+                                  nullptr,
+                                  nullptr);
+    if (windows[0] == nullptr || windows[1] == nullptr)
     {
-        std::string title = (i % 2 == 0) ? "Cabbage Engine [EDSL]" : "Cabbage Engine [GLSL]";
-        windows[i] = glfwCreateWindow(1920, 1080, title.c_str(), nullptr, nullptr);
+        std::cerr << "Failed to create GLFW windows.\n";
+        destroyWindowsAndTerminate();
+        return -1;
     }
 
+    std::array<HardwareImage, 2> finalOutputImages;
+    std::array<HardwareExecutor, 2> executors;
+    for (std::size_t i = 0; i < finalOutputImages.size(); ++i)
     {
-        std::vector<HardwareImage> finalOutputImages(windows.size());
-        std::vector<HardwareExecutor> executors(windows.size());
-        for (size_t i = 0; i < finalOutputImages.size(); i++)
+        HardwareImageCreateInfo createInfo;
+        createInfo.width = config.windowWidth;
+        createInfo.height = config.windowHeight;
+        createInfo.format = ImageFormat::RGBA16_FLOAT;
+        createInfo.usage = ImageUsage::StorageImage;
+        createInfo.arrayLayers = 1;
+        createInfo.mipLevels = 1;
+        finalOutputImages[i] = HardwareImage(createInfo);
+    }
+
+    // 3) 根据场景名创建并初始化场景实现。
+    auto scenario = multishader::createScenario(config.scenario, config);
+    if (!scenario)
+    {
+        std::cerr << "Unknown scenario: " << config.scenario << '\n';
+        printAvailableScenarios();
+        destroyWindowsAndTerminate();
+        return -1;
+    }
+
+    std::string scenarioError;
+    if (!scenario->init(config, finalOutputImages, scenarioError))
+    {
+        std::cerr << "Scenario init failed: " << scenarioError << '\n';
+        destroyWindowsAndTerminate();
+        return -1;
+    }
+
+    DropOldestQueue<MeshFrame> meshToEdsl(config.queueDepth);
+    DropOldestQueue<MeshFrame> meshToGlsl(config.queueDepth);
+    DropOldestQueue<RenderFrame> edslToDisplay(config.queueDepth);
+    DropOldestQueue<RenderFrame> glslToDisplay(config.queueDepth);
+
+    RuntimeStats stats;
+    std::atomic_bool running{true};
+    std::atomic_bool hasError{false};
+    std::mutex errorMutex;
+    std::string errorMessage;
+
+    auto requestStop = [&] {
+        // 统一停止入口：关闭运行标记并唤醒所有队列等待点。
+        running.store(false);
+        meshToEdsl.close();
+        meshToGlsl.close();
+        edslToDisplay.close();
+        glslToDisplay.close();
+    };
+
+    auto setErrorAndStop = [&](const std::string &threadName, const std::string &message) {
+        // 仅记录首个错误，避免多线程并发覆盖关键信息。
+        bool expected = false;
+        if (hasError.compare_exchange_strong(expected, true))
         {
-            HardwareImageCreateInfo createInfo;
-            createInfo.width = 1920;
-            createInfo.height = 1080;
-            createInfo.format = ImageFormat::RGBA16_FLOAT;
-            createInfo.usage = ImageUsage::StorageImage;
-            createInfo.arrayLayers = 1;
-            createInfo.mipLevels = 1;
-
-            finalOutputImages[i] = HardwareImage(createInfo);
+            std::lock_guard<std::mutex> lock(errorMutex);
+            errorMessage = threadName + ": " + message;
         }
+        requestStop();
+    };
 
-        // HardwareBuffer normalBuffer = HardwareBuffer(normals, BufferUsage::VertexBuffer);
-        // HardwareBuffer uvBuffer = HardwareBuffer(uvs, BufferUsage::VertexBuffer);
-        // HardwareBuffer colorBuffer = HardwareBuffer(colors, BufferUsage::VertexBuffer);
-
-        // 纹理加载 - 选择以下任一方式
-        // 方式1: 加载普通纹理
-        auto textureResult = loadTexture(shaderPath + "/awesomeface.png");
-
-        // 方式2: 加载BC1压缩纹理
-        // auto textureResult = loadCompressedTexture(shaderPath + "/awesomeface.png", true);
-
-        // 方式3: 加载带有 mipmap 和 array layers 的纹理
-        // auto textureResult = loadTextureWithMipmapAndLayers(shaderPath + "/awesomeface.png", 2, 5, 1, 0);
-
-        if (!textureResult.success)
+    auto meshThread = [&] {
+        // meshThread：生成单调 frameId 和共享 payload，同时投喂两个 render 输入队列。
+        try
         {
-            //CFW_LOG_ERROR("Failed to load texture, exiting...");
-            for (size_t i = 0; i < windows.size(); i++)
-            {
-                glfwDestroyWindow(windows[i]);
-            }
-            glfwTerminate();
-            return -1;
-        }
-
-        uint32_t textureID = textureResult.descriptorID;
-        HardwareImage &texture = textureResult.texture;
-
-        std::vector<std::vector<HardwareBuffer>> rasterizerStorageBuffers(windows.size());
-        //std::vector<HardwareBuffer> computeStorageBuffers(windows.size());
-
-        std::atomic_bool running = true;
-
-        #if 0
-        auto meshThread = [&](uint32_t threadIndex) {
-            //CFW_LOG_INFO("Mesh thread {} started...", threadIndex);
-
-            //ComputeStorageBufferObject computeUniformData(windows.size());
-            //computeStorageBuffers[threadIndex] = HardwareBuffer(sizeof(ComputeStorageBufferObject), BufferUsage::StorageBuffer);
-
-            std::vector<ktm::fmat4x4> modelMat(20);
-            std::vector<RasterizerStorageBufferObject> rasterizerStorageBufferObjects(modelMat.size());
-            for (size_t i = 0; i < modelMat.size(); i++)
-            {
-                modelMat[i] = (ktm::translate3d(ktm::fvec3((i % 5) - 2.0f, (i / 5) - 0.5f, 0.0f)) * ktm::scale3d(ktm::fvec3(0.1, 0.1, 0.1)) * ktm::rotate3d_axis(ktm::radians(i * 30.0f), ktm::fvec3(0.0f, 0.0f, 1.0f)));
-                rasterizerStorageBuffers[threadIndex].push_back(HardwareBuffer(sizeof(RasterizerStorageBufferObject), BufferUsage::StorageBuffer, &(modelMat[i])));
-            }
-
-            auto startTime = std::chrono::high_resolution_clock::now();
-            uint64_t frameCount = 0;
+            uint64_t frameId = 0;
+            const auto frameInterval = (config.maxFps > 0)
+                                           ? std::chrono::microseconds(1'000'000 / config.maxFps)
+                                           : std::chrono::microseconds(0);
 
             while (running.load())
             {
-                // 等待上一帧显示完成（或初始状态）
-                /*meshSemaphores[threadIndex]->acquire();
-                if (!running.load()) break;*/
+                auto frameBegin = Clock::now();
+                std::string meshError;
 
-                float currentTime = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
+                MeshFrame frame;
+                frame.frameId = ++frameId;
+                frame.timestamp = frameBegin;
+                frame.payload = scenario->meshTick(frame.frameId, frame.timestamp, meshError);
 
-                for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
+                if (!frame.payload)
                 {
-                    // rasterizerUniformBufferObject[i].textureIndex = texture[0][0].storeDescriptor();
-                    rasterizerStorageBufferObjects[i].textureIndex = textureID;
-                    rasterizerStorageBufferObjects[i].model = modelMat[i] * ktm::rotate3d_axis(currentTime * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
-                    rasterizerStorageBuffers[threadIndex][i].copyFromData(&(rasterizerStorageBufferObjects[i]), sizeof(rasterizerStorageBufferObjects[i]));
-                }
-
-                //computeUniformData.imageID = finalOutputImages[threadIndex].storeDescriptor();
-                //computeStorageBuffers[threadIndex].copyFromData(&computeUniformData, sizeof(computeUniformData));
-
-                ++frameCount;
-
-                // 通知渲染线程可以开始
-                // renderSemaphores[threadIndex]->release();
-            }
-            // 退出时释放后续信号量，防止死锁
-            // renderSemaphores[threadIndex]->release();
-
-            //CFW_LOG_INFO("Mesh thread {} ended.", threadIndex);
-        };
-        #endif
-
-        // =====================================================================
-        // renderThreadEDSL: EDSL 路径 — C++ lambda 定义 shader，自动绑定资源
-        // =====================================================================
-        // CPU-side MVP pre-transform helper (shared by EDSL and GLSL paths)
-        // Replicates the same model matrices as the mesh thread, applies
-        // view/proj and perspective divide so that the VS just does:
-        //   gl_Position = vec4(inPosition, 1.0);
-        // =====================================================================
-        // 从 CubeData 中提取 position+color
-        std::vector<SimpleVertex> simpleVertices(vertices.size());
-        for (size_t i = 0; i < vertices.size(); i++)
-        {
-            simpleVertices[i].position = vertices[i].position;
-            simpleVertices[i].color = vertices[i].color;
-        }
-
-        auto transformVerticesForObject = [](const std::vector<SimpleVertex>& src,
-                                             const ktm::fmat4x4& mvp) -> std::vector<SimpleVertex>
-        {
-            auto dst = src;
-            for (auto& v : dst)
-            {
-                ktm::fvec4 clip = mvp * ktm::fvec4(v.position[0], v.position[1], v.position[2], 1.0f);
-                float invW = 1.0f / clip[3];
-                v.position = {clip[0] * invW, clip[1] * invW, clip[2] * invW};
-            }
-            return dst;
-        };
-
-        // Shared camera constants (same as RasterizerStorageBufferObject defaults)
-        auto viewMat = ktm::look_at_lh(ktm::fvec3(2.0f, 2.0f, 2.0f),
-                                        ktm::fvec3(0.0f, 0.0f, 0.0f),
-                                        ktm::fvec3(0.0f, 0.0f, 1.0f));
-        auto projMat = ktm::perspective_lh(ktm::radians(45.0f), 1920.0f / 1080.0f, 0.1f, 10.0f);
-        auto vpMat = projMat * viewMat;
-
-        // Base model matrices (same formula as mesh thread)
-        constexpr size_t OBJECT_COUNT = 20;
-        std::vector<ktm::fmat4x4> baseModelMat(OBJECT_COUNT);
-        for (size_t i = 0; i < OBJECT_COUNT; i++)
-        {
-            baseModelMat[i] = ktm::translate3d(ktm::fvec3(static_cast<float>(i % 5) - 2.0f,
-                                                           static_cast<float>(i / 5) - 0.5f, 0.0f))
-                            * ktm::scale3d(ktm::fvec3(0.1f, 0.1f, 0.1f))
-                            * ktm::rotate3d_axis(ktm::radians(static_cast<float>(i) * 30.0f),
-                                                 ktm::fvec3(0.0f, 0.0f, 1.0f));
-        }
-
-        // =====================================================================
-        // renderThreadEDSL: EDSL 路径 — C++ lambda 定义 shader，自动绑定资源
-        // =====================================================================
-        #if 0
-        auto renderThreadEDSL = [&](uint32_t threadIndex) {
-            using namespace EmbeddedShader;
-            using namespace EmbeddedShader::Ast;
-            using namespace ktm;
-
-            // Texture2D proxy 声明时直接绑定已有 HardwareImage
-            Texture2D<fvec4> inputImageRGBA16 = finalOutputImages[threadIndex];
-
-            // EDSL compute shader: ACES filmic tone mapping
-            auto acesFilmicToneMapCurve = [&](Float3 x)
-            {
-                Float a = 2.51f;
-                Float b = 0.03f;
-                Float c = 2.43f;
-                Float d = 0.59f;
-                Float e = 0.14f;
-
-                return clamp((x * (a * x + b)) / (x * (c * x + d) + e), fvec3(0.0f), fvec3(1.0f));
-            };
-
-            auto compute = [&]
-            {
-                Float4 color = inputImageRGBA16[dispatchThreadID()->xy()];
-                inputImageRGBA16[dispatchThreadID()->xy()] = Float4(acesFilmicToneMapCurve(color->xyz()), 1.f);
-            };
-
-            // EDSL vertex shader: pass-through (MVP 已在 CPU 端完成)
-            auto vsLambda = [&](Aggregate<VertexAttributeProxy> vertex) -> Float4
-            {
-                position() = Float4(vertex->position, 1.0f);
-                return Float4(vertex->color, 1.0f);
-            };
-
-            // EDSL fragment shader: 直接输出插值后的顶点颜色
-            auto fsLambda = [&](Float4 interpolatedColor) -> Float4
-            {
-                return interpolatedColor;
-            };
-
-            // 从 lambda 创建管线，bindOutputTargets 自动绑定 render target
-            RasterizerPipeline rasterizer(vsLambda, fsLambda);
-            rasterizer.bindOutputTargets(inputImageRGBA16);
-
-            // 从 lambda 创建 compute 管线，auto-bind 资源
-            ComputePipeline computer(compute, uvec3(8, 8, 1));
-
-            auto startTime = std::chrono::high_resolution_clock::now();
-
-            while (running.load())
-            {
-                float currentTime = std::chrono::duration<float, std::chrono::seconds::period>(
-                    std::chrono::high_resolution_clock::now() - startTime).count();
-                HardwareBuffer indexBuffer = HardwareBuffer(indices, BufferUsage::IndexBuffer);
-
-                for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
-                {
-                    auto model = baseModelMat[i] * ktm::rotate3d_axis(
-                        currentTime * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
-                    auto transformed = transformVerticesForObject(simpleVertices, vpMat * model);
-                    HardwareBuffer vertexBuffer(transformed, BufferUsage::VertexBuffer);
-                    rasterizer.record(indexBuffer, vertexBuffer);
-                }
-
-                executors[threadIndex] << rasterizer(1920, 1080)
-                                       << computer(1920 / 8, 1080 / 8, 1)
-                                       << executors[threadIndex].commit();
-            }
-        };
-        #endif
-
-        // =====================================================================
-        // renderThreadGLSL: 手写 GLSL 路径 — 预编译 SPIR-V + CPU MVP 预变换
-        // =====================================================================
-        auto renderThreadGLSL = [&](uint32_t threadIndex) {
-            // 简化后的 shader 无需 push constant / UBO，仅做 pass-through
-            RasterizerPipeline<vert_glsl, frag_glsl> rasterizer;
-
-            // 绑定 render target
-            rasterizer.outColor = finalOutputImages[threadIndex];
-
-            // compute 管线保持不变
-            ComputePipeline<compute_glsl> computer;
-            uint32_t computeImageDescriptorID = finalOutputImages[threadIndex].storeDescriptor();
-            computer.GlobalUniformParam.imageID = computeImageDescriptorID;
-
-            auto startTime = std::chrono::high_resolution_clock::now();
-
-            while (running.load())
-            {
-                float currentTime = std::chrono::duration<float, std::chrono::seconds::period>(
-                    std::chrono::high_resolution_clock::now() - startTime).count();
-                HardwareBuffer indexBuffer = HardwareBuffer(indices, BufferUsage::IndexBuffer);
-
-                for (size_t i = 0; i < rasterizerStorageBuffers[threadIndex].size(); i++)
-                {
-                    auto model = baseModelMat[i] * ktm::rotate3d_axis(
-                        currentTime * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
-                    auto transformed = transformVerticesForObject(simpleVertices, vpMat * model);
-                    HardwareBuffer vertexBuffer(transformed, BufferUsage::VertexBuffer);
-                    rasterizer.record(indexBuffer, vertexBuffer);
-                }
-
-                executors[threadIndex] << rasterizer(1920, 1080)
-                                       << computer(1920 / 8, 1080 / 8, 1)
-                                       << executors[threadIndex].commit();
-            }
-        };
-
-        #if 0
-        auto displayThread = [&](uint32_t threadIndex) {
-            //CFW_LOG_INFO("Display thread {} started...", threadIndex);
-
-            HardwareDisplayer displayManager = HardwareDisplayer(glfwGetWin32Window(windows[threadIndex]));
-
-            auto startTime = std::chrono::high_resolution_clock::now();
-            uint64_t frameCount = 0;
-
-            while (running.load())
-            {
-                // 等待渲染提交完成
-                // displaySemaphores[threadIndex]->acquire();
-                // if (!running.load()) break;
-
-                float time = std::chrono::duration<float, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - startTime).count();
-                // CFW_LOG_INFO("Display thread {} frame {} at {:.3f}s", threadIndex, frameCount, time);
-
-                displayManager.wait(executors[threadIndex]) << finalOutputImages[threadIndex];
-                ++frameCount;
-
-                // 通知 Mesh 线程开始下一帧
-                // meshSemaphores[threadIndex]->release();
-            }
-            // meshSemaphores[threadIndex]->release();
-
-            //CFW_LOG_INFO("Display thread {} ended.", threadIndex);
-        };
-        #endif
-
-        MainThreadMethods mainThreadMethods{
-            running,
-            textureID,
-            baseModelMat,
-            simpleVertices,
-            vpMat,
-            rasterizerStorageBuffers,
-            finalOutputImages,
-            executors,
-            windows};
-
-        std::vector<std::thread> meshThreads;
-        std::vector<std::thread> renderThreads;
-        std::vector<std::thread> displayThreads;
-
-        for (size_t i = 0; i < windows.size(); i++)
-        {
-            meshThreads.emplace_back(&MainThreadMethods::meshThread, &mainThreadMethods, static_cast<uint32_t>(i));
-            if (i % 2 == 0)
-                renderThreads.emplace_back(&MainThreadMethods::renderThreadEDSL, &mainThreadMethods, static_cast<uint32_t>(i));
-            else
-                renderThreads.emplace_back(renderThreadGLSL, i);
-            displayThreads.emplace_back(&MainThreadMethods::displayThread, &mainThreadMethods, static_cast<uint32_t>(i));
-        }
-
-        while (running.load())
-        {
-            glfwPollEvents();
-            for (size_t i = 0; i < windows.size(); i++)
-            {
-                if (glfwWindowShouldClose(windows[i]))
-                {
-                    running.store(false);
+                    setErrorAndStop("meshThread", meshError.empty() ? "meshTick returned empty payload" : meshError);
                     break;
                 }
+
+                MeshFrame edslFrame = frame;
+                if (!meshToEdsl.push(std::move(edslFrame)) || !meshToGlsl.push(std::move(frame)))
+                {
+                    break;
+                }
+
+                stats.meshFramesProduced.fetch_add(1, std::memory_order_relaxed);
+
+                if (frameInterval.count() > 0)
+                {
+                    auto elapsed = Clock::now() - frameBegin;
+                    if (elapsed < frameInterval)
+                    {
+                        std::this_thread::sleep_for(frameInterval - elapsed);
+                    }
+                }
+            }
+        }
+        catch (const std::exception &e)
+        {
+            setErrorAndStop("meshThread", e.what());
+        }
+        requestStop();
+    };
+
+    auto renderThreadEDSL = [&] {
+        // renderThreadEDSL：消费 mesh 帧，执行 EDSL 渲染并把提交结果发给 display 队列。
+        try
+        {
+            while (running.load() || !meshToEdsl.isClosedAndEmpty())
+            {
+                auto meshFrame = meshToEdsl.pop_wait();
+                if (!meshFrame.has_value())
+                {
+                    break;
+                }
+
+                std::string renderError;
+                if (!scenario->renderEDSLTick(meshFrame.value(), executors[0], finalOutputImages[0], renderError))
+                {
+                    setErrorAndStop("renderThreadEDSL", renderError.empty() ? "renderEDSLTick failed" : renderError);
+                    break;
+                }
+
+                RenderFrame renderFrame;
+                renderFrame.frameId = meshFrame->frameId;
+                renderFrame.backend = Backend::EDSL;
+                renderFrame.outputImage = &finalOutputImages[0];
+                renderFrame.executorRef = &executors[0];
+                renderFrame.submitTimestamp = Clock::now();
+                if (!edslToDisplay.push(std::move(renderFrame)))
+                {
+                    break;
+                }
+
+                stats.edslRenderFrames.fetch_add(1, std::memory_order_relaxed);
+            }
+        }
+        catch (const std::exception &e)
+        {
+            setErrorAndStop("renderThreadEDSL", e.what());
+        }
+        edslToDisplay.close();
+    };
+
+    auto renderThreadGLSL = [&] {
+        // renderThreadGLSL：消费 mesh 帧，执行 GLSL 渲染并把提交结果发给 display 队列。
+        try
+        {
+            while (running.load() || !meshToGlsl.isClosedAndEmpty())
+            {
+                auto meshFrame = meshToGlsl.pop_wait();
+                if (!meshFrame.has_value())
+                {
+                    break;
+                }
+
+                std::string renderError;
+                if (!scenario->renderGLSLTick(meshFrame.value(), executors[1], finalOutputImages[1], renderError))
+                {
+                    setErrorAndStop("renderThreadGLSL", renderError.empty() ? "renderGLSLTick failed" : renderError);
+                    break;
+                }
+
+                RenderFrame renderFrame;
+                renderFrame.frameId = meshFrame->frameId;
+                renderFrame.backend = Backend::GLSL;
+                renderFrame.outputImage = &finalOutputImages[1];
+                renderFrame.executorRef = &executors[1];
+                renderFrame.submitTimestamp = Clock::now();
+                if (!glslToDisplay.push(std::move(renderFrame)))
+                {
+                    break;
+                }
+
+                stats.glslRenderFrames.fetch_add(1, std::memory_order_relaxed);
+
+                if (config.glslArtificialDelayMs > 0)
+                {
+                    // 可选人工延迟，用于复现/观察背压和丢帧策略。
+                    std::this_thread::sleep_for(std::chrono::milliseconds(config.glslArtificialDelayMs));
+                }
+            }
+        }
+        catch (const std::exception &e)
+        {
+            setErrorAndStop("renderThreadGLSL", e.what());
+        }
+        glslToDisplay.close();
+    };
+
+    auto displayThread = [&] {
+        // displayThread：每轮取两条渲染输出队列的“最新帧”，避免被旧帧积压拖慢。
+        try
+        {
+            HardwareDisplayer edslDisplayer(glfwGetWin32Window(windows[0]));
+            HardwareDisplayer glslDisplayer(glfwGetWin32Window(windows[1]));
+
+            std::optional<RenderFrame> latestEdslFrame;
+            std::optional<RenderFrame> latestGlslFrame;
+
+            while (running.load() || !edslToDisplay.isClosedAndEmpty() || !glslToDisplay.isClosedAndEmpty())
+            {
+                bool gotNewFrame = false;
+
+                auto latestEdsl = edslToDisplay.try_pop_all_latest();
+                if (latestEdsl.has_value())
+                {
+                    latestEdslFrame = std::move(latestEdsl.value());
+                    gotNewFrame = true;
+                }
+
+                auto latestGlsl = glslToDisplay.try_pop_all_latest();
+                if (latestGlsl.has_value())
+                {
+                    latestGlslFrame = std::move(latestGlsl.value());
+                    gotNewFrame = true;
+                }
+
+                auto now = Clock::now();
+
+                if (latestEdslFrame.has_value() &&
+                    latestEdslFrame->outputImage != nullptr &&
+                    latestEdslFrame->executorRef != nullptr)
+                {
+                    // 对 EDSL 最新可用帧进行 wait + present。
+                    edslDisplayer.wait(*latestEdslFrame->executorRef) << *latestEdslFrame->outputImage;
+                    scenario->displayTick(latestEdslFrame.value());
+                    if (latestEdsl.has_value())
+                    {
+                        stats.latestEdslFrameId.store(latestEdslFrame->frameId, std::memory_order_relaxed);
+                        auto latencyUs = std::chrono::duration_cast<std::chrono::microseconds>(
+                                             now - latestEdslFrame->submitTimestamp)
+                                             .count();
+                        stats.edslLatencyUsTotal.fetch_add(static_cast<uint64_t>(latencyUs), std::memory_order_relaxed);
+                        stats.edslDisplayFrames.fetch_add(1, std::memory_order_relaxed);
+                    }
+                }
+
+                if (latestGlslFrame.has_value() &&
+                    latestGlslFrame->outputImage != nullptr &&
+                    latestGlslFrame->executorRef != nullptr)
+                {
+                    // 对 GLSL 最新可用帧进行 wait + present。
+                    glslDisplayer.wait(*latestGlslFrame->executorRef) << *latestGlslFrame->outputImage;
+                    scenario->displayTick(latestGlslFrame.value());
+                    if (latestGlsl.has_value())
+                    {
+                        stats.latestGlslFrameId.store(latestGlslFrame->frameId, std::memory_order_relaxed);
+                        auto latencyUs = std::chrono::duration_cast<std::chrono::microseconds>(
+                                             now - latestGlslFrame->submitTimestamp)
+                                             .count();
+                        stats.glslLatencyUsTotal.fetch_add(static_cast<uint64_t>(latencyUs), std::memory_order_relaxed);
+                        stats.glslDisplayFrames.fetch_add(1, std::memory_order_relaxed);
+                    }
+                }
+
+                stats.displayLoopTicks.fetch_add(1, std::memory_order_relaxed);
+                if (!gotNewFrame)
+                {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+            }
+        }
+        catch (const std::exception &e)
+        {
+            setErrorAndStop("displayThread", e.what());
+        }
+    };
+
+    std::thread renderEDSLWorker(renderThreadEDSL);
+    std::thread renderGLSLWorker(renderThreadGLSL);
+    std::thread displayWorker(displayThread);
+    std::thread meshWorker(meshThread);
+
+    // 4) 主线程负责窗口事件与周期统计输出。
+    auto lastStatTick = Clock::now();
+    uint64_t prevMeshFrames = 0;
+    uint64_t prevEdslFrames = 0;
+    uint64_t prevGlslFrames = 0;
+    uint64_t prevDisplayTicks = 0;
+
+    while (running.load())
+    {
+        glfwPollEvents();
+        if (glfwWindowShouldClose(windows[0]) || glfwWindowShouldClose(windows[1]))
+        {
+            requestStop();
+            break;
+        }
+
+        if (config.enableCompareStats)
+        {
+            auto now = Clock::now();
+            if (now - lastStatTick >= std::chrono::seconds(1))
+            {
+                uint64_t meshFrames = stats.meshFramesProduced.load(std::memory_order_relaxed);
+                uint64_t edslFrames = stats.edslRenderFrames.load(std::memory_order_relaxed);
+                uint64_t glslFrames = stats.glslRenderFrames.load(std::memory_order_relaxed);
+                uint64_t displayTicks = stats.displayLoopTicks.load(std::memory_order_relaxed);
+
+                uint64_t meshFps = meshFrames - prevMeshFrames;
+                uint64_t edslFps = edslFrames - prevEdslFrames;
+                uint64_t glslFps = glslFrames - prevGlslFrames;
+                uint64_t displayFps = displayTicks - prevDisplayTicks;
+
+                prevMeshFrames = meshFrames;
+                prevEdslFrames = edslFrames;
+                prevGlslFrames = glslFrames;
+                prevDisplayTicks = displayTicks;
+
+                uint64_t latestEdsl = stats.latestEdslFrameId.load(std::memory_order_relaxed);
+                uint64_t latestGlsl = stats.latestGlslFrameId.load(std::memory_order_relaxed);
+                uint64_t frameGap = (latestEdsl >= latestGlsl) ? (latestEdsl - latestGlsl) : (latestGlsl - latestEdsl);
+
+                uint64_t edslDisplayed = stats.edslDisplayFrames.load(std::memory_order_relaxed);
+                uint64_t glslDisplayed = stats.glslDisplayFrames.load(std::memory_order_relaxed);
+                double avgEdslLatencyMs = (edslDisplayed == 0)
+                                              ? 0.0
+                                              : static_cast<double>(stats.edslLatencyUsTotal.load(std::memory_order_relaxed)) / 1000.0 / static_cast<double>(edslDisplayed);
+                double avgGlslLatencyMs = (glslDisplayed == 0)
+                                              ? 0.0
+                                              : static_cast<double>(stats.glslLatencyUsTotal.load(std::memory_order_relaxed)) / 1000.0 / static_cast<double>(glslDisplayed);
+
+                std::cout << "[Stats] meshFPS=" << meshFps
+                          << " edslRenderFPS=" << edslFps
+                          << " glslRenderFPS=" << glslFps
+                          << " displayLoopFPS=" << displayFps
+                          << " frameGap=" << frameGap
+                          << " drops(mesh->edsl=" << meshToEdsl.droppedCount()
+                          << ", mesh->glsl=" << meshToGlsl.droppedCount()
+                          << ", edsl->display=" << edslToDisplay.droppedCount()
+                          << ", glsl->display=" << glslToDisplay.droppedCount() << ")"
+                          << " avgLatencyMs(edsl=" << avgEdslLatencyMs
+                          << ", glsl=" << avgGlslLatencyMs << ")\n";
+
+                lastStatTick = now;
             }
         }
 
-        for (size_t i = 0; i < windows.size(); i++)
-        {
-            if (meshThreads[i].joinable())
-                meshThreads[i].join();
-            if (renderThreads[i].joinable())
-                renderThreads[i].join();
-            if (displayThreads[i].joinable())
-                displayThreads[i].join();
-        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
-    for (size_t i = 0; i < windows.size(); i++)
+    requestStop();
+
+    // 5) 线程收敛与场景清理。
+    if (meshWorker.joinable())
     {
-        glfwDestroyWindow(windows[i]);
+        meshWorker.join();
+    }
+    if (renderEDSLWorker.joinable())
+    {
+        renderEDSLWorker.join();
+    }
+    if (renderGLSLWorker.joinable())
+    {
+        renderGLSLWorker.join();
+    }
+    if (displayWorker.joinable())
+    {
+        displayWorker.join();
     }
 
-    glfwTerminate();
+    scenario->shutdown();
+    destroyWindowsAndTerminate();
+
+    if (hasError.load())
+    {
+        std::lock_guard<std::mutex> lock(errorMutex);
+        std::cerr << "Fatal error: " << errorMessage << '\n';
+        return -1;
+    }
 
     return 0;
 }
