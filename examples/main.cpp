@@ -180,7 +180,7 @@ int main(int argc, char **argv)
         final_output_images[i] = HardwareImage(create_Info);
     }
 
-    //// 3) 根据场景名创建并初始化场景实现。
+    // 3 根据场景名创建并初始化场景实现。
     //auto scenario = multishader::createScenario(config.scenario, config);
     //if (!scenario)
     //{
@@ -198,24 +198,24 @@ int main(int argc, char **argv)
     //    return -1;
     //}
 
-    //DropOldestQueue<MeshFrame> meshToEdsl(config.queueDepth);
-    //DropOldestQueue<MeshFrame> meshToGlsl(config.queueDepth);
-    //DropOldestQueue<RenderFrame> edslToDisplay(config.queueDepth);
-    //DropOldestQueue<RenderFrame> glslToDisplay(config.queueDepth);
+    DropOldestQueue<MeshFrame> mesh_to_edsl(config.queue_depth);
+    DropOldestQueue<MeshFrame> mesh_to_glsl(config.queue_depth);
+    DropOldestQueue<RenderFrame> edsl_to_display(config.queue_depth);
+    DropOldestQueue<RenderFrame> glsl_to_display(config.queue_depth);
 
     RuntimeStats stats;
     std::atomic_bool running{true};
-    //std::atomic_bool hasError{false};
-    //std::mutex errorMutex;
-    //std::string errorMessage;
+    std::atomic_bool has_error{false};
+    std::mutex error_mutex;
+    std::string error_message;
 
     auto request_stop = [&] {
         // 统一停止入口：关闭运行标记并唤醒所有队列等待点。
         running.store(false);
-        //meshToEdsl.close();
-        //meshToGlsl.close();
-        //edslToDisplay.close();
-        //glslToDisplay.close();
+        mesh_to_edsl.close();
+        mesh_to_glsl.close();
+        edsl_to_display.close();
+        glsl_to_display.close();
     };
 
     //auto setErrorAndStop = [&](const std::string &threadName, const std::string &message) {
