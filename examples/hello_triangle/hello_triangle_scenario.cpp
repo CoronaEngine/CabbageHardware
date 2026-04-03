@@ -1,4 +1,4 @@
-//#include "HelloTriangleScenario.h"
+﻿//#include "HelloTriangleScenario.h"
 //
 //#include <memory>
 //#include <mutex>
