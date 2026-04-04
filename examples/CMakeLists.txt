@@ -17,4 +17,4 @@ target_link_libraries(CabbageHardwareExamples PRIVATE
 helicon_install_runtime_deps(CabbageHardwareExamples)
 corona_copy_tbb_runtime_artifacts(CabbageHardwareExamples)
 
-#helicon_compile_shaders(CabbageHardwareExamples)
+helicon_compile_shaders(CabbageHardwareExamples)

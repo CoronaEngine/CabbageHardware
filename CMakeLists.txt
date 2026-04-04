@@ -123,7 +123,7 @@ function(helicon_install_runtime_deps target_name)
 endfunction()
 
 # ======================== Shader 自动编译模块 ========================
-#include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/HeliconShaderCompile.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/HeliconShaderCompile.cmake)
 
 # ======================== 其他依赖 ========================
 FetchContent_Declare(CoronaFramework

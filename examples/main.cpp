@@ -9,6 +9,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -275,167 +276,163 @@ int main(int argc, char **argv)
 
     auto render_thread_edsl = [&] {
         // renderThreadEDSL：消费 mesh 帧，执行 EDSL 渲染并把提交结果发给 display 队列。
-        /*try
+        try
         {
-            while (running.load() || !meshToEdsl.isClosedAndEmpty())
+            while (running.load() || !mesh_to_edsl.is_closed_and_empty())
             {
-                auto meshFrame = meshToEdsl.pop_wait();
-                if (!meshFrame.has_value())
+                auto mesh_frame = mesh_to_edsl.pop_wait();
+                if (!mesh_frame.has_value())
                 {
                     break;
                 }
 
-                std::string renderError;
-                if (!scenario->renderEDSLTick(meshFrame.value(), executors[0], finalOutputImages[0], renderError))
+                std::string render_error;
+                if (!scenario->render_edsl_tick(mesh_frame.value(), executors[0], final_output_images[0], render_error))
                 {
-                    setErrorAndStop("renderThreadEDSL", renderError.empty() ? "renderEDSLTick failed" : renderError);
+                    set_error_and_stop("RenderThreadEDSL",
+                                       render_error.empty() ? "render_edsl_tick failed" : render_error);
                     break;
                 }
 
-                RenderFrame renderFrame;
-                renderFrame.frameId = meshFrame->frameId;
-                renderFrame.backend = Backend::EDSL;
-                renderFrame.outputImage = &finalOutputImages[0];
-                renderFrame.executorRef = &executors[0];
-                renderFrame.submitTimestamp = Clock::now();
-                if (!edslToDisplay.push(std::move(renderFrame)))
+                RenderFrame render_frame;
+                render_frame.frame_id = mesh_frame->frame_id;
+                render_frame.backend = Backend::EDSL;
+                render_frame.output_image = &final_output_images[0];
+                render_frame.executor_ref = &executors[0];
+                render_frame.submit_timestamp = Clock::now();
+                if (!edsl_to_display.push(std::move(render_frame)))
                 {
                     break;
                 }
 
-                stats.edslRenderFrames.fetch_add(1, std::memory_order_relaxed);
+                stats.edsl_render_frames.fetch_add(1, std::memory_order_relaxed);
             }
         }
         catch (const std::exception &e)
         {
-            setErrorAndStop("renderThreadEDSL", e.what());
+            set_error_and_stop("RenderThreadEDSL", e.what());
         }
-        edslToDisplay.close();*/
+        edsl_to_display.close();
     };
 
     auto render_thread_glsl = [&] {
         // renderThreadGLSL：消费 mesh 帧，执行 GLSL 渲染并把提交结果发给 display 队列。
-        //try
-        //{
-        //    while (running.load() || !meshToGlsl.isClosedAndEmpty())
-        //    {
-        //        auto meshFrame = meshToGlsl.pop_wait();
-        //        if (!meshFrame.has_value())
-        //        {
-        //            break;
-        //        }
+        try
+        {
+            while (running.load() || !mesh_to_glsl.is_closed_and_empty())
+            {
+                auto mesh_frame = mesh_to_glsl.pop_wait();
+                if (!mesh_frame.has_value())
+                {
+                    break;
+                }
 
-        //        std::string renderError;
-        //        if (!scenario->renderGLSLTick(meshFrame.value(), executors[1], finalOutputImages[1], renderError))
-        //        {
-        //            setErrorAndStop("renderThreadGLSL", renderError.empty() ? "renderGLSLTick failed" : renderError);
-        //            break;
-        //        }
+                std::string render_error;
+                if (!scenario->render_glsl_tick(mesh_frame.value(), executors[1], final_output_images[1], render_error))
+                {
+                    set_error_and_stop("RenderThreadGLSL",
+                                       render_error.empty() ? "render_glsl_tick failed" : render_error);
+                    break;
+                }
 
-        //        RenderFrame renderFrame;
-        //        renderFrame.frameId = meshFrame->frameId;
-        //        renderFrame.backend = Backend::GLSL;
-        //        renderFrame.outputImage = &finalOutputImages[1];
-        //        renderFrame.executorRef = &executors[1];
-        //        renderFrame.submitTimestamp = Clock::now();
-        //        if (!glslToDisplay.push(std::move(renderFrame)))
-        //        {
-        //            break;
-        //        }
+                RenderFrame render_frame;
+                render_frame.frame_id = mesh_frame->frame_id;
+                render_frame.backend = Backend::GLSL;
+                render_frame.output_image = &final_output_images[1];
+                render_frame.executor_ref = &executors[1];
+                render_frame.submit_timestamp = Clock::now();
+                if (!glsl_to_display.push(std::move(render_frame)))
+                {
+                    break;
+                }
 
-        //        stats.glslRenderFrames.fetch_add(1, std::memory_order_relaxed);
-
-        //        if (config.glslArtificialDelayMs > 0)
-        //        {
-        //            // 可选人工延迟，用于复现/观察背压和丢帧策略。
-        //            std::this_thread::sleep_for(std::chrono::milliseconds(config.glslArtificialDelayMs));
-        //        }
-        //    }
-        //}
-        //catch (const std::exception &e)
-        //{
-        //    setErrorAndStop("renderThreadGLSL", e.what());
-        //}
-        //glslToDisplay.close();
+                stats.glsl_render_frames.fetch_add(1, std::memory_order_relaxed);
+            }
+        }
+        catch (const std::exception &e)
+        {
+            set_error_and_stop("RenderThreadGLSL", e.what());
+        }
+        glsl_to_display.close();
     };
 
     auto display_thread = [&] {
         // displayThread：每轮取两条渲染输出队列的“最新帧”，避免被旧帧积压拖慢。
-        //try
-        //{
-        //    HardwareDisplayer edslDisplayer(glfwGetWin32Window(windows[0]));
-        //    HardwareDisplayer glslDisplayer(glfwGetWin32Window(windows[1]));
+        try
+        {
+            HardwareDisplayer edsl_displayer(glfwGetWin32Window(windows[0]));
+            HardwareDisplayer glsl_displayer(glfwGetWin32Window(windows[1]));
 
-        //    std::optional<RenderFrame> latestEdslFrame;
-        //    std::optional<RenderFrame> latestGlslFrame;
+            std::optional<RenderFrame> latest_edsl_frame;
+            std::optional<RenderFrame> latest_glsl_frame;
 
-        //    while (running.load() || !edslToDisplay.isClosedAndEmpty() || !glslToDisplay.isClosedAndEmpty())
-        //    {
-        //        bool gotNewFrame = false;
+            while (running.load() || !edsl_to_display.is_closed_and_empty() || !glsl_to_display.is_closed_and_empty())
+            {
+                bool got_new_frame = false;
 
-        //        auto latestEdsl = edslToDisplay.try_pop_all_latest();
-        //        if (latestEdsl.has_value())
-        //        {
-        //            latestEdslFrame = std::move(latestEdsl.value());
-        //            gotNewFrame = true;
-        //        }
+                auto latest_edsl = edsl_to_display.try_pop_all_latest();
+                if (latest_edsl.has_value())
+                {
+                    latest_edsl_frame = std::move(latest_edsl.value());
+                    got_new_frame = true;
+                }
 
-        //        auto latestGlsl = glslToDisplay.try_pop_all_latest();
-        //        if (latestGlsl.has_value())
-        //        {
-        //            latestGlslFrame = std::move(latestGlsl.value());
-        //            gotNewFrame = true;
-        //        }
+                auto latest_glsl = glsl_to_display.try_pop_all_latest();
+                if (latest_glsl.has_value())
+                {
+                    latest_glsl_frame = std::move(latest_glsl.value());
+                    got_new_frame = true;
+                }
 
-        //        auto now = Clock::now();
+                auto now = Clock::now();
 
-        //        if (latestEdslFrame.has_value() &&
-        //            latestEdslFrame->outputImage != nullptr &&
-        //            latestEdslFrame->executorRef != nullptr)
-        //        {
-        //            // 对 EDSL 最新可用帧进行 wait + present。
-        //            edslDisplayer.wait(*latestEdslFrame->executorRef) << *latestEdslFrame->outputImage;
-        //            scenario->displayTick(latestEdslFrame.value());
-        //            if (latestEdsl.has_value())
-        //            {
-        //                stats.latestEdslFrameId.store(latestEdslFrame->frameId, std::memory_order_relaxed);
-        //                auto latencyUs = std::chrono::duration_cast<std::chrono::microseconds>(
-        //                                     now - latestEdslFrame->submitTimestamp)
-        //                                     .count();
-        //                stats.edslLatencyUsTotal.fetch_add(static_cast<uint64_t>(latencyUs), std::memory_order_relaxed);
-        //                stats.edslDisplayFrames.fetch_add(1, std::memory_order_relaxed);
-        //            }
-        //        }
+                if (latest_edsl_frame.has_value() &&
+                    latest_edsl_frame->output_image != nullptr &&
+                    latest_edsl_frame->executor_ref != nullptr)
+                {
+                    // 对 EDSL 最新可用帧进行 wait + present。
+                    edsl_displayer.wait(*latest_edsl_frame->executor_ref) << *latest_edsl_frame->output_image;
+                    scenario->display_tick(latest_edsl_frame.value());
+                    if (latest_edsl.has_value())
+                    {
+                        stats.latest_edsl_frame_id.store(latest_edsl_frame->frame_id, std::memory_order_relaxed);
+                        auto latency_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                                              now - latest_edsl_frame->submit_timestamp)
+                                             .count();
+                        stats.edsl_latency_us_total.fetch_add(static_cast<uint64_t>(latency_us), std::memory_order_relaxed);
+                        stats.edsl_display_frames.fetch_add(1, std::memory_order_relaxed);
+                    }
+                }
 
-        //        if (latestGlslFrame.has_value() &&
-        //            latestGlslFrame->outputImage != nullptr &&
-        //            latestGlslFrame->executorRef != nullptr)
-        //        {
-        //            // 对 GLSL 最新可用帧进行 wait + present。
-        //            glslDisplayer.wait(*latestGlslFrame->executorRef) << *latestGlslFrame->outputImage;
-        //            scenario->displayTick(latestGlslFrame.value());
-        //            if (latestGlsl.has_value())
-        //            {
-        //                stats.latestGlslFrameId.store(latestGlslFrame->frameId, std::memory_order_relaxed);
-        //                auto latencyUs = std::chrono::duration_cast<std::chrono::microseconds>(
-        //                                     now - latestGlslFrame->submitTimestamp)
-        //                                     .count();
-        //                stats.glslLatencyUsTotal.fetch_add(static_cast<uint64_t>(latencyUs), std::memory_order_relaxed);
-        //                stats.glslDisplayFrames.fetch_add(1, std::memory_order_relaxed);
-        //            }
-        //        }
+                if (latest_glsl_frame.has_value() &&
+                    latest_glsl_frame->output_image != nullptr &&
+                    latest_glsl_frame->executor_ref != nullptr)
+                {
+                    // 对 GLSL 最新可用帧进行 wait + present。
+                    glsl_displayer.wait(*latest_glsl_frame->executor_ref) << *latest_glsl_frame->output_image;
+                    scenario->display_tick(latest_glsl_frame.value());
+                    if (latest_glsl.has_value())
+                    {
+                        stats.latest_glsl_frame_id.store(latest_glsl_frame->frame_id, std::memory_order_relaxed);
+                        auto latency_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                                              now - latest_glsl_frame->submit_timestamp)
+                                             .count();
+                        stats.glsl_latency_us_total.fetch_add(static_cast<uint64_t>(latency_us), std::memory_order_relaxed);
+                        stats.glsl_display_frames.fetch_add(1, std::memory_order_relaxed);
+                    }
+                }
 
-        //        stats.displayLoopTicks.fetch_add(1, std::memory_order_relaxed);
-        //        if (!gotNewFrame)
-        //        {
-        //            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        //        }
-        //    }
-        //}
-        //catch (const std::exception &e)
-        //{
-        //    setErrorAndStop("displayThread", e.what());
-        //}
+                stats.display_loop_ticks.fetch_add(1, std::memory_order_relaxed);
+                if (!got_new_frame)
+                {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+            }
+        }
+        catch (const std::exception &e)
+        {
+            set_error_and_stop("DisplayThread", e.what());
+        }
     };
 
     std::thread render_edsl_worker(render_thread_edsl);
@@ -444,11 +441,11 @@ int main(int argc, char **argv)
     std::thread mesh_worker(mesh_thread);
 
     // 4 主线程负责窗口事件与周期统计输出。
-    auto last_Stat_Tick = Clock::now();
-    uint64_t prev_Mesh_Frames = 0;
-    uint64_t prev_Edsl_Frames = 0;
-    uint64_t prev_Glsl_Frames = 0;
-    uint64_t prev_Display_Ticks = 0;
+    auto last_stat_tick = Clock::now();
+    uint64_t prev_mesh_frames = 0;
+    uint64_t prev_edsl_frames = 0;
+    uint64_t prev_glsl_frames = 0;
+    uint64_t prev_display_ticks = 0;
 
     while (running.load())
     {
@@ -459,54 +456,56 @@ int main(int argc, char **argv)
             break;
         }
 
-        /*if (config.enableCompareStats)
+        if (config.enable_compare_stats)
         {
             auto now = Clock::now();
-            if (now - lastStatTick >= std::chrono::seconds(1))
+            if (now - last_stat_tick >= std::chrono::seconds(1))
             {
-                uint64_t meshFrames = stats.meshFramesProduced.load(std::memory_order_relaxed);
-                uint64_t edslFrames = stats.edslRenderFrames.load(std::memory_order_relaxed);
-                uint64_t glslFrames = stats.glslRenderFrames.load(std::memory_order_relaxed);
-                uint64_t displayTicks = stats.displayLoopTicks.load(std::memory_order_relaxed);
+                uint64_t mesh_frames = stats.mesh_frames_produced.load(std::memory_order_relaxed);
+                uint64_t edsl_frames = stats.edsl_render_frames.load(std::memory_order_relaxed);
+                uint64_t glsl_frames = stats.glsl_render_frames.load(std::memory_order_relaxed);
+                uint64_t display_ticks = stats.display_loop_ticks.load(std::memory_order_relaxed);
 
-                uint64_t meshFps = meshFrames - prevMeshFrames;
-                uint64_t edslFps = edslFrames - prevEdslFrames;
-                uint64_t glslFps = glslFrames - prevGlslFrames;
-                uint64_t displayFps = displayTicks - prevDisplayTicks;
+                uint64_t mesh_fps = mesh_frames - prev_mesh_frames;
+                uint64_t edsl_fps = edsl_frames - prev_edsl_frames;
+                uint64_t glsl_fps = glsl_frames - prev_glsl_frames;
+                uint64_t display_fps = display_ticks - prev_display_ticks;
 
-                prevMeshFrames = meshFrames;
-                prevEdslFrames = edslFrames;
-                prevGlslFrames = glslFrames;
-                prevDisplayTicks = displayTicks;
+                prev_mesh_frames = mesh_frames;
+                prev_edsl_frames = edsl_frames;
+                prev_glsl_frames = glsl_frames;
+                prev_display_ticks = display_ticks;
 
-                uint64_t latestEdsl = stats.latestEdslFrameId.load(std::memory_order_relaxed);
-                uint64_t latestGlsl = stats.latestGlslFrameId.load(std::memory_order_relaxed);
-                uint64_t frameGap = (latestEdsl >= latestGlsl) ? (latestEdsl - latestGlsl) : (latestGlsl - latestEdsl);
+                uint64_t latest_edsl = stats.latest_edsl_frame_id.load(std::memory_order_relaxed);
+                uint64_t latest_glsl = stats.latest_glsl_frame_id.load(std::memory_order_relaxed);
+                uint64_t frame_gap = (latest_edsl >= latest_glsl) ? (latest_edsl - latest_glsl) : (latest_glsl - latest_edsl);
 
-                uint64_t edslDisplayed = stats.edslDisplayFrames.load(std::memory_order_relaxed);
-                uint64_t glslDisplayed = stats.glslDisplayFrames.load(std::memory_order_relaxed);
-                double avgEdslLatencyMs = (edslDisplayed == 0)
-                                              ? 0.0
-                                              : static_cast<double>(stats.edslLatencyUsTotal.load(std::memory_order_relaxed)) / 1000.0 / static_cast<double>(edslDisplayed);
-                double avgGlslLatencyMs = (glslDisplayed == 0)
-                                              ? 0.0
-                                              : static_cast<double>(stats.glslLatencyUsTotal.load(std::memory_order_relaxed)) / 1000.0 / static_cast<double>(glslDisplayed);
+                uint64_t edsl_displayed = stats.edsl_display_frames.load(std::memory_order_relaxed);
+                uint64_t glsl_displayed = stats.glsl_display_frames.load(std::memory_order_relaxed);
+                double avg_edsl_latency_ms = (edsl_displayed == 0)
+                                                 ? 0.0
+                                                 : static_cast<double>(stats.edsl_latency_us_total.load(std::memory_order_relaxed)) / 1000.0 /
+                                                       static_cast<double>(edsl_displayed);
+                double avg_glsl_latency_ms = (glsl_displayed == 0)
+                                                 ? 0.0
+                                                 : static_cast<double>(stats.glsl_latency_us_total.load(std::memory_order_relaxed)) / 1000.0 /
+                                                       static_cast<double>(glsl_displayed);
 
-                std::cout << "[Stats] meshFPS=" << meshFps
-                          << " edslRenderFPS=" << edslFps
-                          << " glslRenderFPS=" << glslFps
-                          << " displayLoopFPS=" << displayFps
-                          << " frameGap=" << frameGap
-                          << " drops(mesh->edsl=" << meshToEdsl.droppedCount()
-                          << ", mesh->glsl=" << meshToGlsl.droppedCount()
-                          << ", edsl->display=" << edslToDisplay.droppedCount()
-                          << ", glsl->display=" << glslToDisplay.droppedCount() << ")"
-                          << " avgLatencyMs(edsl=" << avgEdslLatencyMs
-                          << ", glsl=" << avgGlslLatencyMs << ")\n";
+                std::cout << "[Stats] meshFPS=" << mesh_fps
+                          << " edslRenderFPS=" << edsl_fps
+                          << " glslRenderFPS=" << glsl_fps
+                          << " displayLoopFPS=" << display_fps
+                          << " frameGap=" << frame_gap
+                          << " drops(mesh->edsl=" << mesh_to_edsl.dropped_count()
+                          << ", mesh->glsl=" << mesh_to_glsl.dropped_count()
+                          << ", edsl->display=" << edsl_to_display.dropped_count()
+                          << ", glsl->display=" << glsl_to_display.dropped_count() << ")"
+                          << " avgLatencyMs(edsl=" << avg_edsl_latency_ms
+                          << ", glsl=" << avg_glsl_latency_ms << ")\n";
 
-                lastStatTick = now;
+                last_stat_tick = now;
             }
-        }*/
+        }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
