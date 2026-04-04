@@ -84,6 +84,7 @@ namespace EmbeddedShader
     {
 #if CABBAGE_ENGINE_DEBUG
         std::string bindlessStr = Ast::Parser::getBindless() ? "_Bindless" : "";
+        bool isNeedLinkLib = option.spvLinkBinary && !option.spvLinkBinary->empty();
         std::vector<uint32_t> codeSpirV = {};
 #ifdef WIN32
         std::vector<uint32_t> codeDXIL = {};
@@ -129,7 +130,7 @@ namespace EmbeddedShader
                     languages.push_back(ShaderLanguage::HLSL);
 
 
-                reflections = ShaderLanguageConverter::slangCompiler(codeSlang, binaryLanguages, languages, binaryOutputs, outputs, true);
+                reflections = ShaderLanguageConverter::slangCompiler(codeSlang, binaryLanguages, languages, binaryOutputs, outputs, true,!isNeedLinkLib);
                 size_t index = 0;
                 if (option.compileSpirV)
                     codeSpirV = binaryOutputs[index++];
@@ -185,7 +186,7 @@ namespace EmbeddedShader
                 break;
         }
 
-        if (option.spvLinkBinary && !option.spvLinkBinary->empty() && !codeSpirV.empty())
+        if (isNeedLinkLib && !codeSpirV.empty())
         {
             std::vector<std::vector<uint32_t>> src = *option.spvLinkBinary;
             src.push_back(codeSpirV);

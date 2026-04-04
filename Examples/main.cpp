@@ -55,6 +55,27 @@ struct VertexAttributeProxy
 
 int main()
 {
+    //----CompileTest----
+    // using namespace EmbeddedShader;
+    // using namespace ktm;
+    // Texture2D<fvec4> inputImageRGBA16_0;
+    // auto compute_0 = [&]
+    // {
+    //     Float4 color = inputImageRGBA16_0[dispatchThreadID()->xy()];
+    //     inputImageRGBA16_0[dispatchThreadID()->xy()] = Float4(compute_header_glsl::acesFilmicToneMapCurve(color->xyz()), 1.f);
+    // };
+    // CompilerOption option;
+    // option.compileDXBC = false;
+    // option.compileDXBC = false;
+    // option.compileHLSL = false;
+    // auto pipelineObj = ComputePipelineObject::compile(
+    //     compute_0,
+    //     uvec3(8,8,1),
+    //     option
+    // );
+    // return 0;
+
+
     // Corona::Kernel::CoronaLogger::get_logger()->set_log_level(quill::LogLevel::TraceL3);
     //  setupSignalHandlers();
 

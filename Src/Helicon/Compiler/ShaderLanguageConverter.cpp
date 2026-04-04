@@ -599,161 +599,166 @@ namespace EmbeddedShader
 		return result;
 	}
 
-	std::vector<ShaderCodeModule::ShaderResources> ShaderLanguageConverter::slangCompiler(const std::string& shaderCode,
-		const std::vector<ShaderLanguage>& targetBinary, const std::vector<ShaderLanguage>& targetLanguage,
-		std::vector<std::vector<uint32_t>>& binaryTargetsOutput,
-		std::vector<std::string>& targetsOutput, bool isEnabledReflection)
+	std::vector<ShaderCodeModule::ShaderResources> ShaderLanguageConverter::slangCompiler(const std::string &shaderCode,
+                                                                                          const std::vector<ShaderLanguage> &targetBinary, const std::vector<ShaderLanguage> &targetLanguage,
+                                                                                          std::vector<std::vector<uint32_t>> &binaryTargetsOutput,
+                                                                                          std::vector<std::string> &targetsOutput, bool isEnabledReflection, bool isEnabledLink)
 	{
-		if (targetBinary.empty() && targetLanguage.empty())
-		{
-			throw std::logic_error("No target language specified for Slang compilation.");
-		}
-		Slang::ComPtr<slang::IGlobalSession> globalSession;
-		createGlobalSession(globalSession.writeRef());
+	    if (targetBinary.empty() && targetLanguage.empty())
+	    {
+	        throw std::logic_error("No target language specified for Slang compilation.");
+	    }
+	    Slang::ComPtr<slang::IGlobalSession> globalSession;
+	    createGlobalSession(globalSession.writeRef());
 
-		slang::SessionDesc sessionDesc = {};
+	    slang::SessionDesc sessionDesc = {};
 
-		std::vector<slang::TargetDesc> targets(targetLanguage.size() + targetBinary.size());
+	    std::vector<slang::TargetDesc> targets(targetLanguage.size() + targetBinary.size());
 
-		for (size_t i = 0; i < targetBinary.size(); ++i)
-		{
-			auto& target = targets[i];
-			auto language = targetBinary[i];
-			switch (language)
-			{
-				case ShaderLanguage::SpirV:
-					target.format = SLANG_SPIRV;
-					target.flags = SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
-					break;
-				case ShaderLanguage::DXIL:
-					target.format = SLANG_DXIL;
-					target.profile = globalSession->findProfile("sm_6_6");
-					break;
-				case ShaderLanguage::DXBC:
-					target.format = SLANG_DXBC;
-					break;
-				default:
-					throw std::logic_error("Unsupported binary target for Slang compilation.");
-			}
-		}
+	    for (size_t i = 0; i < targetBinary.size(); ++i)
+	    {
+	        auto& target = targets[i];
+	        auto language = targetBinary[i];
+	        switch (language)
+	        {
+	        case ShaderLanguage::SpirV:
+	            target.format = SLANG_SPIRV;
+	            target.flags = SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
+	            break;
+	        case ShaderLanguage::DXIL:
+	            target.format = SLANG_DXIL;
+	            target.profile = globalSession->findProfile("sm_6_6");
+	            break;
+	        case ShaderLanguage::DXBC:
+	            target.format = SLANG_DXBC;
+	            break;
+	        default:
+	            throw std::logic_error("Unsupported binary target for Slang compilation.");
+	        }
+	    }
 
-		for (size_t i = 0; i < targetLanguage.size(); ++i)
-		{
-			auto& target = targets[i + targetBinary.size()];
-			auto language = targetLanguage[i];
-			switch (language)
-			{
-				case ShaderLanguage::GLSL:
-					// case ShaderLanguage::ESSL:
-				{
-					target.format = SLANG_GLSL;
-					break;
-				}
-				case ShaderLanguage::HLSL:
-				{
-					target.format = SLANG_HLSL;
-					break;
-				}
-				// case ShaderLanguage::MSL:
-				//	targetDesc.format = SLANG_METAL; break;
-				case ShaderLanguage::DXIL:
-					target.format = SLANG_DXIL;
-					break;
-				case ShaderLanguage::DXBC:
-					target.format = SLANG_DXBC;
-					break;
-				default:
-					throw std::logic_error("Unsupported target language for Slang compilation.");
-			}
-		}
+	    for (size_t i = 0; i < targetLanguage.size(); ++i)
+	    {
+	        auto& target = targets[i + targetBinary.size()];
+	        auto language = targetLanguage[i];
+	        switch (language)
+	        {
+	        case ShaderLanguage::GLSL:
+	            // case ShaderLanguage::ESSL:
+	        {
+	            target.format = SLANG_GLSL;
+	            break;
+	        }
+	        case ShaderLanguage::HLSL:
+	        {
+	            target.format = SLANG_HLSL;
+	            break;
+	        }
+	            // case ShaderLanguage::MSL:
+	            //	targetDesc.format = SLANG_METAL; break;
+	        case ShaderLanguage::DXIL:
+	            target.format = SLANG_DXIL;
+	            break;
+	        case ShaderLanguage::DXBC:
+	            target.format = SLANG_DXBC;
+	            break;
+	        default:
+	            throw std::logic_error("Unsupported target language for Slang compilation.");
+	        }
+	    }
 
-		sessionDesc.defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
-		sessionDesc.targets = targets.data();
-		sessionDesc.targetCount = static_cast<SlangInt>(targets.size());
+	    sessionDesc.defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
+	    sessionDesc.targets = targets.data();
+	    sessionDesc.targetCount = static_cast<SlangInt>(targets.size());
 
-		std::array options =
-		{
-			slang::CompilerOptionEntry{
-				slang::CompilerOptionName::EmitSpirvDirectly,
-				{slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}
-			},
-			slang::CompilerOptionEntry{
-				slang::CompilerOptionName::BindlessSpaceIndex,
-				{slang::CompilerOptionValueKind::Int, 0, 0, nullptr, nullptr}
-			},
-		    slang::CompilerOptionEntry{
-		        slang::CompilerOptionName::NoMangle,
+	    std::array options =
+	    {
+	        slang::CompilerOptionEntry{
+	            slang::CompilerOptionName::EmitSpirvDirectly,
                 {slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}
-		    },
-		};
-		sessionDesc.compilerOptionEntries = options.data();
-		sessionDesc.compilerOptionEntryCount = options.size();
+	        },
+            slang::CompilerOptionEntry{
+                slang::CompilerOptionName::BindlessSpaceIndex,
+                {slang::CompilerOptionValueKind::Int, 0, 0, nullptr, nullptr}
+            },
+            slang::CompilerOptionEntry{
+                slang::CompilerOptionName::NoMangle,
+                {slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}
+            },
+	        slang::CompilerOptionEntry{
+	            slang::CompilerOptionName::IncompleteLibrary,
+                {slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}
+	        },
+        };
+	    sessionDesc.compilerOptionEntries = options.data();
+	    sessionDesc.compilerOptionEntryCount = options.size();
 
-		Slang::ComPtr<slang::ISession> session;
-		globalSession->createSession(sessionDesc, session.writeRef());
+	    Slang::ComPtr<slang::ISession> session;
+	    globalSession->createSession(sessionDesc, session.writeRef());
 
-		// 3. Load module
-		Slang::ComPtr<slang::IModule> slangModule; {
-			auto hashStr = std::to_string(std::hash<std::string>()(shaderCode));
-			Slang::ComPtr<slang::IBlob> diagnosticsBlob;
-			slangModule = session->loadModuleFromSourceString(hashStr.c_str(), (hashStr + ".slang").c_str(),
-			                                                  shaderCode.c_str(),
-			                                                  diagnosticsBlob.writeRef());
-			// Optional diagnostic container
-			diagnoseIfNeeded(diagnosticsBlob);
-			if (!slangModule)
-			{
-				throw std::runtime_error("Failed to load Slang module.");
-			}
-		}
+	    // 3. Load module
+	    Slang::ComPtr<slang::IModule> slangModule; {
+	        auto hashStr = std::to_string(std::hash<std::string>()(shaderCode));
+	        Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+	        slangModule = session->loadModuleFromSourceString(hashStr.c_str(), (hashStr + ".slang").c_str(),
+                                                              shaderCode.c_str(),
+                                                              diagnosticsBlob.writeRef());
+	        // Optional diagnostic container
+	        diagnoseIfNeeded(diagnosticsBlob);
+	        if (!slangModule)
+	        {
+	            throw std::runtime_error("Failed to load Slang module.");
+	        }
+	    }
 
-		// 4. Query Entry Points
-		Slang::ComPtr<slang::IEntryPoint> entryPoint; {
-			Slang::ComPtr<slang::IBlob> diagnosticsBlob;
-			slangModule->findEntryPointByName("main", entryPoint.writeRef());
-			if (!entryPoint)
-			{
-				std::cout << "Error getting entry point" << std::endl;
-				throw std::runtime_error("Failed to find entry point 'main' in Slang module.");
-			}
-		}
+	    // 4. Query Entry Points
+	    Slang::ComPtr<slang::IEntryPoint> entryPoint; {
+	        Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+	        slangModule->findEntryPointByName("main", entryPoint.writeRef());
+	        if (!entryPoint)
+	        {
+	            std::cout << "Error getting entry point" << std::endl;
+	            throw std::runtime_error("Failed to find entry point 'main' in Slang module.");
+	        }
+	    }
 
-		// 5. Compose Modules + Entry Points
-		std::array<slang::IComponentType*, 2> componentTypes =
-		{
-			slangModule,
-			entryPoint
-		};
+	    // 5. Compose Modules + Entry Points
+	    std::array<slang::IComponentType*, 2> componentTypes =
+	    {
+	        slangModule,
+            entryPoint
+        };
 
-		Slang::ComPtr<slang::IComponentType> composedProgram; {
-			Slang::ComPtr<slang::IBlob> diagnosticsBlob;
-			SlangResult result = session->createCompositeComponentType(
-				componentTypes.data(),
-				componentTypes.size(),
-				composedProgram.writeRef(),
-				diagnosticsBlob.writeRef());
-			diagnoseIfNeeded(diagnosticsBlob);
-			if (SLANG_FAILED(result))
-				throw std::runtime_error("Failed to create composite component type in Slang.");
-		}
+	    Slang::ComPtr<slang::IComponentType> composedProgram; {
+	        Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+	        SlangResult result = session->createCompositeComponentType(
+                componentTypes.data(),
+                componentTypes.size(),
+                composedProgram.writeRef(),
+                diagnosticsBlob.writeRef());
+	        diagnoseIfNeeded(diagnosticsBlob);
+	        if (SLANG_FAILED(result))
+	            throw std::runtime_error("Failed to create composite component type in Slang.");
+	    }
 
-		// 6. Link
-		Slang::ComPtr<slang::IComponentType> linkedProgram; {
-			Slang::ComPtr<slang::IBlob> diagnosticsBlob;
-			SlangResult result = composedProgram->link(
-				linkedProgram.writeRef(),
-				diagnosticsBlob.writeRef());
-			diagnoseIfNeeded(diagnosticsBlob);
-			if (SLANG_FAILED(result))
-				throw std::runtime_error("Failed to link Slang program.");
-		}
+	    Slang::ComPtr<slang::IComponentType> program = composedProgram;
+	    if (true) {
+	        // 6. Link
+	        Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+	        SlangResult result = composedProgram->link(
+            program.writeRef(),
+            diagnosticsBlob.writeRef());
+	        diagnoseIfNeeded(diagnosticsBlob);
+	        if (SLANG_FAILED(result))
+	            throw std::runtime_error("Failed to link Slang program.");
+	    }
 
 		binaryTargetsOutput.resize(targetBinary.size());
 		for (size_t i = 0; i < binaryTargetsOutput.size(); ++i)
 		{
 			Slang::ComPtr<slang::IBlob> targetCodeBlob;
 			Slang::ComPtr<slang::IBlob> diagnosticsBlob;
-			SlangResult result = linkedProgram->getEntryPointCode(
+			SlangResult result = program->getEntryPointCode(
 				0,
 				static_cast<SlangInt>(i),
 				targetCodeBlob.writeRef(),
@@ -774,7 +779,7 @@ namespace EmbeddedShader
 		{
 			Slang::ComPtr<slang::IBlob> targetCodeBlob;
 			Slang::ComPtr<slang::IBlob> diagnosticsBlob;
-			SlangResult result = linkedProgram->getEntryPointCode(
+			SlangResult result = program->getEntryPointCode(
 				0,
 				static_cast<SlangInt>(i + targetBinary.size()),
 				// Skip the first entry point if there are binary targets
