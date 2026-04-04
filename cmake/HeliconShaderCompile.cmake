@@ -173,6 +173,13 @@ function(helicon_compile_shaders TARGET_NAME)
             set(SHADER_STAGE_ARG "-t" "vert")
         endif()
         
+        # Extract only the last extension to avoid duplication with multi-dot
+        # shader filenames (e.g. .comp.glsl -> .glsl, not .comp.glsl).
+        string(REGEX MATCH "\\.[^.]+$" SHADER_LAST_EXT "${SHADER_NAME}")
+        if(NOT SHADER_LAST_EXT)
+            set(SHADER_LAST_EXT ".h")
+        endif()
+
         message(STATUS "[Helicon]   - ${SHADER_REL_PATH} (${SHADER_LANG}) -> ${SHADER_REL_PATH}.hpp")
         
         # 添加自定义命令（增量编译）
@@ -182,7 +189,7 @@ function(helicon_compile_shaders TARGET_NAME)
                 -l ${LANG_LOWER}
                 -s "${SHADER_PATH}"
                 -o "${OUTPUT_SUBDIR}"
-                -output-file-extension "${SHADER_EXT}.hpp"
+                -output-file-extension "${SHADER_LAST_EXT}.hpp"
                 ${SHADER_STAGE_ARG}
             DEPENDS "${SHADER_PATH}" ShaderCompileScripts
             WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
@@ -205,7 +212,7 @@ function(helicon_compile_shaders TARGET_NAME)
         add_dependencies(${TARGET_NAME} ${SHADER_TARGET})
         
         # 添加 include 路径（OUTPUT_DIR 作为根目录）
-        target_include_directories(${TARGET_NAME} PRIVATE "${ARG_OUTPUT_DIR}")
+        target_include_directories(${TARGET_NAME} PUBLIC "${ARG_OUTPUT_DIR}")
         
         message(STATUS "[Helicon] ${TARGET_NAME}: Output directory: ${ARG_OUTPUT_DIR}")
     endif()
