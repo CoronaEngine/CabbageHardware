@@ -9,7 +9,7 @@
 struct RuntimeConfig
 {
     std::string scenario = "default";      // 场景注册名。
-    //std::string dataset = "cube";        // 数据集名，由场景自行解释。
+    std::string data_set = "cube";        // 数据集名，由场景自行解释。
     std::size_t queue_depth = 10;          // 有界队列的容量。
     uint32_t window_width = 1920;          // EDSL/GLSL 输出窗口宽度。
     uint32_t window_height = 1080;         // EDSL/GLSL 输出窗口高度。

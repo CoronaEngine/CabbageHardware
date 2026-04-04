@@ -23,12 +23,6 @@
 
 #include "default_scenario.h"
 
-//using multishader::Backend;
-//using multishader::Clock;
-//using multishader::DropOldestQueue;
-//using multishader::MeshFrame;
-//using multishader::RenderFrame;
-
 struct RuntimeStats
 {
     // Mesh 线程统计：成功生成并投递的总帧数
@@ -219,7 +213,7 @@ int main(int argc, char **argv)
         glsl_to_display.close();
     };
 
-    auto set_Error_And_Stop = [&](const std::string &thread_name, const std::string &message) {
+    auto set_error_and_stop = [&](const std::string &thread_name, const std::string &message) {
         // 仅记录首个错误，避免多线程并发覆盖关键信息。
         bool expected = false;
         if (has_error.compare_exchange_strong(expected, true))
@@ -232,52 +226,51 @@ int main(int argc, char **argv)
 
     auto mesh_thread = [&] {
         // meshThread：生成单调 frameId 和共享 payload，同时投喂两个 render 输入队列。
-        /*try
+        try
         {
-            uint64_t frameId = 0;
-            const auto frameInterval = (config.maxFps > 0)
-                                           ? std::chrono::microseconds(1'000'000 / config.maxFps)
-                                           : std::chrono::microseconds(0);
+            uint64_t frame_id = 0;
+            const auto frame_interval = (config.max_fps > 0) ? std::chrono::microseconds(1'000'000 / config.max_fps)
+                                                             : std::chrono::microseconds(0);
 
             while (running.load())
             {
-                auto frameBegin = Clock::now();
-                std::string meshError;
+                auto frame_begin = Clock::now();
+                std::string mesh_error;
 
                 MeshFrame frame;
-                frame.frameId = ++frameId;
-                frame.timestamp = frameBegin;
-                frame.payload = scenario->meshTick(frame.frameId, frame.timestamp, meshError);
+                frame.frame_id = ++frame_id;
+                frame.timestamp = frame_begin;
+                frame.payload = scenario->mesh_tick(frame.frame_id, frame.timestamp, mesh_error);
 
                 if (!frame.payload)
                 {
-                    setErrorAndStop("meshThread", meshError.empty() ? "meshTick returned empty payload" : meshError);
+                    set_error_and_stop("MeshThread", mesh_error.empty() ? "MeshTick returned empty payload" : mesh_error);
                     break;
                 }
 
-                MeshFrame edslFrame = frame;
-                if (!meshToEdsl.push(std::move(edslFrame)) || !meshToGlsl.push(std::move(frame)))
+                MeshFrame edsl_frame = frame;
+                if (!mesh_to_edsl.push(std::move(edsl_frame)) || !mesh_to_glsl.push(std::move(frame)))
                 {
                     break;
                 }
 
-                stats.meshFramesProduced.fetch_add(1, std::memory_order_relaxed);
+                stats.mesh_frames_produced.fetch_add(1, std::memory_order_relaxed);
 
-                if (frameInterval.count() > 0)
+                if (frame_interval.count() > 0)
                 {
-                    auto elapsed = Clock::now() - frameBegin;
-                    if (elapsed < frameInterval)
+                    auto elapsed = Clock::now() - frame_begin;
+                    if (elapsed < frame_interval)
                     {
-                        std::this_thread::sleep_for(frameInterval - elapsed);
+                        std::this_thread::sleep_for(frame_interval - elapsed);
                     }
                 }
             }
         }
         catch (const std::exception &e)
         {
-            setErrorAndStop("meshThread", e.what());
+            set_error_and_stop("MeshThread", e.what());
         }
-        requestStop();*/
+        request_stop();
     };
 
     auto render_thread_edsl = [&] {

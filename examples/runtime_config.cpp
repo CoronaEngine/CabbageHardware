@@ -74,11 +74,11 @@ RuntimeConfig parse_runtime_config(int argc, char **argv)
             config.scenario = read_value(i, argc, argv, argument);
             continue;
         }
-        /*if (argument.rfind("--dataset", 0) == 0)
+        if (argument.rfind("--data-set", 0) == 0)
         {
-            config.dataset = readValue(i, argc, argv, argument);
+            config.data_set = read_value(i, argc, argv, argument);
             continue;
-        }*/
+        }
         if (argument.rfind("--queue-depth", 0) == 0)
         {
             config.queue_depth = parse_unsigned_value<std::size_t>(read_value(i, argc, argv, argument), "queue-depth");
@@ -127,7 +127,7 @@ std::string runtime_config_usage(std::string_view exe_name)
     usage += exe_name;
     usage += " [options]\n";
     usage += "  --scenario=<name>         Scenario name (default: default)\n";
-    //usage += "  --dataset=<name>          Dataset name (default: cube)\n";
+    usage += "  --data-set=<name>          Dataset name (default: cube)\n";
     usage += "  --queue-depth=<n>         Bounded queue depth (default: 3)\n";
     usage += "  --width=<n>               Window width (default: 1920)\n";
     usage += "  --height=<n>              Window height (default: 1080)\n";
