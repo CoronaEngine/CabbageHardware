@@ -17,10 +17,11 @@
 
 #include "CabbageHardware.h"
 #include "drop_oldest_queue.h"
-//#include "multishader/HelloTriangleScenario.h"
 #include "runtime_config.h"
 #include "scenario.h"
 #include "scenario_registry.h"
+
+#include "default_scenario.h"
 
 //using multishader::Backend;
 //using multishader::Clock;
@@ -81,21 +82,21 @@ bool run_queue_self_test()
 }
 
 // 打印当前已注册场景列表，便于命令行选择。
-//void print_available_scenarios()
-//{
-//    auto names = listScenarios();
-//    std::ostringstream oss;
-//    oss << "Available scenarios: ";
-//    for (std::size_t i = 0; i < names.size(); ++i)
-//    {
-//        if (i > 0)
-//        {
-//            oss << ", ";
-//        }
-//        oss << names[i];
-//    }
-//    std::cout << oss.str() << '\n';
-//}
+void print_available_scenarios()
+{
+    auto names = list_scenarios();
+    std::ostringstream oss;
+    oss << "Available scenarios: ";
+    for (std::size_t i = 0; i < names.size(); ++i)
+    {
+        if (i > 0)
+        {
+            oss << ", ";
+        }
+        oss << names[i];
+    }
+    std::cout << oss.str() << '\n';
+}
 
 int main(int argc, char **argv)
 {
@@ -125,7 +126,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    //multishader::registerHelloTriangleScenario();
+    register_default_scenario();
 
     // 2 初始化窗口与输出图像。
     if (glfwInit() < 0)
@@ -181,22 +182,22 @@ int main(int argc, char **argv)
     }
 
     // 3 根据场景名创建并初始化场景实现。
-    //auto scenario = multishader::createScenario(config.scenario, config);
-    //if (!scenario)
-    //{
-    //    std::cerr << "Unknown scenario: " << config.scenario << '\n';
-    //    printAvailableScenarios();
-    //    destroyWindowsAndTerminate();
-    //    return -1;
-    //}
+    auto scenario = create_scenario(config.scenario, config);
+    if (!scenario)
+    {
+        std::cerr << "Unknown scenario: " << config.scenario << '\n';
+        print_available_scenarios();
+        destroy_windows_and_terminate();
+        return -1;
+    }
 
-    //std::string scenarioError;
-    //if (!scenario->init(config, finalOutputImages, scenarioError))
-    //{
-    //    std::cerr << "Scenario init failed: " << scenarioError << '\n';
-    //    destroyWindowsAndTerminate();
-    //    return -1;
-    //}
+    std::string scenario_error;
+    if (!scenario->init(config, final_output_images, scenario_error))
+    {
+        std::cerr << "Scenario init failed: " << scenario_error << '\n';
+        destroy_windows_and_terminate();
+        return -1;
+    }
 
     DropOldestQueue<MeshFrame> mesh_to_edsl(config.queue_depth);
     DropOldestQueue<MeshFrame> mesh_to_glsl(config.queue_depth);
@@ -218,243 +219,243 @@ int main(int argc, char **argv)
         glsl_to_display.close();
     };
 
-    //auto setErrorAndStop = [&](const std::string &threadName, const std::string &message) {
-    //    // 仅记录首个错误，避免多线程并发覆盖关键信息。
-    //    bool expected = false;
-    //    if (hasError.compare_exchange_strong(expected, true))
-    //    {
-    //        std::lock_guard<std::mutex> lock(errorMutex);
-    //        errorMessage = threadName + ": " + message;
-    //    }
-    //    requestStop();
-    //};
+    auto set_Error_And_Stop = [&](const std::string &thread_name, const std::string &message) {
+        // 仅记录首个错误，避免多线程并发覆盖关键信息。
+        bool expected = false;
+        if (has_error.compare_exchange_strong(expected, true))
+        {
+            std::lock_guard<std::mutex> lock(error_mutex);
+            error_message = thread_name + ": " + message;
+        }
+        request_stop();
+    };
 
-    //auto meshThread = [&] {
-    //    // meshThread：生成单调 frameId 和共享 payload，同时投喂两个 render 输入队列。
-    //    try
-    //    {
-    //        uint64_t frameId = 0;
-    //        const auto frameInterval = (config.maxFps > 0)
-    //                                       ? std::chrono::microseconds(1'000'000 / config.maxFps)
-    //                                       : std::chrono::microseconds(0);
+    auto mesh_thread = [&] {
+        // meshThread：生成单调 frameId 和共享 payload，同时投喂两个 render 输入队列。
+        /*try
+        {
+            uint64_t frameId = 0;
+            const auto frameInterval = (config.maxFps > 0)
+                                           ? std::chrono::microseconds(1'000'000 / config.maxFps)
+                                           : std::chrono::microseconds(0);
 
-    //        while (running.load())
-    //        {
-    //            auto frameBegin = Clock::now();
-    //            std::string meshError;
+            while (running.load())
+            {
+                auto frameBegin = Clock::now();
+                std::string meshError;
 
-    //            MeshFrame frame;
-    //            frame.frameId = ++frameId;
-    //            frame.timestamp = frameBegin;
-    //            frame.payload = scenario->meshTick(frame.frameId, frame.timestamp, meshError);
+                MeshFrame frame;
+                frame.frameId = ++frameId;
+                frame.timestamp = frameBegin;
+                frame.payload = scenario->meshTick(frame.frameId, frame.timestamp, meshError);
 
-    //            if (!frame.payload)
-    //            {
-    //                setErrorAndStop("meshThread", meshError.empty() ? "meshTick returned empty payload" : meshError);
-    //                break;
-    //            }
+                if (!frame.payload)
+                {
+                    setErrorAndStop("meshThread", meshError.empty() ? "meshTick returned empty payload" : meshError);
+                    break;
+                }
 
-    //            MeshFrame edslFrame = frame;
-    //            if (!meshToEdsl.push(std::move(edslFrame)) || !meshToGlsl.push(std::move(frame)))
-    //            {
-    //                break;
-    //            }
+                MeshFrame edslFrame = frame;
+                if (!meshToEdsl.push(std::move(edslFrame)) || !meshToGlsl.push(std::move(frame)))
+                {
+                    break;
+                }
 
-    //            stats.meshFramesProduced.fetch_add(1, std::memory_order_relaxed);
+                stats.meshFramesProduced.fetch_add(1, std::memory_order_relaxed);
 
-    //            if (frameInterval.count() > 0)
-    //            {
-    //                auto elapsed = Clock::now() - frameBegin;
-    //                if (elapsed < frameInterval)
-    //                {
-    //                    std::this_thread::sleep_for(frameInterval - elapsed);
-    //                }
-    //            }
-    //        }
-    //    }
-    //    catch (const std::exception &e)
-    //    {
-    //        setErrorAndStop("meshThread", e.what());
-    //    }
-    //    requestStop();
-    //};
+                if (frameInterval.count() > 0)
+                {
+                    auto elapsed = Clock::now() - frameBegin;
+                    if (elapsed < frameInterval)
+                    {
+                        std::this_thread::sleep_for(frameInterval - elapsed);
+                    }
+                }
+            }
+        }
+        catch (const std::exception &e)
+        {
+            setErrorAndStop("meshThread", e.what());
+        }
+        requestStop();*/
+    };
 
-    //auto renderThreadEDSL = [&] {
-    //    // renderThreadEDSL：消费 mesh 帧，执行 EDSL 渲染并把提交结果发给 display 队列。
-    //    try
-    //    {
-    //        while (running.load() || !meshToEdsl.isClosedAndEmpty())
-    //        {
-    //            auto meshFrame = meshToEdsl.pop_wait();
-    //            if (!meshFrame.has_value())
-    //            {
-    //                break;
-    //            }
+    auto render_thread_edsl = [&] {
+        // renderThreadEDSL：消费 mesh 帧，执行 EDSL 渲染并把提交结果发给 display 队列。
+        /*try
+        {
+            while (running.load() || !meshToEdsl.isClosedAndEmpty())
+            {
+                auto meshFrame = meshToEdsl.pop_wait();
+                if (!meshFrame.has_value())
+                {
+                    break;
+                }
 
-    //            std::string renderError;
-    //            if (!scenario->renderEDSLTick(meshFrame.value(), executors[0], finalOutputImages[0], renderError))
-    //            {
-    //                setErrorAndStop("renderThreadEDSL", renderError.empty() ? "renderEDSLTick failed" : renderError);
-    //                break;
-    //            }
+                std::string renderError;
+                if (!scenario->renderEDSLTick(meshFrame.value(), executors[0], finalOutputImages[0], renderError))
+                {
+                    setErrorAndStop("renderThreadEDSL", renderError.empty() ? "renderEDSLTick failed" : renderError);
+                    break;
+                }
 
-    //            RenderFrame renderFrame;
-    //            renderFrame.frameId = meshFrame->frameId;
-    //            renderFrame.backend = Backend::EDSL;
-    //            renderFrame.outputImage = &finalOutputImages[0];
-    //            renderFrame.executorRef = &executors[0];
-    //            renderFrame.submitTimestamp = Clock::now();
-    //            if (!edslToDisplay.push(std::move(renderFrame)))
-    //            {
-    //                break;
-    //            }
+                RenderFrame renderFrame;
+                renderFrame.frameId = meshFrame->frameId;
+                renderFrame.backend = Backend::EDSL;
+                renderFrame.outputImage = &finalOutputImages[0];
+                renderFrame.executorRef = &executors[0];
+                renderFrame.submitTimestamp = Clock::now();
+                if (!edslToDisplay.push(std::move(renderFrame)))
+                {
+                    break;
+                }
 
-    //            stats.edslRenderFrames.fetch_add(1, std::memory_order_relaxed);
-    //        }
-    //    }
-    //    catch (const std::exception &e)
-    //    {
-    //        setErrorAndStop("renderThreadEDSL", e.what());
-    //    }
-    //    edslToDisplay.close();
-    //};
+                stats.edslRenderFrames.fetch_add(1, std::memory_order_relaxed);
+            }
+        }
+        catch (const std::exception &e)
+        {
+            setErrorAndStop("renderThreadEDSL", e.what());
+        }
+        edslToDisplay.close();*/
+    };
 
-    //auto renderThreadGLSL = [&] {
-    //    // renderThreadGLSL：消费 mesh 帧，执行 GLSL 渲染并把提交结果发给 display 队列。
-    //    try
-    //    {
-    //        while (running.load() || !meshToGlsl.isClosedAndEmpty())
-    //        {
-    //            auto meshFrame = meshToGlsl.pop_wait();
-    //            if (!meshFrame.has_value())
-    //            {
-    //                break;
-    //            }
+    auto render_thread_glsl = [&] {
+        // renderThreadGLSL：消费 mesh 帧，执行 GLSL 渲染并把提交结果发给 display 队列。
+        //try
+        //{
+        //    while (running.load() || !meshToGlsl.isClosedAndEmpty())
+        //    {
+        //        auto meshFrame = meshToGlsl.pop_wait();
+        //        if (!meshFrame.has_value())
+        //        {
+        //            break;
+        //        }
 
-    //            std::string renderError;
-    //            if (!scenario->renderGLSLTick(meshFrame.value(), executors[1], finalOutputImages[1], renderError))
-    //            {
-    //                setErrorAndStop("renderThreadGLSL", renderError.empty() ? "renderGLSLTick failed" : renderError);
-    //                break;
-    //            }
+        //        std::string renderError;
+        //        if (!scenario->renderGLSLTick(meshFrame.value(), executors[1], finalOutputImages[1], renderError))
+        //        {
+        //            setErrorAndStop("renderThreadGLSL", renderError.empty() ? "renderGLSLTick failed" : renderError);
+        //            break;
+        //        }
 
-    //            RenderFrame renderFrame;
-    //            renderFrame.frameId = meshFrame->frameId;
-    //            renderFrame.backend = Backend::GLSL;
-    //            renderFrame.outputImage = &finalOutputImages[1];
-    //            renderFrame.executorRef = &executors[1];
-    //            renderFrame.submitTimestamp = Clock::now();
-    //            if (!glslToDisplay.push(std::move(renderFrame)))
-    //            {
-    //                break;
-    //            }
+        //        RenderFrame renderFrame;
+        //        renderFrame.frameId = meshFrame->frameId;
+        //        renderFrame.backend = Backend::GLSL;
+        //        renderFrame.outputImage = &finalOutputImages[1];
+        //        renderFrame.executorRef = &executors[1];
+        //        renderFrame.submitTimestamp = Clock::now();
+        //        if (!glslToDisplay.push(std::move(renderFrame)))
+        //        {
+        //            break;
+        //        }
 
-    //            stats.glslRenderFrames.fetch_add(1, std::memory_order_relaxed);
+        //        stats.glslRenderFrames.fetch_add(1, std::memory_order_relaxed);
 
-    //            if (config.glslArtificialDelayMs > 0)
-    //            {
-    //                // 可选人工延迟，用于复现/观察背压和丢帧策略。
-    //                std::this_thread::sleep_for(std::chrono::milliseconds(config.glslArtificialDelayMs));
-    //            }
-    //        }
-    //    }
-    //    catch (const std::exception &e)
-    //    {
-    //        setErrorAndStop("renderThreadGLSL", e.what());
-    //    }
-    //    glslToDisplay.close();
-    //};
+        //        if (config.glslArtificialDelayMs > 0)
+        //        {
+        //            // 可选人工延迟，用于复现/观察背压和丢帧策略。
+        //            std::this_thread::sleep_for(std::chrono::milliseconds(config.glslArtificialDelayMs));
+        //        }
+        //    }
+        //}
+        //catch (const std::exception &e)
+        //{
+        //    setErrorAndStop("renderThreadGLSL", e.what());
+        //}
+        //glslToDisplay.close();
+    };
 
-    //auto displayThread = [&] {
-    //    // displayThread：每轮取两条渲染输出队列的“最新帧”，避免被旧帧积压拖慢。
-    //    try
-    //    {
-    //        HardwareDisplayer edslDisplayer(glfwGetWin32Window(windows[0]));
-    //        HardwareDisplayer glslDisplayer(glfwGetWin32Window(windows[1]));
+    auto display_thread = [&] {
+        // displayThread：每轮取两条渲染输出队列的“最新帧”，避免被旧帧积压拖慢。
+        //try
+        //{
+        //    HardwareDisplayer edslDisplayer(glfwGetWin32Window(windows[0]));
+        //    HardwareDisplayer glslDisplayer(glfwGetWin32Window(windows[1]));
 
-    //        std::optional<RenderFrame> latestEdslFrame;
-    //        std::optional<RenderFrame> latestGlslFrame;
+        //    std::optional<RenderFrame> latestEdslFrame;
+        //    std::optional<RenderFrame> latestGlslFrame;
 
-    //        while (running.load() || !edslToDisplay.isClosedAndEmpty() || !glslToDisplay.isClosedAndEmpty())
-    //        {
-    //            bool gotNewFrame = false;
+        //    while (running.load() || !edslToDisplay.isClosedAndEmpty() || !glslToDisplay.isClosedAndEmpty())
+        //    {
+        //        bool gotNewFrame = false;
 
-    //            auto latestEdsl = edslToDisplay.try_pop_all_latest();
-    //            if (latestEdsl.has_value())
-    //            {
-    //                latestEdslFrame = std::move(latestEdsl.value());
-    //                gotNewFrame = true;
-    //            }
+        //        auto latestEdsl = edslToDisplay.try_pop_all_latest();
+        //        if (latestEdsl.has_value())
+        //        {
+        //            latestEdslFrame = std::move(latestEdsl.value());
+        //            gotNewFrame = true;
+        //        }
 
-    //            auto latestGlsl = glslToDisplay.try_pop_all_latest();
-    //            if (latestGlsl.has_value())
-    //            {
-    //                latestGlslFrame = std::move(latestGlsl.value());
-    //                gotNewFrame = true;
-    //            }
+        //        auto latestGlsl = glslToDisplay.try_pop_all_latest();
+        //        if (latestGlsl.has_value())
+        //        {
+        //            latestGlslFrame = std::move(latestGlsl.value());
+        //            gotNewFrame = true;
+        //        }
 
-    //            auto now = Clock::now();
+        //        auto now = Clock::now();
 
-    //            if (latestEdslFrame.has_value() &&
-    //                latestEdslFrame->outputImage != nullptr &&
-    //                latestEdslFrame->executorRef != nullptr)
-    //            {
-    //                // 对 EDSL 最新可用帧进行 wait + present。
-    //                edslDisplayer.wait(*latestEdslFrame->executorRef) << *latestEdslFrame->outputImage;
-    //                scenario->displayTick(latestEdslFrame.value());
-    //                if (latestEdsl.has_value())
-    //                {
-    //                    stats.latestEdslFrameId.store(latestEdslFrame->frameId, std::memory_order_relaxed);
-    //                    auto latencyUs = std::chrono::duration_cast<std::chrono::microseconds>(
-    //                                         now - latestEdslFrame->submitTimestamp)
-    //                                         .count();
-    //                    stats.edslLatencyUsTotal.fetch_add(static_cast<uint64_t>(latencyUs), std::memory_order_relaxed);
-    //                    stats.edslDisplayFrames.fetch_add(1, std::memory_order_relaxed);
-    //                }
-    //            }
+        //        if (latestEdslFrame.has_value() &&
+        //            latestEdslFrame->outputImage != nullptr &&
+        //            latestEdslFrame->executorRef != nullptr)
+        //        {
+        //            // 对 EDSL 最新可用帧进行 wait + present。
+        //            edslDisplayer.wait(*latestEdslFrame->executorRef) << *latestEdslFrame->outputImage;
+        //            scenario->displayTick(latestEdslFrame.value());
+        //            if (latestEdsl.has_value())
+        //            {
+        //                stats.latestEdslFrameId.store(latestEdslFrame->frameId, std::memory_order_relaxed);
+        //                auto latencyUs = std::chrono::duration_cast<std::chrono::microseconds>(
+        //                                     now - latestEdslFrame->submitTimestamp)
+        //                                     .count();
+        //                stats.edslLatencyUsTotal.fetch_add(static_cast<uint64_t>(latencyUs), std::memory_order_relaxed);
+        //                stats.edslDisplayFrames.fetch_add(1, std::memory_order_relaxed);
+        //            }
+        //        }
 
-    //            if (latestGlslFrame.has_value() &&
-    //                latestGlslFrame->outputImage != nullptr &&
-    //                latestGlslFrame->executorRef != nullptr)
-    //            {
-    //                // 对 GLSL 最新可用帧进行 wait + present。
-    //                glslDisplayer.wait(*latestGlslFrame->executorRef) << *latestGlslFrame->outputImage;
-    //                scenario->displayTick(latestGlslFrame.value());
-    //                if (latestGlsl.has_value())
-    //                {
-    //                    stats.latestGlslFrameId.store(latestGlslFrame->frameId, std::memory_order_relaxed);
-    //                    auto latencyUs = std::chrono::duration_cast<std::chrono::microseconds>(
-    //                                         now - latestGlslFrame->submitTimestamp)
-    //                                         .count();
-    //                    stats.glslLatencyUsTotal.fetch_add(static_cast<uint64_t>(latencyUs), std::memory_order_relaxed);
-    //                    stats.glslDisplayFrames.fetch_add(1, std::memory_order_relaxed);
-    //                }
-    //            }
+        //        if (latestGlslFrame.has_value() &&
+        //            latestGlslFrame->outputImage != nullptr &&
+        //            latestGlslFrame->executorRef != nullptr)
+        //        {
+        //            // 对 GLSL 最新可用帧进行 wait + present。
+        //            glslDisplayer.wait(*latestGlslFrame->executorRef) << *latestGlslFrame->outputImage;
+        //            scenario->displayTick(latestGlslFrame.value());
+        //            if (latestGlsl.has_value())
+        //            {
+        //                stats.latestGlslFrameId.store(latestGlslFrame->frameId, std::memory_order_relaxed);
+        //                auto latencyUs = std::chrono::duration_cast<std::chrono::microseconds>(
+        //                                     now - latestGlslFrame->submitTimestamp)
+        //                                     .count();
+        //                stats.glslLatencyUsTotal.fetch_add(static_cast<uint64_t>(latencyUs), std::memory_order_relaxed);
+        //                stats.glslDisplayFrames.fetch_add(1, std::memory_order_relaxed);
+        //            }
+        //        }
 
-    //            stats.displayLoopTicks.fetch_add(1, std::memory_order_relaxed);
-    //            if (!gotNewFrame)
-    //            {
-    //                std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    //            }
-    //        }
-    //    }
-    //    catch (const std::exception &e)
-    //    {
-    //        setErrorAndStop("displayThread", e.what());
-    //    }
-    //};
+        //        stats.displayLoopTicks.fetch_add(1, std::memory_order_relaxed);
+        //        if (!gotNewFrame)
+        //        {
+        //            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        //        }
+        //    }
+        //}
+        //catch (const std::exception &e)
+        //{
+        //    setErrorAndStop("displayThread", e.what());
+        //}
+    };
 
-    //std::thread renderEDSLWorker(renderThreadEDSL);
-    //std::thread renderGLSLWorker(renderThreadGLSL);
-    //std::thread displayWorker(displayThread);
-    //std::thread meshWorker(meshThread);
+    std::thread render_edsl_worker(render_thread_edsl);
+    std::thread render_glsl_worker(render_thread_glsl);
+    std::thread display_worker(display_thread);
+    std::thread mesh_worker(mesh_thread);
 
-    //// 4) 主线程负责窗口事件与周期统计输出。
-    //auto lastStatTick = Clock::now();
-    //uint64_t prevMeshFrames = 0;
-    //uint64_t prevEdslFrames = 0;
-    //uint64_t prevGlslFrames = 0;
-    //uint64_t prevDisplayTicks = 0;
+    // 4 主线程负责窗口事件与周期统计输出。
+    auto last_Stat_Tick = Clock::now();
+    uint64_t prev_Mesh_Frames = 0;
+    uint64_t prev_Edsl_Frames = 0;
+    uint64_t prev_Glsl_Frames = 0;
+    uint64_t prev_Display_Ticks = 0;
 
     while (running.load())
     {
@@ -519,33 +520,33 @@ int main(int argc, char **argv)
 
     request_stop();
 
-    //// 5) 线程收敛与场景清理。
-    //if (meshWorker.joinable())
-    //{
-    //    meshWorker.join();
-    //}
-    //if (renderEDSLWorker.joinable())
-    //{
-    //    renderEDSLWorker.join();
-    //}
-    //if (renderGLSLWorker.joinable())
-    //{
-    //    renderGLSLWorker.join();
-    //}
-    //if (displayWorker.joinable())
-    //{
-    //    displayWorker.join();
-    //}
+    // 5 线程收敛与场景清理。
+    if (mesh_worker.joinable())
+    {
+        mesh_worker.join();
+    }
+    if (render_edsl_worker.joinable())
+    {
+        render_edsl_worker.join();
+    }
+    if (render_glsl_worker.joinable())
+    {
+        render_glsl_worker.join();
+    }
+    if (display_worker.joinable())
+    {
+        display_worker.join();
+    }
 
-    //scenario->shutdown();
-    //destroyWindowsAndTerminate();
+    scenario->shutdown();
+    destroy_windows_and_terminate();
 
-    //if (hasError.load())
-    //{
-    //    std::lock_guard<std::mutex> lock(errorMutex);
-    //    std::cerr << "Fatal error: " << errorMessage << '\n';
-    //    return -1;
-    //}
+    if (has_error.load())
+    {
+        std::lock_guard<std::mutex> lock(error_mutex);
+        std::cerr << "Fatal error: " << error_message << '\n';
+        return -1;
+    }
 
     return 0;
 }
