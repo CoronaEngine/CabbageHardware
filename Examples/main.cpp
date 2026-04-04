@@ -25,6 +25,7 @@
 #include GLSL(vert.glsl)
 #include GLSL(frag.glsl)
 #include GLSL(compute.glsl)
+#include GLSL(compute_header.glsl)
 
 // storage buffer (used by mesh thread, retained for compatibility)
 struct RasterizerStorageBufferObject
@@ -250,7 +251,7 @@ int main()
             auto compute = [&]
             {
                 Float4 color = inputImageRGBA16[dispatchThreadID()->xy()];
-                inputImageRGBA16[dispatchThreadID()->xy()] = Float4(acesFilmicToneMapCurve(color->xyz()), 1.f);
+                inputImageRGBA16[dispatchThreadID()->xy()] = Float4(compute_header_glsl::acesFilmicToneMapCurve(color->xyz()), 1.f);
             };
 
             // EDSL vertex shader: pass-through (MVP 已在 CPU 端完成)
