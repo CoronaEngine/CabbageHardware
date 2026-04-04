@@ -314,7 +314,6 @@ void register_default_scenario()
 {
     static const bool registered = [] {
         register_scenario("default", create_default_scenario);
-        register_scenario("hello_triangle", create_default_scenario);
         return true;
     }();
     (void)registered;

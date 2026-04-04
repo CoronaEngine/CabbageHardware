@@ -50,5 +50,5 @@ class DefaultScenario final : public ScenarioHooks
 // 场景工厂：供注册表调用创建实例。
 std::unique_ptr<ScenarioHooks> create_default_scenario(const RuntimeConfig &config);
 
-// 注册内置场景（default 与 hello_triangle）。
+// 注册默认场景（default）。
 void register_default_scenario();
