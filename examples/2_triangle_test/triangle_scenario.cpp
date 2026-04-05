@@ -243,7 +243,7 @@ std::unique_ptr<ScenarioHooks> create_triangle_scenario(const RuntimeConfig &con
 void register_triangle_scenario()
 {
     static const bool registered = [] {
-        register_scenario("hello_triangle", create_triangle_scenario);
+        register_scenario("triangle", create_triangle_scenario);
         return true;
     }();
     (void)registered;
