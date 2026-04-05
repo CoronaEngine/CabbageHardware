@@ -1,4 +1,4 @@
-#include "triangle_scenario.h"
+﻿#include "triangle_scenario.h"
 
 #include <array>
 #include <cmath>

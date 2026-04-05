@@ -5,11 +5,11 @@
 #include "../runtime_config.h"
 #include "../scenario.h"
 
-class TriangleScenario final : public ScenarioHooks
+class TextureScenario final : public ScenarioHooks
 {
   public:
-    explicit TriangleScenario(const RuntimeConfig &config);
-    ~TriangleScenario() override;
+    explicit TextureScenario(const RuntimeConfig &config);
+    ~TextureScenario() override;
 
     std::string name() const override;
 
@@ -39,6 +39,6 @@ class TriangleScenario final : public ScenarioHooks
     std::unique_ptr<Impl> impl_;
 };
 
-std::unique_ptr<ScenarioHooks> create_triangle_scenario(const RuntimeConfig &config);
+std::unique_ptr<ScenarioHooks> create_texture_scenario(const RuntimeConfig &config);
 
-void register_triangle_scenario();
+void register_texture_scenario();
