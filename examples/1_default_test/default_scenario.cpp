@@ -1,4 +1,4 @@
-#include "default_scenario.h"
+﻿#include "default_scenario.h"
 
 #include <array>
 #include <memory>
@@ -26,7 +26,7 @@ struct VertexAttributeProxy
     EmbeddedShader::Float3 color;
 };
 
-struct SceneVertex
+struct DefaultVertex
 {
     std::array<float, 3> position{};
     std::array<float, 3> color{};
@@ -34,15 +34,15 @@ struct SceneVertex
 
 struct DefaultMeshPayload
 {
-    std::vector<std::vector<SceneVertex>> transformed_vertices_per_object;
+    std::vector<std::vector<DefaultVertex>> transformed_vertices_per_object;
 };
 
 constexpr std::size_t kDefaultObjectCount = 20;
 constexpr uint32_t kComputeGroupSize = 8;
 
-static std::vector<SceneVertex> make_simple_vertices_from_cube_data()
+static std::vector<DefaultVertex> make_vertices_from_cube_data()
 {
-    std::vector<SceneVertex> result;
+    std::vector<DefaultVertex> result;
     result.reserve(vertices.size());
     for (const auto &vertex : vertices)
     {
@@ -51,14 +51,13 @@ static std::vector<SceneVertex> make_simple_vertices_from_cube_data()
     return result;
 }
 
-static std::vector<SceneVertex> transform_vertices_for_object(const std::vector<SceneVertex> &source,
-                                                               const ktm::fmat4x4 &mvp)
+static std::vector<DefaultVertex> transform_vertices_for_object(const std::vector<DefaultVertex> &source,
+                                                                const ktm::fmat4x4 &mvp)
 {
     auto transformed = source;
     for (auto &vertex : transformed)
     {
-        ktm::fvec4 clip_position =
-            mvp * ktm::fvec4(vertex.position[0], vertex.position[1], vertex.position[2], 1.0f);
+        ktm::fvec4 clip_position = mvp * ktm::fvec4(vertex.position[0], vertex.position[1], vertex.position[2], 1.0f);
         float inverse_w = 1.0f / clip_position[3];
         vertex.position = {clip_position[0] * inverse_w,
                            clip_position[1] * inverse_w,
@@ -91,16 +90,19 @@ struct DefaultScenario::Impl
         auto &mutable_output_image = const_cast<HardwareImage &>(output_image);
         edsl_output = mutable_output_image;
 
-        auto vertex_shader = [&](Aggregate<VertexAttributeProxy> vertex) -> Float4 {
+        auto vertex_shader = [&](Aggregate<VertexAttributeProxy> vertex) -> Float4 
+        {
             position() = Float4(vertex->position, 1.0f);
             return Float4(vertex->color, 1.0f);
         };
 
-        auto fragment_shader = [&](Float4 interpolated_color) -> Float4 {
+        auto fragment_shader = [&](Float4 interpolated_color) -> Float4 
+        {
             return interpolated_color;
         };
 
-        auto aces_filmic_tone_map_curve = [&](Float3 x) {
+        auto aces_filmic_tone_map_curve = [&](Float3 x) 
+        {
             Float a = 2.51f;
             Float b = 0.03f;
             Float c = 2.43f;
@@ -109,7 +111,8 @@ struct DefaultScenario::Impl
             return clamp((x * (a * x + b)) / (x * (c * x + d) + e), ktm::fvec3(0.0f), ktm::fvec3(1.0f));
         };
 
-        auto compute_shader = [&] {
+        auto compute_shader = [&] 
+        {
             Float4 color = edsl_output[dispatchThreadID()->xy()];
             edsl_output[dispatchThreadID()->xy()] = Float4(aces_filmic_tone_map_curve(color->xyz()), 1.0f);
         };
@@ -139,8 +142,8 @@ struct DefaultScenario::Impl
     }
 
     RuntimeConfig config;
-    std::vector<SceneVertex> vertices;
-    std::vector<ktm::fmat4x4> base_model_matrices;
+    std::vector<DefaultVertex> vertices;
+    std::vector<ktm::fmat4x4> model_matrices;
     ktm::fmat4x4 vp_matrix{};
     Clock::time_point start_time{};
     bool initialized{false};
@@ -171,7 +174,7 @@ bool DefaultScenario::init(const RuntimeConfig &config,
                            std::string &error_message)
 {
     impl_->config = config;
-    impl_->vertices = make_simple_vertices_from_cube_data();
+    impl_->vertices = make_vertices_from_cube_data();
 
     auto view_matrix = ktm::look_at_lh(ktm::fvec3(2.0f, 2.0f, 2.0f),
                                        ktm::fvec3(0.0f, 0.0f, 0.0f),
@@ -180,13 +183,12 @@ bool DefaultScenario::init(const RuntimeConfig &config,
     auto projection_matrix = ktm::perspective_lh(ktm::radians(45.0f), aspect_ratio, 0.1f, 10.0f);
     impl_->vp_matrix = projection_matrix * view_matrix;
 
-    impl_->base_model_matrices.resize(kDefaultObjectCount);
+    impl_->model_matrices.resize(kDefaultObjectCount);
     for (std::size_t i = 0; i < kDefaultObjectCount; ++i)
     {
-        impl_->base_model_matrices[i] =
-            ktm::translate3d(ktm::fvec3(static_cast<float>(i % 5) - 2.0f, static_cast<float>(i / 5) - 0.5f, 0.0f))
-            * ktm::scale3d(ktm::fvec3(0.1f, 0.1f, 0.1f))
-            * ktm::rotate3d_axis(ktm::radians(static_cast<float>(i) * 30.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
+        impl_->model_matrices[i] = ktm::translate3d(ktm::fvec3(static_cast<float>(i % 5) - 2.0f, static_cast<float>(i / 5) - 0.5f, 0.0f)) * 
+                                   ktm::scale3d(ktm::fvec3(0.1f, 0.1f, 0.1f)) * 
+                                   ktm::rotate3d_axis(ktm::radians(static_cast<float>(i) * 30.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
     }
 
     impl_->ensure_edsl_pipeline(outputs[0]);
@@ -209,13 +211,12 @@ std::shared_ptr<const void> DefaultScenario::mesh_tick(uint64_t frame_id,
 
     float current_time = std::chrono::duration<float, std::chrono::seconds::period>(now - impl_->start_time).count();
     auto payload = std::make_shared<DefaultMeshPayload>();
-    payload->transformed_vertices_per_object.reserve(impl_->base_model_matrices.size());
+    payload->transformed_vertices_per_object.reserve(impl_->model_matrices.size());
 
-    for (const auto &base_model : impl_->base_model_matrices)
+    for (const auto &base_model : impl_->model_matrices)
     {
         auto model = base_model * ktm::rotate3d_axis(current_time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
-        payload->transformed_vertices_per_object.push_back(
-            transform_vertices_for_object(impl_->vertices, impl_->vp_matrix * model));
+        payload->transformed_vertices_per_object.push_back(transform_vertices_for_object(impl_->vertices, impl_->vp_matrix * model));
     }
 
     return payload;
@@ -243,11 +244,8 @@ bool DefaultScenario::render_edsl_tick(const MeshFrame &mesh_frame,
         impl_->edsl_rasterizer->record(*impl_->edsl_index_buffer, vertex_buffer);
     }
 
-    executor << (*impl_->edsl_rasterizer)(static_cast<uint16_t>(impl_->config.window_width),
-                                          static_cast<uint16_t>(impl_->config.window_height))
-             << (*impl_->edsl_compute)(compute_group_count(impl_->config.window_width, kComputeGroupSize),
-                                       compute_group_count(impl_->config.window_height, kComputeGroupSize),
-                                       1u)
+    executor << (*impl_->edsl_rasterizer)(static_cast<uint16_t>(impl_->config.window_width), static_cast<uint16_t>(impl_->config.window_height))
+             << (*impl_->edsl_compute)(compute_group_count(impl_->config.window_width, kComputeGroupSize), compute_group_count(impl_->config.window_height, kComputeGroupSize), 1u)
              << executor.commit();
     return true;
 }
@@ -274,11 +272,8 @@ bool DefaultScenario::render_glsl_tick(const MeshFrame &mesh_frame,
         impl_->glsl_rasterizer->record(*impl_->glsl_index_buffer, vertex_buffer);
     }
 
-    executor << (*impl_->glsl_rasterizer)(static_cast<uint16_t>(impl_->config.window_width),
-                                          static_cast<uint16_t>(impl_->config.window_height))
-             << (*impl_->glsl_compute)(compute_group_count(impl_->config.window_width, kComputeGroupSize),
-                                       compute_group_count(impl_->config.window_height, kComputeGroupSize),
-                                       1u)
+    executor << (*impl_->glsl_rasterizer)(static_cast<uint16_t>(impl_->config.window_width), static_cast<uint16_t>(impl_->config.window_height))
+             << (*impl_->glsl_compute)(compute_group_count(impl_->config.window_width, kComputeGroupSize), compute_group_count(impl_->config.window_height, kComputeGroupSize), 1u)
              << executor.commit();
     return true;
 }

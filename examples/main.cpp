@@ -24,7 +24,7 @@
 
 #include "1_default_test/default_scenario.h"
 #include "2_triangle_test/triangle_scenario.h"
-#include "3_texture_test/texture_scenario.h"
+//#include "3_texture_test/texture_scenario.h"
 
 struct RuntimeStats
 {
@@ -125,7 +125,7 @@ int main(int argc, char **argv)
 
     register_default_scenario();
     register_triangle_scenario();
-    register_texture_scenario();
+    //register_texture_scenario();
 
     // 2 初始化窗口与输出图像。
     if (glfwInit() < 0)
@@ -293,8 +293,7 @@ int main(int argc, char **argv)
                 std::string render_error;
                 if (!scenario->render_edsl_tick(mesh_frame.value(), executors[0], final_output_images[0], render_error))
                 {
-                    set_error_and_stop("RenderThreadEDSL",
-                                       render_error.empty() ? "render_edsl_tick failed" : render_error);
+                    set_error_and_stop("RenderThreadEDSL", render_error.empty() ? "render_edsl_tick failed" : render_error);
                     break;
                 }
 
@@ -334,8 +333,7 @@ int main(int argc, char **argv)
                 std::string render_error;
                 if (!scenario->render_glsl_tick(mesh_frame.value(), executors[1], final_output_images[1], render_error))
                 {
-                    set_error_and_stop("RenderThreadGLSL",
-                                       render_error.empty() ? "render_glsl_tick failed" : render_error);
+                    set_error_and_stop("RenderThreadGLSL", render_error.empty() ? "render_glsl_tick failed" : render_error);
                     break;
                 }
 
@@ -400,9 +398,7 @@ int main(int argc, char **argv)
                     if (latest_edsl.has_value())
                     {
                         stats.latest_edsl_frame_id.store(latest_edsl_frame->frame_id, std::memory_order_relaxed);
-                        auto latency_us = std::chrono::duration_cast<std::chrono::microseconds>(
-                                              now - latest_edsl_frame->submit_timestamp)
-                                             .count();
+                        auto latency_us = std::chrono::duration_cast<std::chrono::microseconds>(now - latest_edsl_frame->submit_timestamp).count();
                         stats.edsl_latency_us_total.fetch_add(static_cast<uint64_t>(latency_us), std::memory_order_relaxed);
                         stats.edsl_display_frames.fetch_add(1, std::memory_order_relaxed);
                     }
@@ -418,9 +414,7 @@ int main(int argc, char **argv)
                     if (latest_glsl.has_value())
                     {
                         stats.latest_glsl_frame_id.store(latest_glsl_frame->frame_id, std::memory_order_relaxed);
-                        auto latency_us = std::chrono::duration_cast<std::chrono::microseconds>(
-                                              now - latest_glsl_frame->submit_timestamp)
-                                             .count();
+                        auto latency_us = std::chrono::duration_cast<std::chrono::microseconds>(now - latest_glsl_frame->submit_timestamp).count();
                         stats.glsl_latency_us_total.fetch_add(static_cast<uint64_t>(latency_us), std::memory_order_relaxed);
                         stats.glsl_display_frames.fetch_add(1, std::memory_order_relaxed);
                     }
@@ -486,14 +480,8 @@ int main(int argc, char **argv)
 
                 uint64_t edsl_displayed = stats.edsl_display_frames.load(std::memory_order_relaxed);
                 uint64_t glsl_displayed = stats.glsl_display_frames.load(std::memory_order_relaxed);
-                double avg_edsl_latency_ms = (edsl_displayed == 0)
-                                                 ? 0.0
-                                                 : static_cast<double>(stats.edsl_latency_us_total.load(std::memory_order_relaxed)) / 1000.0 /
-                                                       static_cast<double>(edsl_displayed);
-                double avg_glsl_latency_ms = (glsl_displayed == 0)
-                                                 ? 0.0
-                                                 : static_cast<double>(stats.glsl_latency_us_total.load(std::memory_order_relaxed)) / 1000.0 /
-                                                       static_cast<double>(glsl_displayed);
+                double avg_edsl_latency_ms = (edsl_displayed == 0) ? 0.0 : static_cast<double>(stats.edsl_latency_us_total.load(std::memory_order_relaxed)) / 1000.0 / static_cast<double>(edsl_displayed);
+                double avg_glsl_latency_ms = (glsl_displayed == 0) ? 0.0 : static_cast<double>(stats.glsl_latency_us_total.load(std::memory_order_relaxed)) / 1000.0 / static_cast<double>(glsl_displayed);
 
                 std::cout << "[Stats] meshFPS=" << mesh_fps
                           << " edslRenderFPS=" << edsl_fps

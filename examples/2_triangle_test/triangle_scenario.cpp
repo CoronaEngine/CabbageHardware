@@ -11,6 +11,7 @@
 #include "Codegen/BuiltinVariate.h"
 #include "Codegen/CustomLibrary.h"
 #include "Codegen/TypeAlias.h"
+#include "triangle_data.h"
 #include "../scenario_registry.h"
 
 #ifndef HELICON_STRINGIZE_
@@ -42,11 +43,13 @@ struct TrianglePayload
 
 static std::vector<TriangleVertex> make_triangle_vertices()
 {
-    return {
-        {{{0.0f, -0.55f, 0.0f}}, {{1.0f, 0.25f, 0.25f}}},
-        {{{0.58f, 0.45f, 0.0f}}, {{0.2f, 1.0f, 0.3f}}},
-        {{{-0.58f, 0.45f, 0.0f}}, {{0.25f, 0.45f, 1.0f}}},
-    };
+    std::vector<TriangleVertex> result;
+    result.reserve(vertices.size());
+    for (const auto &vertex : vertices)
+    {
+        result.push_back({vertex.position, vertex.color});
+    }
+    return result;
 }
 
 static std::vector<TriangleVertex> rotate_vertices_z(const std::vector<TriangleVertex> &source, float radians)
@@ -190,8 +193,7 @@ bool TriangleScenario::render_edsl_tick(const MeshFrame &mesh_frame,
     HardwareBuffer vertex_buffer(payload->vertices, BufferUsage::VertexBuffer);
     impl_->edsl_rasterizer->record(*impl_->edsl_index_buffer, vertex_buffer);
 
-    executor << (*impl_->edsl_rasterizer)(static_cast<uint16_t>(impl_->config.window_width),
-                                          static_cast<uint16_t>(impl_->config.window_height))
+    executor << (*impl_->edsl_rasterizer)(static_cast<uint16_t>(impl_->config.window_width), static_cast<uint16_t>(impl_->config.window_height))
              << executor.commit();
     return true;
 }
@@ -215,8 +217,7 @@ bool TriangleScenario::render_glsl_tick(const MeshFrame &mesh_frame,
     HardwareBuffer vertex_buffer(payload->vertices, BufferUsage::VertexBuffer);
     impl_->glsl_rasterizer->record(*impl_->glsl_index_buffer, vertex_buffer);
 
-    executor << (*impl_->glsl_rasterizer)(static_cast<uint16_t>(impl_->config.window_width),
-                                          static_cast<uint16_t>(impl_->config.window_height))
+    executor << (*impl_->glsl_rasterizer)(static_cast<uint16_t>(impl_->config.window_width), static_cast<uint16_t>(impl_->config.window_height))
              << executor.commit();
     return true;
 }
