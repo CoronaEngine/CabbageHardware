@@ -14,11 +14,11 @@
 #include "Codegen/CustomLibrary.h"
 #include "Codegen/TypeAlias.h"
 #include "cube_data.h"
-#include "scenario_registry.h"
+#include "../scenario_registry.h"
 
-#include GLSL(vert.glsl)
-#include GLSL(frag.glsl)
-#include GLSL(compute.glsl)
+#include GLSL(default_vert.glsl)
+#include GLSL(default_frag.glsl)
+#include GLSL(default_compute.glsl)
 
 struct VertexAttributeProxy
 {
@@ -26,7 +26,7 @@ struct VertexAttributeProxy
     EmbeddedShader::Float3 color;
 };
 
-struct SimpleVertex
+struct SceneVertex
 {
     std::array<float, 3> position{};
     std::array<float, 3> color{};
@@ -34,15 +34,15 @@ struct SimpleVertex
 
 struct DefaultMeshPayload
 {
-    std::vector<std::vector<SimpleVertex>> transformed_vertices_per_object;
+    std::vector<std::vector<SceneVertex>> transformed_vertices_per_object;
 };
 
 constexpr std::size_t kDefaultObjectCount = 20;
 constexpr uint32_t kComputeGroupSize = 8;
 
-static std::vector<SimpleVertex> make_simple_vertices_from_cube_data()
+static std::vector<SceneVertex> make_simple_vertices_from_cube_data()
 {
-    std::vector<SimpleVertex> result;
+    std::vector<SceneVertex> result;
     result.reserve(vertices.size());
     for (const auto &vertex : vertices)
     {
@@ -51,7 +51,7 @@ static std::vector<SimpleVertex> make_simple_vertices_from_cube_data()
     return result;
 }
 
-static std::vector<SimpleVertex> transform_vertices_for_object(const std::vector<SimpleVertex> &source,
+static std::vector<SceneVertex> transform_vertices_for_object(const std::vector<SceneVertex> &source,
                                                                const ktm::fmat4x4 &mvp)
 {
     auto transformed = source;
@@ -128,18 +128,18 @@ struct DefaultScenario::Impl
             return;
         }
 
-        glsl_rasterizer = std::make_unique<RasterizerPipeline<vert_glsl, frag_glsl>>();
+        glsl_rasterizer = std::make_unique<RasterizerPipeline<default_vert_glsl, default_frag_glsl>>();
         auto &mutable_output_image = const_cast<HardwareImage &>(output_image);
         glsl_rasterizer->outColor = mutable_output_image;
 
-        glsl_compute = std::make_unique<ComputePipeline<compute_glsl>>();
+        glsl_compute = std::make_unique<ComputePipeline<default_compute_glsl>>();
         glsl_compute->GlobalUniformParam.imageID = mutable_output_image.storeDescriptor();
 
         glsl_index_buffer = std::make_unique<HardwareBuffer>(indices, BufferUsage::IndexBuffer);
     }
 
     RuntimeConfig config;
-    std::vector<SimpleVertex> simple_vertices;
+    std::vector<SceneVertex> vertices;
     std::vector<ktm::fmat4x4> base_model_matrices;
     ktm::fmat4x4 vp_matrix{};
     Clock::time_point start_time{};
@@ -152,8 +152,8 @@ struct DefaultScenario::Impl
     std::unique_ptr<HardwareBuffer> edsl_index_buffer;
 
     std::mutex glsl_mutex;
-    std::unique_ptr<RasterizerPipeline<vert_glsl, frag_glsl>> glsl_rasterizer;
-    std::unique_ptr<ComputePipeline<compute_glsl>> glsl_compute;
+    std::unique_ptr<RasterizerPipeline<default_vert_glsl, default_frag_glsl>> glsl_rasterizer;
+    std::unique_ptr<ComputePipeline<default_compute_glsl>> glsl_compute;
     std::unique_ptr<HardwareBuffer> glsl_index_buffer;
 };
 
@@ -170,14 +170,8 @@ bool DefaultScenario::init(const RuntimeConfig &config,
                            const std::array<HardwareImage, 2> &outputs,
                            std::string &error_message)
 {
-    if (config.data_set != "cube")
-    {
-        error_message = "Unsupported dataset for default scenario: " + config.data_set;
-        return false;
-    }
-
     impl_->config = config;
-    impl_->simple_vertices = make_simple_vertices_from_cube_data();
+    impl_->vertices = make_simple_vertices_from_cube_data();
 
     auto view_matrix = ktm::look_at_lh(ktm::fvec3(2.0f, 2.0f, 2.0f),
                                        ktm::fvec3(0.0f, 0.0f, 0.0f),
@@ -221,7 +215,7 @@ std::shared_ptr<const void> DefaultScenario::mesh_tick(uint64_t frame_id,
     {
         auto model = base_model * ktm::rotate3d_axis(current_time * ktm::radians(90.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
         payload->transformed_vertices_per_object.push_back(
-            transform_vertices_for_object(impl_->simple_vertices, impl_->vp_matrix * model));
+            transform_vertices_for_object(impl_->vertices, impl_->vp_matrix * model));
     }
 
     return payload;

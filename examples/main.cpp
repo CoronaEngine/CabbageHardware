@@ -22,8 +22,8 @@
 #include "scenario.h"
 #include "scenario_registry.h"
 
-#include "default_scenario.h"
-#include "hello_triangle/hello_triangle_scenario.h"
+#include "1_default_test/default_scenario.h"
+#include "2_triangle_test/triangle_scenario.h"
 
 struct RuntimeStats
 {
@@ -123,7 +123,7 @@ int main(int argc, char **argv)
     }
 
     register_default_scenario();
-    register_hello_triangle_scenario();
+    register_triangle_scenario();
 
     // 2 初始化窗口与输出图像。
     if (glfwInit() < 0)

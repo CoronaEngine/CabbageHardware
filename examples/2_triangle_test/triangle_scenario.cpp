@@ -1,4 +1,4 @@
-#include "hello_triangle_scenario.h"
+#include "triangle_scenario.h"
 
 #include <array>
 #include <cmath>
@@ -20,27 +20,27 @@
 #define GLSL(path) HELICON_STRINGIZE_(path.hpp)
 #endif
 
-#include GLSL(ht_vert.glsl)
-#include GLSL(ht_frag.glsl)
+#include GLSL(triangle_vert.glsl)
+#include GLSL(triangle_frag.glsl)
 
-struct HelloTriangleVertexAttributeProxy
+struct TriangleVertexAttributeProxy
 {
     EmbeddedShader::Float3 position;
     EmbeddedShader::Float3 color;
 };
 
-struct HelloTriangleVertex
+struct TriangleVertex
 {
     std::array<float, 3> position{};
     std::array<float, 3> color{};
 };
 
-struct HelloTrianglePayload
+struct TrianglePayload
 {
-    std::vector<HelloTriangleVertex> vertices;
+    std::vector<TriangleVertex> vertices;
 };
 
-static std::vector<HelloTriangleVertex> make_triangle_vertices()
+static std::vector<TriangleVertex> make_triangle_vertices()
 {
     return {
         {{{0.0f, -0.55f, 0.0f}}, {{1.0f, 0.25f, 0.25f}}},
@@ -49,7 +49,7 @@ static std::vector<HelloTriangleVertex> make_triangle_vertices()
     };
 }
 
-static std::vector<HelloTriangleVertex> rotate_vertices_z(const std::vector<HelloTriangleVertex> &source, float radians)
+static std::vector<TriangleVertex> rotate_vertices_z(const std::vector<TriangleVertex> &source, float radians)
 {
     const float cos_v = std::cos(radians);
     const float sin_v = std::sin(radians);
@@ -65,7 +65,7 @@ static std::vector<HelloTriangleVertex> rotate_vertices_z(const std::vector<Hell
     return rotated;
 }
 
-struct HelloTriangleScenario::Impl
+struct TriangleScenario::Impl
 {
     explicit Impl(RuntimeConfig cfg) : config(std::move(cfg)) {}
 
@@ -83,7 +83,7 @@ struct HelloTriangleScenario::Impl
         auto &mutable_output_image = const_cast<HardwareImage &>(output_image);
         edsl_output = mutable_output_image;
 
-        auto vertex_shader = [&](Aggregate<HelloTriangleVertexAttributeProxy> vertex) -> Float4 {
+        auto vertex_shader = [&](Aggregate<TriangleVertexAttributeProxy> vertex) -> Float4 {
             position() = Float4(vertex->position, 1.0f);
             return Float4(vertex->color, 1.0f);
         };
@@ -105,14 +105,14 @@ struct HelloTriangleScenario::Impl
             return;
         }
 
-        glsl_rasterizer = std::make_unique<RasterizerPipeline<ht_vert_glsl, ht_frag_glsl>>();
+        glsl_rasterizer = std::make_unique<RasterizerPipeline<triangle_vert_glsl, triangle_frag_glsl>>();
         auto &mutable_output_image = const_cast<HardwareImage &>(output_image);
         glsl_rasterizer->outColor = mutable_output_image;
         glsl_index_buffer = std::make_unique<HardwareBuffer>(triangle_indices, BufferUsage::IndexBuffer);
     }
 
     RuntimeConfig config;
-    std::vector<HelloTriangleVertex> base_vertices;
+    std::vector<TriangleVertex> base_vertices;
     Clock::time_point start_time{};
     bool initialized{false};
 
@@ -122,24 +122,24 @@ struct HelloTriangleScenario::Impl
     std::unique_ptr<HardwareBuffer> edsl_index_buffer;
 
     std::mutex glsl_mutex;
-    std::unique_ptr<RasterizerPipeline<ht_vert_glsl, ht_frag_glsl>> glsl_rasterizer;
+    std::unique_ptr<RasterizerPipeline<triangle_vert_glsl, triangle_frag_glsl>> glsl_rasterizer;
     std::unique_ptr<HardwareBuffer> glsl_index_buffer;
 
     static inline const std::array<uint16_t, 3> triangle_indices = {0, 1, 2};
 };
 
-HelloTriangleScenario::HelloTriangleScenario(const RuntimeConfig &config) : impl_(std::make_unique<Impl>(config)) {}
+TriangleScenario::TriangleScenario(const RuntimeConfig &config) : impl_(std::make_unique<Impl>(config)) {}
 
-HelloTriangleScenario::~HelloTriangleScenario() = default;
+TriangleScenario::~TriangleScenario() = default;
 
-std::string HelloTriangleScenario::name() const
+std::string TriangleScenario::name() const
 {
     return "hello_triangle";
 }
 
-bool HelloTriangleScenario::init(const RuntimeConfig &config,
-                                 const std::array<HardwareImage, 2> &outputs,
-                                 std::string &error_message)
+bool TriangleScenario::init(const RuntimeConfig &config,
+                            const std::array<HardwareImage, 2> &outputs,
+                            std::string &error_message)
 {
     (void)error_message;
 
@@ -152,9 +152,9 @@ bool HelloTriangleScenario::init(const RuntimeConfig &config,
     return true;
 }
 
-std::shared_ptr<const void> HelloTriangleScenario::mesh_tick(uint64_t frame_id,
-                                                             Clock::time_point now,
-                                                             std::string &error_message)
+std::shared_ptr<const void> TriangleScenario::mesh_tick(uint64_t frame_id,
+                                                        Clock::time_point now,
+                                                        std::string &error_message)
 {
     (void)frame_id;
     if (!impl_->initialized)
@@ -163,19 +163,18 @@ std::shared_ptr<const void> HelloTriangleScenario::mesh_tick(uint64_t frame_id,
         return nullptr;
     }
 
-    const float elapsed_seconds =
-        std::chrono::duration<float, std::chrono::seconds::period>(now - impl_->start_time).count();
+    const float elapsed_seconds = std::chrono::duration<float, std::chrono::seconds::period>(now - impl_->start_time).count();
     const float rotation_radians = elapsed_seconds * 0.75f;
 
-    auto payload = std::make_shared<HelloTrianglePayload>();
+    auto payload = std::make_shared<TrianglePayload>();
     payload->vertices = rotate_vertices_z(impl_->base_vertices, rotation_radians);
     return payload;
 }
 
-bool HelloTriangleScenario::render_edsl_tick(const MeshFrame &mesh_frame,
-                                             HardwareExecutor &executor,
-                                             const HardwareImage &output_image,
-                                             std::string &error_message)
+bool TriangleScenario::render_edsl_tick(const MeshFrame &mesh_frame,
+                                        HardwareExecutor &executor,
+                                        const HardwareImage &output_image,
+                                        std::string &error_message)
 {
     if (!mesh_frame.payload)
     {
@@ -187,7 +186,7 @@ bool HelloTriangleScenario::render_edsl_tick(const MeshFrame &mesh_frame,
         impl_->ensure_edsl_pipeline(output_image);
     }
 
-    auto payload = std::static_pointer_cast<const HelloTrianglePayload>(mesh_frame.payload);
+    auto payload = std::static_pointer_cast<const TrianglePayload>(mesh_frame.payload);
     HardwareBuffer vertex_buffer(payload->vertices, BufferUsage::VertexBuffer);
     impl_->edsl_rasterizer->record(*impl_->edsl_index_buffer, vertex_buffer);
 
@@ -197,7 +196,7 @@ bool HelloTriangleScenario::render_edsl_tick(const MeshFrame &mesh_frame,
     return true;
 }
 
-bool HelloTriangleScenario::render_glsl_tick(const MeshFrame &mesh_frame,
+bool TriangleScenario::render_glsl_tick(const MeshFrame &mesh_frame,
                                              HardwareExecutor &executor,
                                              const HardwareImage &output_image,
                                              std::string &error_message)
@@ -212,7 +211,7 @@ bool HelloTriangleScenario::render_glsl_tick(const MeshFrame &mesh_frame,
         impl_->ensure_glsl_pipeline(output_image);
     }
 
-    auto payload = std::static_pointer_cast<const HelloTrianglePayload>(mesh_frame.payload);
+    auto payload = std::static_pointer_cast<const TrianglePayload>(mesh_frame.payload);
     HardwareBuffer vertex_buffer(payload->vertices, BufferUsage::VertexBuffer);
     impl_->glsl_rasterizer->record(*impl_->glsl_index_buffer, vertex_buffer);
 
@@ -222,12 +221,12 @@ bool HelloTriangleScenario::render_glsl_tick(const MeshFrame &mesh_frame,
     return true;
 }
 
-void HelloTriangleScenario::display_tick(const RenderFrame &render_frame)
+void TriangleScenario::display_tick(const RenderFrame &render_frame)
 {
     (void)render_frame;
 }
 
-void HelloTriangleScenario::shutdown()
+void TriangleScenario::shutdown()
 {
     impl_->edsl_index_buffer.reset();
     impl_->glsl_index_buffer.reset();
@@ -236,15 +235,15 @@ void HelloTriangleScenario::shutdown()
     impl_->initialized = false;
 }
 
-std::unique_ptr<ScenarioHooks> create_hello_triangle_scenario(const RuntimeConfig &config)
+std::unique_ptr<ScenarioHooks> create_triangle_scenario(const RuntimeConfig &config)
 {
-    return std::make_unique<HelloTriangleScenario>(config);
+    return std::make_unique<TriangleScenario>(config);
 }
 
-void register_hello_triangle_scenario()
+void register_triangle_scenario()
 {
     static const bool registered = [] {
-        register_scenario("hello_triangle", create_hello_triangle_scenario);
+        register_scenario("hello_triangle", create_triangle_scenario);
         return true;
     }();
     (void)registered;
