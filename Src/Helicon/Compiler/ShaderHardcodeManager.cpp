@@ -4,6 +4,7 @@
 #include <filesystem>
 
 #include <Compiler/ShaderHardcodeManager.h>
+#include <Compiler/ShaderUtils.h>
 
 #ifndef CABBAGE_ENGINE_DEBUG
 #include <Compiler/HardcodeShaders/HardcodeShaders.h>
@@ -50,10 +51,7 @@ namespace EmbeddedShader
 		std::fstream hardcodeShaderFile(hardcodePath / ("HardcodeShaders" + targetName + ".cpp"), std::ios::out | std::ios::in);
 		hardcodeShaderFile.seekg(-static_cast<int>(sizeof("};")), std::ios::end);
 		hardcodeShaderFile << "{\"" + itemName + "\", std::vector<uint32_t>{";
-		for (uint32_t code : shaderCode)
-		{
-			hardcodeShaderFile << code << ",";
-		}
+		emitSpirVLiteral(hardcodeShaderFile, shaderCode);
 		hardcodeShaderFile << "}}," << std::endl;
 		hardcodeShaderFile << "};";
 
@@ -66,7 +64,7 @@ namespace EmbeddedShader
 
 		std::fstream hardcodeShaderFile(hardcodePath / ("HardcodeShaders" + targetName + ".cpp"), std::ios::out | std::ios::in);
 		hardcodeShaderFile.seekg(-static_cast<int>(sizeof("};")), std::ios::end);
-		hardcodeShaderFile << "{\"" + itemName + "\", " + getShaderResourceOutput(shaderResource) + "}," << std::endl;
+		hardcodeShaderFile << "{\"" + itemName + "\", " + serializeShaderResources(shaderResource) + "}," << std::endl;
 		hardcodeShaderFile << "};";
 	}
 #endif
@@ -164,35 +162,7 @@ std::unordered_map<std::string, std::variant<EmbeddedShader::ShaderCodeModule::S
 		}
 	}
 
-	std::string ShaderHardcodeManager::getShaderResourceOutput(const ShaderCodeModule::ShaderResources& shaderResources)
-	{
-		std::stringstream result;
-		result << "ShaderCodeModule::ShaderResources{";
-		result << shaderResources.pushConstantSize << ",";
-		result << "\"" << shaderResources.pushConstantName << "\",";
-		result << shaderResources.uniformBufferSize << ",";
-		result << "\"" << shaderResources.uniformBufferName << "\",";
-		result << "{";
-		for (const auto& bindInfo: shaderResources.bindInfoPool)
-		{
-			result << "{";
-			result << bindInfo.set << ",";
-			result << bindInfo.binding << ",";
-			result << bindInfo.location << ",";
-			result << "\"" << bindInfo.semantic << "\",";
-			result << "\"" << bindInfo.variateName << "\",";
-			result << "\"" << bindInfo.typeName << "\",";
-			result << bindInfo.elementCount << ",";
-			result << bindInfo.typeSize << ",";
-			result << bindInfo.byteOffset << ",";
-			result << "static_cast<EmbeddedShader::ShaderCodeModule::ShaderResources::BindType>(" << bindInfo.bindType << ")";
-			result << "},";
-		}
-		result << "}";
-
-		result << "}";
-		return result.str();
-	}
+	// getShaderResourceOutput() has been consolidated into serializeShaderResources() in ShaderUtils.h
 
 	std::string ShaderHardcodeManager::getSourceLocationString(const std::source_location& sourceLocation)
 	{
@@ -210,11 +180,6 @@ std::unordered_map<std::string, std::variant<EmbeddedShader::ShaderCodeModule::S
 				throw std::runtime_error("Failed to resolve source path.");
 			}
 		}
-		std::ranges::replace(fileName, '\\', '_');
-		std::ranges::replace(fileName, '/', '_');
-		std::ranges::replace(fileName, '.', '_');
-		std::ranges::replace(fileName, ':', '_');
-
-		return fileName;
+		return sanitizePath(fileName);
 	}
 }
