@@ -742,7 +742,7 @@ namespace EmbeddedShader
 	    }
 
 	    Slang::ComPtr<slang::IComponentType> program = composedProgram;
-	    if (true) {
+	    if (isEnabledLink) {
 	        // 6. Link
 	        Slang::ComPtr<slang::IBlob> diagnosticsBlob;
 	        SlangResult result = composedProgram->link(
@@ -759,7 +759,7 @@ namespace EmbeddedShader
 			Slang::ComPtr<slang::IBlob> targetCodeBlob;
 			Slang::ComPtr<slang::IBlob> diagnosticsBlob;
 			SlangResult result = program->getEntryPointCode(
-				0,
+			    0,
 				static_cast<SlangInt>(i),
 				targetCodeBlob.writeRef(),
 				diagnosticsBlob.writeRef());
@@ -779,8 +779,8 @@ namespace EmbeddedShader
 		{
 			Slang::ComPtr<slang::IBlob> targetCodeBlob;
 			Slang::ComPtr<slang::IBlob> diagnosticsBlob;
-			SlangResult result = program->getEntryPointCode(
-				0,
+		    SlangResult result = program->getEntryPointCode(
+                0,
 				static_cast<SlangInt>(i + targetBinary.size()),
 				// Skip the first entry point if there are binary targets
 				targetCodeBlob.writeRef(),
