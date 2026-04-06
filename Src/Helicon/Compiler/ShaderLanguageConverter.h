@@ -67,7 +67,7 @@ namespace EmbeddedShader
             const std::vector<ShaderLanguage> &targetLanguage,
             std::vector<std::vector<uint32_t>> &binaryTargetsOutput,
             std::vector<std::string> &targetsOutput,
-            bool isEnabledReflection);
+            bool isEnabledReflection, bool isEnabledLink = true);
 
 		static std::vector<uint32_t> slangSpirvCompiler(const std::string& shaderCode, Slang::ComPtr<slang::IComponentType>& program);
 #ifdef WIN32
