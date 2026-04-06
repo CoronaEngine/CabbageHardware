@@ -1124,34 +1124,8 @@ int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<Resource
     if (image->bindlessIndex < 0)
     {
         image->bindlessIndex = globalImageStorages.seq_id(image);
-
-        VkDescriptorType descriptorType = (image->imageUsage & VK_IMAGE_USAGE_STORAGE_BIT) ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-
-        VkDescriptorImageInfo imageInfo{};
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-        imageInfo.imageView = image->imageView;
-        imageInfo.sampler = textureSampler;
-
-        VkWriteDescriptorSet write{};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.descriptorType = descriptorType;
-        write.descriptorCount = 1;
-        write.dstArrayElement = image->bindlessIndex;
-        write.pImageInfo = &imageInfo;
-
-        if (write.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-        {
-            write.dstSet = bindlessDescriptors[textureBinding].descriptorSet;
-            write.dstBinding = 0;
-        }
-        if (write.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-        {
-            write.dstSet = bindlessDescriptors[storageImageBinding].descriptorSet;
-            write.dstBinding = 0;
-        }
-
-        vkUpdateDescriptorSets(device->getLogicalDevice(), 1, &write, 0, nullptr);
     }
+    storeDescriptorAt(image, static_cast<uint32_t>(image->bindlessIndex));
 
     return image->bindlessIndex;
 }
@@ -1161,25 +1135,73 @@ int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<Resource
     if (buffer->bindlessIndex < 0)
     {
         buffer->bindlessIndex = globalBufferStorages.seq_id(buffer);
-
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = buffer->bufferHandle;
-        bufferInfo.offset = 0;
-        bufferInfo.range = VK_WHOLE_SIZE;
-
-        VkWriteDescriptorSet writes{};
-        writes.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        writes.descriptorCount = 1;
-        writes.pBufferInfo = &bufferInfo;
-        writes.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        writes.dstArrayElement = buffer->bindlessIndex;
-        writes.dstSet = bindlessDescriptors[storageBufferBinding].descriptorSet;
-        writes.dstBinding = 0;
-
-        vkUpdateDescriptorSets(device->getLogicalDevice(), 1, &writes, 0, nullptr);
     }
+    storeDescriptorAt(buffer, static_cast<uint32_t>(buffer->bindlessIndex));
 
     return buffer->bindlessIndex;
+}
+
+bool ResourceManager::storeDescriptorAt(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle &image, uint32_t descriptorIndex)
+{
+    if (!device || device->getLogicalDevice() == VK_NULL_HANDLE)
+    {
+        return false;
+    }
+
+    VkDescriptorType descriptorType = (image->imageUsage & VK_IMAGE_USAGE_STORAGE_BIT)
+                                          ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
+                                          : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imageInfo.imageView = image->imageView;
+    imageInfo.sampler = textureSampler;
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.descriptorType = descriptorType;
+    write.descriptorCount = 1;
+    write.dstArrayElement = descriptorIndex;
+    write.pImageInfo = &imageInfo;
+
+    if (descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+    {
+        write.dstSet = bindlessDescriptors[textureBinding].descriptorSet;
+        write.dstBinding = 0;
+    }
+    else
+    {
+        write.dstSet = bindlessDescriptors[storageImageBinding].descriptorSet;
+        write.dstBinding = 0;
+    }
+
+    vkUpdateDescriptorSets(device->getLogicalDevice(), 1, &write, 0, nullptr);
+    return true;
+}
+
+bool ResourceManager::storeDescriptorAt(Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle &buffer, uint32_t descriptorIndex)
+{
+    if (!device || device->getLogicalDevice() == VK_NULL_HANDLE)
+    {
+        return false;
+    }
+
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = buffer->bufferHandle;
+    bufferInfo.offset = 0;
+    bufferInfo.range = VK_WHOLE_SIZE;
+
+    VkWriteDescriptorSet writes{};
+    writes.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes.descriptorCount = 1;
+    writes.pBufferInfo = &bufferInfo;
+    writes.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    writes.dstArrayElement = descriptorIndex;
+    writes.dstSet = bindlessDescriptors[storageBufferBinding].descriptorSet;
+    writes.dstBinding = 0;
+
+    vkUpdateDescriptorSets(device->getLogicalDevice(), 1, &writes, 0, nullptr);
+    return true;
 }
 
 ResourceManager &ResourceManager::copyBuffer(VkCommandBuffer &commandBuffer,

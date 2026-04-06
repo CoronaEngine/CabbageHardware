@@ -96,6 +96,23 @@ std::string extractMemberName(const std::string& qualifiedKey)
 	return qualifiedKey;
 }
 
+static bool isDirectResourceBindType(ShaderCodeModule::ShaderResources::BindType bindType)
+{
+	using BindType = ShaderCodeModule::ShaderResources::BindType;
+	switch (bindType)
+	{
+		case BindType::sampledImages:
+		case BindType::texture:
+		case BindType::sampler:
+		case BindType::rawBuffer:
+		case BindType::storageTexture:
+		case BindType::storageBuffer:
+			return true;
+		default:
+			return false;
+	}
+}
+
 std::set<std::string> generateBindingKeys(std::stringstream& out, const std::vector<uint32_t>& spirv, ShaderLanguage lang)
 {
 	auto resources = ShaderLanguageConverter::spirvCrossReflectedBindInfo(spirv, lang);
@@ -147,6 +164,15 @@ std::set<std::string> generateBindingKeys(std::stringstream& out, const std::vec
 			out << "static inline ::EmbeddedShader::BindingKey " << info.variateName
 			    << "{" << info.byteOffset << ", " << info.typeSize
 			    << ", " << static_cast<int32_t>(info.bindType) << ", " << info.location << "};\n";
+	}
+
+	// Descriptor resources (sampled/storage/buffer/sampler) for direct key binding.
+	for (auto& info : resources.bindInfoPool)
+	{
+		if (isDirectResourceBindType(info.bindType))
+			out << "static inline ::EmbeddedShader::BindingKey " << info.variateName
+			    << "{" << info.byteOffset << ", " << info.typeSize
+			    << ", " << static_cast<int32_t>(info.bindType) << ", " << info.binding << "};\n";
 	}
 
 	return bindingBlockNames;
@@ -227,6 +253,18 @@ void generateBindings(std::stringstream& out, const std::vector<uint32_t>& spirv
 		s = emitBlockProxy(out, resources.uniformBufferName,
 		                    ShaderCodeModule::ShaderResources::uniformBufferMembers, resources);
 		if (!s.empty()) initList.push_back(std::move(s));
+
+		for (auto& info : resources.bindInfoPool)
+		{
+			if (!isDirectResourceBindType(info.bindType))
+				continue;
+
+			out << "::EmbeddedShader::BoundField<P> " << info.variateName << ";\n";
+			std::stringstream ss;
+			ss << info.variateName << "(p, " << info.byteOffset << ", " << info.typeSize
+			   << ", " << static_cast<int32_t>(info.bindType) << ", " << info.binding << ")";
+			initList.push_back(ss.str());
+		}
 
 		emitCtorBody(out, "ResourceBindings", initList);
 	}

@@ -179,18 +179,11 @@ if(CABBAGE_HARDWARE_BUILD_EXAMPLES)
     )
     FetchContent_MakeAvailable(glfw)
 
-    add_subdirectory(Examples)
+    add_subdirectory(examples)
 endif()
 
-
 if (MSVC)
-    # ���� AddressSanitizer ����ѡ��
     add_compile_options(/fsanitize=address)
-
-    # ��������������� (Incremental Linking)
-    # ASan ������ /INCREMENTAL
     add_link_options(/INCREMENTAL:NO)
-    
-    # (��ѡ) Ϊ�˻�ø��õĶ�ջ׷����Ϣ�����Լ������
     add_compile_options(/Zi) 
 endif()

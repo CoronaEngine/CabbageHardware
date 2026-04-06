@@ -125,6 +125,7 @@ void HardwareContext::prepareFeaturesChain()
         features.samplerAnisotropy = VK_TRUE;
         features.shaderInt16 = VK_TRUE;
         features.wideLines = VK_TRUE;
+        features.fragmentStoresAndAtomics = VK_TRUE;
 
         VkPhysicalDeviceVulkan11Features features11{};
         features11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;

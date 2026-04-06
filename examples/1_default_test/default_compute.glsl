@@ -16,7 +16,14 @@ layout(set = 3, binding = 0) uniform GlobalUniformParam
 void main()
 {
     uint imageID = globalParams.imageID;
-    vec4 color = imageLoad(inputImageRGBA16[imageID], ivec2(gl_GlobalInvocationID.xy));
+    imageID = nonuniformEXT(imageID);
+    ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 imageExtent = imageSize(inputImageRGBA16[imageID]);
+    if (pixelCoord.x >= imageExtent.x || pixelCoord.y >= imageExtent.y)
+    {
+        return;
+    }
 
-    imageStore(inputImageRGBA16[imageID], ivec2(gl_GlobalInvocationID.xy), vec4(acesFilmicToneMapCurve(color.xyz), 1.0));
+    vec4 color = imageLoad(inputImageRGBA16[imageID], pixelCoord);
+    imageStore(inputImageRGBA16[imageID], pixelCoord, vec4(acesFilmicToneMapCurve(color.xyz), color.w));
 }
