@@ -24,6 +24,12 @@ namespace EmbeddedShader::CustomLibrary
 		return {Ast::AST::callFunc("clamp", Ast::AST::createType<base_type_t<Type>>(),Ast::Node::accessAll({proxy_wrap(std::forward<decltype(x)>(x)), proxy_wrap(std::forward<decltype(min)>(min)),proxy_wrap(std::forward<decltype(max)>(max))},Ast::AccessPermissions::ReadOnly))};
 	}
 
+	template<typename TexelType>
+	VariateProxy<TexelType> texture(Texture2DProxy<TexelType>& tex, const VariateProxy<ktm::fvec2>& uv)
+	{
+		return tex.sample(uv);
+	}
+
 	template<typename Type> requires ktm::is_vector_v<base_type_t<Type>>
 	VariateProxy<base_type_t<Type>> normalize(Type&& x)
 	{

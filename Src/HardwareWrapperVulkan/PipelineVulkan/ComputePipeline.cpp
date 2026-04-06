@@ -3,6 +3,66 @@
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "Compiler/ShaderLanguageConverter.h"
+#include <cstring>
+
+namespace
+{
+using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
+
+constexpr uint32_t kDescriptorHandle32Size = sizeof(uint32_t);
+constexpr uint32_t kDescriptorHandle64Size = sizeof(uint32_t) * 2;
+
+bool copy_to_push_constant(HardwarePushConstant &target, uint64_t byteOffset, const void *src, size_t size)
+{
+    uint8_t *dst = target.getData();
+    if (!dst || !src || size == 0)
+    {
+        return false;
+    }
+
+    const uint64_t targetSize = target.getSize();
+    if (byteOffset > targetSize || size > targetSize - byteOffset)
+    {
+        return false;
+    }
+
+    std::memcpy(dst + byteOffset, src, size);
+    return true;
+}
+
+uint32_t descriptor_write_size(uint32_t reflectedTypeSize)
+{
+    if (reflectedTypeSize == 0)
+    {
+        return kDescriptorHandle64Size;
+    }
+    return reflectedTypeSize >= kDescriptorHandle64Size ? kDescriptorHandle64Size : kDescriptorHandle32Size;
+}
+
+bool write_descriptor_handle(HardwarePushConstant &target, uint64_t byteOffset, uint32_t reflectedTypeSize, uint32_t descriptorIndex)
+{
+    const uint32_t writeSize = descriptor_write_size(reflectedTypeSize);
+    if (writeSize >= kDescriptorHandle64Size)
+    {
+        const uint32_t handleData[2] = {descriptorIndex, 0};
+        return copy_to_push_constant(target, byteOffset, handleData, sizeof(handleData));
+    }
+    return copy_to_push_constant(target, byteOffset, &descriptorIndex, sizeof(descriptorIndex));
+}
+
+bool is_buffer_resource_bind_type(BindType bindType)
+{
+    return bindType == BindType::rawBuffer || bindType == BindType::storageBuffer;
+}
+
+bool is_image_resource_bind_type(BindType bindType)
+{
+    return bindType == BindType::sampledImages ||
+           bindType == BindType::texture ||
+           bindType == BindType::sampler ||
+           bindType == BindType::storageTexture;
+}
+} // namespace
 
 ComputePipelineVulkan::ComputePipelineVulkan()
 {
@@ -121,20 +181,16 @@ ComputePipelineVulkan::~ComputePipelineVulkan()
 
 void ComputePipelineVulkan::setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType)
 {
-    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
-    if (bindType == BindType::pushConstantMembers)
+    const auto typedBindType = static_cast<BindType>(bindType);
+    if (typedBindType == BindType::pushConstantMembers)
     {
-        uint8_t *dst = pushConstant.getData();
-        if (dst)
-            std::memcpy(dst + byteOffset, data, size);
+        copy_to_push_constant(pushConstant, byteOffset, data, size);
         return;
     }
-    if (bindType == BindType::uniformBufferMembers)
+    if (typedBindType == BindType::uniformBufferMembers)
     {
-        uint8_t *dst = tempUBO.getData();
-        if (dst)
+        if (copy_to_push_constant(tempUBO, byteOffset, data, size))
         {
-            std::memcpy(dst + byteOffset, data, size);
             uboDescriptorDirty = true;
         }
         return;
@@ -143,69 +199,67 @@ void ComputePipelineVulkan::setPushConstantDirect(uint64_t byteOffset, const voi
 
 void ComputePipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType)
 {
-    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
-    if (bindType == BindType::pushConstantMembers)
+    const auto typedBindType = static_cast<BindType>(bindType);
+    const uint32_t descriptorIndex = const_cast<HardwareBuffer &>(buffer).storeDescriptor();
+
+    if (typedBindType == BindType::pushConstantMembers)
     {
-        uint32_t descriptorIndex = const_cast<HardwareBuffer&>(buffer).storeDescriptor();
-        uint8_t *dst = pushConstant.getData();
-        if (dst)
-        {
-            if (typeSize >= 8) {
-                uint32_t handleData[2] = { descriptorIndex, 0 };
-                std::memcpy(dst + byteOffset, handleData, 8);
-            } else {
-                std::memcpy(dst + byteOffset, &descriptorIndex, sizeof(descriptorIndex));
-            }
-        }
+        write_descriptor_handle(pushConstant, byteOffset, typeSize, descriptorIndex);
+        return;
     }
-    else if (bindType == BindType::uniformBufferMembers)
+    if (typedBindType == BindType::uniformBufferMembers)
     {
-        uint32_t descriptorIndex = const_cast<HardwareBuffer&>(buffer).storeDescriptor();
-        uint8_t *dst = tempUBO.getData();
-        if (dst)
+        if (write_descriptor_handle(tempUBO, byteOffset, typeSize, descriptorIndex))
         {
-            if (typeSize >= 8) {
-                uint32_t handleData[2] = { descriptorIndex, 0 };
-                std::memcpy(dst + byteOffset, handleData, 8);
-            } else {
-                std::memcpy(dst + byteOffset, &descriptorIndex, sizeof(descriptorIndex));
-            }
             uboDescriptorDirty = true;
         }
+        return;
+    }
+    if (!is_buffer_resource_bind_type(typedBindType))
+    {
+        return;
+    }
+
+    if (write_descriptor_handle(pushConstant, byteOffset, typeSize, descriptorIndex))
+    {
+        return;
+    }
+    if (write_descriptor_handle(tempUBO, byteOffset, typeSize, descriptorIndex))
+    {
+        uboDescriptorDirty = true;
     }
 }
 
 void ComputePipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType)
 {
-    using BindType = EmbeddedShader::ShaderCodeModule::ShaderResources::BindType;
-    if (bindType == BindType::pushConstantMembers)
+    const auto typedBindType = static_cast<BindType>(bindType);
+    const uint32_t descriptorIndex = const_cast<HardwareImage &>(image).storeDescriptor();
+
+    if (typedBindType == BindType::pushConstantMembers)
     {
-        uint32_t descriptorIndex = const_cast<HardwareImage&>(image).storeDescriptor();
-        uint8_t *dst = pushConstant.getData();
-        if (dst)
-        {
-            if (typeSize >= 8) {
-                uint32_t handleData[2] = { descriptorIndex, 0 };
-                std::memcpy(dst + byteOffset, handleData, 8);
-            } else {
-                std::memcpy(dst + byteOffset, &descriptorIndex, sizeof(descriptorIndex));
-            }
-        }
+        write_descriptor_handle(pushConstant, byteOffset, typeSize, descriptorIndex);
+        return;
     }
-    else if (bindType == BindType::uniformBufferMembers)
+    if (typedBindType == BindType::uniformBufferMembers)
     {
-        uint32_t descriptorIndex = const_cast<HardwareImage&>(image).storeDescriptor();
-        uint8_t *dst = tempUBO.getData();
-        if (dst)
+        if (write_descriptor_handle(tempUBO, byteOffset, typeSize, descriptorIndex))
         {
-            if (typeSize >= 8) {
-                uint32_t handleData[2] = { descriptorIndex, 0 };
-                std::memcpy(dst + byteOffset, handleData, 8);
-            } else {
-                std::memcpy(dst + byteOffset, &descriptorIndex, sizeof(descriptorIndex));
-            }
             uboDescriptorDirty = true;
         }
+        return;
+    }
+    if (!is_image_resource_bind_type(typedBindType))
+    {
+        return;
+    }
+
+    if (write_descriptor_handle(pushConstant, byteOffset, typeSize, descriptorIndex))
+    {
+        return;
+    }
+    if (write_descriptor_handle(tempUBO, byteOffset, typeSize, descriptorIndex))
+    {
+        uboDescriptorDirty = true;
     }
 }
 

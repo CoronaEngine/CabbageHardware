@@ -111,6 +111,8 @@ struct ResourceManager
     // Descriptor operations
     [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle &image);
     [[nodiscard]] int32_t storeDescriptor(Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle &buffer);
+    [[nodiscard]] bool storeDescriptorAt(Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap>::WriteHandle &image, uint32_t descriptorIndex);
+    [[nodiscard]] bool storeDescriptorAt(Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle &buffer, uint32_t descriptorIndex);
 
     // Copy operations
     ResourceManager &copyBuffer(VkCommandBuffer &commandBuffer, BufferHardwareWrap &srcBuffer, BufferHardwareWrap &dstBuffer);

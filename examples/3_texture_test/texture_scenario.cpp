@@ -8,12 +8,13 @@
 #include <utility>
 #include <vector>
 
+#include <stb_image.h>
+
 #include "Codegen/BuiltinVariate.h"
 #include "Codegen/CustomLibrary.h"
 #include "Codegen/TypeAlias.h"
 #include "texture_data.h"
 #include "../common/asset_utils.h"
-#include "../common/texture_loader.h"
 #include "../scenario_registry.h"
 
 #ifndef HELICON_STRINGIZE_
@@ -29,16 +30,23 @@
 struct TextureVertexAttributeProxy
 {
     EmbeddedShader::Float3 position;
-    EmbeddedShader::Float3 color;
     EmbeddedShader::Float2 tex_coord;
+};
+
+struct TextureEdslVertex
+{
+    std::array<float, 3> position{};
+    std::array<float, 2> texCoord{};
 };
 
 struct TexturePayload
 {
-    std::vector<Vertex> vertices;
+    std::vector<TextureEdslVertex> edsl_vertices;
+    std::vector<TextureEdslVertex> glsl_vertices;
 };
 
-static std::vector<Vertex> rotate_vertices_z(const std::vector<Vertex> &source, float radians)
+template <typename TVertex>
+static std::vector<TVertex> rotate_vertices_z(const std::vector<TVertex> &source, float radians)
 {
     const float cos_v = std::cos(radians);
     const float sin_v = std::sin(radians);
@@ -54,62 +62,98 @@ static std::vector<Vertex> rotate_vertices_z(const std::vector<Vertex> &source, 
     return rotated;
 }
 
+static std::vector<TextureEdslVertex> make_edsl_vertices(const std::vector<texture_test_data::Vertex> &source)
+{
+    std::vector<TextureEdslVertex> result;
+    result.reserve(source.size());
+    for (const auto &vertex : source)
+    {
+        result.push_back({vertex.position, vertex.texCoord});
+    }
+    return result;
+}
+
 struct TextureScenario::Impl
 {
     explicit Impl(RuntimeConfig cfg) : config(std::move(cfg)) {}
 
-    void ensure_edsl_pipeline(const HardwareImage &output_image)
+    bool ensure_edsl_pipeline(const HardwareImage &output_image, std::string &error_message)
     {
         std::lock_guard<std::mutex> lock(edsl_mutex);
+        if (!texture_image)
+        {
+            error_message = "Texture image is not initialized for EDSL pipeline.";
+            return false;
+        }
+
+        auto &mutable_output_image = const_cast<HardwareImage &>(output_image);
+        edsl_output = mutable_output_image;
+        edsl_texture = texture_image;
+
         if (edsl_rasterizer && edsl_index_buffer)
         {
-            return;
+            return true;
         }
 
         using namespace EmbeddedShader;
         using namespace EmbeddedShader::Ast;
 
-        auto &mutable_output_image = const_cast<HardwareImage &>(output_image);
-        edsl_output = mutable_output_image;
-
-        auto vertex_shader = [&](Aggregate<TextureVertexAttributeProxy> vertex) -> Float4 {
+        auto vertex_shader = [&](Aggregate<TextureVertexAttributeProxy> vertex) -> Float2 {
             position() = Float4(vertex->position, 1.0f);
-            return Float4(vertex->color, 1.0f);
+            return vertex->tex_coord;
         };
 
-        auto fragment_shader = [&](Float4 interpolated_color) -> Float4 {
-            return interpolated_color;
+        auto fragment_shader = [&](Float2 interpolated_tex_coord) -> Float4 {
+            Float2 uv = clamp(interpolated_tex_coord, ktm::fvec2(0.0f), ktm::fvec2(1.0f));
+            return texture(edsl_texture, uv);
         };
 
         edsl_rasterizer = std::make_unique<RasterizerPipeline<>>(vertex_shader, fragment_shader);
         edsl_rasterizer->bindOutputTargets(edsl_output);
         edsl_index_buffer = std::make_unique<HardwareBuffer>(index_data, BufferUsage::IndexBuffer);
+        return true;
     }
 
-    void ensure_glsl_pipeline(const HardwareImage &output_image)
+    bool ensure_glsl_pipeline(const HardwareImage &output_image, std::string &error_message)
     {
         std::lock_guard<std::mutex> lock(glsl_mutex);
-        if (glsl_rasterizer && glsl_index_buffer)
+        if (!texture_image)
         {
-            return;
+            error_message = "Texture image is not initialized for GLSL pipeline.";
+            return false;
         }
 
-        glsl_rasterizer = std::make_unique<RasterizerPipeline<texture_vert_glsl, texture_frag_glsl>>();
+        if (!glsl_rasterizer || !glsl_index_buffer)
+        {
+            glsl_rasterizer = std::make_unique<RasterizerPipeline<texture_vert_glsl, texture_frag_glsl>>();
+            glsl_index_buffer = std::make_unique<HardwareBuffer>(index_data, BufferUsage::IndexBuffer);
+        }
+
         auto &mutable_output_image = const_cast<HardwareImage &>(output_image);
         glsl_rasterizer->FragColor = mutable_output_image;
-        glsl_index_buffer = std::make_unique<HardwareBuffer>(index_data, BufferUsage::IndexBuffer);
+        if constexpr (requires { texture_frag_glsl::texture1; })
+        {
+            (*glsl_rasterizer)[texture_frag_glsl::texture1] = texture_image;
+        }
+        else
+        {
+            error_message = "Generated shader bindings are missing texture1. Rebuild shader headers.";
+            return false;
+        }
+        return true;
     }
 
     RuntimeConfig config;
-    std::vector<Vertex> base_vertices;
+    std::vector<TextureEdslVertex> base_vertices;
+    std::vector<TextureEdslVertex> base_edsl_vertices;
     std::vector<uint16_t> index_data;
     HardwareImage texture_image;
-    uint32_t texture_descriptor = 0;
     Clock::time_point start_time{};
     bool initialized = false;
 
     std::mutex edsl_mutex;
     EmbeddedShader::Texture2D<ktm::fvec4> edsl_output;
+    EmbeddedShader::Texture2D<ktm::fvec4> edsl_texture;
     std::unique_ptr<RasterizerPipeline<>> edsl_rasterizer;
     std::unique_ptr<HardwareBuffer> edsl_index_buffer;
 
@@ -132,21 +176,56 @@ bool TextureScenario::init(const RuntimeConfig &config,
                            std::string &error_message)
 {
     impl_->config = config;
-    impl_->base_vertices = vertices;
-    impl_->index_data = indices;
+    impl_->base_vertices = make_edsl_vertices(texture_test_data::kQuadVertices);
+    impl_->base_edsl_vertices = impl_->base_vertices;
+    impl_->index_data = texture_test_data::kQuadIndices;
 
-    const auto texture_path = examples::common::resolve_examples_asset("3_texture_test/container.jpg");
-    auto texture_result = examples::common::load_texture_rgba8_srgb(texture_path, true, error_message);
-    if (!texture_result.success)
+    const auto texture_path = resolve_examples_asset("3_texture_test/container.jpg");
+    stbi_set_flip_vertically_on_load(1);
+    int texture_width = 0;
+    int texture_height = 0;
+    int texture_channels = 0;
+    stbi_uc *texture_pixels = stbi_load(texture_path.string().c_str(), &texture_width, &texture_height, &texture_channels, STBI_rgb_alpha);
+    if (texture_pixels == nullptr)
     {
+        error_message = "Failed to load texture pixels.";
+        return false;
+    }
+    if (texture_width <= 0 || texture_height <= 0)
+    {
+        stbi_image_free(texture_pixels);
+        error_message = "Loaded texture has invalid dimensions.";
         return false;
     }
 
-    impl_->texture_image = std::move(texture_result.texture);
-    impl_->texture_descriptor = texture_result.descriptor_id;
+    HardwareImageCreateInfo texture_info;
+    texture_info.width = static_cast<uint32_t>(texture_width);
+    texture_info.height = static_cast<uint32_t>(texture_height);
+    texture_info.format = ImageFormat::RGBA8_SRGB;
+    texture_info.usage = ImageUsage::SampledImage;
+    texture_info.arrayLayers = 1;
+    texture_info.mipLevels = 1;
+    impl_->texture_image = HardwareImage(texture_info);
+    if (!impl_->texture_image)
+    {
+        stbi_image_free(texture_pixels);
+        error_message = "Failed to create sampled texture image.";
+        return false;
+    }
 
-    impl_->ensure_edsl_pipeline(outputs[0]);
-    impl_->ensure_glsl_pipeline(outputs[1]);
+    HardwareExecutor upload_executor;
+    upload_executor << impl_->texture_image.copyFrom(texture_pixels)
+                    << upload_executor.commit();
+    stbi_image_free(texture_pixels);
+
+    if (!impl_->ensure_edsl_pipeline(outputs[0], error_message))
+    {
+        return false;
+    }
+    if (!impl_->ensure_glsl_pipeline(outputs[1], error_message))
+    {
+        return false;
+    }
 
     impl_->start_time = Clock::now();
     impl_->initialized = true;
@@ -168,7 +247,8 @@ std::shared_ptr<const void> TextureScenario::mesh_tick(uint64_t frame_id,
     const float rotation_radians = elapsed_seconds * 0.5f;
 
     auto payload = std::make_shared<TexturePayload>();
-    payload->vertices = rotate_vertices_z(impl_->base_vertices, rotation_radians);
+    payload->edsl_vertices = rotate_vertices_z(impl_->base_edsl_vertices, rotation_radians);
+    payload->glsl_vertices = payload->edsl_vertices;
     return payload;
 }
 
@@ -182,13 +262,18 @@ bool TextureScenario::render_edsl_tick(const MeshFrame &mesh_frame,
         error_message = "render_edsl_tick received an empty mesh payload.";
         return false;
     }
-    if (!impl_->edsl_rasterizer || !impl_->edsl_index_buffer)
+    if (!impl_->texture_image)
     {
-        impl_->ensure_edsl_pipeline(output_image);
+        error_message = "render_edsl_tick cannot run without a valid texture image.";
+        return false;
+    }
+    if (!impl_->ensure_edsl_pipeline(output_image, error_message))
+    {
+        return false;
     }
 
     auto payload = std::static_pointer_cast<const TexturePayload>(mesh_frame.payload);
-    HardwareBuffer vertex_buffer(payload->vertices, BufferUsage::VertexBuffer);
+    HardwareBuffer vertex_buffer(payload->edsl_vertices, BufferUsage::VertexBuffer);
     impl_->edsl_rasterizer->record(*impl_->edsl_index_buffer, vertex_buffer);
 
     executor << (*impl_->edsl_rasterizer)(static_cast<uint16_t>(impl_->config.window_width), static_cast<uint16_t>(impl_->config.window_height))
@@ -206,13 +291,18 @@ bool TextureScenario::render_glsl_tick(const MeshFrame &mesh_frame,
         error_message = "render_glsl_tick received an empty mesh payload.";
         return false;
     }
-    if (!impl_->glsl_rasterizer || !impl_->glsl_index_buffer)
+    if (!impl_->texture_image)
     {
-        impl_->ensure_glsl_pipeline(output_image);
+        error_message = "render_glsl_tick cannot run without a valid texture image.";
+        return false;
+    }
+    if (!impl_->ensure_glsl_pipeline(output_image, error_message))
+    {
+        return false;
     }
 
     auto payload = std::static_pointer_cast<const TexturePayload>(mesh_frame.payload);
-    HardwareBuffer vertex_buffer(payload->vertices, BufferUsage::VertexBuffer);
+    HardwareBuffer vertex_buffer(payload->glsl_vertices, BufferUsage::VertexBuffer);
     impl_->glsl_rasterizer->record(*impl_->glsl_index_buffer, vertex_buffer);
 
     executor << (*impl_->glsl_rasterizer)(static_cast<uint16_t>(impl_->config.window_width), static_cast<uint16_t>(impl_->config.window_height))
@@ -232,7 +322,6 @@ void TextureScenario::shutdown()
     impl_->edsl_rasterizer.reset();
     impl_->glsl_rasterizer.reset();
     impl_->texture_image = HardwareImage();
-    impl_->texture_descriptor = 0;
     impl_->initialized = false;
 }
 

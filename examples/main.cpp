@@ -209,7 +209,8 @@ int main(int argc, char **argv)
     std::mutex error_mutex;
     std::string error_message;
 
-    auto request_stop = [&] {
+    auto request_stop = [&] 
+    {
         // 统一停止入口：关闭运行标记并唤醒所有队列等待点。
         running.store(false);
         mesh_to_edsl.close();
@@ -218,7 +219,8 @@ int main(int argc, char **argv)
         glsl_to_display.close();
     };
 
-    auto set_error_and_stop = [&](const std::string &thread_name, const std::string &message) {
+    auto set_error_and_stop = [&](const std::string &thread_name, const std::string &message) 
+    {
         // 仅记录首个错误，避免多线程并发覆盖关键信息。
         bool expected = false;
         if (has_error.compare_exchange_strong(expected, true))
@@ -229,7 +231,8 @@ int main(int argc, char **argv)
         request_stop();
     };
 
-    auto mesh_thread = [&] {
+    auto mesh_thread = [&] 
+    {
         // meshThread：生成单调 frameId 和共享 payload，同时投喂两个 render 输入队列。
         try
         {
@@ -278,7 +281,8 @@ int main(int argc, char **argv)
         request_stop();
     };
 
-    auto render_thread_edsl = [&] {
+    auto render_thread_edsl = [&] 
+    {
         // renderThreadEDSL：消费 mesh 帧，执行 EDSL 渲染并把提交结果发给 display 队列。
         try
         {
@@ -318,7 +322,8 @@ int main(int argc, char **argv)
         edsl_to_display.close();
     };
 
-    auto render_thread_glsl = [&] {
+    auto render_thread_glsl = [&] 
+    {
         // renderThreadGLSL：消费 mesh 帧，执行 GLSL 渲染并把提交结果发给 display 队列。
         try
         {
@@ -358,7 +363,8 @@ int main(int argc, char **argv)
         glsl_to_display.close();
     };
 
-    auto display_thread = [&] {
+    auto display_thread = [&] 
+    {
         // displayThread：每轮取两条渲染输出队列的“最新帧”，避免被旧帧积压拖慢。
         try
         {

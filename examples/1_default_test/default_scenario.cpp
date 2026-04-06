@@ -43,8 +43,8 @@ constexpr uint32_t kComputeGroupSize = 8;
 static std::vector<DefaultVertex> make_vertices_from_cube_data()
 {
     std::vector<DefaultVertex> result;
-    result.reserve(vertices.size());
-    for (const auto &vertex : vertices)
+    result.reserve(default_test_data::kCubeVertices.size());
+    for (const auto &vertex : default_test_data::kCubeVertices)
     {
         result.push_back({vertex.position, vertex.color});
     }
@@ -120,7 +120,7 @@ struct DefaultScenario::Impl
         edsl_rasterizer = std::make_unique<RasterizerPipeline<>>(vertex_shader, fragment_shader);
         edsl_rasterizer->bindOutputTargets(edsl_output);
         edsl_compute = std::make_unique<ComputePipeline<>>(compute_shader, ktm::uvec3(kComputeGroupSize, kComputeGroupSize, 1));
-        edsl_index_buffer = std::make_unique<HardwareBuffer>(indices, BufferUsage::IndexBuffer);
+        edsl_index_buffer = std::make_unique<HardwareBuffer>(default_test_data::kCubeIndices, BufferUsage::IndexBuffer);
     }
 
     void ensure_glsl_pipeline(const HardwareImage &output_image)
@@ -138,7 +138,7 @@ struct DefaultScenario::Impl
         glsl_compute = std::make_unique<ComputePipeline<default_compute_glsl>>();
         glsl_compute->GlobalUniformParam.imageID = mutable_output_image.storeDescriptor();
 
-        glsl_index_buffer = std::make_unique<HardwareBuffer>(indices, BufferUsage::IndexBuffer);
+        glsl_index_buffer = std::make_unique<HardwareBuffer>(default_test_data::kCubeIndices, BufferUsage::IndexBuffer);
     }
 
     RuntimeConfig config;

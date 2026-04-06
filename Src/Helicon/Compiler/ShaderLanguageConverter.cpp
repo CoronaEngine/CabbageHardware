@@ -1125,20 +1125,45 @@ namespace EmbeddedShader
 			}
 		}
 
-		for (auto& item: res.sampled_images)
+		auto appendDescriptorBindInfo = [&](const spirv_cross::Resource& item,
+		                                    ShaderCodeModule::ShaderResources::BindType bindType)
 		{
 			ShaderCodeModule::ShaderResources::ShaderBindInfo bindInfo = {};
 
-			bindInfo.typeName = "sampler2D";
-			bindInfo.variateName = item.name;
+			bindInfo.variateName = item.name.empty() ? compiler->get_name(item.id) : item.name;
+			bindInfo.typeName = spirTypeToString(*compiler, compiler->get_type(item.base_type_id));
 
 			bindInfo.set = compiler->get_decoration(item.id, spv::DecorationDescriptorSet);
 			bindInfo.binding = compiler->get_decoration(item.id, spv::DecorationBinding);
 			bindInfo.location = compiler->get_decoration(item.id, spv::DecorationLocation);
 
-			bindInfo.bindType = ShaderCodeModule::ShaderResources::sampledImages;
-
+			bindInfo.bindType = bindType;
 			result.bindInfoPool.push_back(bindInfo);
+		};
+
+		for (auto& item: res.sampled_images)
+		{
+			appendDescriptorBindInfo(item, ShaderCodeModule::ShaderResources::sampledImages);
+		}
+
+		for (auto& item: res.separate_images)
+		{
+			appendDescriptorBindInfo(item, ShaderCodeModule::ShaderResources::texture);
+		}
+
+		for (auto& item: res.separate_samplers)
+		{
+			appendDescriptorBindInfo(item, ShaderCodeModule::ShaderResources::sampler);
+		}
+
+		for (auto& item: res.storage_images)
+		{
+			appendDescriptorBindInfo(item, ShaderCodeModule::ShaderResources::storageTexture);
+		}
+
+		for (auto& item: res.storage_buffers)
+		{
+			appendDescriptorBindInfo(item, ShaderCodeModule::ShaderResources::storageBuffer);
 		}
 
 		for (auto& item: res.stage_inputs)

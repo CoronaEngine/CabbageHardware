@@ -44,8 +44,8 @@ struct TrianglePayload
 static std::vector<TriangleVertex> make_triangle_vertices()
 {
     std::vector<TriangleVertex> result;
-    result.reserve(vertices.size());
-    for (const auto &vertex : vertices)
+    result.reserve(triangle_test_data::kTriangleVertices.size());
+    for (const auto &vertex : triangle_test_data::kTriangleVertices)
     {
         result.push_back({vertex.position, vertex.color});
     }
@@ -97,7 +97,7 @@ struct TriangleScenario::Impl
 
         edsl_rasterizer = std::make_unique<RasterizerPipeline<>>(vertex_shader, fragment_shader);
         edsl_rasterizer->bindOutputTargets(edsl_output);
-        edsl_index_buffer = std::make_unique<HardwareBuffer>(triangle_indices, BufferUsage::IndexBuffer);
+        edsl_index_buffer = std::make_unique<HardwareBuffer>(triangle_test_data::kTriangleIndices, BufferUsage::IndexBuffer);
     }
 
     void ensure_glsl_pipeline(const HardwareImage &output_image)
@@ -111,7 +111,7 @@ struct TriangleScenario::Impl
         glsl_rasterizer = std::make_unique<RasterizerPipeline<triangle_vert_glsl, triangle_frag_glsl>>();
         auto &mutable_output_image = const_cast<HardwareImage &>(output_image);
         glsl_rasterizer->outColor = mutable_output_image;
-        glsl_index_buffer = std::make_unique<HardwareBuffer>(triangle_indices, BufferUsage::IndexBuffer);
+        glsl_index_buffer = std::make_unique<HardwareBuffer>(triangle_test_data::kTriangleIndices, BufferUsage::IndexBuffer);
     }
 
     RuntimeConfig config;
@@ -128,7 +128,6 @@ struct TriangleScenario::Impl
     std::unique_ptr<RasterizerPipeline<triangle_vert_glsl, triangle_frag_glsl>> glsl_rasterizer;
     std::unique_ptr<HardwareBuffer> glsl_index_buffer;
 
-    static inline const std::array<uint16_t, 3> triangle_indices = {0, 1, 2};
 };
 
 TriangleScenario::TriangleScenario(const RuntimeConfig &config) : impl_(std::make_unique<Impl>(config)) {}
