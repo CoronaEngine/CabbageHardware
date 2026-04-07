@@ -170,9 +170,11 @@ std::string DefaultScenario::name() const
 }
 
 bool DefaultScenario::init(const RuntimeConfig &config,
-                           const std::array<HardwareImage, 2> &outputs,
+                           Backend backend,
+                           const HardwareImage &output,
                            std::string &error_message)
 {
+    (void)error_message;
     impl_->config = config;
     impl_->vertices = make_vertices_from_cube_data();
 
@@ -191,8 +193,14 @@ bool DefaultScenario::init(const RuntimeConfig &config,
                                    ktm::rotate3d_axis(ktm::radians(static_cast<float>(i) * 30.0f), ktm::fvec3(0.0f, 0.0f, 1.0f));
     }
 
-    impl_->ensure_edsl_pipeline(outputs[0]);
-    impl_->ensure_glsl_pipeline(outputs[1]);
+    if (backend == Backend::EDSL)
+    {
+        impl_->ensure_edsl_pipeline(output);
+    }
+    else
+    {
+        impl_->ensure_glsl_pipeline(output);
+    }
     impl_->start_time = Clock::now();
     impl_->initialized = true;
     return true;
@@ -222,50 +230,43 @@ std::shared_ptr<const void> DefaultScenario::mesh_tick(uint64_t frame_id,
     return payload;
 }
 
-bool DefaultScenario::render_edsl_tick(const MeshFrame &mesh_frame,
-                                       HardwareExecutor &executor,
-                                       const HardwareImage &output_image,
-                                       std::string &error_message)
+bool DefaultScenario::render_tick(const MeshFrame &mesh_frame,
+                                  Backend backend,
+                                  HardwareExecutor &executor,
+                                  const HardwareImage &output_image,
+                                  std::string &error_message)
 {
     if (!mesh_frame.payload)
     {
-        error_message = "render_edsl_tick received an empty mesh payload.";
+        error_message = "render_tick received an empty mesh payload.";
         return false;
-    }
-    if (!impl_->edsl_rasterizer || !impl_->edsl_compute || !impl_->edsl_index_buffer)
-    {
-        impl_->ensure_edsl_pipeline(output_image);
     }
 
     auto payload = std::static_pointer_cast<const DefaultMeshPayload>(mesh_frame.payload);
-    for (const auto &transformed_vertices : payload->transformed_vertices_per_object)
+    if (backend == Backend::EDSL)
     {
-        HardwareBuffer vertex_buffer(transformed_vertices, BufferUsage::VertexBuffer);
-        impl_->edsl_rasterizer->record(*impl_->edsl_index_buffer, vertex_buffer);
+        if (!impl_->edsl_rasterizer || !impl_->edsl_compute || !impl_->edsl_index_buffer)
+        {
+            impl_->ensure_edsl_pipeline(output_image);
+        }
+
+        for (const auto &transformed_vertices : payload->transformed_vertices_per_object)
+        {
+            HardwareBuffer vertex_buffer(transformed_vertices, BufferUsage::VertexBuffer);
+            impl_->edsl_rasterizer->record(*impl_->edsl_index_buffer, vertex_buffer);
+        }
+
+        executor << (*impl_->edsl_rasterizer)(static_cast<uint16_t>(impl_->config.window_width), static_cast<uint16_t>(impl_->config.window_height))
+                 << (*impl_->edsl_compute)(compute_group_count(impl_->config.window_width, kComputeGroupSize), compute_group_count(impl_->config.window_height, kComputeGroupSize), 1u)
+                 << executor.commit();
+        return true;
     }
 
-    executor << (*impl_->edsl_rasterizer)(static_cast<uint16_t>(impl_->config.window_width), static_cast<uint16_t>(impl_->config.window_height))
-             << (*impl_->edsl_compute)(compute_group_count(impl_->config.window_width, kComputeGroupSize), compute_group_count(impl_->config.window_height, kComputeGroupSize), 1u)
-             << executor.commit();
-    return true;
-}
-
-bool DefaultScenario::render_glsl_tick(const MeshFrame &mesh_frame,
-                                       HardwareExecutor &executor,
-                                       const HardwareImage &output_image,
-                                       std::string &error_message)
-{
-    if (!mesh_frame.payload)
-    {
-        error_message = "render_glsl_tick received an empty mesh payload.";
-        return false;
-    }
     if (!impl_->glsl_rasterizer || !impl_->glsl_compute || !impl_->glsl_index_buffer)
     {
         impl_->ensure_glsl_pipeline(output_image);
     }
 
-    auto payload = std::static_pointer_cast<const DefaultMeshPayload>(mesh_frame.payload);
     for (const auto &transformed_vertices : payload->transformed_vertices_per_object)
     {
         HardwareBuffer vertex_buffer(transformed_vertices, BufferUsage::VertexBuffer);

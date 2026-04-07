@@ -140,15 +140,22 @@ std::string TriangleScenario::name() const
 }
 
 bool TriangleScenario::init(const RuntimeConfig &config,
-                            const std::array<HardwareImage, 2> &outputs,
+                            Backend backend,
+                            const HardwareImage &output,
                             std::string &error_message)
 {
     (void)error_message;
 
     impl_->config = config;
     impl_->base_vertices = make_triangle_vertices();
-    impl_->ensure_edsl_pipeline(outputs[0]);
-    impl_->ensure_glsl_pipeline(outputs[1]);
+    if (backend == Backend::EDSL)
+    {
+        impl_->ensure_edsl_pipeline(output);
+    }
+    else
+    {
+        impl_->ensure_glsl_pipeline(output);
+    }
     impl_->start_time = Clock::now();
     impl_->initialized = true;
     return true;
@@ -173,49 +180,40 @@ std::shared_ptr<const void> TriangleScenario::mesh_tick(uint64_t frame_id,
     return payload;
 }
 
-bool TriangleScenario::render_edsl_tick(const MeshFrame &mesh_frame,
-                                        HardwareExecutor &executor,
-                                        const HardwareImage &output_image,
-                                        std::string &error_message)
+bool TriangleScenario::render_tick(const MeshFrame &mesh_frame,
+                                   Backend backend,
+                                   HardwareExecutor &executor,
+                                   const HardwareImage &output_image,
+                                   std::string &error_message)
 {
     if (!mesh_frame.payload)
     {
-        error_message = "render_edsl_tick received an empty mesh payload.";
+        error_message = "render_tick received an empty mesh payload.";
         return false;
-    }
-    if (!impl_->edsl_rasterizer || !impl_->edsl_index_buffer)
-    {
-        impl_->ensure_edsl_pipeline(output_image);
     }
 
     auto payload = std::static_pointer_cast<const TrianglePayload>(mesh_frame.payload);
-    HardwareBuffer vertex_buffer(payload->vertices, BufferUsage::VertexBuffer);
-    impl_->edsl_rasterizer->record(*impl_->edsl_index_buffer, vertex_buffer);
-
-    executor << (*impl_->edsl_rasterizer)(static_cast<uint16_t>(impl_->config.window_width), static_cast<uint16_t>(impl_->config.window_height))
-             << executor.commit();
-    return true;
-}
-
-bool TriangleScenario::render_glsl_tick(const MeshFrame &mesh_frame,
-                                             HardwareExecutor &executor,
-                                             const HardwareImage &output_image,
-                                             std::string &error_message)
-{
-    if (!mesh_frame.payload)
+    if (backend == Backend::EDSL)
     {
-        error_message = "render_glsl_tick received an empty mesh payload.";
-        return false;
+        if (!impl_->edsl_rasterizer || !impl_->edsl_index_buffer)
+        {
+            impl_->ensure_edsl_pipeline(output_image);
+        }
+
+        HardwareBuffer vertex_buffer(payload->vertices, BufferUsage::VertexBuffer);
+        impl_->edsl_rasterizer->record(*impl_->edsl_index_buffer, vertex_buffer);
+        executor << (*impl_->edsl_rasterizer)(static_cast<uint16_t>(impl_->config.window_width), static_cast<uint16_t>(impl_->config.window_height))
+                 << executor.commit();
+        return true;
     }
+
     if (!impl_->glsl_rasterizer || !impl_->glsl_index_buffer)
     {
         impl_->ensure_glsl_pipeline(output_image);
     }
 
-    auto payload = std::static_pointer_cast<const TrianglePayload>(mesh_frame.payload);
     HardwareBuffer vertex_buffer(payload->vertices, BufferUsage::VertexBuffer);
     impl_->glsl_rasterizer->record(*impl_->glsl_index_buffer, vertex_buffer);
-
     executor << (*impl_->glsl_rasterizer)(static_cast<uint16_t>(impl_->config.window_width), static_cast<uint16_t>(impl_->config.window_height))
              << executor.commit();
     return true;
