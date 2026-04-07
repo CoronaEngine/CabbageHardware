@@ -1,6 +1,5 @@
 ﻿#pragma once
 
-#include <array>
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -45,25 +44,21 @@ class ScenarioHooks
 
     // 场景初始化：创建/绑定场景内部资源。
     virtual bool init(const RuntimeConfig &config,
-                      const std::array<HardwareImage, 2> &outputs,
+                      Backend backend,
+                      const HardwareImage &output,
                       std::string &error_message) = 0;
 
-    // Mesh 钩子：生产一帧共享载荷，后续会同时投喂 EDSL/GLSL 渲染线程。
+    // Mesh 钩子：生产一帧共享载荷，后续由渲染线程消费。
     virtual std::shared_ptr<const void> mesh_tick(uint64_t frame_id,
                                                   Clock::time_point now,
                                                   std::string &error_message) = 0;
 
-    // EDSL 渲染钩子：消费 MeshFrame，并向 executor 录制/提交命令。
-    virtual bool render_edsl_tick(const MeshFrame &mesh_frame,
-                                  HardwareExecutor &executor,
-                                  const HardwareImage &output_image,
-                                  std::string &error_message) = 0;
-
-    // GLSL 渲染钩子：消费 MeshFrame，并向 executor 录制/提交命令。
-    virtual bool render_glsl_tick(const MeshFrame &mesh_frame,
-                                  HardwareExecutor &executor,
-                                  const HardwareImage &output_image,
-                                  std::string &error_message) = 0;
+    // 渲染钩子：按后端消费 MeshFrame，并向 executor 录制/提交命令。
+    virtual bool render_tick(const MeshFrame &mesh_frame,
+                             Backend backend,
+                             HardwareExecutor &executor,
+                             const HardwareImage &output_image,
+                             std::string &error_message) = 0;
 
     // Display 钩子：在 display 线程每次呈现后触发，可用于场景级统计或调试。
     virtual void display_tick(const RenderFrame &render_frame) = 0;
