@@ -375,7 +375,20 @@ DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
     pendingResources.reserve(32);
 
 
-    commitCommand(queue);
+    if (!commitCommand(queue))
+    {
+        for (auto &resource : localPendingResources)
+        {
+            pendingResources.push_back(std::move(resource));
+        }
+        localPendingResources.clear();
+
+        waitSemaphores.clear();
+        signalSemaphores.clear();
+        waitFence = VK_NULL_HANDLE;
+        queue->queueMutex->unlock();
+        return nullptr;
+    }
 
     // P0 修复：确保 currentRecordQueue 始终指向本次选出的队列
     // commit() 的 lambda 已经设置了此值（幂等），但外部调用者（如 displayFrame 的 present lambda）

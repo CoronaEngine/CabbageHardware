@@ -23,7 +23,7 @@ struct RuntimeConfig
     std::size_t queue_depth = 10;                         // 有界队列的容量。
     uint32_t window_width = 1920;                         // EDSL/GLSL 输出窗口宽度。
     uint32_t window_height = 1080;                        // EDSL/GLSL 输出窗口高度。
-    uint32_t window_count = 1;                            // 输出窗口数量。
+    uint32_t window_count = 4;                            // 输出窗口数量。
     BackendMode backend_mode = BackendMode::AllGLSL;      // 窗口后端分配模式。
     uint32_t max_fps = 0;                                 // Mesh 线程帧率上限，0 表示不限制。
     bool enable_compare_stats = true;                     // 是否周期打印对比统计信息。
