@@ -56,6 +56,29 @@ bool parse_bool_value(const std::string &value)
     throw std::runtime_error("Invalid boolean value: " + value);
 }
 
+BackendMode parse_backend_mode_value(const std::string &value)
+{
+    std::string lowered = value;
+    std::transform(lowered.begin(), lowered.end(), lowered.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+
+    if (lowered == "edsl")
+    {
+        return BackendMode::AllEDSL;
+    }
+    if (lowered == "glsl")
+    {
+        return BackendMode::AllGLSL;
+    }
+    if (lowered == "alternating")
+    {
+        return BackendMode::Alternating;
+    }
+
+    throw std::runtime_error("Invalid value for backend-mode: " + value + " (expected: edsl|glsl|alternating)");
+}
+
 RuntimeConfig parse_runtime_config(int argc, char **argv)
 {
     RuntimeConfig config;
@@ -89,6 +112,16 @@ RuntimeConfig parse_runtime_config(int argc, char **argv)
             config.window_height = parse_unsigned_value<uint32_t>(read_value(i, argc, argv, argument), "height");
             continue;
         }
+        if (argument.rfind("--window-count", 0) == 0)
+        {
+            config.window_count = parse_unsigned_value<uint32_t>(read_value(i, argc, argv, argument), "window-count");
+            continue;
+        }
+        if (argument.rfind("--backend-mode", 0) == 0)
+        {
+            config.backend_mode = parse_backend_mode_value(read_value(i, argc, argv, argument));
+            continue;
+        }
         if (argument.rfind("--max-fps", 0) == 0)
         {
             config.max_fps = parse_unsigned_value<uint32_t>(read_value(i, argc, argv, argument), "max-fps");
@@ -112,6 +145,7 @@ RuntimeConfig parse_runtime_config(int argc, char **argv)
     config.queue_depth = std::max<std::size_t>(1, config.queue_depth);
     config.window_width = std::max<uint32_t>(1, config.window_width);
     config.window_height = std::max<uint32_t>(1, config.window_height);
+    config.window_count = std::max<uint32_t>(1, config.window_count);
     return config;
 }
 
@@ -121,10 +155,12 @@ std::string runtime_config_usage(std::string_view exe_name)
     usage += "Usage: ";
     usage += exe_name;
     usage += " [options]\n";
-    usage += "  --scenario=<name>         Scenario name (default: default)\n";
-    usage += "  --queue-depth=<n>         Bounded queue depth (default: 3)\n";
+    usage += "  --scenario=<name>         Scenario name (default: texture)\n";
+    usage += "  --queue-depth=<n>         Bounded queue depth (default: 10)\n";
     usage += "  --width=<n>               Window width (default: 1920)\n";
     usage += "  --height=<n>              Window height (default: 1080)\n";
+    usage += "  --window-count=<n>        Number of windows (default: 4)\n";
+    usage += "  --backend-mode=<mode>     Backend mode: edsl|glsl|alternating (default: alternating)\n";
     usage += "  --max-fps=<n>             Mesh thread FPS cap, 0 uncapped (default: 0)\n";
     usage += "  --compare-stats=<bool>    Enable periodic compare stats (default: true)\n";
     //usage += "  --glsl-delay-ms=<n>       Artificial delay in GLSL render thread (default: 0)\n";

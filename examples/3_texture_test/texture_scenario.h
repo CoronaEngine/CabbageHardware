@@ -14,22 +14,19 @@ class TextureScenario final : public ScenarioHooks
     std::string name() const override;
 
     bool init(const RuntimeConfig &config,
-              const std::array<HardwareImage, 2> &outputs,
+              Backend backend,
+              const HardwareImage &output,
               std::string &error_message) override;
 
     std::shared_ptr<const void> mesh_tick(uint64_t frame_id,
                                           Clock::time_point now,
                                           std::string &error_message) override;
 
-    bool render_edsl_tick(const MeshFrame &mesh_frame,
-                          HardwareExecutor &executor,
-                          const HardwareImage &output_image,
-                          std::string &error_message) override;
-
-    bool render_glsl_tick(const MeshFrame &mesh_frame,
-                          HardwareExecutor &executor,
-                          const HardwareImage &output_image,
-                          std::string &error_message) override;
+    bool render_tick(const MeshFrame &mesh_frame,
+                     Backend backend,
+                     HardwareExecutor &executor,
+                     const HardwareImage &output_image,
+                     std::string &error_message) override;
 
     void display_tick(const RenderFrame &render_frame) override;
     void shutdown() override;

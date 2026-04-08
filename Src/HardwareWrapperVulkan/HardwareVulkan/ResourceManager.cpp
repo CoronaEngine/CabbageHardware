@@ -3,6 +3,8 @@
 #include "HardwareWrapperVulkan/HardwareContext.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
 
+#include <unordered_set>
+
 #define VK_NO_PROTOTYPES
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
@@ -79,7 +81,7 @@ void ResourceManager::cleanUpResourceManager()
     // 清理 VMA 分配器
     if (vmaAllocator != VK_NULL_HANDLE)
     {
-        // vmaDestroyAllocator(vmaAllocator);
+        vmaDestroyAllocator(vmaAllocator);
         vmaAllocator = VK_NULL_HANDLE;
     }
 
@@ -636,29 +638,41 @@ void ResourceManager::destroyImage(ImageHardwareWrap &image)
     }
 
     VkDevice logicalDevice = device->getLogicalDevice();
+    if (image.ownsImageViews)
+    {
+        std::unordered_set<VkImageView> viewsToDestroy;
+        if (image.imageView != VK_NULL_HANDLE)
+        {
+            viewsToDestroy.insert(image.imageView);
+        }
 
-    // if (image.generateMips) {
-    //     // 清理每个 mip level 的视图
-    //     for (auto& mipView : image.mipLevelImageViews) {
-    //         if (mipView != VK_NULL_HANDLE) {
-    //             vkDestroyImageView(logicalDevice, mipView, nullptr);
-    //         }
-    //     }
-    //     image.mipLevelImageViews.clear();
-    // }
+        for (const auto &[_, view] : image.allSubViews)
+        {
+            if (view != VK_NULL_HANDLE)
+            {
+                viewsToDestroy.insert(view);
+            }
+        }
 
-    // 清理主 ImageView
-    /*if (image.imageView != VK_NULL_HANDLE) {
-        vkDestroyImageView(logicalDevice, image.imageView, nullptr);
-        image.imageView = VK_NULL_HANDLE;
-    }*/
+        for (VkImageView view : viewsToDestroy)
+        {
+            vkDestroyImageView(logicalDevice, view, nullptr);
+        }
+    }
 
-    // 销毁图像
-    /*if (image.imageHandle != VK_NULL_HANDLE) {
+    image.allSubViews.clear();
+    image.imageView = VK_NULL_HANDLE;
+
+    if (image.ownsImageMemory &&
+        image.imageHandle != VK_NULL_HANDLE &&
+        image.imageAlloc != VK_NULL_HANDLE)
+    {
         vmaDestroyImage(vmaAllocator, image.imageHandle, image.imageAlloc);
-        image.imageHandle = VK_NULL_HANDLE;
-        image.imageAlloc = VK_NULL_HANDLE;
-    }*/
+    }
+
+    image.imageHandle = VK_NULL_HANDLE;
+    image.imageAlloc = VK_NULL_HANDLE;
+    image.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 }
 
 ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(uint32_t elementCount,
@@ -1220,17 +1234,34 @@ ResourceManager &ResourceManager::copyBuffer(VkCommandBuffer &commandBuffer,
 
 ResourceManager &ResourceManager::copyImage(VkCommandBuffer &commandBuffer,
                                             ImageHardwareWrap &source,
-                                            ImageHardwareWrap &destination)
+                                            ImageHardwareWrap &destination,
+                                            uint32_t srcLayer,
+                                            uint32_t dstLayer,
+                                            uint32_t srcMip,
+                                            uint32_t dstMip)
 {
-    if (source.imageSize == destination.imageSize && source.imageFormat == destination.imageFormat)
+    if (source.imageFormat == destination.imageFormat &&
+        srcLayer < source.arrayLayers &&
+        dstLayer < destination.arrayLayers &&
+        srcMip < source.mipLevels &&
+        dstMip < destination.mipLevels)
     {
+        const uint32_t srcWidth = std::max(1u, source.imageSize.x >> srcMip);
+        const uint32_t srcHeight = std::max(1u, source.imageSize.y >> srcMip);
+        const uint32_t dstWidth = std::max(1u, destination.imageSize.x >> dstMip);
+        const uint32_t dstHeight = std::max(1u, destination.imageSize.y >> dstMip);
+
         VkImageCopy copyRegion{};
         copyRegion.srcSubresource.aspectMask = source.aspectMask;
-        copyRegion.srcSubresource.layerCount = source.arrayLayers;
+        copyRegion.srcSubresource.mipLevel = srcMip;
+        copyRegion.srcSubresource.baseArrayLayer = srcLayer;
+        copyRegion.srcSubresource.layerCount = 1;
         copyRegion.dstSubresource.aspectMask = destination.aspectMask;
-        copyRegion.dstSubresource.layerCount = destination.arrayLayers;
-        copyRegion.extent.width = std::min(source.imageSize.x, destination.imageSize.x);
-        copyRegion.extent.height = std::min(source.imageSize.y, destination.imageSize.y);
+        copyRegion.dstSubresource.mipLevel = dstMip;
+        copyRegion.dstSubresource.baseArrayLayer = dstLayer;
+        copyRegion.dstSubresource.layerCount = 1;
+        copyRegion.extent.width = std::min(srcWidth, dstWidth);
+        copyRegion.extent.height = std::min(srcHeight, dstHeight);
         copyRegion.extent.depth = 1;
 
         vkCmdCopyImage(commandBuffer,
@@ -1396,9 +1427,9 @@ void ResourceManager::transitionImageLayout(VkCommandBuffer &commandBuffer,
     imageBarrier.newLayout = newLayout;
     imageBarrier.subresourceRange.aspectMask = image.aspectMask;
     imageBarrier.subresourceRange.baseMipLevel = 0;
-    imageBarrier.subresourceRange.levelCount = 1;
+    imageBarrier.subresourceRange.levelCount = std::max(1u, image.mipLevels);
     imageBarrier.subresourceRange.baseArrayLayer = 0;
-    imageBarrier.subresourceRange.layerCount = 1;
+    imageBarrier.subresourceRange.layerCount = std::max(1u, image.arrayLayers);
     imageBarrier.pNext = nullptr;
 
     image.imageLayout = imageBarrier.newLayout;

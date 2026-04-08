@@ -384,6 +384,8 @@ HardwareImage HardwareImage::operator[](const uint32_t index)
             subImageHandle->imageHandle = imageHandle->imageHandle; // 共享同一个 VkImage
             subImageHandle->imageAlloc = imageHandle->imageAlloc;
             subImageHandle->imageAllocInfo = imageHandle->imageAllocInfo;
+            subImageHandle->ownsImageMemory = false;
+            subImageHandle->ownsImageViews = false;
             subImageHandle->bindlessIndex = -1;
 
             // 直接获取mipmap（单层数组图像）

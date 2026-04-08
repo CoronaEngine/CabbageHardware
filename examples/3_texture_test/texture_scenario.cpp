@@ -172,7 +172,8 @@ std::string TextureScenario::name() const
 }
 
 bool TextureScenario::init(const RuntimeConfig &config,
-                           const std::array<HardwareImage, 2> &outputs,
+                           Backend backend,
+                           const HardwareImage &output,
                            std::string &error_message)
 {
     impl_->config = config;
@@ -218,13 +219,19 @@ bool TextureScenario::init(const RuntimeConfig &config,
                     << upload_executor.commit();
     stbi_image_free(texture_pixels);
 
-    if (!impl_->ensure_edsl_pipeline(outputs[0], error_message))
+    if (backend == Backend::EDSL)
     {
-        return false;
+        if (!impl_->ensure_edsl_pipeline(output, error_message))
+        {
+            return false;
+        }
     }
-    if (!impl_->ensure_glsl_pipeline(outputs[1], error_message))
+    else
     {
-        return false;
+        if (!impl_->ensure_glsl_pipeline(output, error_message))
+        {
+            return false;
+        }
     }
 
     impl_->start_time = Clock::now();
@@ -252,56 +259,41 @@ std::shared_ptr<const void> TextureScenario::mesh_tick(uint64_t frame_id,
     return payload;
 }
 
-bool TextureScenario::render_edsl_tick(const MeshFrame &mesh_frame,
-                                       HardwareExecutor &executor,
-                                       const HardwareImage &output_image,
-                                       std::string &error_message)
+bool TextureScenario::render_tick(const MeshFrame &mesh_frame,
+                                  Backend backend,
+                                  HardwareExecutor &executor,
+                                  const HardwareImage &output_image,
+                                  std::string &error_message)
 {
     if (!mesh_frame.payload)
     {
-        error_message = "render_edsl_tick received an empty mesh payload.";
+        error_message = "render_tick received an empty mesh payload.";
         return false;
     }
     if (!impl_->texture_image)
     {
-        error_message = "render_edsl_tick cannot run without a valid texture image.";
-        return false;
-    }
-    if (!impl_->ensure_edsl_pipeline(output_image, error_message))
-    {
+        error_message = "render_tick cannot run without a valid texture image.";
         return false;
     }
 
     auto payload = std::static_pointer_cast<const TexturePayload>(mesh_frame.payload);
-    HardwareBuffer vertex_buffer(payload->edsl_vertices, BufferUsage::VertexBuffer);
-    impl_->edsl_rasterizer->record(*impl_->edsl_index_buffer, vertex_buffer);
-
-    executor << (*impl_->edsl_rasterizer)(static_cast<uint16_t>(impl_->config.window_width), static_cast<uint16_t>(impl_->config.window_height))
-             << executor.commit();
-    return true;
-}
-
-bool TextureScenario::render_glsl_tick(const MeshFrame &mesh_frame,
-                                       HardwareExecutor &executor,
-                                       const HardwareImage &output_image,
-                                       std::string &error_message)
-{
-    if (!mesh_frame.payload)
+    if (backend == Backend::EDSL)
     {
-        error_message = "render_glsl_tick received an empty mesh payload.";
-        return false;
+        if (!impl_->ensure_edsl_pipeline(output_image, error_message))
+        {
+            return false;
+        }
+        HardwareBuffer vertex_buffer(payload->edsl_vertices, BufferUsage::VertexBuffer);
+        impl_->edsl_rasterizer->record(*impl_->edsl_index_buffer, vertex_buffer);
+        executor << (*impl_->edsl_rasterizer)(static_cast<uint16_t>(impl_->config.window_width), static_cast<uint16_t>(impl_->config.window_height))
+                 << executor.commit();
+        return true;
     }
-    if (!impl_->texture_image)
-    {
-        error_message = "render_glsl_tick cannot run without a valid texture image.";
-        return false;
-    }
+
     if (!impl_->ensure_glsl_pipeline(output_image, error_message))
     {
         return false;
     }
-
-    auto payload = std::static_pointer_cast<const TexturePayload>(mesh_frame.payload);
     HardwareBuffer vertex_buffer(payload->glsl_vertices, BufferUsage::VertexBuffer);
     impl_->glsl_rasterizer->record(*impl_->glsl_index_buffer, vertex_buffer);
 

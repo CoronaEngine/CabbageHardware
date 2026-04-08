@@ -141,13 +141,23 @@ struct ImageCopyCommandImpl : CopyCommandImpl
         {
             auto srcHandle = globalImageStorages.acquire_write(srcImageID);
             auto dstHandle = globalImageStorages.acquire_write(dstImageID);
-            command = std::make_unique<CopyImageCommand>(*srcHandle, *dstHandle);
+            command = std::make_unique<CopyImageCommand>(*srcHandle,
+                                                         *dstHandle,
+                                                         srcLayer,
+                                                         dstLayer,
+                                                         srcMip,
+                                                         dstMip);
         }
         else
         {
             auto dstHandle = globalImageStorages.acquire_write(dstImageID);
             auto srcHandle = globalImageStorages.acquire_write(srcImageID);
-            command = std::make_unique<CopyImageCommand>(*srcHandle, *dstHandle);
+            command = std::make_unique<CopyImageCommand>(*srcHandle,
+                                                         *dstHandle,
+                                                         srcLayer,
+                                                         dstLayer,
+                                                         srcMip,
+                                                         dstMip);
         }
 
         return command.get();
