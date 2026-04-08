@@ -468,16 +468,16 @@ int main(int argc, char **argv)
                 double avg_latency_ms = (total_displayed_frames == 0) ? 0.0
                                                                       : static_cast<double>(total_latency_us) / 1000.0 / static_cast<double>(total_displayed_frames);
 
-                std::cout << "[Stats] windows=" << windows.size()
-                          << " backend(edsl=" << edsl_windows
-                          << ", glsl=" << glsl_windows << ")"
-                          << " meshFPS=" << total_mesh_fps
-                          << " renderFPS=" << total_render_fps
-                          << " displayLoopFPS=" << total_display_loop_fps
-                          << " drops(mesh->render=" << total_mesh_to_render_drops
-                          << ", render->display=" << total_render_to_display_drops << ")"
-                          << " avgLatencyMs=" << avg_latency_ms
-                          << '\n';
+                // std::cout << "[Stats] windows=" << windows.size()
+                //           << " backend(edsl=" << edsl_windows
+                //           << ", glsl=" << glsl_windows << ")"
+                //           << " meshFPS=" << total_mesh_fps
+                //           << " renderFPS=" << total_render_fps
+                //           << " displayLoopFPS=" << total_display_loop_fps
+                //           << " drops(mesh->render=" << total_mesh_to_render_drops
+                //           << ", render->display=" << total_render_to_display_drops << ")"
+                //           << " avgLatencyMs=" << avg_latency_ms
+                //           << '\n';
 
                 last_stat_tick = now;
             }
