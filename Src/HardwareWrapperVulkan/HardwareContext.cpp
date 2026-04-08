@@ -16,6 +16,15 @@ HardwareContext::HardwareContext()
         throw std::runtime_error("Failed to initialize Volk!");
     }
 
+    uint32_t instanceVersion = 0;
+    if (vkEnumerateInstanceVersion(&instanceVersion) == VK_SUCCESS)
+    {
+        CFW_LOG_INFO("Vulkan Instance Version: {}.{}.{}",
+                      VK_API_VERSION_MAJOR(instanceVersion),
+                      VK_API_VERSION_MINOR(instanceVersion),
+                      VK_API_VERSION_PATCH(instanceVersion));
+    }
+
     prepareFeaturesChain();
     createVkInstance(hardwareCreateInfos);
 
