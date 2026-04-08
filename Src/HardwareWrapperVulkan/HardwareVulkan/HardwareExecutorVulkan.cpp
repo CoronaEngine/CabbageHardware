@@ -3,6 +3,43 @@
 #include "corona/kernel/core/i_logger.h"
 #include <algorithm>
 
+namespace
+{
+std::vector<VkSemaphoreSubmitInfo> mergeSemaphoreSubmitInfos(const std::vector<VkSemaphoreSubmitInfo> &infos)
+{
+    std::vector<VkSemaphoreSubmitInfo> mergedInfos;
+    mergedInfos.reserve(infos.size());
+
+    std::unordered_map<VkSemaphore, size_t> semaphoreToIndex;
+    semaphoreToIndex.reserve(infos.size());
+
+    for (const auto &info : infos)
+    {
+        if (info.semaphore == VK_NULL_HANDLE)
+        {
+            continue;
+        }
+
+        auto it = semaphoreToIndex.find(info.semaphore);
+        if (it == semaphoreToIndex.end())
+        {
+            VkSemaphoreSubmitInfo normalizedInfo = info;
+            normalizedInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            normalizedInfo.pNext = nullptr;
+            mergedInfos.push_back(normalizedInfo);
+            semaphoreToIndex.emplace(info.semaphore, mergedInfos.size() - 1);
+            continue;
+        }
+
+        auto &dst = mergedInfos[it->second];
+        dst.value = std::max(dst.value, info.value);
+        dst.stageMask |= info.stageMask;
+    }
+
+    return mergedInfos;
+}
+} // namespace
+
 // ========== 析构函数：等待所有延迟释放的资源完成 ==========
 HardwareExecutorVulkan::~HardwareExecutorVulkan()
 {
@@ -369,11 +406,36 @@ DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
         timelineSignalSemaphoreSubmitInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
         signalSemaphores.push_back(timelineSignalSemaphoreSubmitInfo);
 
+        std::vector<VkSemaphoreSubmitInfo> mergedWaitSemaphores = mergeSemaphoreSubmitInfos(waitSemaphores);
+        std::vector<VkSemaphoreSubmitInfo> mergedSignalSemaphores = mergeSemaphoreSubmitInfos(signalSemaphores);
+
+        // timeline semaphore 在同一次 submit 中 wait+signal 时，signal value 必须严格大于 wait value。
+        // binary semaphore 的 value 固定为 0，这里通过 value==0 直接跳过。
+        std::unordered_map<VkSemaphore, uint64_t> waitValueMap;
+        waitValueMap.reserve(mergedWaitSemaphores.size());
+        for (const auto &waitSem : mergedWaitSemaphores)
+        {
+            waitValueMap.emplace(waitSem.semaphore, waitSem.value);
+        }
+        for (auto &signalSem : mergedSignalSemaphores)
+        {
+            if (signalSem.value == 0)
+            {
+                continue;
+            }
+
+            auto it = waitValueMap.find(signalSem.semaphore);
+            if (it != waitValueMap.end() && signalSem.value <= it->second)
+            {
+                signalSem.value = it->second + 1;
+            }
+        }
+
         // ===== 修复4: Semaphore 值验证 =====
         // 在提交前验证所有 timeline semaphore 的当前值是否有效
         // 如果 semaphore 值为 UINT64_MAX，说明 semaphore 已损坏或设备丢失
         bool semaphoreValid = true;
-        for (const auto &waitSem : waitSemaphores)
+        for (const auto &waitSem : mergedWaitSemaphores)
         {
             // 跳过 Binary Semaphore（Binary Semaphore 的 value 固定为 0）
             if (waitSem.value == 0)
@@ -431,10 +493,10 @@ DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
 
         VkSubmitInfo2 submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-        submitInfo.waitSemaphoreInfoCount = static_cast<uint32_t>(waitSemaphores.size());
-        submitInfo.pWaitSemaphoreInfos = waitSemaphores.data();
-        submitInfo.signalSemaphoreInfoCount = static_cast<uint32_t>(signalSemaphores.size());
-        submitInfo.pSignalSemaphoreInfos = signalSemaphores.data();
+        submitInfo.waitSemaphoreInfoCount = static_cast<uint32_t>(mergedWaitSemaphores.size());
+        submitInfo.pWaitSemaphoreInfos = mergedWaitSemaphores.data();
+        submitInfo.signalSemaphoreInfoCount = static_cast<uint32_t>(mergedSignalSemaphores.size());
+        submitInfo.pSignalSemaphoreInfos = mergedSignalSemaphores.data();
         submitInfo.commandBufferInfoCount = 1;
         submitInfo.pCommandBufferInfos = &commandBufferSubmitInfo;
 
