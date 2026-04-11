@@ -72,6 +72,38 @@ enum class BufferUsage : uint32_t
     StorageBuffer = 8,
 };
 
+enum class SamplerFilter : uint32_t
+{
+    Nearest = 0,
+    Linear = 1,
+};
+
+enum class SamplerAddressMode : uint32_t
+{
+    Repeat = 0,
+    MirroredRepeat = 1,
+    ClampToEdge = 2,
+    ClampToBorder = 3,
+};
+
+enum class SamplerMipmapMode : uint32_t
+{
+    Nearest = 0,
+    Linear = 1,
+};
+
+enum class SamplerCompareOp : uint32_t
+{
+    Never = 0,
+    Less = 1,
+    Equal = 2,
+    LessOrEqual = 3,
+    Greater = 4,
+    NotEqual = 5,
+    GreaterOrEqual = 6,
+    Always = 7,
+};
+
 template <typename T>
 concept IsContainer = requires(T a) {
     { a.size() } -> std::convertible_to<size_t>;
@@ -194,7 +226,8 @@ struct HardwareImage
     HardwareImage operator[](const uint32_t index);
     explicit operator bool() const;
 
-    [[nodiscard]] uint32_t storeDescriptor();
+    [[nodiscard]] uint32_t storeSampledDescriptor();
+    [[nodiscard]] uint32_t storeStorageDescriptor();
     [[nodiscard]] uintptr_t getImageID() const
     {
         return imageID.load(std::memory_order_acquire);
@@ -224,6 +257,48 @@ struct HardwareImage
     mutable std::mutex imageMutex;
 
     friend class HardwareDisplayer;
+};
+
+struct HardwareSamplerCreateInfo
+{
+    SamplerFilter magFilter = SamplerFilter::Nearest;
+    SamplerFilter minFilter = SamplerFilter::Nearest;
+    SamplerMipmapMode mipmapMode = SamplerMipmapMode::Nearest;
+    SamplerAddressMode addressModeU = SamplerAddressMode::Repeat;
+    SamplerAddressMode addressModeV = SamplerAddressMode::Repeat;
+    SamplerAddressMode addressModeW = SamplerAddressMode::Repeat;
+    bool anisotropyEnable = false;
+    float maxAnisotropy = 1.0f;
+    bool compareEnable = false;
+    SamplerCompareOp compareOp = SamplerCompareOp::Always;
+    float mipLodBias = 0.0f;
+    float minLod = 0.0f;
+    float maxLod = 5.0f;
+};
+
+struct HardwareSampler
+{
+  public:
+    HardwareSampler();
+    HardwareSampler(const HardwareSampler &other);
+    HardwareSampler(HardwareSampler &&other) noexcept;
+    explicit HardwareSampler(const HardwareSamplerCreateInfo &createInfo);
+    ~HardwareSampler();
+
+    HardwareSampler &operator=(const HardwareSampler &other);
+    HardwareSampler &operator=(HardwareSampler &&other) noexcept;
+
+    explicit operator bool() const;
+
+    [[nodiscard]] uint32_t storeDescriptor() const;
+    [[nodiscard]] uintptr_t getSamplerID() const
+    {
+        return samplerID.load(std::memory_order_acquire);
+    }
+
+  private:
+    std::atomic<std::uintptr_t> samplerID;
+    mutable std::mutex samplerMutex;
 };
 
 // ================= 对外封装：HardwarePushConstant =================
@@ -412,8 +487,9 @@ struct ComputePipelineBase
 
 
     void setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType);
-    void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType);
-    void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType);
+    void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType, uint32_t location = 0);
+    void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType, uint32_t location = 0);
+    void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareSampler &sampler, int32_t bindType, uint32_t location = 0);
 
     mutable std::mutex computePipelineMutex;
     std::atomic<std::uintptr_t> computePipelineID;
@@ -475,10 +551,11 @@ struct RasterizerPipelineBase
 
     // 将 Texture2D proxy 注册为渲染目标（render target），在 dispatch 时自动绑定
     template<typename T>
-    RasterizerPipelineBase& bindRenderTarget(uint32_t location, EmbeddedShader::Texture2DProxy<T>& proxy)
+    RasterizerPipelineBase& bindRenderTarget(uint32_t location, EmbeddedShader::RenderTarget2DProxy<T>& proxy)
     {
         autoBindEntries_.push_back({
             &proxy.boundResource_,
+            EmbeddedShader::AutoBindResourceKind::RenderTarget,
             0, 0,
             static_cast<int32_t>(EmbeddedShader::ShaderCodeModule::ShaderResources::stageOutputs),
             location
@@ -488,7 +565,7 @@ struct RasterizerPipelineBase
 
     // 批量绑定 render target
     template<typename... Ts>
-    RasterizerPipelineBase& bindOutputTargets(EmbeddedShader::Texture2DProxy<Ts>&... targets)
+    RasterizerPipelineBase& bindOutputTargets(EmbeddedShader::RenderTarget2DProxy<Ts>&... targets)
     {
         uint32_t location = 0;
         (bindRenderTarget(location++, targets), ...);
@@ -504,8 +581,9 @@ struct RasterizerPipelineBase
     friend struct ResourceProxy;
 
     void setPushConstantDirect(uint64_t byteOffset, const void *data, size_t size, int32_t bindType);
-    void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType);
+    void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareBuffer &buffer, int32_t bindType, uint32_t location = 0);
     void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType, uint32_t location = 0);
+    void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareSampler &sampler, int32_t bindType, uint32_t location = 0);
 
     mutable std::mutex rasterizerPipelineMutex;
     std::atomic<std::uintptr_t> rasterizerPipelineID;
@@ -557,16 +635,23 @@ ResourceProxy &ResourceProxy::operator=(const T &value)
     if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareImage>)
     {
         if (compute_pipeline_)
-            compute_pipeline_->setResourceDirect(byte_offset_, type_size_, value, bind_type_);
+            compute_pipeline_->setResourceDirect(byte_offset_, type_size_, value, bind_type_, location_);
         if (rasterizer_pipeline_)
             rasterizer_pipeline_->setResourceDirect(byte_offset_, type_size_, value, bind_type_, location_);
     }
     else if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareBuffer>)
     {
         if (compute_pipeline_)
-            compute_pipeline_->setResourceDirect(byte_offset_, type_size_, value, bind_type_);
+            compute_pipeline_->setResourceDirect(byte_offset_, type_size_, value, bind_type_, location_);
         if (rasterizer_pipeline_)
-            rasterizer_pipeline_->setResourceDirect(byte_offset_, type_size_, value, bind_type_);
+            rasterizer_pipeline_->setResourceDirect(byte_offset_, type_size_, value, bind_type_, location_);
+    }
+    else if constexpr (std::is_same_v<std::remove_cvref_t<T>, HardwareSampler>)
+    {
+        if (compute_pipeline_)
+            compute_pipeline_->setResourceDirect(byte_offset_, type_size_, value, bind_type_, location_);
+        if (rasterizer_pipeline_)
+            rasterizer_pipeline_->setResourceDirect(byte_offset_, type_size_, value, bind_type_, location_);
     }
     else if constexpr (!std::is_same_v<std::remove_cvref_t<T>, ResourceProxy>)
     {
@@ -782,13 +867,33 @@ ComputePipeline(const std::string&, EmbeddedShader::ShaderLanguage, const std::s
 ComputePipeline(const std::vector<uint32_t>&, const std::source_location&)
     -> ComputePipeline<>;
 
-// ================= Texture2DProxy::createResource 实现 =================
+// ================= Resource Proxy createResource 实现 =================
 // 此处 HardwareImage 和 HardwareImageCreateInfo 已经完整定义
 namespace EmbeddedShader {
 template<typename Type>
 void Texture2DProxy<Type>::createResource(const ::HardwareImageCreateInfo& createInfo)
 {
     ownedResource_ = std::make_unique<::HardwareImage>(createInfo);
+    boundResource_ = ownedResource_.get();
+}
+
+template<typename Type>
+void StorageTexture2DProxy<Type>::createResource(const ::HardwareImageCreateInfo& createInfo)
+{
+    ownedResource_ = std::make_unique<::HardwareImage>(createInfo);
+    boundResource_ = ownedResource_.get();
+}
+
+template<typename Type>
+void RenderTarget2DProxy<Type>::createResource(const ::HardwareImageCreateInfo& createInfo)
+{
+    ownedResource_ = std::make_unique<::HardwareImage>(createInfo);
+    boundResource_ = ownedResource_.get();
+}
+
+inline void SamplerProxy::createResource(const ::HardwareSamplerCreateInfo& createInfo)
+{
+    ownedResource_ = std::make_unique<::HardwareSampler>(createInfo);
     boundResource_ = ownedResource_.get();
 }
 } // namespace EmbeddedShader
