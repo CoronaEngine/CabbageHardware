@@ -523,10 +523,18 @@ HardwareImage::operator bool() const
     return self_image_id > 0 && globalImageStorages.acquire_read(self_image_id)->imageHandle != VK_NULL_HANDLE;
 }
 
-uint32_t HardwareImage::storeDescriptor()
+uint32_t HardwareImage::storeSampledDescriptor()
 {
     auto imageHandle = globalImageStorages.acquire_write(imageID.load(std::memory_order_acquire));
-    return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(imageHandle);
+    return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(
+        imageHandle, ResourceManager::BindlessSet::SampledImage);
+}
+
+uint32_t HardwareImage::storeStorageDescriptor()
+{
+    auto imageHandle = globalImageStorages.acquire_write(imageID.load(std::memory_order_acquire));
+    return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(
+        imageHandle, ResourceManager::BindlessSet::StorageImage);
 }
 
 void HardwareImage::setClearColor(float r, float g, float b, float a)
