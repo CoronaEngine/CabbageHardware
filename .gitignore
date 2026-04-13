@@ -63,3 +63,5 @@ _deps/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+Src/Helicon/Compiler/HardcodeShaders/*
