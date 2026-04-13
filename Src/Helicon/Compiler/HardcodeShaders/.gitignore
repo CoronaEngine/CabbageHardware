@@ -1,0 +1,3 @@
+# Keep this directory in the repository, but ignore generated shader outputs.
+*
+!.gitignore
