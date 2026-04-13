@@ -17,24 +17,20 @@ class DefaultScenario final : public ScenarioHooks
 
     // 初始化场景资源与固定矩阵，并预热两条渲染管线。
     bool init(const RuntimeConfig &config,
-              const std::array<HardwareImage, 2> &outputs,
+              Backend backend,
+              const HardwareImage &output,
               std::string &error_message) override;
 
     // 每帧在 mesh 线程执行：生成两个 render 线程共享的顶点变换结果。
     std::shared_ptr<const void> mesh_tick(uint64_t frame_id,
                                           Clock::time_point now,
                                           std::string &error_message) override;
-    // EDSL 渲染线程入口。
-    bool render_edsl_tick(const MeshFrame &mesh_frame,
-                          HardwareExecutor &executor,
-                          const HardwareImage &output_image,
-                          std::string &error_message) override;
-
-    // GLSL 渲染线程入口。
-    bool render_glsl_tick(const MeshFrame &mesh_frame,
-                          HardwareExecutor &executor,
-                          const HardwareImage &output_image,
-                          std::string &error_message) override;
+    // 统一渲染入口，按 backend 分发到 EDSL 或 GLSL。
+    bool render_tick(const MeshFrame &mesh_frame,
+                     Backend backend,
+                     HardwareExecutor &executor,
+                     const HardwareImage &output_image,
+                     std::string &error_message) override;
 
     // 预留给 display 阶段扩展（目前无额外逻辑）。
     void display_tick(const RenderFrame &render_frame) override;
