@@ -35,10 +35,28 @@ HardwareContext::HardwareContext()
     hardwareUtils.reserve(devices.size());
     for (const auto &physicalDevice : devices)
     {
+        VkPhysicalDeviceProperties properties{};
+        vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+
+        if (properties.apiVersion < VK_API_VERSION_1_4)
+        {
+            CFW_LOG_WARNING("Skipping device '{}' due to Vulkan API {}.{}.{} (< 1.4)",
+                            properties.deviceName,
+                            VK_VERSION_MAJOR(properties.apiVersion),
+                            VK_VERSION_MINOR(properties.apiVersion),
+                            VK_VERSION_PATCH(properties.apiVersion));
+            continue;
+        }
+
         auto utils = std::make_shared<HardwareUtils>();
         utils->deviceManager.initDeviceManager(hardwareCreateInfos, vkInstance, physicalDevice);
         utils->resourceManager.initResourceManager(utils->deviceManager);
         hardwareUtils.push_back(std::move(utils));
+    }
+
+    if (hardwareUtils.empty())
+    {
+        throw std::runtime_error("No Vulkan 1.4-capable GPU found.");
     }
 
     //setupCrossDeviceSemaphores();
