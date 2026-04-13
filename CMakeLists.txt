@@ -80,7 +80,7 @@ FetchContent_MakeAvailable(SPIRV-Cross)
 FetchContent_Declare(
     SPIRV-Headers
     GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Headers.git
-    GIT_TAG vulkan-sdk-1.4.335.0
+    GIT_TAG vulkan-sdk-1.4.341
     EXCLUDE_FROM_ALL
 )
 FetchContent_MakeAvailable(SPIRV-Headers)
@@ -88,7 +88,7 @@ FetchContent_MakeAvailable(SPIRV-Headers)
 FetchContent_Declare(
     SPIRV-Tools
     GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Tools.git
-    GIT_TAG vulkan-sdk-1.4.335.0
+    GIT_TAG vulkan-sdk-1.4.341
     EXCLUDE_FROM_ALL
 )
 FetchContent_MakeAvailable(SPIRV-Tools)
@@ -146,7 +146,7 @@ FetchContent_MakeAvailable(volk)
 FetchContent_Declare(
     Vulkan-Headers
     GIT_REPOSITORY https://github.com/KhronosGroup/Vulkan-Headers.git
-    GIT_TAG main
+    GIT_TAG v1.4.341
     EXCLUDE_FROM_ALL
 )
 FetchContent_MakeAvailable(Vulkan-Headers)
