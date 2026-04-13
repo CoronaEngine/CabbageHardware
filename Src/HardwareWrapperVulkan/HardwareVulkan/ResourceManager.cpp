@@ -1072,6 +1072,13 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *host
     bufferInfo.size = size;
     bufferInfo.usage = bufferWrap.bufferUsage;
 
+    // Host-pointer import requires matching external handle type on the buffer.
+    VkExternalMemoryBufferCreateInfo externalMemoryInfo{};
+    externalMemoryInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO;
+    externalMemoryInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
+    externalMemoryInfo.pNext = nullptr;
+    bufferInfo.pNext = &externalMemoryInfo;
+
     // P0 修复：与 createBuffer 保持一致，多队列族时使用 CONCURRENT 模式
     // 跨设备传输场景下 host buffer 可能在 transfer/graphics 不同队列族间使用
     std::vector<uint32_t> queueFamilyIndices;
@@ -1098,8 +1105,7 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *host
 
     VmaAllocationCreateInfo allocInfo{};
     allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
-    allocInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT |
-                      VMA_ALLOCATION_CREATE_MAPPED_BIT |
+    allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT |
                       VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
     // 指定允许的内存类型（基于查询到的主机指针属性）
