@@ -61,9 +61,9 @@ void DeviceManager::initDeviceManager(const CreateCallback &createCallback, cons
     //                  reinterpret_cast<std::uintptr_t>(queue.deviceManager));
     // }
 
-    CFW_LOG_INFO("Graphics Queue Count: {}", graphicsQueues.size());
-    CFW_LOG_INFO("Compute Queue Count: {}", computeQueues.size());
-    CFW_LOG_INFO("Transfer Queue Count: {}", transferQueues.size());
+    CFW_LOG_DEBUG("Graphics Queue Count: {}", graphicsQueues.size());
+    CFW_LOG_DEBUG("Compute Queue Count: {}", computeQueues.size());
+    CFW_LOG_DEBUG("Transfer Queue Count: {}", transferQueues.size());
 }
 
 void DeviceManager::cleanUpDeviceManager()

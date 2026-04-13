@@ -100,7 +100,7 @@ static inline void coronaHardwareCheck(VkResult result, const std::source_locati
 
 inline void printDeviceInfo(const VkPhysicalDeviceProperties &properties)
 {
-    CFW_LOG_INFO("---------- GPU: {} ----------", properties.deviceName);
+    CFW_LOG_DEBUG("---------- GPU: {} ----------", properties.deviceName);
 }
 
 inline void printExtensionWarning(const char *extensionName)
