@@ -59,8 +59,18 @@ CommandRecordVulkan::RequiredBarriers CopyBufferCommand::getRequiredBarriers(Har
 }
 
 // CopyImageCommand implementations
-CopyImageCommand::CopyImageCommand(ResourceManager::ImageHardwareWrap &srcImg, ResourceManager::ImageHardwareWrap &dstImg)
-    : srcImage(srcImg), dstImage(dstImg)
+CopyImageCommand::CopyImageCommand(ResourceManager::ImageHardwareWrap &srcImg,
+                                   ResourceManager::ImageHardwareWrap &dstImg,
+                                   uint32_t srcLayerValue,
+                                   uint32_t dstLayerValue,
+                                   uint32_t srcMipValue,
+                                   uint32_t dstMipValue)
+    : srcImage(srcImg),
+      dstImage(dstImg),
+      srcLayer(srcLayerValue),
+      dstLayer(dstLayerValue),
+      srcMip(srcMipValue),
+      dstMip(dstMipValue)
 {
     executorType = ExecutorType::Transfer;
 }
@@ -72,12 +82,58 @@ CommandRecordVulkan::ExecutorType CopyImageCommand::getExecutorType()
 
 void CopyImageCommand::commitCommand(HardwareExecutorVulkan &hardwareExecutor)
 {
-    hardwareExecutor.hardwareContext->resourceManager.copyImage(hardwareExecutor.currentRecordQueue->commandBuffer, srcImage, dstImage);
+    if (srcImage.imageFormat != dstImage.imageFormat ||
+        srcLayer >= std::max(1u, srcImage.arrayLayers) ||
+        dstLayer >= std::max(1u, dstImage.arrayLayers) ||
+        srcMip >= std::max(1u, srcImage.mipLevels) ||
+        dstMip >= std::max(1u, dstImage.mipLevels))
+    {
+        return;
+    }
+
+    hardwareExecutor.hardwareContext->resourceManager.copyImage(hardwareExecutor.currentRecordQueue->commandBuffer,
+                                                                srcImage,
+                                                                dstImage,
+                                                                srcLayer,
+                                                                dstLayer,
+                                                                srcMip,
+                                                                dstMip);
+
+    if ((srcImage.imageUsage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT)) != 0 &&
+        srcImage.imageLayout != VK_IMAGE_LAYOUT_GENERAL)
+    {
+        hardwareExecutor.hardwareContext->resourceManager.transitionImageLayout(
+            hardwareExecutor.currentRecordQueue->commandBuffer,
+            srcImage,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+    }
+
+    if ((dstImage.imageUsage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT)) != 0 &&
+        dstImage.imageLayout != VK_IMAGE_LAYOUT_GENERAL)
+    {
+        hardwareExecutor.hardwareContext->resourceManager.transitionImageLayout(
+            hardwareExecutor.currentRecordQueue->commandBuffer,
+            dstImage,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+    }
 }
 
 CommandRecordVulkan::RequiredBarriers CopyImageCommand::getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor)
 {
     CommandRecordVulkan::RequiredBarriers requiredBarriers;
+
+    if (srcImage.imageFormat != dstImage.imageFormat ||
+        srcLayer >= std::max(1u, srcImage.arrayLayers) ||
+        dstLayer >= std::max(1u, dstImage.arrayLayers) ||
+        srcMip >= std::max(1u, srcImage.mipLevels) ||
+        dstMip >= std::max(1u, dstImage.mipLevels))
+    {
+        return requiredBarriers;
+    }
 
     {
         VkImageMemoryBarrier2 srcImageBarrier{};
@@ -92,10 +148,11 @@ CommandRecordVulkan::RequiredBarriers CopyImageCommand::getRequiredBarriers(Hard
         srcImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         srcImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         srcImageBarrier.image = srcImage.imageHandle;
+        srcImageBarrier.subresourceRange.aspectMask = srcImage.aspectMask;
         srcImageBarrier.subresourceRange.baseMipLevel = 0;
-        srcImageBarrier.subresourceRange.levelCount = 1;
+        srcImageBarrier.subresourceRange.levelCount = std::max(1u, srcImage.mipLevels);
         srcImageBarrier.subresourceRange.baseArrayLayer = 0;
-        srcImageBarrier.subresourceRange.layerCount = 1;
+        srcImageBarrier.subresourceRange.layerCount = std::max(1u, srcImage.arrayLayers);
 
         srcImage.imageLayout = srcImageBarrier.newLayout;
 
@@ -115,10 +172,11 @@ CommandRecordVulkan::RequiredBarriers CopyImageCommand::getRequiredBarriers(Hard
         dstImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         dstImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         dstImageBarrier.image = dstImage.imageHandle;
+        dstImageBarrier.subresourceRange.aspectMask = dstImage.aspectMask;
         dstImageBarrier.subresourceRange.baseMipLevel = 0;
-        dstImageBarrier.subresourceRange.levelCount = 1;
+        dstImageBarrier.subresourceRange.levelCount = std::max(1u, dstImage.mipLevels);
         dstImageBarrier.subresourceRange.baseArrayLayer = 0;
-        dstImageBarrier.subresourceRange.layerCount = 1;
+        dstImageBarrier.subresourceRange.layerCount = std::max(1u, dstImage.arrayLayers);
 
         dstImage.imageLayout = dstImageBarrier.newLayout;
 
@@ -151,6 +209,17 @@ void CopyBufferToImageCommand::commitCommand(HardwareExecutorVulkan &hardwareExe
         dstImage,
         mipLevel,
         dstImage.arrayLayers);
+
+    if ((dstImage.imageUsage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT)) != 0 &&
+        dstImage.imageLayout != VK_IMAGE_LAYOUT_GENERAL)
+    {
+        hardwareExecutor.hardwareContext->resourceManager.transitionImageLayout(
+            hardwareExecutor.currentRecordQueue->commandBuffer,
+            dstImage,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+    }
 }
 
 CommandRecordVulkan::RequiredBarriers CopyBufferToImageCommand::getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor)
@@ -179,7 +248,8 @@ CommandRecordVulkan::RequiredBarriers CopyBufferToImageCommand::getRequiredBarri
         dstImageBarrier.srcAccessMask = 0; // 初始转换，没有源访问
         dstImageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
         dstImageBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-        dstImageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; // 从未定义布局开始
+        //dstImageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; // 从未定义布局开始
+        dstImageBarrier.oldLayout = dstImage.imageLayout;
         dstImageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         dstImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         dstImageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -213,6 +283,17 @@ CommandRecordVulkan::ExecutorType CopyImageToBufferCommand::getExecutorType()
 void CopyImageToBufferCommand::commitCommand(HardwareExecutorVulkan &hardwareExecutor)
 {
     hardwareExecutor.hardwareContext->resourceManager.copyImageToBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, srcImage, dstBuffer);
+
+    if ((srcImage.imageUsage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT)) != 0 &&
+        srcImage.imageLayout != VK_IMAGE_LAYOUT_GENERAL)
+    {
+        hardwareExecutor.hardwareContext->resourceManager.transitionImageLayout(
+            hardwareExecutor.currentRecordQueue->commandBuffer,
+            srcImage,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+    }
 }
 
 CommandRecordVulkan::RequiredBarriers CopyImageToBufferCommand::getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor)
@@ -275,6 +356,28 @@ CommandRecordVulkan::ExecutorType BlitImageCommand::getExecutorType()
 void BlitImageCommand::commitCommand(HardwareExecutorVulkan &hardwareExecutor)
 {
     hardwareExecutor.hardwareContext->resourceManager.blitImage(hardwareExecutor.currentRecordQueue->commandBuffer, srcImage, dstImage);
+
+    if ((srcImage.imageUsage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT)) != 0 &&
+        srcImage.imageLayout != VK_IMAGE_LAYOUT_GENERAL)
+    {
+        hardwareExecutor.hardwareContext->resourceManager.transitionImageLayout(
+            hardwareExecutor.currentRecordQueue->commandBuffer,
+            srcImage,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+    }
+
+    if ((dstImage.imageUsage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT)) != 0 &&
+        dstImage.imageLayout != VK_IMAGE_LAYOUT_GENERAL)
+    {
+        hardwareExecutor.hardwareContext->resourceManager.transitionImageLayout(
+            hardwareExecutor.currentRecordQueue->commandBuffer,
+            dstImage,
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+            VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+    }
 }
 
 CommandRecordVulkan::RequiredBarriers BlitImageCommand::getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor)

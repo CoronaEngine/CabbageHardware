@@ -1,4 +1,5 @@
 ﻿#pragma once
+
 #include "HardwareExecutorVulkan.h"
 
 struct CopyBufferCommand : public CommandRecordVulkan
@@ -18,7 +19,17 @@ struct CopyImageCommand : public CommandRecordVulkan
     ResourceManager::ImageHardwareWrap &srcImage;
     ResourceManager::ImageHardwareWrap &dstImage;
 
-    CopyImageCommand(ResourceManager::ImageHardwareWrap &srcImg, ResourceManager::ImageHardwareWrap &dstImg);
+    uint32_t srcLayer;
+    uint32_t dstLayer;
+    uint32_t srcMip;
+    uint32_t dstMip;
+
+    CopyImageCommand(ResourceManager::ImageHardwareWrap &srcImg,
+                     ResourceManager::ImageHardwareWrap &dstImg,
+                     uint32_t srcLayer = 0,
+                     uint32_t dstLayer = 0,
+                     uint32_t srcMip = 0,
+                     uint32_t dstMip = 0);
 
     ExecutorType getExecutorType() override;
     void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override;
