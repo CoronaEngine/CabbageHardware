@@ -30,6 +30,7 @@ struct ResourceManager
 
         VmaAllocation bufferAlloc{VK_NULL_HANDLE};
         VmaAllocationInfo bufferAllocInfo{};
+        bool hostImportedManualBind{false};
 
         int32_t bindlessIndex{-1};
 

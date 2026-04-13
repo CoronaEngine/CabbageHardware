@@ -885,7 +885,16 @@ void ResourceManager::destroyBuffer(BufferHardwareWrap &buffer)
             // 这种情况下可以安全地直接销毁
         }
         
-        vmaDestroyBuffer(vmaAllocator, buffer.bufferHandle, buffer.bufferAlloc);
+        if (buffer.hostImportedManualBind)
+        {
+            vkDestroyBuffer(device->getLogicalDevice(), buffer.bufferHandle, nullptr);
+            vmaFreeMemory(vmaAllocator, buffer.bufferAlloc);
+            buffer.hostImportedManualBind = false;
+        }
+        else
+        {
+            vmaDestroyBuffer(vmaAllocator, buffer.bufferHandle, buffer.bufferAlloc);
+        }
 
         buffer.bufferHandle = VK_NULL_HANDLE;
         buffer.bufferAlloc = VK_NULL_HANDLE;
@@ -1050,6 +1059,8 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *host
     BufferHardwareWrap bufferWrap{};
     bufferWrap.device = device;
     bufferWrap.resourceManager = this;
+    bufferWrap.elementCount = static_cast<uint32_t>(size);
+    bufferWrap.elementSize = 1;
     bufferWrap.bufferUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
                              VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
@@ -1104,22 +1115,52 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *host
     importInfo.pHostPointer = hostPtr;
 
     VmaAllocationCreateInfo allocInfo{};
-    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
-    allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT |
-                      VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+    allocInfo.usage = VMA_MEMORY_USAGE_UNKNOWN;
+    allocInfo.flags = 0;
 
     // 指定允许的内存类型（基于查询到的主机指针属性）
     allocInfo.requiredFlags = 0;
     allocInfo.preferredFlags = 0;
     allocInfo.memoryTypeBits = hostPointerProps.memoryTypeBits;
 
-    coronaHardwareCheck(vmaCreateDedicatedBuffer(vmaAllocator,
-                                                 &bufferInfo,
-                                                 &allocInfo,
-                                                 &importInfo,
-                                                 &bufferWrap.bufferHandle,
-                                                 &bufferWrap.bufferAlloc,
-                                                 &bufferWrap.bufferAllocInfo));
+    coronaHardwareCheck(vkCreateBuffer(device->getLogicalDevice(), &bufferInfo, nullptr, &bufferWrap.bufferHandle));
+
+    VkMemoryRequirements memReq{};
+    vkGetBufferMemoryRequirements(device->getLogicalDevice(), bufferWrap.bufferHandle, &memReq);
+
+    // 同时满足 host pointer 支持的类型和 buffer 的内存需求
+    allocInfo.memoryTypeBits &= memReq.memoryTypeBits;
+    if (allocInfo.memoryTypeBits == 0)
+    {
+        vkDestroyBuffer(device->getLogicalDevice(), bufferWrap.bufferHandle, nullptr);
+        bufferWrap.bufferHandle = VK_NULL_HANDLE;
+        throw std::runtime_error("Cannot import host buffer: no compatible memory type between host pointer and buffer requirements");
+    }
+
+    VkResult allocResult = vmaAllocateDedicatedMemory(vmaAllocator,
+                                                      &memReq,
+                                                      &allocInfo,
+                                                      &importInfo,
+                                                      &bufferWrap.bufferAlloc,
+                                                      &bufferWrap.bufferAllocInfo);
+    if (allocResult != VK_SUCCESS)
+    {
+        vkDestroyBuffer(device->getLogicalDevice(), bufferWrap.bufferHandle, nullptr);
+        bufferWrap.bufferHandle = VK_NULL_HANDLE;
+        coronaHardwareCheck(allocResult);
+    }
+
+    VkResult bindResult = vmaBindBufferMemory(vmaAllocator, bufferWrap.bufferAlloc, bufferWrap.bufferHandle);
+    if (bindResult != VK_SUCCESS)
+    {
+        vmaFreeMemory(vmaAllocator, bufferWrap.bufferAlloc);
+        bufferWrap.bufferAlloc = VK_NULL_HANDLE;
+        vkDestroyBuffer(device->getLogicalDevice(), bufferWrap.bufferHandle, nullptr);
+        bufferWrap.bufferHandle = VK_NULL_HANDLE;
+        coronaHardwareCheck(bindResult);
+    }
+
+    bufferWrap.hostImportedManualBind = true;
 
     bufferWrap.bufferAllocInfo.size = size;
     return bufferWrap;
