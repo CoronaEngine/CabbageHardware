@@ -151,31 +151,15 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    std::cout << "[Examples] Runtime config: scenario="
-              << config.scenario
-              << ", window_count="
-              << config.window_count
-              << ", size="
-              << config.window_width
-              << "x"
-              << config.window_height
-              << ", backend_mode="
-              << static_cast<int>(config.backend_mode)
-              << ", queue_depth="
-              << config.queue_depth
-              << '\n';
-
     register_default_scenario();
     register_triangle_scenario();
     register_texture_scenario();
 
-    std::cout << "[Examples] Calling glfwInit()" << '\n';
     if (glfwInit() < 0)
     {
         std::cerr << "glfwInit failed.\n";
         return -1;
     }
-    std::cout << "[Examples] glfwInit() succeeded" << '\n';
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
     std::vector<std::unique_ptr<WindowContext>> windows;
@@ -209,11 +193,6 @@ int main(int argc, char **argv)
         auto ctx = std::make_unique<WindowContext>(i, backend, config.queue_depth);
 
         std::string title = "Cabbage Engine [" + std::string(backend_name(backend)) + "] #" + std::to_string(i);
-        std::cout << "[Examples] Creating GLFW window "
-                  << i
-                  << " with backend "
-                  << backend_name(backend)
-                  << '\n';
         ctx->window = glfwCreateWindow(static_cast<int>(config.window_width),
                                        static_cast<int>(config.window_height),
                                        title.c_str(),
@@ -225,10 +204,6 @@ int main(int argc, char **argv)
             destroy_windows_and_terminate();
             return -1;
         }
-        std::cout << "[Examples] GLFW window "
-                  << i
-                  << " created successfully"
-                  << '\n';
 
         HardwareImageCreateInfo create_info;
         create_info.width = config.window_width;
@@ -237,22 +212,11 @@ int main(int argc, char **argv)
         create_info.usage = ImageUsage::StorageImage;
         create_info.arrayLayers = 1;
         create_info.mipLevels = 1;
-        std::cout << "[Examples] Creating output image for window "
-                  << i
-                  << '\n';
         ctx->output_image = HardwareImage(create_info);
-        std::cout << "[Examples] Output image created for window "
-                  << i
-                  << '\n';
 
         windows.push_back(std::move(ctx));
         WindowContext *window_ctx = windows.back().get();
 
-        std::cout << "[Examples] Creating scenario '"
-                  << config.scenario
-                  << "' for window "
-                  << i
-                  << '\n';
         window_ctx->scenario = create_scenario(config.scenario, config);
         if (!window_ctx->scenario)
         {
@@ -261,18 +225,8 @@ int main(int argc, char **argv)
             destroy_windows_and_terminate();
             return -1;
         }
-        std::cout << "[Examples] Scenario '"
-                  << config.scenario
-                  << "' created for window "
-                  << i
-                  << '\n';
 
         std::string scenario_error;
-        std::cout << "[Examples] Initializing scenario '"
-                  << config.scenario
-                  << "' for window "
-                  << i
-                  << '\n';
         if (!window_ctx->scenario->init(config, backend, window_ctx->output_image, scenario_error))
         {
             std::cerr << "Scenario init failed for window #" << i << ": " << scenario_error << '\n';
@@ -280,11 +234,6 @@ int main(int argc, char **argv)
             destroy_windows_and_terminate();
             return -1;
         }
-        std::cout << "[Examples] Scenario '"
-                  << config.scenario
-                  << "' initialized for window "
-                  << i
-                  << '\n';
     }
 
     std::atomic_bool running{true};
