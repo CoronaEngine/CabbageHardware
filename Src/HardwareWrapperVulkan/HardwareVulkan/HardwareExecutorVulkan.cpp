@@ -3,8 +3,6 @@
 #include "corona/kernel/core/i_logger.h"
 #include <algorithm>
 
-namespace
-{
 struct GraphicsSubmitChainState
 {
     VkSemaphore semaphore{VK_NULL_HANDLE};
@@ -47,7 +45,6 @@ std::vector<VkSemaphoreSubmitInfo> mergeSemaphoreSubmitInfos(const std::vector<V
 
     return mergedInfos;
 }
-} // namespace
 
 // ========== 析构函数：等待所有延迟释放的资源完成 ==========
 HardwareExecutorVulkan::~HardwareExecutorVulkan()
