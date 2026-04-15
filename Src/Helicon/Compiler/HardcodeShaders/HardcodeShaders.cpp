@@ -1,3 +1,0 @@
-#include"HardcodeShaders.h"
-std::unordered_map<std::string,std::unordered_map<std::string, std::variant<EmbeddedShader::ShaderCodeModule::ShaderResources,std::variant<std::vector<uint32_t>,std::string>>>*> EmbeddedShader::HardcodeShaders::hardcodeShaders = {{"VertexShader",&hardcodeShadersVertexShader},{"FragmentShader",&hardcodeShadersFragmentShader},
-};

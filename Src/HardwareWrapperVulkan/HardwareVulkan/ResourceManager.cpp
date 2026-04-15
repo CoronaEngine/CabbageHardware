@@ -146,8 +146,7 @@ void ResourceManager::createVmaAllocator()
     }
 
 #ifdef CABBAGE_ENGINE_DEBUG
-    const auto toGB = [](uint64_t bytes) -> double 
-    {
+    const auto toGB = [](uint64_t bytes) -> double {
         return bytes / 1073741824.0; // 1024^3
     };
 
@@ -192,7 +191,7 @@ void ResourceManager::createBindlessDescriptorSet()
         std::function<uint32_t(const VkPhysicalDeviceDescriptorIndexingProperties &)> computeMaxCount;
     };
 
-    #ifdef CABBAGE_ENGINE_DEBUG
+#ifdef CABBAGE_ENGINE_DEBUG
     // CFW_LOG_DEBUG("[ResourceManager] Descriptor Indexing Properties:\n"
     //               "  maxUpdateAfterBindDescriptorsInAllPools: {}\n"
     //               "  maxPerStageUpdateAfterBindResources: {}\n"
@@ -261,9 +260,7 @@ void ResourceManager::createBindlessDescriptorSet()
         maxResourceCounts[i] = configs[i].computeMaxCount(cachedIndexingProperties);
     }
 
-    constexpr VkDescriptorBindingFlags bindingFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT 
-                                                    | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT 
-                                                    | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+    constexpr VkDescriptorBindingFlags bindingFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
 
     VkDevice logicalDevice = device->getLogicalDevice();
 
@@ -851,28 +848,32 @@ void ResourceManager::destroyBuffer(BufferHardwareWrap &buffer)
     {
         // 修复2: 使用基于 timeline semaphore 的延迟销毁，避免 vkDeviceWaitIdle 阻塞
         // vkDeviceWaitIdle 会阻塞整个设备，导致多线程场景下的竞态条件和 TDR
-        
+
         // 收集所有队列的当前 timeline 值，等待所有正在进行的 GPU 操作完成
         std::vector<VkSemaphore> semaphores;
         std::vector<uint64_t> waitValues;
-        
-        auto collectQueueSemaphores = [&](const std::vector<DeviceManager::QueueUtils>& queues) {
-            for (const auto& queue : queues) {
-                if (queue.timelineSemaphore != VK_NULL_HANDLE && queue.timelineValue) {
+
+        auto collectQueueSemaphores = [&](const std::vector<DeviceManager::QueueUtils> &queues) {
+            for (const auto &queue : queues)
+            {
+                if (queue.timelineSemaphore != VK_NULL_HANDLE && queue.timelineValue)
+                {
                     uint64_t currentValue = queue.timelineValue->load(std::memory_order_acquire);
-                    if (currentValue > 0) {
+                    if (currentValue > 0)
+                    {
                         semaphores.push_back(queue.timelineSemaphore);
                         waitValues.push_back(currentValue);
                     }
                 }
             }
         };
-        
+
         collectQueueSemaphores(device->graphicsQueues);
         collectQueueSemaphores(device->computeQueues);
         collectQueueSemaphores(device->transferQueues);
-        
-        if (!semaphores.empty()) {
+
+        if (!semaphores.empty())
+        {
             VkSemaphoreWaitInfo waitInfo{};
             waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
             waitInfo.pNext = nullptr;
@@ -880,26 +881,40 @@ void ResourceManager::destroyBuffer(BufferHardwareWrap &buffer)
             waitInfo.semaphoreCount = static_cast<uint32_t>(semaphores.size());
             waitInfo.pSemaphores = semaphores.data();
             waitInfo.pValues = waitValues.data();
-            
+
             // 设置合理的超时时间（2秒），避免无限等待
             constexpr uint64_t timeoutNs = 2'000'000'000ULL;
-            
+
             VkResult result = vkWaitSemaphores(device->getLogicalDevice(), &waitInfo, timeoutNs);
-            if (result == VK_TIMEOUT) {
+            if (result == VK_TIMEOUT)
+            {
                 CFW_LOG_WARNING("[ResourceManager] destroyBuffer: timeout waiting for GPU operations, forcing device wait");
                 vkDeviceWaitIdle(device->getLogicalDevice());
-            } else if (result != VK_SUCCESS && result != VK_ERROR_DEVICE_LOST) {
+            }
+            else if (result != VK_SUCCESS && result != VK_ERROR_DEVICE_LOST)
+            {
                 CFW_LOG_ERROR("[ResourceManager] destroyBuffer: vkWaitSemaphores failed with {}", static_cast<int>(result));
                 // 回退到 vkDeviceWaitIdle
                 vkDeviceWaitIdle(device->getLogicalDevice());
             }
             // 如果是 VK_ERROR_DEVICE_LOST，不再调用任何 Vulkan API，直接清理
-        } else {
+        }
+        else
+        {
             // 没有活跃的 timeline semaphore，说明没有进行中的 GPU 操作
             // 这种情况下可以安全地直接销毁
         }
-        
-        vmaDestroyBuffer(vmaAllocator, buffer.bufferHandle, buffer.bufferAlloc);
+
+        if (buffer.hostImportedManualBind)
+        {
+            vkDestroyBuffer(device->getLogicalDevice(), buffer.bufferHandle, nullptr);
+            vmaFreeMemory(vmaAllocator, buffer.bufferAlloc);
+            buffer.hostImportedManualBind = false;
+        }
+        else
+        {
+            vmaDestroyBuffer(vmaAllocator, buffer.bufferHandle, buffer.bufferAlloc);
+        }
 
         buffer.bufferHandle = VK_NULL_HANDLE;
         buffer.bufferAlloc = VK_NULL_HANDLE;
@@ -1064,6 +1079,8 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *host
     BufferHardwareWrap bufferWrap{};
     bufferWrap.device = device;
     bufferWrap.resourceManager = this;
+    bufferWrap.elementCount = static_cast<uint32_t>(size);
+    bufferWrap.elementSize = 1;
     bufferWrap.bufferUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
                              VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
@@ -1085,6 +1102,13 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *host
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size;
     bufferInfo.usage = bufferWrap.bufferUsage;
+
+    // Host-pointer import requires matching external handle type on the buffer.
+    VkExternalMemoryBufferCreateInfo externalMemoryInfo{};
+    externalMemoryInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO;
+    externalMemoryInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
+    externalMemoryInfo.pNext = nullptr;
+    bufferInfo.pNext = &externalMemoryInfo;
 
     // P0 修复：与 createBuffer 保持一致，多队列族时使用 CONCURRENT 模式
     // 跨设备传输场景下 host buffer 可能在 transfer/graphics 不同队列族间使用
@@ -1111,23 +1135,52 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *host
     importInfo.pHostPointer = hostPtr;
 
     VmaAllocationCreateInfo allocInfo{};
-    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
-    allocInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT |
-                      VMA_ALLOCATION_CREATE_MAPPED_BIT |
-                      VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+    allocInfo.usage = VMA_MEMORY_USAGE_UNKNOWN;
+    allocInfo.flags = 0;
 
     // 指定允许的内存类型（基于查询到的主机指针属性）
     allocInfo.requiredFlags = 0;
     allocInfo.preferredFlags = 0;
     allocInfo.memoryTypeBits = hostPointerProps.memoryTypeBits;
 
-    coronaHardwareCheck(vmaCreateDedicatedBuffer(vmaAllocator,
-                                                 &bufferInfo,
-                                                 &allocInfo,
-                                                 &importInfo,
-                                                 &bufferWrap.bufferHandle,
-                                                 &bufferWrap.bufferAlloc,
-                                                 &bufferWrap.bufferAllocInfo));
+    coronaHardwareCheck(vkCreateBuffer(device->getLogicalDevice(), &bufferInfo, nullptr, &bufferWrap.bufferHandle));
+
+    VkMemoryRequirements memReq{};
+    vkGetBufferMemoryRequirements(device->getLogicalDevice(), bufferWrap.bufferHandle, &memReq);
+
+    // 同时满足 host pointer 支持的类型和 buffer 的内存需求
+    allocInfo.memoryTypeBits &= memReq.memoryTypeBits;
+    if (allocInfo.memoryTypeBits == 0)
+    {
+        vkDestroyBuffer(device->getLogicalDevice(), bufferWrap.bufferHandle, nullptr);
+        bufferWrap.bufferHandle = VK_NULL_HANDLE;
+        throw std::runtime_error("Cannot import host buffer: no compatible memory type between host pointer and buffer requirements");
+    }
+
+    VkResult allocResult = vmaAllocateDedicatedMemory(vmaAllocator,
+                                                      &memReq,
+                                                      &allocInfo,
+                                                      &importInfo,
+                                                      &bufferWrap.bufferAlloc,
+                                                      &bufferWrap.bufferAllocInfo);
+    if (allocResult != VK_SUCCESS)
+    {
+        vkDestroyBuffer(device->getLogicalDevice(), bufferWrap.bufferHandle, nullptr);
+        bufferWrap.bufferHandle = VK_NULL_HANDLE;
+        coronaHardwareCheck(allocResult);
+    }
+
+    VkResult bindResult = vmaBindBufferMemory(vmaAllocator, bufferWrap.bufferAlloc, bufferWrap.bufferHandle);
+    if (bindResult != VK_SUCCESS)
+    {
+        vmaFreeMemory(vmaAllocator, bufferWrap.bufferAlloc);
+        bufferWrap.bufferAlloc = VK_NULL_HANDLE;
+        vkDestroyBuffer(device->getLogicalDevice(), bufferWrap.bufferHandle, nullptr);
+        bufferWrap.bufferHandle = VK_NULL_HANDLE;
+        coronaHardwareCheck(bindResult);
+    }
+
+    bufferWrap.hostImportedManualBind = true;
 
     bufferWrap.bufferAllocInfo.size = size;
     return bufferWrap;
@@ -1253,10 +1306,14 @@ ResourceManager &ResourceManager::copyImage(VkCommandBuffer &commandBuffer,
 
         VkImageCopy copyRegion{};
         copyRegion.srcSubresource.aspectMask = source.aspectMask;
+        // copyRegion.srcSubresource.layerCount = source.arrayLayers;
         copyRegion.srcSubresource.mipLevel = srcMip;
         copyRegion.srcSubresource.baseArrayLayer = srcLayer;
         copyRegion.srcSubresource.layerCount = 1;
         copyRegion.dstSubresource.aspectMask = destination.aspectMask;
+        // copyRegion.dstSubresource.layerCount = destination.arrayLayers;
+        // copyRegion.extent.width = std::min(source.imageSize.x, destination.imageSize.x);
+        // copyRegion.extent.height = std::min(source.imageSize.y, destination.imageSize.y);
         copyRegion.dstSubresource.mipLevel = dstMip;
         copyRegion.dstSubresource.baseArrayLayer = dstLayer;
         copyRegion.dstSubresource.layerCount = 1;
@@ -1427,8 +1484,10 @@ void ResourceManager::transitionImageLayout(VkCommandBuffer &commandBuffer,
     imageBarrier.newLayout = newLayout;
     imageBarrier.subresourceRange.aspectMask = image.aspectMask;
     imageBarrier.subresourceRange.baseMipLevel = 0;
+    // imageBarrier.subresourceRange.levelCount = 1;
     imageBarrier.subresourceRange.levelCount = std::max(1u, image.mipLevels);
     imageBarrier.subresourceRange.baseArrayLayer = 0;
+    // imageBarrier.subresourceRange.layerCount = 1;
     imageBarrier.subresourceRange.layerCount = std::max(1u, image.arrayLayers);
     imageBarrier.pNext = nullptr;
 

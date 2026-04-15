@@ -1,4 +1,4 @@
-#include "texture_scenario.h"
+﻿#include "texture_scenario.h"
 
 #include <array>
 #include <cmath>

@@ -7,7 +7,7 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/memory/cache_aligned_allocator.h"
 
-//#define USE_SAME_DEVICE
+// #define USE_SAME_DEVICE
 
 DisplayManager::DisplayManager() = default;
 
@@ -104,7 +104,7 @@ void DisplayManager::cleanUpDisplayManager()
     // 清理状态
     presentQueues.clear();
     mainDeviceExecutor.reset();
-    //displayDeviceExecutors.clear();
+    // displayDeviceExecutors.clear();
     displayDeviceExecutor.reset();
     waitedExecutor.reset();
     displaySurface = nullptr;
@@ -240,14 +240,14 @@ void DisplayManager::createSyncObjects()
 
     imageAvailableSemaphores.resize(imageCount);
     renderFinishedSemaphores.resize(imageCount);
-    acquireFences.resize(imageCount);  // 用于 vkAcquireNextImageKHR 同步
+    acquireFences.resize(imageCount); // 用于 vkAcquireNextImageKHR 同步
 
     VkSemaphoreCreateInfo semaphoreInfo{};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
     VkFenceCreateInfo fenceInfo{};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;  // 首帧无需等待
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // 首帧无需等待
 
     VkDevice device = displayDevice->deviceManager.getLogicalDevice();
 
@@ -519,7 +519,7 @@ void DisplayManager::recreateSwapChain()
     waitPresentQueuesIdle();
 
     cleanupSyncObjects();
-    //displayDeviceExecutors.clear();
+    // displayDeviceExecutors.clear();
     cleanupSwapChainImages();
 
     createSwapChain();
@@ -633,7 +633,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         if (waitedExecutor)
         {
             mainDeviceExecutor->wait(*waitedExecutor);
-            //displayDeviceExecutors[currentFrame]->wait(*waitedExecutor);
+            // displayDeviceExecutors[currentFrame]->wait(*waitedExecutor);
             displayDeviceExecutor->wait(*waitedExecutor);
         }
 
@@ -656,7 +656,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
 
         // 等待 Acquire Fence (替代 Present Fence，用于确保图像可用)
         VkDevice device = displayDevice->deviceManager.getLogicalDevice();
-        
+
         VkResult fenceResult = vkWaitForFences(device, 1, &acquireFences[currentFrame], VK_TRUE, UINT64_MAX);
         if (fenceResult != VK_SUCCESS)
         {
@@ -752,7 +752,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = &swapChain;
         presentInfo.pImageIndices = &imageIndex;
-        presentInfo.pNext = nullptr;  // 不再使用 VkSwapchainPresentFenceInfoKHR
+        presentInfo.pNext = nullptr; // 不再使用 VkSwapchainPresentFenceInfoKHR
 
         // 移除: VK_EXT_swapchain_maintenance1 相关代码
         // VkSwapchainPresentFenceInfoKHR presentFenceInfo{};

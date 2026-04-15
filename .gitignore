@@ -64,4 +64,4 @@ _deps/
 ehthumbs.db
 Thumbs.db
 
-Src/Helicon/Helicon/Compiler/HardcodeShaders/*
+Src/Helicon/Compiler/HardcodeShaders/*

@@ -112,7 +112,7 @@ namespace EmbeddedShader
 		glslang::TShader shader(stage);
 		shader.setStrings(shaderSources.data(), 1);
 		shader.setEnvInput(shaderLang, stage, glslang::EShClientVulkan, 460);
-		shader.setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_3);
+		shader.setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_4);
 		shader.setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_6);
 
 		if (isLink) shader.setEntryPoint("main");

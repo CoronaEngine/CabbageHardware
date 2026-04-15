@@ -18,6 +18,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+if(MSVC)
+    # Read source files as UTF-8 so Chinese comments do not break parsing under legacy code pages.
+    add_compile_options(/utf-8)
+endif()
+
 add_compile_definitions(
     $<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>
     NOMINMAX
@@ -80,7 +85,7 @@ FetchContent_MakeAvailable(SPIRV-Cross)
 FetchContent_Declare(
     SPIRV-Headers
     GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Headers.git
-    GIT_TAG vulkan-sdk-1.4.335.0
+    GIT_TAG vulkan-sdk-1.4.341
     EXCLUDE_FROM_ALL
 )
 FetchContent_MakeAvailable(SPIRV-Headers)
@@ -88,7 +93,7 @@ FetchContent_MakeAvailable(SPIRV-Headers)
 FetchContent_Declare(
     SPIRV-Tools
     GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Tools.git
-    GIT_TAG vulkan-sdk-1.4.335.0
+    GIT_TAG vulkan-sdk-1.4.341
     EXCLUDE_FROM_ALL
 )
 FetchContent_MakeAvailable(SPIRV-Tools)
@@ -146,7 +151,7 @@ FetchContent_MakeAvailable(volk)
 FetchContent_Declare(
     Vulkan-Headers
     GIT_REPOSITORY https://github.com/KhronosGroup/Vulkan-Headers.git
-    GIT_TAG main
+    GIT_TAG v1.4.341
     EXCLUDE_FROM_ALL
 )
 FetchContent_MakeAvailable(Vulkan-Headers)

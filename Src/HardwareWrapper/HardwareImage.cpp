@@ -532,7 +532,8 @@ uint32_t HardwareImage::storeDescriptor()
 void HardwareImage::setClearColor(float r, float g, float b, float a)
 {
     auto const self_image_id = imageID.load(std::memory_order_acquire);
-    if (self_image_id == 0) return;
+    if (self_image_id == 0)
+        return;
     auto handle = globalImageStorages.acquire_write(self_image_id);
     handle->clearValue.color = {{r, g, b, a}};
 }
