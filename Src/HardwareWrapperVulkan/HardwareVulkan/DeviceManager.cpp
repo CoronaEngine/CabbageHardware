@@ -105,7 +105,7 @@ void DeviceManager::cleanUpDeviceManager()
 
     queueFamilies.clear();
 
-    vkDestroyDevice(logicalDevice, nullptr);
+    // vkDestroyDevice(logicalDevice, nullptr);
     logicalDevice = VK_NULL_HANDLE;
     physicalDevice = VK_NULL_HANDLE;
 
@@ -271,39 +271,41 @@ void DeviceManager::createDevices(const CreateCallback &initInfo, const VkInstan
 
 void DeviceManager::createQueueUtils()
 {
-    auto createTimelineSemaphoreForQueue = [&](QueueUtils &queue) {
-        VkExportSemaphoreCreateInfo exportInfo{};
-        exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
-        exportInfo.pNext = nullptr;
+    auto createTimelineSemaphoreForQueue = [&](QueueUtils &queue) 
+        {
+            VkExportSemaphoreCreateInfo exportInfo{};
+            exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
+            exportInfo.pNext = nullptr;
 #if _WIN32 || _WIN64
-        exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+            exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
 #elif __linux__
-        exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+            exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
 #endif
-        VkSemaphoreTypeCreateInfo typeCreateInfo{};
-        typeCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
-        typeCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-        typeCreateInfo.initialValue = 0;
-        typeCreateInfo.pNext = &exportInfo;
+            VkSemaphoreTypeCreateInfo typeCreateInfo{};
+            typeCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+            typeCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+            typeCreateInfo.initialValue = 0;
+            typeCreateInfo.pNext = &exportInfo;
 
-        VkSemaphoreCreateInfo semaphoreInfo{};
-        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-        semaphoreInfo.pNext = &typeCreateInfo;
-        semaphoreInfo.flags = 0;
+            VkSemaphoreCreateInfo semaphoreInfo{};
+            semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+            semaphoreInfo.pNext = &typeCreateInfo;
+            semaphoreInfo.flags = 0;
 
-        coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &queue.timelineSemaphore));
+            coronaHardwareCheck(vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr, &queue.timelineSemaphore));
 
 #ifdef CABBAGE_ENGINE_DEBUG
-        uint64_t initialValue = UINT64_MAX;
-        vkGetSemaphoreCounterValue(logicalDevice, queue.timelineSemaphore, &initialValue);
-        if (initialValue != 0)
-        {
-            CFW_LOG_ERROR("Timeline semaphore initial value is {}, expected 0!", initialValue);
-        }
+            uint64_t initialValue = UINT64_MAX;
+            vkGetSemaphoreCounterValue(logicalDevice, queue.timelineSemaphore, &initialValue);
+            if (initialValue != 0)
+            {
+                CFW_LOG_ERROR("Timeline semaphore initial value is {}, expected 0!", initialValue);
+            }
 #endif
-    };
+        };
 
-    auto createCommandBufferForQueue = [this](QueueUtils &queue) {
+    auto createCommandBufferForQueue = [this](QueueUtils &queue) 
+    {
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -359,6 +361,7 @@ void DeviceManager::createQueueUtils()
             }
         }
     }
+
 }
 
 // bool DeviceManager::createCommandBuffers() {
@@ -468,10 +471,10 @@ VkSemaphore DeviceManager::getOrImportTimelineSemaphore(const QueueUtils &foreig
 
     //// 跨设备 semaphore 未预导入：可能是不兼容的设备对（如不同架构 GPU），
     //// 调用方应检查返回值并回退到 CPU 侧同步
-    // CFW_LOG_WARNING("[DeviceManager] Cross-device semaphore not pre-imported (foreign={} on device={}). "
-    //                 "Devices may not support opaque handle sharing. Caller should fall back to CPU-side sync.",
-    //                 reinterpret_cast<uintptr_t>(foreignQueue.timelineSemaphore),
-    //                 reinterpret_cast<uintptr_t>(logicalDevice));
+    //CFW_LOG_WARNING("[DeviceManager] Cross-device semaphore not pre-imported (foreign={} on device={}). "
+    //                "Devices may not support opaque handle sharing. Caller should fall back to CPU-side sync.",
+    //                reinterpret_cast<uintptr_t>(foreignQueue.timelineSemaphore),
+    //                reinterpret_cast<uintptr_t>(logicalDevice));
     return VK_NULL_HANDLE;
 }
 
@@ -487,7 +490,7 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
 
             VkSemaphore foreignSem = foreignQueue.timelineSemaphore;
             ExternalSemaphoreHandle handle = foreignDevice->exportSemaphore(foreignSem);
-            if (handle.handle == nullptr)
+            if(handle.handle == nullptr)
             {
                 CFW_LOG_ERROR("[DeviceManager] Failed to export timeline semaphore from foreign device {}. Skipping import.",
                               reinterpret_cast<uintptr_t>(foreignDevice->logicalDevice));
@@ -568,7 +571,7 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
         timelineTypeInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
         timelineTypeInfo.pNext = nullptr;
         timelineTypeInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-        timelineTypeInfo.initialValue = 0;
+        timelineTypeInfo.initialValue = 0; 
 
         VkPhysicalDeviceExternalSemaphoreInfo localExternalSemInfo{};
         localExternalSemInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO;
@@ -596,12 +599,12 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
 
         if (!localCanImport || !foreignCanExport)
         {
-            // CFW_LOG_WARNING("[DeviceManager] Cross-device semaphore sharing not supported between "
-            //                 "local device={} (import={}) and foreign device={} (export={}). "
-            //                 "Likely different GPU architectures (e.g. GTX 1080 + RTX 2080). "
-            //                 "Cross-device synchronization will fall back to CPU-side wait.",
-            //                 reinterpret_cast<uintptr_t>(physicalDevice), localCanImport,
-            //                 reinterpret_cast<uintptr_t>(other->physicalDevice), foreignCanExport);
+            //CFW_LOG_WARNING("[DeviceManager] Cross-device semaphore sharing not supported between "
+            //                "local device={} (import={}) and foreign device={} (export={}). "
+            //                "Likely different GPU architectures (e.g. GTX 1080 + RTX 2080). "
+            //                "Cross-device synchronization will fall back to CPU-side wait.",
+            //                reinterpret_cast<uintptr_t>(physicalDevice), localCanImport,
+            //                reinterpret_cast<uintptr_t>(other->physicalDevice), foreignCanExport);
             continue;
         }
 
@@ -610,7 +613,7 @@ void DeviceManager::importForeignSemaphores(const std::vector<DeviceManager *> &
         importFromQueues(other->transferQueues, other);
     }
 
-    // CFW_LOG_INFO("[DeviceManager] Pre-imported {} foreign timeline semaphores on device {}",
-    //              importedTimelineSemaphores.size(),
-    //              reinterpret_cast<uintptr_t>(logicalDevice));
+    //CFW_LOG_INFO("[DeviceManager] Pre-imported {} foreign timeline semaphores on device {}",
+    //             importedTimelineSemaphores.size(),
+    //             reinterpret_cast<uintptr_t>(logicalDevice));
 }

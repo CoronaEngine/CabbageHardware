@@ -3,8 +3,6 @@
 #include "HardwareWrapperVulkan/HardwareContext.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
 
-#include <unordered_set>
-
 #define VK_NO_PROTOTYPES
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
@@ -146,7 +144,8 @@ void ResourceManager::createVmaAllocator()
     }
 
 #ifdef CABBAGE_ENGINE_DEBUG
-    const auto toGB = [](uint64_t bytes) -> double {
+    const auto toGB = [](uint64_t bytes) -> double 
+    {
         return bytes / 1073741824.0; // 1024^3
     };
 
@@ -191,7 +190,7 @@ void ResourceManager::createBindlessDescriptorSet()
         std::function<uint32_t(const VkPhysicalDeviceDescriptorIndexingProperties &)> computeMaxCount;
     };
 
-#ifdef CABBAGE_ENGINE_DEBUG
+    #ifdef CABBAGE_ENGINE_DEBUG
     // CFW_LOG_DEBUG("[ResourceManager] Descriptor Indexing Properties:\n"
     //               "  maxUpdateAfterBindDescriptorsInAllPools: {}\n"
     //               "  maxPerStageUpdateAfterBindResources: {}\n"
@@ -260,7 +259,9 @@ void ResourceManager::createBindlessDescriptorSet()
         maxResourceCounts[i] = configs[i].computeMaxCount(cachedIndexingProperties);
     }
 
-    constexpr VkDescriptorBindingFlags bindingFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+    constexpr VkDescriptorBindingFlags bindingFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT 
+                                                    | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT 
+                                                    | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
 
     VkDevice logicalDevice = device->getLogicalDevice();
 
@@ -635,41 +636,29 @@ void ResourceManager::destroyImage(ImageHardwareWrap &image)
     }
 
     VkDevice logicalDevice = device->getLogicalDevice();
-    if (image.ownsImageViews)
-    {
-        std::unordered_set<VkImageView> viewsToDestroy;
-        if (image.imageView != VK_NULL_HANDLE)
-        {
-            viewsToDestroy.insert(image.imageView);
-        }
 
-        for (const auto &[_, view] : image.allSubViews)
-        {
-            if (view != VK_NULL_HANDLE)
-            {
-                viewsToDestroy.insert(view);
-            }
-        }
+    // if (image.generateMips) {
+    //     // 清理每个 mip level 的视图
+    //     for (auto& mipView : image.mipLevelImageViews) {
+    //         if (mipView != VK_NULL_HANDLE) {
+    //             vkDestroyImageView(logicalDevice, mipView, nullptr);
+    //         }
+    //     }
+    //     image.mipLevelImageViews.clear();
+    // }
 
-        for (VkImageView view : viewsToDestroy)
-        {
-            vkDestroyImageView(logicalDevice, view, nullptr);
-        }
-    }
+    // 清理主 ImageView
+    /*if (image.imageView != VK_NULL_HANDLE) {
+        vkDestroyImageView(logicalDevice, image.imageView, nullptr);
+        image.imageView = VK_NULL_HANDLE;
+    }*/
 
-    image.allSubViews.clear();
-    image.imageView = VK_NULL_HANDLE;
-
-    if (image.ownsImageMemory &&
-        image.imageHandle != VK_NULL_HANDLE &&
-        image.imageAlloc != VK_NULL_HANDLE)
-    {
+    // 销毁图像
+    /*if (image.imageHandle != VK_NULL_HANDLE) {
         vmaDestroyImage(vmaAllocator, image.imageHandle, image.imageAlloc);
-    }
-
-    image.imageHandle = VK_NULL_HANDLE;
-    image.imageAlloc = VK_NULL_HANDLE;
-    image.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        image.imageHandle = VK_NULL_HANDLE;
+        image.imageAlloc = VK_NULL_HANDLE;
+    }*/
 }
 
 ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(uint32_t elementCount,
@@ -848,32 +837,28 @@ void ResourceManager::destroyBuffer(BufferHardwareWrap &buffer)
     {
         // 修复2: 使用基于 timeline semaphore 的延迟销毁，避免 vkDeviceWaitIdle 阻塞
         // vkDeviceWaitIdle 会阻塞整个设备，导致多线程场景下的竞态条件和 TDR
-
+        
         // 收集所有队列的当前 timeline 值，等待所有正在进行的 GPU 操作完成
         std::vector<VkSemaphore> semaphores;
         std::vector<uint64_t> waitValues;
-
-        auto collectQueueSemaphores = [&](const std::vector<DeviceManager::QueueUtils> &queues) {
-            for (const auto &queue : queues)
-            {
-                if (queue.timelineSemaphore != VK_NULL_HANDLE && queue.timelineValue)
-                {
+        
+        auto collectQueueSemaphores = [&](const std::vector<DeviceManager::QueueUtils>& queues) {
+            for (const auto& queue : queues) {
+                if (queue.timelineSemaphore != VK_NULL_HANDLE && queue.timelineValue) {
                     uint64_t currentValue = queue.timelineValue->load(std::memory_order_acquire);
-                    if (currentValue > 0)
-                    {
+                    if (currentValue > 0) {
                         semaphores.push_back(queue.timelineSemaphore);
                         waitValues.push_back(currentValue);
                     }
                 }
             }
         };
-
+        
         collectQueueSemaphores(device->graphicsQueues);
         collectQueueSemaphores(device->computeQueues);
         collectQueueSemaphores(device->transferQueues);
-
-        if (!semaphores.empty())
-        {
+        
+        if (!semaphores.empty()) {
             VkSemaphoreWaitInfo waitInfo{};
             waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
             waitInfo.pNext = nullptr;
@@ -881,30 +866,25 @@ void ResourceManager::destroyBuffer(BufferHardwareWrap &buffer)
             waitInfo.semaphoreCount = static_cast<uint32_t>(semaphores.size());
             waitInfo.pSemaphores = semaphores.data();
             waitInfo.pValues = waitValues.data();
-
+            
             // 设置合理的超时时间（2秒），避免无限等待
             constexpr uint64_t timeoutNs = 2'000'000'000ULL;
-
+            
             VkResult result = vkWaitSemaphores(device->getLogicalDevice(), &waitInfo, timeoutNs);
-            if (result == VK_TIMEOUT)
-            {
+            if (result == VK_TIMEOUT) {
                 CFW_LOG_WARNING("[ResourceManager] destroyBuffer: timeout waiting for GPU operations, forcing device wait");
                 vkDeviceWaitIdle(device->getLogicalDevice());
-            }
-            else if (result != VK_SUCCESS && result != VK_ERROR_DEVICE_LOST)
-            {
+            } else if (result != VK_SUCCESS && result != VK_ERROR_DEVICE_LOST) {
                 CFW_LOG_ERROR("[ResourceManager] destroyBuffer: vkWaitSemaphores failed with {}", static_cast<int>(result));
                 // 回退到 vkDeviceWaitIdle
                 vkDeviceWaitIdle(device->getLogicalDevice());
             }
             // 如果是 VK_ERROR_DEVICE_LOST，不再调用任何 Vulkan API，直接清理
-        }
-        else
-        {
+        } else {
             // 没有活跃的 timeline semaphore，说明没有进行中的 GPU 操作
             // 这种情况下可以安全地直接销毁
         }
-
+        
         if (buffer.hostImportedManualBind)
         {
             vkDestroyBuffer(device->getLogicalDevice(), buffer.bufferHandle, nullptr);
@@ -1303,17 +1283,17 @@ ResourceManager &ResourceManager::copyImage(VkCommandBuffer &commandBuffer,
         const uint32_t srcHeight = std::max(1u, source.imageSize.y >> srcMip);
         const uint32_t dstWidth = std::max(1u, destination.imageSize.x >> dstMip);
         const uint32_t dstHeight = std::max(1u, destination.imageSize.y >> dstMip);
-
+    
         VkImageCopy copyRegion{};
         copyRegion.srcSubresource.aspectMask = source.aspectMask;
-        // copyRegion.srcSubresource.layerCount = source.arrayLayers;
+        //copyRegion.srcSubresource.layerCount = source.arrayLayers;
         copyRegion.srcSubresource.mipLevel = srcMip;
         copyRegion.srcSubresource.baseArrayLayer = srcLayer;
         copyRegion.srcSubresource.layerCount = 1;
         copyRegion.dstSubresource.aspectMask = destination.aspectMask;
-        // copyRegion.dstSubresource.layerCount = destination.arrayLayers;
-        // copyRegion.extent.width = std::min(source.imageSize.x, destination.imageSize.x);
-        // copyRegion.extent.height = std::min(source.imageSize.y, destination.imageSize.y);
+        //copyRegion.dstSubresource.layerCount = destination.arrayLayers;
+        //copyRegion.extent.width = std::min(source.imageSize.x, destination.imageSize.x);
+        //copyRegion.extent.height = std::min(source.imageSize.y, destination.imageSize.y);
         copyRegion.dstSubresource.mipLevel = dstMip;
         copyRegion.dstSubresource.baseArrayLayer = dstLayer;
         copyRegion.dstSubresource.layerCount = 1;
@@ -1484,10 +1464,10 @@ void ResourceManager::transitionImageLayout(VkCommandBuffer &commandBuffer,
     imageBarrier.newLayout = newLayout;
     imageBarrier.subresourceRange.aspectMask = image.aspectMask;
     imageBarrier.subresourceRange.baseMipLevel = 0;
-    // imageBarrier.subresourceRange.levelCount = 1;
+    //imageBarrier.subresourceRange.levelCount = 1;
     imageBarrier.subresourceRange.levelCount = std::max(1u, image.mipLevels);
     imageBarrier.subresourceRange.baseArrayLayer = 0;
-    // imageBarrier.subresourceRange.layerCount = 1;
+    //imageBarrier.subresourceRange.layerCount = 1;
     imageBarrier.subresourceRange.layerCount = std::max(1u, image.arrayLayers);
     imageBarrier.pNext = nullptr;
 

@@ -16,15 +16,6 @@ HardwareContext::HardwareContext()
         throw std::runtime_error("Failed to initialize Volk!");
     }
 
-    uint32_t instanceVersion = 0;
-    if (vkEnumerateInstanceVersion(&instanceVersion) == VK_SUCCESS)
-    {
-        CFW_LOG_INFO("Vulkan Instance Version: {}.{}.{}",
-                      VK_API_VERSION_MAJOR(instanceVersion),
-                      VK_API_VERSION_MINOR(instanceVersion),
-                      VK_API_VERSION_PATCH(instanceVersion));
-    }
-
     prepareFeaturesChain();
     createVkInstance(hardwareCreateInfos);
 
@@ -68,7 +59,7 @@ HardwareContext::HardwareContext()
         throw std::runtime_error("No Vulkan 1.4-capable GPU found.");
     }
 
-    // setupCrossDeviceSemaphores();
+    //setupCrossDeviceSemaphores();
 
     chooseMainDevice();
 
@@ -93,7 +84,7 @@ HardwareContext::~HardwareContext()
 
     if (vkInstance != VK_NULL_HANDLE)
     {
-        vkDestroyInstance(vkInstance, nullptr);
+        // vkDestroyInstance(vkInstance, nullptr);
         vkInstance = VK_NULL_HANDLE;
     }
 }
@@ -129,7 +120,7 @@ void HardwareContext::prepareFeaturesChain()
             VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
             VK_KHR_16BIT_STORAGE_EXTENSION_NAME,
             VK_KHR_MULTIVIEW_EXTENSION_NAME,
-            // VK_AMD_GPU_SHADER_HALF_FLOAT_EXTENSION_NAME,
+            //VK_AMD_GPU_SHADER_HALF_FLOAT_EXTENSION_NAME,
             VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
             VK_EXT_SHADER_SUBGROUP_BALLOT_EXTENSION_NAME,
             VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
