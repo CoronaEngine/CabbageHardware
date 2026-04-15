@@ -122,25 +122,9 @@ void CopyImageCommand::commitCommand(HardwareExecutorVulkan &hardwareExecutor)
     }
 }
 
-    if ((dstImage.imageUsage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT)) != 0 &&
-        dstImage.imageLayout != VK_IMAGE_LAYOUT_GENERAL)
-    {
-        hardwareExecutor.hardwareContext->resourceManager.transitionImageLayout(
-            hardwareExecutor.currentRecordQueue->commandBuffer,
-            dstImage,
-            VK_IMAGE_LAYOUT_GENERAL,
-            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-            VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
-    }
-}
-
 CommandRecordVulkan::RequiredBarriers CopyImageCommand::getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor)
 {
     CommandRecordVulkan::RequiredBarriers requiredBarriers;
-    const uint32_t srcMipIndex = (srcImage.mipLevels > 0 && srcMip < srcImage.mipLevels) ? srcMip : 0;
-    const uint32_t dstMipIndex = (dstImage.mipLevels > 0 && dstMip < dstImage.mipLevels) ? dstMip : 0;
-    const uint32_t srcLayerIndex = (srcImage.arrayLayers > 0 && srcLayer < srcImage.arrayLayers) ? srcLayer : 0;
-    const uint32_t dstLayerIndex = (dstImage.arrayLayers > 0 && dstLayer < dstImage.arrayLayers) ? dstLayer : 0;
 
     if (srcImage.imageFormat != dstImage.imageFormat ||
         srcLayer >= std::max(1u, srcImage.arrayLayers) ||
@@ -264,7 +248,7 @@ CommandRecordVulkan::RequiredBarriers CopyBufferToImageCommand::getRequiredBarri
         dstImageBarrier.srcAccessMask = 0; // 初始转换，没有源访问
         dstImageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
         dstImageBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-        //dstImageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; // 从未定义布局开始
+        // dstImageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; // 从未定义布局开始
         dstImageBarrier.oldLayout = dstImage.imageLayout;
         dstImageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         dstImageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;

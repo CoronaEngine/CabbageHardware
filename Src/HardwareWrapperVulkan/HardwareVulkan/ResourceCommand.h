@@ -18,10 +18,6 @@ struct CopyImageCommand : public CommandRecordVulkan
 {
     ResourceManager::ImageHardwareWrap &srcImage;
     ResourceManager::ImageHardwareWrap &dstImage;
-    uint32_t srcLayer;
-    uint32_t dstLayer;
-    uint32_t srcMip;
-    uint32_t dstMip;
 
     uint32_t srcLayer;
     uint32_t dstLayer;
