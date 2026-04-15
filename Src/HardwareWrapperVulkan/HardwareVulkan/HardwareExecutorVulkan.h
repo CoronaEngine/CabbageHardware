@@ -195,8 +195,8 @@ struct HardwareExecutorVulkan
     // void disposeWhenCommitCompletes(std::function<void()> &&deallocator);
 
     DeviceManager::QueueUtils *pickQueueAndCommit(std::atomic_uint16_t &queueIndex,
-                                                         std::vector<DeviceManager::QueueUtils> &queues,
-                                                         std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand);
+                                                  std::vector<DeviceManager::QueueUtils> &queues,
+                                                  std::function<bool(DeviceManager::QueueUtils *currentRecordQueue)> commitCommand);
 
     DeviceManager::QueueUtils *currentRecordQueue{nullptr};
     uint64_t lastSignalValue{0}; // 记录最近一次提交的 signal timeline 值，避免跨原子操作竞态
