@@ -72,7 +72,6 @@ class DisplayManager
     void cleanupSwapChainImages();
     void cleanupStagingBuffers();
     void cleanupDisplayImage();
-    void waitPresentQueuesIdle();
 
     bool needsSwapChainRecreation(const ktm::uvec2 &newSize) const;
     void setupCrossDeviceTransfer(const ResourceManager::ImageHardwareWrap &sourceImage);

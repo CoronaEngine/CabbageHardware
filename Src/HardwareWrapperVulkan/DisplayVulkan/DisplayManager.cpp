@@ -7,7 +7,7 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "corona/kernel/memory/cache_aligned_allocator.h"
 
-// #define USE_SAME_DEVICE
+//#define USE_SAME_DEVICE
 
 DisplayManager::DisplayManager() = default;
 
@@ -16,62 +16,13 @@ DisplayManager::~DisplayManager()
     cleanUpDisplayManager();
 }
 
-void DisplayManager::waitPresentQueuesIdle()
-{
-    if (!displayDevice || presentQueues.empty())
-    {
-        return;
-    }
-
-    std::vector<VkSemaphore> semaphores;
-    std::vector<uint64_t> waitValues;
-    semaphores.reserve(presentQueues.size());
-    waitValues.reserve(presentQueues.size());
-
-    for (const auto &queue : presentQueues)
-    {
-        if (queue.timelineSemaphore == VK_NULL_HANDLE || !queue.timelineValue)
-        {
-            continue;
-        }
-
-        const uint64_t targetValue = queue.timelineValue->load(std::memory_order_acquire);
-        if (targetValue == 0)
-        {
-            continue;
-        }
-
-        semaphores.push_back(queue.timelineSemaphore);
-        waitValues.push_back(targetValue);
-    }
-
-    if (semaphores.empty())
-    {
-        return;
-    }
-
-    VkSemaphoreWaitInfo waitInfo{};
-    waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
-    waitInfo.pNext = nullptr;
-    waitInfo.flags = 0;
-    waitInfo.semaphoreCount = static_cast<uint32_t>(semaphores.size());
-    waitInfo.pSemaphores = semaphores.data();
-    waitInfo.pValues = waitValues.data();
-
-    VkResult result = vkWaitSemaphores(displayDevice->deviceManager.getLogicalDevice(), &waitInfo, UINT64_MAX);
-    if (result != VK_SUCCESS)
-    {
-        CFW_LOG_ERROR("[DisplayManager] waitPresentQueuesIdle failed: {}", static_cast<int>(result));
-    }
-}
-
 void DisplayManager::cleanUpDisplayManager()
 {
     VkDevice device = (displayDevice ? displayDevice->deviceManager.getLogicalDevice() : VK_NULL_HANDLE);
 
     if (device != VK_NULL_HANDLE)
     {
-        waitPresentQueuesIdle();
+        vkDeviceWaitIdle(device);
     }
 
     // 按照正确的顺序清理资源
@@ -104,7 +55,7 @@ void DisplayManager::cleanUpDisplayManager()
     // 清理状态
     presentQueues.clear();
     mainDeviceExecutor.reset();
-    // displayDeviceExecutors.clear();
+    //displayDeviceExecutors.clear();
     displayDeviceExecutor.reset();
     waitedExecutor.reset();
     displaySurface = nullptr;
@@ -196,7 +147,7 @@ void DisplayManager::cleanupDisplayImage()
         displayImage.imageAlloc != VK_NULL_HANDLE &&
         displayDevice)
     {
-        displayDevice->resourceManager.destroyImage(displayImage);
+        // displayDevice->resourceManager.destroyImage(displayImage);
         displayImage = {};
     }
 }
@@ -240,14 +191,14 @@ void DisplayManager::createSyncObjects()
 
     imageAvailableSemaphores.resize(imageCount);
     renderFinishedSemaphores.resize(imageCount);
-    acquireFences.resize(imageCount); // 用于 vkAcquireNextImageKHR 同步
+    acquireFences.resize(imageCount);  // 用于 vkAcquireNextImageKHR 同步
 
     VkSemaphoreCreateInfo semaphoreInfo{};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
     VkFenceCreateInfo fenceInfo{};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // 首帧无需等待
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;  // 首帧无需等待
 
     VkDevice device = displayDevice->deviceManager.getLogicalDevice();
 
@@ -486,8 +437,6 @@ void DisplayManager::createSwapChain()
         swapChainImages[i].aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         swapChainImages[i].arrayLayers = 1;
         swapChainImages[i].mipLevels = 1;
-        swapChainImages[i].ownsImageMemory = false;
-        swapChainImages[i].ownsImageViews = false;
         swapChainImages[i].device = &displayDevice->deviceManager;
         swapChainImages[i].resourceManager = &displayDevice->resourceManager;
         swapChainImages[i].pixelSize = 4; // RGBA8
@@ -498,33 +447,15 @@ void DisplayManager::createSwapChain()
 
 void DisplayManager::recreateSwapChain()
 {
-    VkSurfaceCapabilitiesKHR capabilities{};
-    VkResult surfaceResult = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-        displayDevice->deviceManager.getPhysicalDevice(),
-        vkSurface,
-        &capabilities);
-
-    if (surfaceResult != VK_SUCCESS)
-    {
-        CFW_LOG_ERROR("[DisplayManager] Failed to query surface capabilities during swapchain recreation: {}",
-                      static_cast<int>(surfaceResult));
-        return;
-    }
-
-    if (capabilities.currentExtent.width == 0u || capabilities.currentExtent.height == 0u)
-    {
-        return;
-    }
-
-    waitPresentQueuesIdle();
+    VkDevice device = displayDevice->deviceManager.getLogicalDevice();
+    vkDeviceWaitIdle(device);
 
     cleanupSyncObjects();
-    // displayDeviceExecutors.clear();
+    //displayDeviceExecutors.clear();
     cleanupSwapChainImages();
 
     createSwapChain();
     createSyncObjects();
-    currentFrame = 0;
 }
 
 bool DisplayManager::needsSwapChainRecreation(const ktm::uvec2 &newSize) const
@@ -624,8 +555,6 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
             else
             {
                 this->displayImage = *handle;
-                this->displayImage.ownsImageMemory = false;
-                this->displayImage.ownsImageViews = false;
             }
         }
 
@@ -633,7 +562,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         if (waitedExecutor)
         {
             mainDeviceExecutor->wait(*waitedExecutor);
-            // displayDeviceExecutors[currentFrame]->wait(*waitedExecutor);
+            //displayDeviceExecutors[currentFrame]->wait(*waitedExecutor);
             displayDeviceExecutor->wait(*waitedExecutor);
         }
 
@@ -656,7 +585,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
 
         // 等待 Acquire Fence (替代 Present Fence，用于确保图像可用)
         VkDevice device = displayDevice->deviceManager.getLogicalDevice();
-
+        
         VkResult fenceResult = vkWaitForFences(device, 1, &acquireFences[currentFrame], VK_TRUE, UINT64_MAX);
         if (fenceResult != VK_SUCCESS)
         {
@@ -674,18 +603,12 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
                                                 VK_NULL_HANDLE,
                                                 &imageIndex);
 
-        bool needsSwapChainRebuild = false;
         if (result == VK_ERROR_OUT_OF_DATE_KHR)
         {
-            needsSwapChainRebuild = true;
             recreateSwapChain();
             return true;
         }
-        else if (result == VK_SUBOPTIMAL_KHR)
-        {
-            needsSwapChainRebuild = true;
-        }
-        else if (result != VK_SUCCESS)
+        else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
         {
             throw std::runtime_error("Failed to acquire swap chain image");
         }
@@ -752,7 +675,7 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = &swapChain;
         presentInfo.pImageIndices = &imageIndex;
-        presentInfo.pNext = nullptr; // 不再使用 VkSwapchainPresentFenceInfoKHR
+        presentInfo.pNext = nullptr;  // 不再使用 VkSwapchainPresentFenceInfoKHR
 
         // 移除: VK_EXT_swapchain_maintenance1 相关代码
         // VkSwapchainPresentFenceInfoKHR presentFenceInfo{};
@@ -766,31 +689,12 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
             // 让 pickQueueAndCommit 后续提交使用正确的 present 队列
             displayDeviceExecutor->currentRecordQueue = currentRecordQueue;
 
-            auto waitCurrentQueueIdle = [&]() {
-                VkResult idleResult = vkQueueWaitIdle(currentRecordQueue->vkQueue);
-                if (idleResult != VK_SUCCESS)
-                {
-                    CFW_LOG_ERROR("[DisplayManager] vkQueueWaitIdle failed after present error: {}", static_cast<int>(idleResult));
-                }
-            };
-
             // 1. 先执行 Present（只依赖 binary semaphore）
             VkResult presentResult = vkQueuePresentKHR(currentRecordQueue->vkQueue, &presentInfo);
 
-            if (presentResult == VK_SUBOPTIMAL_KHR)
-            {
-                needsSwapChainRebuild = true;
-            }
-            else if (presentResult == VK_ERROR_OUT_OF_DATE_KHR)
-            {
-                needsSwapChainRebuild = true;
-                waitCurrentQueueIdle();
-                return false;
-            }
-            else if (presentResult != VK_SUCCESS)
+            if (presentResult != VK_SUCCESS && presentResult != VK_SUBOPTIMAL_KHR)
             {
                 CFW_LOG_ERROR("vkQueuePresentKHR failed: {}", static_cast<int>(presentResult));
-                waitCurrentQueueIdle();
                 return false;
             }
 
@@ -808,23 +712,8 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
             return true;
         };
 
-        DeviceManager::QueueUtils *presentQueue =
-            displayDeviceExecutor->pickQueueAndCommit(currentQueueIndex, presentQueues, commitToQueue);
-
-        if (needsSwapChainRebuild)
-        {
-            recreateSwapChain();
-        }
-
-        if (presentQueue == nullptr)
-        {
-            return needsSwapChainRebuild;
-        }
-
-        if (!needsSwapChainRebuild)
-        {
-            currentFrame = (currentFrame + 1) % swapChainImages.size();
-        }
+        displayDeviceExecutor->pickQueueAndCommit(currentQueueIndex, presentQueues, commitToQueue);
+        currentFrame = (currentFrame + 1) % swapChainImages.size();
         return true;
     }
     catch (const std::exception &e)
