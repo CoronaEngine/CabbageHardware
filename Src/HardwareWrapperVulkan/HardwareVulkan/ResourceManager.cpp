@@ -3,6 +3,8 @@
 #include "HardwareWrapperVulkan/HardwareContext.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
 
+#include <unordered_set>
+
 #define VK_NO_PROTOTYPES
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
@@ -633,29 +635,41 @@ void ResourceManager::destroyImage(ImageHardwareWrap &image)
     }
 
     VkDevice logicalDevice = device->getLogicalDevice();
+    if (image.ownsImageViews)
+    {
+        std::unordered_set<VkImageView> viewsToDestroy;
+        if (image.imageView != VK_NULL_HANDLE)
+        {
+            viewsToDestroy.insert(image.imageView);
+        }
 
-    // if (image.generateMips) {
-    //     // 清理每个 mip level 的视图
-    //     for (auto& mipView : image.mipLevelImageViews) {
-    //         if (mipView != VK_NULL_HANDLE) {
-    //             vkDestroyImageView(logicalDevice, mipView, nullptr);
-    //         }
-    //     }
-    //     image.mipLevelImageViews.clear();
-    // }
+        for (const auto &[_, view] : image.allSubViews)
+        {
+            if (view != VK_NULL_HANDLE)
+            {
+                viewsToDestroy.insert(view);
+            }
+        }
 
-    // 清理主 ImageView
-    /*if (image.imageView != VK_NULL_HANDLE) {
-        vkDestroyImageView(logicalDevice, image.imageView, nullptr);
-        image.imageView = VK_NULL_HANDLE;
-    }*/
+        for (VkImageView view : viewsToDestroy)
+        {
+            vkDestroyImageView(logicalDevice, view, nullptr);
+        }
+    }
 
-    // 销毁图像
-    /*if (image.imageHandle != VK_NULL_HANDLE) {
+    image.allSubViews.clear();
+    image.imageView = VK_NULL_HANDLE;
+
+    if (image.ownsImageMemory &&
+        image.imageHandle != VK_NULL_HANDLE &&
+        image.imageAlloc != VK_NULL_HANDLE)
+    {
         vmaDestroyImage(vmaAllocator, image.imageHandle, image.imageAlloc);
-        image.imageHandle = VK_NULL_HANDLE;
-        image.imageAlloc = VK_NULL_HANDLE;
-    }*/
+    }
+
+    image.imageHandle = VK_NULL_HANDLE;
+    image.imageAlloc = VK_NULL_HANDLE;
+    image.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 }
 
 ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(uint32_t elementCount,
