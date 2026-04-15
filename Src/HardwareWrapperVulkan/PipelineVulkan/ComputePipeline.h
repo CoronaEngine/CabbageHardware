@@ -38,8 +38,21 @@ struct ComputePipelineVulkan : public CommandRecordVulkan
 
     void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override;
     RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override;
+    void collectResourceStates(HardwareExecutorVulkan &hardwareExecutor, ResourceStateTracker &tracker) override;
 
   private:
+    struct BoundBuffer
+    {
+        HardwareBuffer buffer;
+        ResourceState state{ResourceState::ShaderResource};
+    };
+
+    struct BoundImage
+    {
+        HardwareImage image;
+        ResourceState state{ResourceState::ShaderResource};
+    };
+
     void createComputePipeline();
 
     VkPipelineLayout pipelineLayout{VK_NULL_HANDLE};
@@ -60,4 +73,6 @@ struct ComputePipelineVulkan : public CommandRecordVulkan
     void updateUBODescriptor();
 
     ktm::uvec3 groupCount = {0, 0, 0};
+    std::vector<BoundBuffer> boundBuffers;
+    std::vector<BoundImage> boundImages;
 };

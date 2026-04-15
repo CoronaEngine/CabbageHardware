@@ -3,6 +3,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <type_traits>
 #include <vector>
 
@@ -72,6 +73,56 @@ enum class BufferUsage : uint32_t
     StorageBuffer = 8,
 };
 
+enum class ResourceState : uint32_t
+{
+    Unknown = 0,
+    ShaderResource = 1u << 0u,
+    UnorderedAccess = 1u << 1u,
+    RenderTarget = 1u << 2u,
+    DepthRead = 1u << 3u,
+    DepthWrite = 1u << 4u,
+    CopySource = 1u << 5u,
+    CopyDest = 1u << 6u,
+    Present = 1u << 7u,
+    VertexBuffer = 1u << 8u,
+    IndexBuffer = 1u << 9u,
+    ConstantBuffer = 1u << 10u,
+};
+
+constexpr ResourceState operator|(ResourceState lhs, ResourceState rhs)
+{
+    return static_cast<ResourceState>(static_cast<uint32_t>(lhs) | static_cast<uint32_t>(rhs));
+}
+
+constexpr ResourceState operator&(ResourceState lhs, ResourceState rhs)
+{
+    return static_cast<ResourceState>(static_cast<uint32_t>(lhs) & static_cast<uint32_t>(rhs));
+}
+
+constexpr ResourceState &operator|=(ResourceState &lhs, ResourceState rhs)
+{
+    lhs = lhs | rhs;
+    return lhs;
+}
+
+constexpr bool hasResourceState(ResourceState states, ResourceState state)
+{
+    return (static_cast<uint32_t>(states & state) != 0u);
+}
+
+struct TextureSubresourceSet
+{
+    static constexpr uint32_t AllMipLevels = ~0u;
+    static constexpr uint32_t AllArraySlices = ~0u;
+
+    uint32_t baseMipLevel{0};
+    uint32_t numMipLevels{AllMipLevels};
+    uint32_t baseArraySlice{0};
+    uint32_t numArraySlices{AllArraySlices};
+};
+
+inline constexpr TextureSubresourceSet AllSubresources{};
+
 template <typename T>
 concept IsContainer = requires(T a) {
     { a.size() } -> std::convertible_to<size_t>;
@@ -88,6 +139,18 @@ struct ExternalHandle
 #endif
 };
 
+struct HardwareBufferCreateInfo
+{
+    uint32_t elementCount{1};
+    uint32_t elementSize{0};
+    BufferUsage usage = BufferUsage::StorageBuffer;
+    bool useDedicated{true};
+    bool hostVisibleMapped{true};
+    ResourceState initialState = ResourceState::Unknown;
+    bool keepInitialState{false};
+    std::string debugName{};
+};
+
 // ================= 对外封装：HardwareBuffer =================
 struct HardwareBuffer
 {
@@ -95,6 +158,7 @@ struct HardwareBuffer
     HardwareBuffer();
     HardwareBuffer(const HardwareBuffer &other);
     HardwareBuffer(HardwareBuffer &&other) noexcept;
+    explicit HardwareBuffer(const HardwareBufferCreateInfo &createInfo, const void *data = nullptr);
     HardwareBuffer(uint32_t bufferSize, uint32_t elementSize, BufferUsage usage, const void *data = nullptr, bool useDedicated = true);
 
     HardwareBuffer(uint32_t size, BufferUsage usage, const void *data = nullptr, bool useDedicated = true)
@@ -135,6 +199,7 @@ struct HardwareBuffer
     // CPU 映射内存操作（非 GPU 命令）
     bool copyFromData(const void *inputData, uint64_t size) const;
     bool copyToData(void *outputData, uint64_t size) const;
+    bool readback(void *outputData, uint64_t size) const;
 
     template <typename T>
     bool copyFromVector(const std::vector<T> &input)
@@ -167,6 +232,9 @@ struct HardwareImageCreateInfo
     ImageUsage usage = ImageUsage::SampledImage;
     int arrayLayers{1};
     int mipLevels{1};
+    ResourceState initialState = ResourceState::Unknown;
+    bool keepInitialState{false};
+    std::string debugName{};
     // void *initialData{nullptr};
 
     HardwareImageCreateInfo() = default;
@@ -174,6 +242,57 @@ struct HardwareImageCreateInfo
         : width(w), height(h), format(fmt)
     {
     }
+};
+
+enum class SamplerFilter : uint32_t
+{
+    Nearest,
+    Linear,
+};
+
+enum class SamplerAddressMode : uint32_t
+{
+    Repeat,
+    ClampToEdge,
+    ClampToBorder,
+};
+
+struct SamplerDesc
+{
+    SamplerFilter minFilter = SamplerFilter::Nearest;
+    SamplerFilter magFilter = SamplerFilter::Nearest;
+    SamplerAddressMode addressModeU = SamplerAddressMode::Repeat;
+    SamplerAddressMode addressModeV = SamplerAddressMode::Repeat;
+    SamplerAddressMode addressModeW = SamplerAddressMode::Repeat;
+    float mipLodBias{0.0f};
+    float minLod{0.0f};
+    float maxLod{1000.0f};
+    bool enableAnisotropy{false};
+    float maxAnisotropy{1.0f};
+    std::string debugName{};
+};
+
+struct HardwareSampler
+{
+  public:
+    HardwareSampler();
+    explicit HardwareSampler(const SamplerDesc &desc);
+    HardwareSampler(const HardwareSampler &other);
+    HardwareSampler(HardwareSampler &&other) noexcept;
+    ~HardwareSampler();
+
+    HardwareSampler &operator=(const HardwareSampler &other);
+    HardwareSampler &operator=(HardwareSampler &&other) noexcept;
+    explicit operator bool() const;
+
+    [[nodiscard]] uintptr_t getSamplerID() const
+    {
+        return samplerID.load(std::memory_order_acquire);
+    }
+
+  private:
+    std::atomic<std::uintptr_t> samplerID;
+    mutable std::mutex samplerMutex;
 };
 
 // ================= 对外封装：HardwareImage =================
@@ -215,6 +334,10 @@ struct HardwareImage
     [[nodiscard]] BufferToImageCommand copyFrom(const void *inputData,
                                                 uint32_t imageLayer = 0,
                                                 uint32_t imageMip = 0) const;
+    bool readback(void *outputData,
+                  uint64_t size,
+                  uint32_t imageLayer = 0,
+                  uint32_t imageMip = 0) const;
 
     //[[nodiscard]] uint32_t getNumMipLevels() const;
     //[[nodiscard]] uint32_t getArrayLayers() const;
@@ -531,6 +654,11 @@ struct HardwareExecutor
 
     HardwareExecutor &wait(HardwareExecutor &other);
     HardwareExecutor &commit();
+    HardwareExecutor &setAutomaticBarriers(bool enabled);
+    HardwareExecutor &transition(HardwareImage &image,
+                                 ResourceState state,
+                                 TextureSubresourceSet subresources = AllSubresources);
+    HardwareExecutor &transition(HardwareBuffer &buffer, ResourceState state);
 
     // ========== 延迟释放相关接口 ==========
     /// @brief 等待所有延迟释放的资源完成（阻塞）

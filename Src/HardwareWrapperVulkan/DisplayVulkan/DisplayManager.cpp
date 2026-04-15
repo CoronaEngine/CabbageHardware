@@ -147,7 +147,10 @@ void DisplayManager::cleanupDisplayImage()
         displayImage.imageAlloc != VK_NULL_HANDLE &&
         displayDevice)
     {
-        // displayDevice->resourceManager.destroyImage(displayImage);
+        if (displayImage.ownsImage)
+        {
+            displayDevice->resourceManager.destroyImage(displayImage);
+        }
         displayImage = {};
     }
 }
@@ -440,6 +443,10 @@ void DisplayManager::createSwapChain()
         swapChainImages[i].device = &displayDevice->deviceManager;
         swapChainImages[i].resourceManager = &displayDevice->resourceManager;
         swapChainImages[i].pixelSize = 4; // RGBA8
+        swapChainImages[i].ownsImage = false;
+        swapChainImages[i].ownsImageView = true;
+        swapChainImages[i].currentState = ResourceState::Present;
+        swapChainImages[i].initialState = ResourceState::Present;
 
         swapChainImages[i].imageView = displayDevice->resourceManager.createImageView(swapChainImages[i]);
     }
@@ -555,6 +562,8 @@ bool DisplayManager::displayFrame(void *surface, HardwareImage displayImage)
             else
             {
                 this->displayImage = *handle;
+                this->displayImage.ownsImage = false;
+                this->displayImage.ownsImageView = false;
             }
         }
 

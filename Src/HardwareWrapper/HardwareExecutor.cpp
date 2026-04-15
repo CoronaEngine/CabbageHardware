@@ -311,3 +311,115 @@ void HardwareExecutor::cleanupDeferredResources()
         handle->impl->cleanupCompletedResources();
     }
 }
+
+namespace
+{
+struct ImageTransitionCommandImpl : CopyCommandImpl
+{
+    HardwareImage image;
+    ResourceState state{ResourceState::Unknown};
+    TextureSubresourceSet subresources{};
+    std::unique_ptr<TransitionImageStateCommand> command;
+
+    ImageTransitionCommandImpl(const HardwareImage &imageValue,
+                               ResourceState stateValue,
+                               TextureSubresourceSet subresourcesValue)
+        : image(imageValue), state(stateValue), subresources(subresourcesValue)
+    {
+    }
+
+    CommandRecordVulkan *getCommandRecord() override
+    {
+        if (image.getImageID() == 0)
+        {
+            return nullptr;
+        }
+        auto handle = globalImageStorages.acquire_write(image.getImageID());
+        command = std::make_unique<TransitionImageStateCommand>(*handle, state, subresources);
+        return command.get();
+    }
+};
+
+struct BufferTransitionCommandImpl : CopyCommandImpl
+{
+    HardwareBuffer buffer;
+    ResourceState state{ResourceState::Unknown};
+    std::unique_ptr<TransitionBufferStateCommand> command;
+
+    BufferTransitionCommandImpl(const HardwareBuffer &bufferValue, ResourceState stateValue)
+        : buffer(bufferValue), state(stateValue)
+    {
+    }
+
+    CommandRecordVulkan *getCommandRecord() override
+    {
+        if (buffer.getBufferID() == 0)
+        {
+            return nullptr;
+        }
+        auto handle = globalBufferStorages.acquire_write(buffer.getBufferID());
+        command = std::make_unique<TransitionBufferStateCommand>(*handle, state);
+        return command.get();
+    }
+};
+} // namespace
+
+HardwareExecutor &HardwareExecutor::setAutomaticBarriers(bool enabled)
+{
+    auto const self_id = executorID.load(std::memory_order_acquire);
+    if (self_id == 0)
+    {
+        return *this;
+    }
+
+    auto handle = gExecutorStorage.acquire_write(self_id);
+    if (handle->impl)
+    {
+        handle->impl->setAutomaticBarriers(enabled);
+    }
+    return *this;
+}
+
+HardwareExecutor &HardwareExecutor::transition(HardwareImage &image,
+                                               ResourceState state,
+                                               TextureSubresourceSet subresources)
+{
+    auto const self_id = executorID.load(std::memory_order_acquire);
+    if (self_id == 0)
+    {
+        return *this;
+    }
+
+    auto impl = std::make_shared<ImageTransitionCommandImpl>(image, state, subresources);
+    auto handle = gExecutorStorage.acquire_write(self_id);
+    if (handle->impl)
+    {
+        if (CommandRecordVulkan *record = impl->getCommandRecord())
+        {
+            *handle->impl << record;
+            handle->impl->pendingResources.push_back(std::move(impl));
+        }
+    }
+    return *this;
+}
+
+HardwareExecutor &HardwareExecutor::transition(HardwareBuffer &buffer, ResourceState state)
+{
+    auto const self_id = executorID.load(std::memory_order_acquire);
+    if (self_id == 0)
+    {
+        return *this;
+    }
+
+    auto impl = std::make_shared<BufferTransitionCommandImpl>(buffer, state);
+    auto handle = gExecutorStorage.acquire_write(self_id);
+    if (handle->impl)
+    {
+        if (CommandRecordVulkan *record = impl->getCommandRecord())
+        {
+            *handle->impl << record;
+            handle->impl->pendingResources.push_back(std::move(impl));
+        }
+    }
+    return *this;
+}

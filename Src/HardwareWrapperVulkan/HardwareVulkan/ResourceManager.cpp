@@ -2,6 +2,11 @@
 
 #include "HardwareWrapperVulkan/HardwareContext.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
+#include "HardwareWrapperVulkan/HardwareVulkan/ResourceStateTracker.h"
+
+#include <algorithm>
+#include <numeric>
+#include <unordered_set>
 
 #define VK_NO_PROTOTYPES
 #define VMA_IMPLEMENTATION
@@ -13,6 +18,28 @@ ResourceManager::~ResourceManager()
 {
     cleanUpResourceManager();
 }
+
+namespace
+{
+VkFilter convertSamplerFilter(SamplerFilter filter)
+{
+    return filter == SamplerFilter::Linear ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+}
+
+VkSamplerAddressMode convertSamplerAddressMode(SamplerAddressMode mode)
+{
+    switch (mode)
+    {
+    case SamplerAddressMode::ClampToEdge:
+        return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    case SamplerAddressMode::ClampToBorder:
+        return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    case SamplerAddressMode::Repeat:
+    default:
+        return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    }
+}
+} // namespace
 
 void ResourceManager::initResourceManager(DeviceManager &device)
 {
@@ -180,6 +207,44 @@ void ResourceManager::createTextureSampler()
     samplerInfo.maxLod = static_cast<float>(5.0);
 
     coronaHardwareCheck(vkCreateSampler(device->getLogicalDevice(), &samplerInfo, nullptr, &textureSampler));
+}
+
+ResourceManager::SamplerHardwareWrap ResourceManager::createSampler(const SamplerDesc &desc)
+{
+    SamplerHardwareWrap result{};
+    result.device = device;
+    result.resourceManager = this;
+    result.desc = desc;
+
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = convertSamplerFilter(desc.magFilter);
+    samplerInfo.minFilter = convertSamplerFilter(desc.minFilter);
+    samplerInfo.addressModeU = convertSamplerAddressMode(desc.addressModeU);
+    samplerInfo.addressModeV = convertSamplerAddressMode(desc.addressModeV);
+    samplerInfo.addressModeW = convertSamplerAddressMode(desc.addressModeW);
+    samplerInfo.anisotropyEnable = desc.enableAnisotropy ? VK_TRUE : VK_FALSE;
+    samplerInfo.maxAnisotropy = std::min(desc.maxAnisotropy, cachedDeviceProperties.limits.maxSamplerAnisotropy);
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = desc.minFilter == SamplerFilter::Linear ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    samplerInfo.mipLodBias = desc.mipLodBias;
+    samplerInfo.minLod = desc.minLod;
+    samplerInfo.maxLod = desc.maxLod;
+
+    coronaHardwareCheck(vkCreateSampler(device->getLogicalDevice(), &samplerInfo, nullptr, &result.sampler));
+    return result;
+}
+
+void ResourceManager::destroySampler(SamplerHardwareWrap &sampler)
+{
+    if (sampler.sampler != VK_NULL_HANDLE && sampler.device != nullptr)
+    {
+        vkDestroySampler(sampler.device->getLogicalDevice(), sampler.sampler, nullptr);
+        sampler.sampler = VK_NULL_HANDLE;
+    }
 }
 
 void ResourceManager::createBindlessDescriptorSet()
@@ -433,6 +498,12 @@ ResourceManager::ImageHardwareWrap ResourceManager::createImage(ktm::uvec2 image
     resultImage.arrayLayers = arrayLayers;
     resultImage.mipLevels = mipLevels;
     resultImage.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    resultImage.currentState = ResourceState::Unknown;
+    resultImage.initialState = ResourceState::Unknown;
+    resultImage.ownsImage = true;
+    resultImage.ownsImageView = true;
+    resultImage.subresourceStates.assign(static_cast<size_t>(std::max(1u, mipLevels)) * std::max(1u, arrayLayers),
+                                         ResourceState::Unknown);
 
     if (imageUsage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
     {
@@ -630,35 +701,41 @@ VkImageView ResourceManager::createImageView(ImageHardwareWrap &image, uint32_t 
 
 void ResourceManager::destroyImage(ImageHardwareWrap &image)
 {
-    if (vmaAllocator == VK_NULL_HANDLE)
+    if (!device || device->getLogicalDevice() == VK_NULL_HANDLE)
     {
         return;
     }
 
     VkDevice logicalDevice = device->getLogicalDevice();
 
-    // if (image.generateMips) {
-    //     // 清理每个 mip level 的视图
-    //     for (auto& mipView : image.mipLevelImageViews) {
-    //         if (mipView != VK_NULL_HANDLE) {
-    //             vkDestroyImageView(logicalDevice, mipView, nullptr);
-    //         }
-    //     }
-    //     image.mipLevelImageViews.clear();
-    // }
+    if (image.ownsImageView)
+    {
+        std::unordered_set<VkImageView> destroyedViews;
+        auto destroyView = [&](VkImageView &view) {
+            if (view != VK_NULL_HANDLE && destroyedViews.insert(view).second)
+            {
+                vkDestroyImageView(logicalDevice, view, nullptr);
+            }
+            view = VK_NULL_HANDLE;
+        };
 
-    // 清理主 ImageView
-    /*if (image.imageView != VK_NULL_HANDLE) {
-        vkDestroyImageView(logicalDevice, image.imageView, nullptr);
-        image.imageView = VK_NULL_HANDLE;
-    }*/
+        destroyView(image.imageView);
+        for (auto &[_, view] : image.allSubViews)
+        {
+            destroyView(view);
+        }
+    }
+    image.allSubViews.clear();
 
-    // 销毁图像
-    /*if (image.imageHandle != VK_NULL_HANDLE) {
+    if (image.ownsImage && image.imageHandle != VK_NULL_HANDLE && image.imageAlloc != VK_NULL_HANDLE && vmaAllocator != VK_NULL_HANDLE)
+    {
         vmaDestroyImage(vmaAllocator, image.imageHandle, image.imageAlloc);
-        image.imageHandle = VK_NULL_HANDLE;
-        image.imageAlloc = VK_NULL_HANDLE;
-    }*/
+    }
+
+    image.imageHandle = VK_NULL_HANDLE;
+    image.imageAlloc = VK_NULL_HANDLE;
+    image.imageAllocInfo = {};
+    image.subresourceStates.clear();
 }
 
 ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(uint32_t elementCount,
@@ -673,6 +750,9 @@ ResourceManager::BufferHardwareWrap ResourceManager::createBuffer(uint32_t eleme
     resultBuffer.elementCount = elementCount;
     resultBuffer.elementSize = elementSize;
     resultBuffer.bufferUsage = usage;
+    resultBuffer.currentState = ResourceState::Unknown;
+    resultBuffer.initialState = ResourceState::Unknown;
+    resultBuffer.hostVisibleMapped = hostVisibleMapped;
 
     const uint64_t totalSize = static_cast<uint64_t>(elementCount) * elementSize;
     if (totalSize == 0)
@@ -961,6 +1041,9 @@ ResourceManager::BufferHardwareWrap ResourceManager::importBufferMemory(const Ex
     importedBuffer.bufferUsage = bufferUsage;
     importedBuffer.elementCount = elementCount;
     importedBuffer.elementSize = elementSize;
+    importedBuffer.currentState = ResourceState::Unknown;
+    importedBuffer.initialState = ResourceState::Unknown;
+    importedBuffer.hostVisibleMapped = false;
 
     // allocSize 必须等于 CUDA 导出时的 aligned_size
     if (allocSize == 0)
@@ -1064,6 +1147,9 @@ ResourceManager::BufferHardwareWrap ResourceManager::importHostBuffer(void *host
     bufferWrap.bufferUsage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
                              VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    bufferWrap.currentState = ResourceState::Unknown;
+    bufferWrap.initialState = ResourceState::Unknown;
+    bufferWrap.hostVisibleMapped = true;
 
     VkMemoryHostPointerPropertiesEXT hostPointerProps{};
     hostPointerProps.sType = VK_STRUCTURE_TYPE_MEMORY_HOST_POINTER_PROPERTIES_EXT;
@@ -1202,7 +1288,7 @@ bool ResourceManager::storeDescriptorAt(Corona::Kernel::Utils::Storage<ResourceM
     VkDescriptorImageInfo imageInfo{};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
     imageInfo.imageView = image->imageView;
-    imageInfo.sampler = textureSampler;
+    imageInfo.sampler = image->sampler != VK_NULL_HANDLE ? image->sampler : textureSampler;
 
     VkWriteDescriptorSet write{};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1472,6 +1558,9 @@ void ResourceManager::transitionImageLayout(VkCommandBuffer &commandBuffer,
     imageBarrier.pNext = nullptr;
 
     image.imageLayout = imageBarrier.newLayout;
+    image.currentState = resourceStateFromImageLayout(newLayout);
+    image.subresourceStates.assign(static_cast<size_t>(std::max(1u, image.mipLevels)) * std::max(1u, image.arrayLayers),
+                                   image.currentState);
 
     imageBarriers.push_back(imageBarrier);
 

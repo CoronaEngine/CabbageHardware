@@ -5,6 +5,8 @@
 #include "HardwareWrapperVulkan/HardwareVulkan/ResourceCommand.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
 
+#include <algorithm>
+
 struct ImageFormatInfo
 {
     VkFormat vkFormat;
@@ -192,6 +194,13 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo &createInfo)
             vkUsage,
             createInfo.arrayLayers,
             createInfo.mipLevels);
+        handle->initialState = createInfo.initialState;
+        handle->currentState = createInfo.initialState;
+        handle->keepInitialState = createInfo.keepInitialState;
+        handle->debugName = createInfo.debugName;
+        handle->subresourceStates.assign(static_cast<size_t>(std::max(1, createInfo.arrayLayers)) *
+                                             static_cast<size_t>(std::max(1, createInfo.mipLevels)),
+                                         createInfo.initialState);
     }
 
     //CFW_LOG_TRACE("HardwareImage created: id={}", self_image_id);
@@ -385,6 +394,13 @@ HardwareImage HardwareImage::operator[](const uint32_t index)
             subImageHandle->imageAlloc = imageHandle->imageAlloc;
             subImageHandle->imageAllocInfo = imageHandle->imageAllocInfo;
             subImageHandle->bindlessIndex = -1;
+            subImageHandle->ownsImage = false;
+            subImageHandle->ownsImageView = false;
+            subImageHandle->parentImageId = selfImageId;
+            subImageHandle->currentState = imageHandle->currentState;
+            subImageHandle->initialState = imageHandle->initialState;
+            subImageHandle->keepInitialState = imageHandle->keepInitialState;
+            subImageHandle->subresourceStates = imageHandle->subresourceStates;
 
             // 直接获取mipmap（单层数组图像）
             if (imageHandle->arrayLayers == 1)
@@ -601,4 +617,21 @@ BufferToImageCommand HardwareImage::copyFrom(const void *inputData,
     HardwareBuffer stagingBuffer(bufferSize, BufferUsage::StorageBuffer, inputData);
     auto cmd = BufferToImageCommand(std::move(stagingBuffer), *this, 0, imageLayer, imageMip);
     return cmd;
+}
+
+bool HardwareImage::readback(void *outputData,
+                             uint64_t size,
+                             uint32_t imageLayer,
+                             uint32_t imageMip) const
+{
+    if (outputData == nullptr || size == 0)
+    {
+        return false;
+    }
+
+    HardwareBuffer stagingBuffer(static_cast<uint32_t>(size), BufferUsage::StorageBuffer, nullptr, false);
+    HardwareExecutor executor;
+    executor << copyTo(stagingBuffer, imageLayer, imageMip, 0) << executor.commit();
+    executor.waitForDeferredResources();
+    return stagingBuffer.copyToData(outputData, size);
 }

@@ -82,8 +82,21 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan
 
     void commitCommand(HardwareExecutorVulkan &hardwareExecutorVulkan) override;
     RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutorVulkan) override;
+    void collectResourceStates(HardwareExecutorVulkan &hardwareExecutorVulkan, ResourceStateTracker &tracker) override;
 
   private:
+    struct BoundBuffer
+    {
+        HardwareBuffer buffer;
+        ResourceState state{ResourceState::ShaderResource};
+    };
+
+    struct BoundImage
+    {
+        HardwareImage image;
+        ResourceState state{ResourceState::ShaderResource};
+    };
+
     struct TriangleGeomMesh
     {
         HardwareBuffer indexBuffer;
@@ -138,4 +151,6 @@ struct RasterizerPipelineVulkan : public CommandRecordVulkan
     std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> vertexStageOutputs;
     std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> fragmentStageInputs;
     std::vector<EmbeddedShader::ShaderCodeModule::ShaderResources::ShaderBindInfo> fragmentStageOutputs;
+    std::vector<BoundBuffer> boundBuffers;
+    std::vector<BoundImage> boundImages;
 };

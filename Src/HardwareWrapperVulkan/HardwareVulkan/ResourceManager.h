@@ -2,6 +2,7 @@
 
 #include <ktm/ktm.h>
 
+#include "CabbageHardware.h"
 #include "DeviceManager.h"
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 #include "corona/kernel/utils/storage.h"
@@ -27,6 +28,11 @@ struct ResourceManager
 
         VkBuffer bufferHandle{VK_NULL_HANDLE};
         VkBufferUsageFlags bufferUsage{VK_BUFFER_USAGE_FLAG_BITS_MAX_ENUM};
+        ResourceState currentState{ResourceState::Unknown};
+        ResourceState initialState{ResourceState::Unknown};
+        bool keepInitialState{false};
+        bool hostVisibleMapped{true};
+        std::string debugName{};
 
         VmaAllocation bufferAlloc{VK_NULL_HANDLE};
         VmaAllocationInfo bufferAllocInfo{};
@@ -41,6 +47,14 @@ struct ResourceManager
     struct ImageHardwareWrap
     {
         VkImageLayout imageLayout{VK_IMAGE_LAYOUT_UNDEFINED};
+        ResourceState currentState{ResourceState::Unknown};
+        ResourceState initialState{ResourceState::Unknown};
+        bool keepInitialState{false};
+        bool ownsImage{true};
+        bool ownsImageView{true};
+        uint64_t parentImageId{0};
+        std::vector<ResourceState> subresourceStates{};
+        std::string debugName{};
         float pixelSize{0};
         ktm::uvec2 imageSize{0, 0};
         uint64_t refCount{1};
@@ -58,6 +72,7 @@ struct ResourceManager
 
         VkImageView imageView{VK_NULL_HANDLE};
         std::unordered_map<uint64_t, VkImageView> allSubViews{};
+        VkSampler sampler{VK_NULL_HANDLE};
 
         VmaAllocation imageAlloc{VK_NULL_HANDLE};
         VmaAllocationInfo imageAllocInfo{};
@@ -73,6 +88,15 @@ struct ResourceManager
         VkDescriptorPool descriptorPool{VK_NULL_HANDLE};
         VkDescriptorSetLayout descriptorSetLayout{VK_NULL_HANDLE};
         VkDescriptorSet descriptorSet{VK_NULL_HANDLE};
+    };
+
+    struct SamplerHardwareWrap
+    {
+        VkSampler sampler{VK_NULL_HANDLE};
+        uint64_t refCount{1};
+        DeviceManager *device{nullptr};
+        ResourceManager *resourceManager{nullptr};
+        SamplerDesc desc{};
     };
 
     ResourceManager();
@@ -99,6 +123,10 @@ struct ResourceManager
                                                   bool hostVisibleMapped = true,
                                                   bool useDedicated = false);
     void destroyBuffer(BufferHardwareWrap &buffer);
+
+    // Sampler operations
+    [[nodiscard]] SamplerHardwareWrap createSampler(const SamplerDesc &desc);
+    void destroySampler(SamplerHardwareWrap &sampler);
 
     // External memory operations
     [[nodiscard]] ExternalMemoryHandle exportBufferMemory(BufferHardwareWrap &sourceBuffer);
@@ -132,6 +160,11 @@ struct ResourceManager
                                VkImageLayout imageLayout,
                                VkPipelineStageFlags2 dstStageMask,
                                VkAccessFlags2 dstAccessMask);
+
+    [[nodiscard]] VkSampler getDefaultSampler() const
+    {
+        return textureSampler;
+    }
 
     // Shader module
     [[nodiscard]] VkShaderModule createShaderModule(const std::vector<unsigned int> &code);

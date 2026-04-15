@@ -9,6 +9,7 @@
 
 #include "HardwareWrapperVulkan/HardwareContext.h"
 #include "CabbageHardware.h"
+#include "ResourceStateTracker.h"
 
 struct HardwareExecutorVulkan;
 struct CommandRecordVulkan;
@@ -48,10 +49,8 @@ struct CommandRecordVulkan
     };
 
     struct RequiredBarriers
+        : VulkanBarrierBatch
     {
-        std::vector<VkMemoryBarrier2> memoryBarriers;
-        std::vector<VkBufferMemoryBarrier2> bufferBarriers;
-        std::vector<VkImageMemoryBarrier2> imageBarriers;
     };
 
     CommandRecordVulkan() = default;
@@ -64,6 +63,10 @@ struct CommandRecordVulkan
     virtual RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &executor)
     {
         return RequiredBarriers{};
+    }
+
+    virtual void collectResourceStates(HardwareExecutorVulkan &executor, ResourceStateTracker &tracker)
+    {
     }
 
     virtual ExecutorType getExecutorType()
@@ -175,6 +178,16 @@ struct HardwareExecutorVulkan
     HardwareExecutorVulkan &commit();
     //HardwareExecutorVulkan &commitTest();
 
+    void setAutomaticBarriers(bool enabled)
+    {
+        automaticBarriers = enabled;
+    }
+
+    [[nodiscard]] bool automaticBarriersEnabled() const
+    {
+        return automaticBarriers;
+    }
+
     // ========== 延迟释放相关接口 ==========
     void cleanupCompletedResources();
     void waitForAllDeferredResources();
@@ -204,6 +217,7 @@ struct HardwareExecutorVulkan
     std::vector<CommandRecordVulkan *> commandList;
     std::vector<VkSemaphoreSubmitInfo> waitSemaphores;
     std::vector<VkSemaphoreSubmitInfo> signalSemaphores;
+    bool automaticBarriers{true};
     // std::vector<VkFence> prentFences;
     VkFence waitFence{VK_NULL_HANDLE};
     // std::unordered_map<VkFence, DeviceManager::QueueUtils*> fenceToPresent;

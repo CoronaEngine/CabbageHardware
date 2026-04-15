@@ -8,6 +8,7 @@
 
 extern Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap> globalBufferStorages;
 extern Corona::Kernel::Utils::Storage<ResourceManager::ImageHardwareWrap> globalImageStorages;
+extern Corona::Kernel::Utils::Storage<ResourceManager::SamplerHardwareWrap> globalSamplerStorages;
 
 struct RasterizerPipelineWrap
 {

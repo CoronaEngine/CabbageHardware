@@ -583,7 +583,17 @@ HardwareExecutorVulkan &HardwareExecutorVulkan::commit()
 
             for (size_t i = 0; i < commandList.size(); i++)
             {
-                CommandRecordVulkan::RequiredBarriers requiredBarriers = commandList[i]->getRequiredBarriers(*this);
+                VulkanBarrierBatch requiredBarriers;
+                if (automaticBarriers)
+                {
+                    ResourceStateTracker tracker;
+                    commandList[i]->collectResourceStates(*this, tracker);
+                    requiredBarriers = tracker.takeBarriers();
+                }
+                else
+                {
+                    requiredBarriers = commandList[i]->getRequiredBarriers(*this);
+                }
 
                 if (!requiredBarriers.memoryBarriers.empty() || !requiredBarriers.bufferBarriers.empty() || !requiredBarriers.imageBarriers.empty())
                 {

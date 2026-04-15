@@ -3,6 +3,7 @@
 #include "HardwareWrapperVulkan/HardwareUtilsVulkan.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
 #include "Compiler/ShaderLanguageConverter.h"
+#include <algorithm>
 #include <cstring>
 
 namespace
@@ -61,6 +62,16 @@ bool is_image_resource_bind_type(BindType bindType)
            bindType == BindType::texture ||
            bindType == BindType::sampler ||
            bindType == BindType::storageTexture;
+}
+
+ResourceState buffer_state_for_bind_type(BindType bindType)
+{
+    return bindType == BindType::storageBuffer ? ResourceState::UnorderedAccess : ResourceState::ShaderResource;
+}
+
+ResourceState image_state_for_bind_type(BindType bindType)
+{
+    return bindType == BindType::storageTexture ? ResourceState::UnorderedAccess : ResourceState::ShaderResource;
 }
 } // namespace
 
@@ -201,6 +212,22 @@ void ComputePipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t type
 {
     const auto typedBindType = static_cast<BindType>(bindType);
     const uint32_t descriptorIndex = const_cast<HardwareBuffer &>(buffer).storeDescriptor();
+    const ResourceState requiredState = buffer_state_for_bind_type(typedBindType);
+    const uintptr_t bufferId = buffer.getBufferID();
+    if (bufferId != 0)
+    {
+        auto found = std::find_if(boundBuffers.begin(), boundBuffers.end(), [bufferId](const BoundBuffer &entry) {
+            return entry.buffer.getBufferID() == bufferId;
+        });
+        if (found == boundBuffers.end())
+        {
+            boundBuffers.push_back({buffer, requiredState});
+        }
+        else
+        {
+            found->state = requiredState;
+        }
+    }
 
     if (typedBindType == BindType::pushConstantMembers)
     {
@@ -234,6 +261,22 @@ void ComputePipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t type
 {
     const auto typedBindType = static_cast<BindType>(bindType);
     const uint32_t descriptorIndex = const_cast<HardwareImage &>(image).storeDescriptor();
+    const ResourceState requiredState = image_state_for_bind_type(typedBindType);
+    const uintptr_t imageId = image.getImageID();
+    if (imageId != 0)
+    {
+        auto found = std::find_if(boundImages.begin(), boundImages.end(), [imageId](const BoundImage &entry) {
+            return entry.image.getImageID() == imageId;
+        });
+        if (found == boundImages.end())
+        {
+            boundImages.push_back({image, requiredState});
+        }
+        else
+        {
+            found->state = requiredState;
+        }
+    }
 
     if (typedBindType == BindType::pushConstantMembers)
     {
@@ -283,6 +326,42 @@ CommandRecordVulkan::RequiredBarriers ComputePipelineVulkan::getRequiredBarriers
     barrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
 
     return requiredBarriers;
+}
+
+void ComputePipelineVulkan::collectResourceStates(HardwareExecutorVulkan &, ResourceStateTracker &tracker)
+{
+    tracker.addMemoryBarrier(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+                             VK_ACCESS_2_MEMORY_WRITE_BIT,
+                             VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                             VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+
+    for (const auto &entry : boundBuffers)
+    {
+        const uintptr_t id = entry.buffer.getBufferID();
+        if (id == 0)
+        {
+            continue;
+        }
+        auto handle = globalBufferStorages.acquire_write(id);
+        tracker.requireBufferState(*handle, entry.state);
+    }
+
+    for (const auto &entry : boundImages)
+    {
+        const uintptr_t id = entry.image.getImageID();
+        if (id == 0)
+        {
+            continue;
+        }
+        auto handle = globalImageStorages.acquire_write(id);
+        tracker.requireImageState(*handle, entry.state);
+    }
+
+    if (uboBuffer)
+    {
+        auto handle = globalBufferStorages.acquire_write(uboBuffer.getBufferID());
+        tracker.requireBufferState(*handle, ResourceState::ConstantBuffer);
+    }
 }
 
 void ComputePipelineVulkan::createComputePipeline()

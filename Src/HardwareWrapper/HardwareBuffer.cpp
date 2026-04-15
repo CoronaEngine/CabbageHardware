@@ -52,6 +52,28 @@ HardwareBuffer::HardwareBuffer()
 {
 }
 
+HardwareBuffer::HardwareBuffer(const HardwareBufferCreateInfo &createInfo, const void *data)
+{
+    auto const buffer_id = globalBufferStorages.allocate();
+    bufferID.store(buffer_id, std::memory_order_release);
+    auto const handle = globalBufferStorages.acquire_write(buffer_id);
+    *handle = globalHardwareContext.getMainDevice()->resourceManager.createBuffer(createInfo.elementCount,
+                                                                                  createInfo.elementSize,
+                                                                                  convertBufferUsage(createInfo.usage),
+                                                                                  createInfo.hostVisibleMapped,
+                                                                                  createInfo.useDedicated);
+    handle->initialState = createInfo.initialState;
+    handle->currentState = createInfo.initialState;
+    handle->keepInitialState = createInfo.keepInitialState;
+    handle->hostVisibleMapped = createInfo.hostVisibleMapped;
+    handle->debugName = createInfo.debugName;
+
+    if (data != nullptr && handle->bufferAllocInfo.pMappedData != nullptr)
+    {
+        std::memcpy(handle->bufferAllocInfo.pMappedData, data, static_cast<size_t>(createInfo.elementCount) * createInfo.elementSize);
+    }
+}
+
 HardwareBuffer::HardwareBuffer(const uint32_t bufferSize, const uint32_t elementSize, const BufferUsage usage, const void *data, bool useDedicated)
 {
     auto const buffer_id = globalBufferStorages.allocate();
@@ -289,6 +311,11 @@ bool HardwareBuffer::copyToData(void *outputData, const uint64_t size) const
         return true;
     }
     return false;
+}
+
+bool HardwareBuffer::readback(void *outputData, const uint64_t size) const
+{
+    return copyToData(outputData, size);
 }
 
 void *HardwareBuffer::getMappedData() const

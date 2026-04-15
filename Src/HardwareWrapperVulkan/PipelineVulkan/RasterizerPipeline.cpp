@@ -65,6 +65,16 @@ bool is_image_resource_bind_type(BindType bindType)
            bindType == BindType::storageTexture;
 }
 
+ResourceState buffer_state_for_bind_type(BindType bindType)
+{
+    return bindType == BindType::storageBuffer ? ResourceState::UnorderedAccess : ResourceState::ShaderResource;
+}
+
+ResourceState image_state_for_bind_type(BindType bindType)
+{
+    return bindType == BindType::storageTexture ? ResourceState::UnorderedAccess : ResourceState::ShaderResource;
+}
+
 bool bind_image_descriptor_slot(const HardwareImage &image, uint32_t descriptorSlot)
 {
     auto mainDevice = globalHardwareContext.getMainDevice();
@@ -731,6 +741,22 @@ void RasterizerPipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t t
 {
     const auto typedBindType = static_cast<BindType>(bindType);
     const uint32_t descriptorIndex = const_cast<HardwareBuffer &>(buffer).storeDescriptor();
+    const ResourceState requiredState = buffer_state_for_bind_type(typedBindType);
+    const uintptr_t bufferId = buffer.getBufferID();
+    if (bufferId != 0)
+    {
+        auto found = std::find_if(boundBuffers.begin(), boundBuffers.end(), [bufferId](const BoundBuffer &entry) {
+            return entry.buffer.getBufferID() == bufferId;
+        });
+        if (found == boundBuffers.end())
+        {
+            boundBuffers.push_back({buffer, requiredState});
+        }
+        else
+        {
+            found->state = requiredState;
+        }
+    }
 
     if (typedBindType == BindType::pushConstantMembers)
     {
@@ -773,6 +799,22 @@ void RasterizerPipelineVulkan::setResourceDirect(uint64_t byteOffset, uint32_t t
     }
 
     const uint32_t descriptorIndex = const_cast<HardwareImage &>(image).storeDescriptor();
+    const ResourceState requiredState = image_state_for_bind_type(typedBindType);
+    const uintptr_t imageId = image.getImageID();
+    if (imageId != 0)
+    {
+        auto found = std::find_if(boundImages.begin(), boundImages.end(), [imageId](const BoundImage &entry) {
+            return entry.image.getImageID() == imageId;
+        });
+        if (found == boundImages.end())
+        {
+            boundImages.push_back({image, requiredState});
+        }
+        else
+        {
+            found->state = requiredState;
+        }
+    }
 
     if (typedBindType == BindType::pushConstantMembers)
     {
@@ -956,6 +998,73 @@ CommandRecordVulkan::RequiredBarriers RasterizerPipelineVulkan::getRequiredBarri
     }
 
     return requiredBarriers;
+}
+
+void RasterizerPipelineVulkan::collectResourceStates(HardwareExecutorVulkan &, ResourceStateTracker &tracker)
+{
+    tracker.addMemoryBarrier(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+                             VK_ACCESS_2_MEMORY_WRITE_BIT,
+                             VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                             VK_ACCESS_2_MEMORY_READ_BIT);
+
+    for (const auto &renderTarget : renderTargets)
+    {
+        const uintptr_t id = renderTarget.getImageID();
+        if (id == 0)
+        {
+            continue;
+        }
+        auto handle = globalImageStorages.acquire_write(id);
+        tracker.requireImageState(*handle, ResourceState::RenderTarget);
+    }
+
+    if (depthImage)
+    {
+        auto handle = globalImageStorages.acquire_write(depthImage.getImageID());
+        tracker.requireImageState(*handle, ResourceState::DepthWrite);
+    }
+
+    for (const auto &mesh : geomMeshesRecord)
+    {
+        if (mesh.indexBuffer)
+        {
+            auto handle = globalBufferStorages.acquire_write(mesh.indexBuffer.getBufferID());
+            tracker.requireBufferState(*handle, ResourceState::IndexBuffer);
+        }
+        if (mesh.vertexBuffer)
+        {
+            auto handle = globalBufferStorages.acquire_write(mesh.vertexBuffer.getBufferID());
+            tracker.requireBufferState(*handle, ResourceState::VertexBuffer);
+        }
+    }
+
+    for (const auto &entry : boundBuffers)
+    {
+        const uintptr_t id = entry.buffer.getBufferID();
+        if (id == 0)
+        {
+            continue;
+        }
+        auto handle = globalBufferStorages.acquire_write(id);
+        tracker.requireBufferState(*handle, entry.state);
+    }
+
+    for (const auto &entry : boundImages)
+    {
+        const uintptr_t id = entry.image.getImageID();
+        if (id == 0)
+        {
+            continue;
+        }
+        auto handle = globalImageStorages.acquire_write(id);
+        tracker.requireImageState(*handle, entry.state);
+    }
+
+    if (uboBuffer)
+    {
+        auto handle = globalBufferStorages.acquire_write(uboBuffer.getBufferID());
+        tracker.requireBufferState(*handle, ResourceState::ConstantBuffer);
+    }
 }
 
 void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExecutor)
@@ -1189,6 +1298,33 @@ void RasterizerPipelineVulkan::commitCommand(HardwareExecutorVulkan &hardwareExe
     }
 
     vkCmdEndRenderPass(commandBuffer);
+
+    for (const auto &renderTarget : renderTargets)
+    {
+        const uintptr_t id = renderTarget.getImageID();
+        if (id == 0)
+        {
+            continue;
+        }
+        auto handle = globalImageStorages.acquire_write(id);
+        if (handle->imageUsage & VK_IMAGE_USAGE_STORAGE_BIT)
+        {
+            handle->imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+            handle->currentState = ResourceState::UnorderedAccess;
+        }
+        else
+        {
+            handle->imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            handle->currentState = ResourceState::RenderTarget;
+        }
+    }
+
+    if (depthImage)
+    {
+        auto handle = globalImageStorages.acquire_write(depthImage.getImageID());
+        handle->imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        handle->currentState = ResourceState::DepthWrite;
+    }
 
     // Keep resources alive until GPU execution completes
     if (!geomMeshesRecord.empty())

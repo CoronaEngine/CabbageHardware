@@ -12,6 +12,7 @@ struct CopyBufferCommand : public CommandRecordVulkan
     ExecutorType getExecutorType() override;
     void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override;
     CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override;
+    void collectResourceStates(HardwareExecutorVulkan &hardwareExecutor, ResourceStateTracker &tracker) override;
 };
 
 struct CopyImageCommand : public CommandRecordVulkan
@@ -34,6 +35,7 @@ struct CopyImageCommand : public CommandRecordVulkan
     ExecutorType getExecutorType() override;
     void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override;
     CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override;
+    void collectResourceStates(HardwareExecutorVulkan &hardwareExecutor, ResourceStateTracker &tracker) override;
 };
 
 // struct CopyBufferToImageCommand : public CommandRecordVulkan {
@@ -119,6 +121,7 @@ struct CopyBufferToImageCommand : public CommandRecordVulkan
     ExecutorType getExecutorType() override;
     void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override;
     CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override;
+    void collectResourceStates(HardwareExecutorVulkan &hardwareExecutor, ResourceStateTracker &tracker) override;
 };
 
 struct CopyImageToBufferCommand : public CommandRecordVulkan
@@ -131,6 +134,7 @@ struct CopyImageToBufferCommand : public CommandRecordVulkan
     ExecutorType getExecutorType() override;
     void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override;
     CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override;
+    void collectResourceStates(HardwareExecutorVulkan &hardwareExecutor, ResourceStateTracker &tracker) override;
 };
 
 struct BlitImageCommand : public CommandRecordVulkan
@@ -143,6 +147,7 @@ struct BlitImageCommand : public CommandRecordVulkan
     ExecutorType getExecutorType() override;
     void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override;
     CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override;
+    void collectResourceStates(HardwareExecutorVulkan &hardwareExecutor, ResourceStateTracker &tracker) override;
 };
 
 struct TransitionImageLayoutCommand : public CommandRecordVulkan
@@ -157,4 +162,34 @@ struct TransitionImageLayoutCommand : public CommandRecordVulkan
     ExecutorType getExecutorType() override;
     void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override;
     CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override;
+    void collectResourceStates(HardwareExecutorVulkan &hardwareExecutor, ResourceStateTracker &tracker) override;
+};
+
+struct TransitionImageStateCommand : public CommandRecordVulkan
+{
+    ResourceManager::ImageHardwareWrap &image;
+    ResourceState state;
+    TextureSubresourceSet subresources;
+
+    TransitionImageStateCommand(ResourceManager::ImageHardwareWrap &image,
+                                ResourceState state,
+                                TextureSubresourceSet subresources = AllSubresources);
+
+    ExecutorType getExecutorType() override;
+    void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override;
+    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override;
+    void collectResourceStates(HardwareExecutorVulkan &hardwareExecutor, ResourceStateTracker &tracker) override;
+};
+
+struct TransitionBufferStateCommand : public CommandRecordVulkan
+{
+    ResourceManager::BufferHardwareWrap &buffer;
+    ResourceState state;
+
+    TransitionBufferStateCommand(ResourceManager::BufferHardwareWrap &buffer, ResourceState state);
+
+    ExecutorType getExecutorType() override;
+    void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override;
+    CommandRecordVulkan::RequiredBarriers getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor) override;
+    void collectResourceStates(HardwareExecutorVulkan &hardwareExecutor, ResourceStateTracker &tracker) override;
 };
