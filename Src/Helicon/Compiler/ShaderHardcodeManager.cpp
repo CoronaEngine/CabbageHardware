@@ -1,4 +1,3 @@
-#include <regex>
 #include <fstream>
 #include <sstream>
 #include <filesystem>
@@ -167,18 +166,11 @@ std::unordered_map<std::string, std::variant<EmbeddedShader::ShaderCodeModule::S
 	std::string ShaderHardcodeManager::getSourceLocationString(const std::source_location& sourceLocation)
 	{
         std::string fileName = sourceLocation.file_name() + std::string("_line_") + std::to_string(sourceLocation.line()) + std::string("_column_") + std::to_string(sourceLocation.column());
-		std::regex pattern(R"(CabbageEngine(.*))");
-		std::smatch matches;
-		if (std::regex_search(fileName, matches, pattern))
+		const std::string marker = "CabbageEngine";
+		const auto markerPos = fileName.find(marker);
+		if (markerPos != std::string::npos)
 		{
-			if (matches.size() > 1)
-			{
-				fileName = matches[1].str();
-			}
-			else
-			{
-				throw std::runtime_error("Failed to resolve source path.");
-			}
+			fileName = fileName.substr(markerPos + marker.size());
 		}
 		return sanitizePath(fileName);
 	}

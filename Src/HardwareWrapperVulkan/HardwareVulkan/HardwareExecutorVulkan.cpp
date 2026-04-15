@@ -397,6 +397,13 @@ DeviceManager::QueueUtils *HardwareExecutorVulkan::pickQueueAndCommit(std::atomi
         return nullptr;
     }
 
+        waitSemaphores.clear();
+        signalSemaphores.clear();
+        waitFence = VK_NULL_HANDLE;
+        queue->queueMutex->unlock();
+        return nullptr;
+    }
+
     // P0 修复：确保 currentRecordQueue 始终指向本次选出的队列
     // commit() 的 lambda 已经设置了此值（幂等），但外部调用者（如 displayFrame 的 present lambda）
     // 可能不会设置。统一在此处赋值，保证后续 timeline 管理和 vkQueueSubmit2 作用于正确的队列。
