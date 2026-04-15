@@ -15,8 +15,16 @@ CommandRecordVulkan::RequiredBarriers makeRequiredBarriers(VulkanBarrierBatch &&
 }
 } // namespace
 
-CopyBufferCommand::CopyBufferCommand(ResourceManager::BufferHardwareWrap &src, ResourceManager::BufferHardwareWrap &dst)
-    : srcBuffer(src), dstBuffer(dst)
+CopyBufferCommand::CopyBufferCommand(ResourceManager::BufferHardwareWrap &src,
+                                     ResourceManager::BufferHardwareWrap &dst,
+                                     uint64_t srcOffsetValue,
+                                     uint64_t dstOffsetValue,
+                                     uint64_t sizeValue)
+    : srcBuffer(src),
+      dstBuffer(dst),
+      srcOffset(srcOffsetValue),
+      dstOffset(dstOffsetValue),
+      size(sizeValue)
 {
     executorType = ExecutorType::Transfer;
 }
@@ -28,7 +36,12 @@ CommandRecordVulkan::ExecutorType CopyBufferCommand::getExecutorType()
 
 void CopyBufferCommand::commitCommand(HardwareExecutorVulkan &hardwareExecutor)
 {
-    hardwareExecutor.hardwareContext->resourceManager.copyBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, srcBuffer, dstBuffer);
+    hardwareExecutor.hardwareContext->resourceManager.copyBuffer(hardwareExecutor.currentRecordQueue->commandBuffer,
+                                                                  srcBuffer,
+                                                                  dstBuffer,
+                                                                  srcOffset,
+                                                                  dstOffset,
+                                                                  size);
 }
 
 CommandRecordVulkan::RequiredBarriers CopyBufferCommand::getRequiredBarriers(HardwareExecutorVulkan &hardwareExecutor)
@@ -136,8 +149,14 @@ void CopyImageCommand::collectResourceStates(HardwareExecutorVulkan &, ResourceS
 
 CopyBufferToImageCommand::CopyBufferToImageCommand(ResourceManager::BufferHardwareWrap &srcBuf,
                                                    ResourceManager::ImageHardwareWrap &dstImg,
+                                                   uint64_t bufferOffsetValue,
+                                                   uint32_t imageLayerValue,
                                                    uint32_t mip)
-    : srcBuffer(srcBuf), dstImage(dstImg), mipLevel(mip)
+    : srcBuffer(srcBuf),
+      dstImage(dstImg),
+      bufferOffset(bufferOffsetValue),
+      imageLayer(imageLayerValue),
+      mipLevel(mip)
 {
     executorType = ExecutorType::Transfer;
 }
@@ -153,8 +172,10 @@ void CopyBufferToImageCommand::commitCommand(HardwareExecutorVulkan &hardwareExe
         hardwareExecutor.currentRecordQueue->commandBuffer,
         srcBuffer,
         dstImage,
+        bufferOffset,
+        imageLayer,
         mipLevel,
-        dstImage.arrayLayers);
+        1);
 
     if (!hardwareExecutor.automaticBarriersEnabled() &&
         (dstImage.imageUsage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT)) != 0 &&
@@ -180,12 +201,19 @@ void CopyBufferToImageCommand::collectResourceStates(HardwareExecutorVulkan &, R
 {
     tracker.requireBufferState(srcBuffer, ResourceState::CopySource);
     tracker.requireImageState(dstImage, ResourceState::CopyDest,
-                              TextureSubresourceSet{mipLevel, 1, 0, std::max(1u, dstImage.arrayLayers)});
+                              TextureSubresourceSet{mipLevel, 1, imageLayer, 1});
 }
 
 CopyImageToBufferCommand::CopyImageToBufferCommand(ResourceManager::ImageHardwareWrap &srcImg,
-                                                   ResourceManager::BufferHardwareWrap &dstBuf)
-    : srcImage(srcImg), dstBuffer(dstBuf)
+                                                   ResourceManager::BufferHardwareWrap &dstBuf,
+                                                   uint32_t imageLayerValue,
+                                                   uint32_t imageMipValue,
+                                                   uint64_t bufferOffsetValue)
+    : srcImage(srcImg),
+      dstBuffer(dstBuf),
+      imageLayer(imageLayerValue),
+      imageMip(imageMipValue),
+      bufferOffset(bufferOffsetValue)
 {
     executorType = ExecutorType::Transfer;
 }
@@ -197,7 +225,13 @@ CommandRecordVulkan::ExecutorType CopyImageToBufferCommand::getExecutorType()
 
 void CopyImageToBufferCommand::commitCommand(HardwareExecutorVulkan &hardwareExecutor)
 {
-    hardwareExecutor.hardwareContext->resourceManager.copyImageToBuffer(hardwareExecutor.currentRecordQueue->commandBuffer, srcImage, dstBuffer);
+    hardwareExecutor.hardwareContext->resourceManager.copyImageToBuffer(hardwareExecutor.currentRecordQueue->commandBuffer,
+                                                                        srcImage,
+                                                                        dstBuffer,
+                                                                        imageLayer,
+                                                                        imageMip,
+                                                                        bufferOffset,
+                                                                        1);
 
     if (!hardwareExecutor.automaticBarriersEnabled() &&
         (srcImage.imageUsage & (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT)) != 0 &&
@@ -221,7 +255,8 @@ CommandRecordVulkan::RequiredBarriers CopyImageToBufferCommand::getRequiredBarri
 
 void CopyImageToBufferCommand::collectResourceStates(HardwareExecutorVulkan &, ResourceStateTracker &tracker)
 {
-    tracker.requireImageState(srcImage, ResourceState::CopySource);
+    tracker.requireImageState(srcImage, ResourceState::CopySource,
+                              TextureSubresourceSet{imageMip, 1, imageLayer, 1});
     tracker.requireBufferState(dstBuffer, ResourceState::CopyDest);
 }
 

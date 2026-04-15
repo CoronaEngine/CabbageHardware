@@ -24,7 +24,6 @@ struct ResourceManager
     {
         uint32_t elementCount{0};
         uint32_t elementSize{0};
-        uint64_t refCount{1};
 
         VkBuffer bufferHandle{VK_NULL_HANDLE};
         VkBufferUsageFlags bufferUsage{VK_BUFFER_USAGE_FLAG_BITS_MAX_ENUM};
@@ -57,7 +56,6 @@ struct ResourceManager
         std::string debugName{};
         float pixelSize{0};
         ktm::uvec2 imageSize{0, 0};
-        uint64_t refCount{1};
 
         VkFormat imageFormat{VK_FORMAT_MAX_ENUM};
         VkImageUsageFlags imageUsage{VK_IMAGE_USAGE_FLAG_BITS_MAX_ENUM};
@@ -73,6 +71,8 @@ struct ResourceManager
         VkImageView imageView{VK_NULL_HANDLE};
         std::unordered_map<uint64_t, VkImageView> allSubViews{};
         VkSampler sampler{VK_NULL_HANDLE};
+        HardwareSampler samplerRef{};
+        CabbageHardwareInternal::ResourceHandle<CabbageHardwareInternal::ImageTag> parentImageRef{};
 
         VmaAllocation imageAlloc{VK_NULL_HANDLE};
         VmaAllocationInfo imageAllocInfo{};
@@ -93,7 +93,6 @@ struct ResourceManager
     struct SamplerHardwareWrap
     {
         VkSampler sampler{VK_NULL_HANDLE};
-        uint64_t refCount{1};
         DeviceManager *device{nullptr};
         ResourceManager *resourceManager{nullptr};
         SamplerDesc desc{};
@@ -144,12 +143,29 @@ struct ResourceManager
     [[nodiscard]] bool storeDescriptorAt(Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle &buffer, uint32_t descriptorIndex);
 
     // Copy operations
-    ResourceManager &copyBuffer(VkCommandBuffer &commandBuffer, BufferHardwareWrap &srcBuffer, BufferHardwareWrap &dstBuffer);
+    ResourceManager &copyBuffer(VkCommandBuffer &commandBuffer,
+                                BufferHardwareWrap &srcBuffer,
+                                BufferHardwareWrap &dstBuffer,
+                                uint64_t srcOffset = 0,
+                                uint64_t dstOffset = 0,
+                                uint64_t size = 0);
     //ResourceManager &copyImage(VkCommandBuffer &commandBuffer, ImageHardwareWrap &source, ImageHardwareWrap &destination);
     ResourceManager &copyImage(VkCommandBuffer &commandBuffer, ImageHardwareWrap &source, ImageHardwareWrap &destination, uint32_t srcLayer = 0, uint32_t dstLayer = 0, uint32_t srcMip = 0, uint32_t dstMip = 0);
 
-    ResourceManager &copyBufferToImage(VkCommandBuffer &commandBuffer, BufferHardwareWrap &buffer, ImageHardwareWrap &image, uint32_t mipLevel = 0, uint32_t layerCount = 1);
-    ResourceManager &copyImageToBuffer(VkCommandBuffer &commandBuffer, ImageHardwareWrap &image, BufferHardwareWrap &buffer);
+    ResourceManager &copyBufferToImage(VkCommandBuffer &commandBuffer,
+                                       BufferHardwareWrap &buffer,
+                                       ImageHardwareWrap &image,
+                                       uint64_t bufferOffset = 0,
+                                       uint32_t imageLayer = 0,
+                                       uint32_t mipLevel = 0,
+                                       uint32_t layerCount = 1);
+    ResourceManager &copyImageToBuffer(VkCommandBuffer &commandBuffer,
+                                       ImageHardwareWrap &image,
+                                       BufferHardwareWrap &buffer,
+                                       uint32_t imageLayer = 0,
+                                       uint32_t imageMip = 0,
+                                       uint64_t bufferOffset = 0,
+                                       uint32_t layerCount = 1);
     ResourceManager &blitImage(VkCommandBuffer &commandBuffer, ImageHardwareWrap &srcImage, ImageHardwareWrap &dstImage);
 
     void copyBufferToHost(BufferHardwareWrap &buffer, void *cpuData, uint64_t size);

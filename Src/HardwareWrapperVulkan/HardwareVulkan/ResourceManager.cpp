@@ -733,6 +733,8 @@ void ResourceManager::destroyImage(ImageHardwareWrap &image)
     }
 
     image.imageHandle = VK_NULL_HANDLE;
+    image.sampler = VK_NULL_HANDLE;
+    image.samplerRef = HardwareSampler();
     image.imageAlloc = VK_NULL_HANDLE;
     image.imageAllocInfo = {};
     image.subresourceStates.clear();
@@ -1258,7 +1260,7 @@ int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<Resource
     {
         image->bindlessIndex = globalImageStorages.seq_id(image);
     }
-    storeDescriptorAt(image, static_cast<uint32_t>(image->bindlessIndex));
+    (void)storeDescriptorAt(image, static_cast<uint32_t>(image->bindlessIndex));
 
     return image->bindlessIndex;
 }
@@ -1269,7 +1271,7 @@ int32_t ResourceManager::storeDescriptor(Corona::Kernel::Utils::Storage<Resource
     {
         buffer->bindlessIndex = globalBufferStorages.seq_id(buffer);
     }
-    storeDescriptorAt(buffer, static_cast<uint32_t>(buffer->bindlessIndex));
+    (void)storeDescriptorAt(buffer, static_cast<uint32_t>(buffer->bindlessIndex));
 
     return buffer->bindlessIndex;
 }
@@ -1339,14 +1341,31 @@ bool ResourceManager::storeDescriptorAt(Corona::Kernel::Utils::Storage<ResourceM
 
 ResourceManager &ResourceManager::copyBuffer(VkCommandBuffer &commandBuffer,
                                              BufferHardwareWrap &srcBuffer,
-                                             BufferHardwareWrap &dstBuffer)
+                                             BufferHardwareWrap &dstBuffer,
+                                             uint64_t srcOffset,
+                                             uint64_t dstOffset,
+                                             uint64_t size)
 {
-    if (srcBuffer.bufferAllocInfo.size == dstBuffer.bufferAllocInfo.size)
+    const uint64_t srcSize = srcBuffer.bufferAllocInfo.size;
+    const uint64_t dstSize = dstBuffer.bufferAllocInfo.size;
+    if (srcOffset >= srcSize || dstOffset >= dstSize)
     {
-        VkBufferCopy copyRegion{};
-        copyRegion.size = srcBuffer.bufferAllocInfo.size;
-        vkCmdCopyBuffer(commandBuffer, srcBuffer.bufferHandle, dstBuffer.bufferHandle, 1, &copyRegion);
+        return *this;
     }
+
+    const uint64_t srcAvailable = srcSize - srcOffset;
+    const uint64_t dstAvailable = dstSize - dstOffset;
+    const uint64_t copySize = size == 0 ? std::min(srcAvailable, dstAvailable) : std::min(size, std::min(srcAvailable, dstAvailable));
+    if (copySize == 0)
+    {
+        return *this;
+    }
+
+    VkBufferCopy copyRegion{};
+    copyRegion.srcOffset = srcOffset;
+    copyRegion.dstOffset = dstOffset;
+    copyRegion.size = copySize;
+    vkCmdCopyBuffer(commandBuffer, srcBuffer.bufferHandle, dstBuffer.bufferHandle, 1, &copyRegion);
 
     return *this;
 }
@@ -1434,12 +1453,20 @@ ResourceManager &ResourceManager::copyImage(VkCommandBuffer &commandBuffer,
 ResourceManager &ResourceManager::copyBufferToImage(VkCommandBuffer &commandBuffer,
                                                     BufferHardwareWrap &buffer,
                                                     ImageHardwareWrap &image,
+                                                    uint64_t bufferOffset,
+                                                    uint32_t imageLayer,
                                                     uint32_t mipLevel,
                                                     uint32_t layerCount)
 {
-    if (mipLevel >= image.mipLevels)
+    if (mipLevel >= image.mipLevels || imageLayer >= image.arrayLayers)
     {
         return *this; // Invalid mip level
+    }
+
+    layerCount = std::min(layerCount, image.arrayLayers - imageLayer);
+    if (layerCount == 0)
+    {
+        return *this;
     }
 
     // 计算指定 mip level 的尺寸
@@ -1447,12 +1474,12 @@ ResourceManager &ResourceManager::copyBufferToImage(VkCommandBuffer &commandBuff
     uint32_t mipHeight = std::max(1u, image.imageSize.y >> mipLevel);
 
     VkBufferImageCopy region{};
-    region.bufferOffset = 0;
+    region.bufferOffset = bufferOffset;
     region.bufferRowLength = 0;
     region.bufferImageHeight = 0;
     region.imageSubresource.aspectMask = image.aspectMask;
     region.imageSubresource.mipLevel = mipLevel; // 指定 mip level
-    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.baseArrayLayer = imageLayer;
     region.imageSubresource.layerCount = layerCount;
     region.imageOffset = {0, 0, 0};
     region.imageExtent = {mipWidth, mipHeight, 1};
@@ -1469,18 +1496,36 @@ ResourceManager &ResourceManager::copyBufferToImage(VkCommandBuffer &commandBuff
 
 ResourceManager &ResourceManager::copyImageToBuffer(VkCommandBuffer &commandBuffer,
                                                     ImageHardwareWrap &image,
-                                                    BufferHardwareWrap &buffer)
+                                                    BufferHardwareWrap &buffer,
+                                                    uint32_t imageLayer,
+                                                    uint32_t imageMip,
+                                                    uint64_t bufferOffset,
+                                                    uint32_t layerCount)
 {
+    if (imageMip >= image.mipLevels || imageLayer >= image.arrayLayers)
+    {
+        return *this;
+    }
+
+    layerCount = std::min(layerCount, image.arrayLayers - imageLayer);
+    if (layerCount == 0)
+    {
+        return *this;
+    }
+
+    const uint32_t mipWidth = std::max(1u, image.imageSize.x >> imageMip);
+    const uint32_t mipHeight = std::max(1u, image.imageSize.y >> imageMip);
+
     VkBufferImageCopy region{};
-    region.bufferOffset = 0;
+    region.bufferOffset = bufferOffset;
     region.bufferRowLength = 0;
     region.bufferImageHeight = 0;
     region.imageSubresource.aspectMask = image.aspectMask;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = image.arrayLayers;
+    region.imageSubresource.mipLevel = imageMip;
+    region.imageSubresource.baseArrayLayer = imageLayer;
+    region.imageSubresource.layerCount = layerCount;
     region.imageOffset = {0, 0, 0};
-    region.imageExtent = {image.imageSize.x, image.imageSize.y, 1};
+    region.imageExtent = {mipWidth, mipHeight, 1};
 
     vkCmdCopyImageToBuffer(commandBuffer,
                            image.imageHandle,

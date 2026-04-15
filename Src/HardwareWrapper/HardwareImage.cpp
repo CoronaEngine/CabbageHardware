@@ -6,6 +6,7 @@
 #include "HardwareWrapperVulkan/ResourcePool.h"
 
 #include <algorithm>
+#include <limits>
 
 struct ImageFormatInfo
 {
@@ -137,6 +138,30 @@ static bool decrementImageRefCount(uint32_t id, const Corona::Kernel::Utils::Sto
     return false;
 }
 
+static uint64_t computeImageMipByteSize(const ResourceManager::ImageHardwareWrap &image, uint32_t imageMip)
+{
+    if (imageMip >= image.mipLevels)
+    {
+        return 0;
+    }
+
+    const uint32_t width = std::max(1u, image.imageSize.x >> imageMip);
+    const uint32_t height = std::max(1u, image.imageSize.y >> imageMip);
+    const bool isCompressed = image.pixelSize < 2.0f;
+
+    if (isCompressed)
+    {
+        constexpr uint32_t blockWidth = 4;
+        constexpr uint32_t blockHeight = 4;
+        const uint32_t widthInBlocks = (width + blockWidth - 1) / blockWidth;
+        const uint32_t heightInBlocks = (height + blockHeight - 1) / blockHeight;
+        const uint32_t bytesPerBlock = static_cast<uint32_t>(image.pixelSize * 16.0f);
+        return static_cast<uint64_t>(widthInBlocks) * heightInBlocks * bytesPerBlock;
+    }
+
+    return static_cast<uint64_t>(width) * height * static_cast<uint32_t>(image.pixelSize);
+}
+
 HardwareImage::HardwareImage()
     : imageID(0)
 {
@@ -205,48 +230,49 @@ HardwareImage::HardwareImage(const HardwareImageCreateInfo &createInfo)
 
     //CFW_LOG_TRACE("HardwareImage created: id={}", self_image_id);
 
-    // if (createInfo.initialData != nullptr)
-    // {
-    //     HardwareExecutorVulkan tempExecutor;
-    //     auto imageHandle = globalImageStorages.acquire_write(self_image_id);
+    if (createInfo.initialData != nullptr)
+    {
+        const uint8_t *currentSrcDataPtr = static_cast<const uint8_t *>(createInfo.initialData);
+        HardwareExecutor executor;
 
-    //     const uint8_t *currentSrcDataPtr = static_cast<const uint8_t *>(createInfo.initialData);
-    //     for (int mip = 0; mip < createInfo.mipLevels; ++mip)
-    //     {
-    //         uint32_t mipWidth = std::max(1u, createInfo.width >> mip);
-    //         uint32_t mipHeight = std::max(1u, createInfo.height >> mip);
-    //         uint32_t mipSize = 0;
+        uint32_t mipLevels = 1;
+        uint32_t arrayLayers = 1;
+        std::vector<uint64_t> mipSizes;
+        {
+            auto imageHandle = globalImageStorages.acquire_read(self_image_id);
+            mipLevels = std::max(1u, imageHandle->mipLevels);
+            arrayLayers = std::max(1u, imageHandle->arrayLayers);
+            mipSizes.reserve(mipLevels);
+            for (uint32_t mip = 0; mip < mipLevels; ++mip)
+            {
+                mipSizes.push_back(computeImageMipByteSize(*imageHandle, mip));
+            }
+        }
 
-    //         if (isCompressed)
-    //         {
-    //             const uint32_t blockWidth = 4;
-    //             const uint32_t blockHeight = 4;
-    //             // 向上取整计算 Block 数量
-    //             uint32_t widthInBlocks = (mipWidth + blockWidth - 1) / blockWidth;
-    //             uint32_t heightInBlocks = (mipHeight + blockHeight - 1) / blockHeight;
-    //             // 计算每个 Block 的字节数 (例如 BC1: 0.5 * 16 = 8 bytes)
-    //             uint32_t bytesPerBlock = static_cast<uint32_t>(imageHandle->pixelSize * 16.0f);
+        for (uint32_t mip = 0; mip < mipLevels; ++mip)
+        {
+            const uint64_t mipSize = mipSizes[mip];
+            if (mipSize == 0 || mipSize > std::numeric_limits<uint32_t>::max())
+            {
+                CFW_LOG_WARNING("Skipping HardwareImage initialData upload for unsupported mip size.");
+                break;
+            }
 
-    //             mipSize = widthInBlocks * heightInBlocks * bytesPerBlock * imageHandle->arrayLayers;
-    //         }
-    //         else
-    //         {
-    //             mipSize = mipWidth * mipHeight * static_cast<uint32_t>(imageHandle->pixelSize) * imageHandle->arrayLayers;
-    //         }
+            for (uint32_t layer = 0; layer < arrayLayers; ++layer)
+            {
+                HardwareBuffer stagingBuffer(static_cast<uint32_t>(mipSize),
+                                             1,
+                                             BufferUsage::StorageBuffer,
+                                             currentSrcDataPtr,
+                                             false);
+                executor << stagingBuffer.copyTo(*this, 0, layer, mip);
+                currentSrcDataPtr += mipSize;
+            }
+        }
 
-    //         HardwareBuffer stagingBuffer(mipSize,
-    //                                      1,
-    //                                      BufferUsage::StorageBuffer,
-    //                                      currentSrcDataPtr,
-    //                                      false);
-
-    //         auto bufferHandle = globalBufferStorages.acquire_write(stagingBuffer.getBufferID());
-
-    //         CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, mip);
-    //         tempExecutor << &copyCmd << tempExecutor.commit();
-    //         currentSrcDataPtr += mipSize;
-    //     }
-    // }
+        executor.commit();
+        executor.waitForDeferredResources();
+    }
 }
 
 // TODO : 后面会被弃用
@@ -273,17 +299,31 @@ HardwareImage::HardwareImage(uint32_t width, uint32_t height, ImageFormat imageF
 
     if (imageData != nullptr)
     {
-        HardwareExecutorVulkan tempExecutor;
+        uint64_t layerSize = 0;
+        uint32_t layerCount = 1;
+        {
+            auto imageHandle = globalImageStorages.acquire_read(self_image_id);
+            layerSize = computeImageMipByteSize(*imageHandle, 0);
+            layerCount = std::max(1u, imageHandle->arrayLayers);
+        }
 
-        auto imageHandle = globalImageStorages.acquire_write(self_image_id);
-        HardwareBuffer stagingBuffer(imageHandle->imageSize.x * imageHandle->imageSize.y * imageHandle->pixelSize,
-                                     BufferUsage::StorageBuffer,
-                                     imageData);
-
-        auto bufferHandle = globalBufferStorages.acquire_write(stagingBuffer.getBufferID());
-
-        CopyBufferToImageCommand copyCmd(*bufferHandle, *imageHandle, 0);
-        tempExecutor << &copyCmd << tempExecutor.commit();
+        if (layerSize > 0 && layerSize <= std::numeric_limits<uint32_t>::max())
+        {
+            const uint8_t *currentSrcDataPtr = static_cast<const uint8_t *>(imageData);
+            HardwareExecutor executor;
+            for (uint32_t layer = 0; layer < layerCount; ++layer)
+            {
+                HardwareBuffer stagingBuffer(static_cast<uint32_t>(layerSize),
+                                             1,
+                                             BufferUsage::StorageBuffer,
+                                             currentSrcDataPtr,
+                                             false);
+                executor << stagingBuffer.copyTo(*this, 0, layer, 0);
+                currentSrcDataPtr += layerSize;
+            }
+            executor.commit();
+            executor.waitForDeferredResources();
+        }
     }
 }
 
@@ -393,6 +433,8 @@ HardwareImage HardwareImage::operator[](const uint32_t index)
             subImageHandle->imageHandle = imageHandle->imageHandle; // 共享同一个 VkImage
             subImageHandle->imageAlloc = imageHandle->imageAlloc;
             subImageHandle->imageAllocInfo = imageHandle->imageAllocInfo;
+            subImageHandle->sampler = imageHandle->sampler;
+            subImageHandle->samplerRef = imageHandle->samplerRef;
             subImageHandle->bindlessIndex = -1;
             subImageHandle->ownsImage = false;
             subImageHandle->ownsImageView = false;
@@ -551,6 +593,33 @@ void HardwareImage::setClearColor(float r, float g, float b, float a)
     handle->clearValue.color = {{r, g, b, a}};
 }
 
+void HardwareImage::setSampler(const HardwareSampler &sampler)
+{
+    auto const selfImageId = imageID.load(std::memory_order_acquire);
+    if (selfImageId == 0)
+    {
+        return;
+    }
+
+    VkSampler vkSampler = VK_NULL_HANDLE;
+    auto const samplerId = sampler.getSamplerID();
+    if (samplerId > 0)
+    {
+        auto samplerHandle = globalSamplerStorages.acquire_read(samplerId);
+        vkSampler = samplerHandle->sampler;
+    }
+
+    auto imageHandle = globalImageStorages.acquire_write(selfImageId);
+    imageHandle->samplerRef = sampler;
+    imageHandle->sampler = vkSampler;
+
+    if (imageHandle->bindlessIndex >= 0)
+    {
+        (void)globalHardwareContext.getMainDevice()->resourceManager.storeDescriptorAt(imageHandle,
+                                                                                       static_cast<uint32_t>(imageHandle->bindlessIndex));
+    }
+}
+
 ImageCopyCommand HardwareImage::copyTo(const HardwareImage &dst,
                                        uint32_t srcLayer, uint32_t dstLayer,
                                        uint32_t srcMip, uint32_t dstMip) const
@@ -587,34 +656,19 @@ BufferToImageCommand HardwareImage::copyFrom(const void *inputData,
 
     {
         auto const imageHandle = globalImageStorages.acquire_read(imageID.load(std::memory_order_acquire));
-        if (imageMip >= imageHandle->mipLevels)
+        if (imageMip >= imageHandle->mipLevels || imageLayer >= imageHandle->arrayLayers)
         {
             return BufferToImageCommand();
         }
-        const uint32_t width = std::max(1u, imageHandle->imageSize.x >> imageMip);
-        const uint32_t height = std::max(1u, imageHandle->imageSize.y >> imageMip);
-
-        // 判断是否是压缩格式 (压缩格式的 pixelSize < 2.0f)
-        const bool isCompressed = imageHandle->pixelSize < 2.0f;
-
-        if (isCompressed)
-        {
-            const uint32_t blockWidth = 4;
-            const uint32_t blockHeight = 4;
-            // 向上取整计算 Block 数量
-            uint32_t widthInBlocks = (width + blockWidth - 1) / blockWidth;
-            uint32_t heightInBlocks = (height + blockHeight - 1) / blockHeight;
-            // 计算每个 Block 的字节数 (例如 BC1: 0.5 * 16 = 8 bytes)
-            uint32_t bytesPerBlock = static_cast<uint32_t>(imageHandle->pixelSize * 16.0f);
-            bufferSize = widthInBlocks * heightInBlocks * bytesPerBlock;
-        }
-        else
-        {
-            bufferSize = width * height * static_cast<uint32_t>(imageHandle->pixelSize);
-        }
+        bufferSize = computeImageMipByteSize(*imageHandle, imageMip);
     }
 
-    HardwareBuffer stagingBuffer(bufferSize, BufferUsage::StorageBuffer, inputData);
+    if (bufferSize == 0 || bufferSize > std::numeric_limits<uint32_t>::max())
+    {
+        return BufferToImageCommand();
+    }
+
+    HardwareBuffer stagingBuffer(static_cast<uint32_t>(bufferSize), BufferUsage::StorageBuffer, inputData);
     auto cmd = BufferToImageCommand(std::move(stagingBuffer), *this, 0, imageLayer, imageMip);
     return cmd;
 }

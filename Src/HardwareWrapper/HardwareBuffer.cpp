@@ -4,7 +4,9 @@
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/ResourceCommand.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"
-#include "corona/kernel/utils/storage.h"
+
+#include <cstring>
+#include <limits>
 
 VkBufferUsageFlags convertBufferUsage(BufferUsage const usage)
 {
@@ -31,59 +33,70 @@ VkBufferUsageFlags convertBufferUsage(BufferUsage const usage)
     return vkUsage;
 }
 
-static void incrementBufferRefCount(uint64_t id, const Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle &handle)
-{
-    ++handle->refCount;
-}
-
-static bool decrementBufferRefCount(uint64_t id, const Corona::Kernel::Utils::Storage<ResourceManager::BufferHardwareWrap>::WriteHandle &handle)
-{
-    uint64_t const newCount = --handle->refCount;
-    if (newCount == 0)
-    {
-        globalHardwareContext.getMainDevice()->resourceManager.destroyBuffer(*handle);
-        return true;
-    }
-    return false;
-}
-
-HardwareBuffer::HardwareBuffer()
-    : bufferID(0)
-{
-}
+HardwareBuffer::HardwareBuffer() = default;
 
 HardwareBuffer::HardwareBuffer(const HardwareBufferCreateInfo &createInfo, const void *data)
 {
-    auto const buffer_id = globalBufferStorages.allocate();
-    bufferID.store(buffer_id, std::memory_order_release);
-    auto const handle = globalBufferStorages.acquire_write(buffer_id);
-    *handle = globalHardwareContext.getMainDevice()->resourceManager.createBuffer(createInfo.elementCount,
-                                                                                  createInfo.elementSize,
-                                                                                  convertBufferUsage(createInfo.usage),
-                                                                                  createInfo.hostVisibleMapped,
-                                                                                  createInfo.useDedicated);
-    handle->initialState = createInfo.initialState;
-    handle->currentState = createInfo.initialState;
-    handle->keepInitialState = createInfo.keepInitialState;
-    handle->hostVisibleMapped = createInfo.hostVisibleMapped;
-    handle->debugName = createInfo.debugName;
+    bufferHandle_ = globalBufferStorages.allocate_handle(createInfo.debugName);
+    auto const buffer_id = getBufferID();
 
-    if (data != nullptr && handle->bufferAllocInfo.pMappedData != nullptr)
+    bool needsStagedUpload = false;
+    const uint64_t dataSize = static_cast<uint64_t>(createInfo.elementCount) * createInfo.elementSize;
+
     {
-        std::memcpy(handle->bufferAllocInfo.pMappedData, data, static_cast<size_t>(createInfo.elementCount) * createInfo.elementSize);
+        auto const handle = globalBufferStorages.acquire_write(buffer_id);
+        *handle = globalHardwareContext.getMainDevice()->resourceManager.createBuffer(createInfo.elementCount,
+                                                                                      createInfo.elementSize,
+                                                                                      convertBufferUsage(createInfo.usage),
+                                                                                      createInfo.hostVisibleMapped,
+                                                                                      createInfo.useDedicated);
+        handle->initialState = createInfo.initialState;
+        handle->currentState = createInfo.initialState;
+        handle->keepInitialState = createInfo.keepInitialState;
+        handle->hostVisibleMapped = createInfo.hostVisibleMapped;
+        handle->debugName = createInfo.debugName;
+
+        if (data != nullptr && handle->bufferAllocInfo.pMappedData != nullptr)
+        {
+            std::memcpy(handle->bufferAllocInfo.pMappedData, data, static_cast<size_t>(dataSize));
+        }
+        else if (data != nullptr && dataSize > 0)
+        {
+            needsStagedUpload = true;
+        }
+    }
+
+    if (needsStagedUpload)
+    {
+        copyFromData(data, dataSize);
     }
 }
 
 HardwareBuffer::HardwareBuffer(const uint32_t bufferSize, const uint32_t elementSize, const BufferUsage usage, const void *data, bool useDedicated)
 {
-    auto const buffer_id = globalBufferStorages.allocate();
-    bufferID.store(buffer_id, std::memory_order_release);
-    auto const handle = globalBufferStorages.acquire_write(buffer_id);
-    *handle = globalHardwareContext.getMainDevice()->resourceManager.createBuffer(bufferSize, elementSize, convertBufferUsage(usage), true, useDedicated);
+    bufferHandle_ = globalBufferStorages.allocate_handle();
+    auto const buffer_id = getBufferID();
 
-    if (data != nullptr && handle->bufferAllocInfo.pMappedData != nullptr)
+    bool needsStagedUpload = false;
+    const uint64_t dataSize = static_cast<uint64_t>(bufferSize) * elementSize;
+
     {
-        std::memcpy(handle->bufferAllocInfo.pMappedData, data, static_cast<size_t>(bufferSize) * elementSize);
+        auto const handle = globalBufferStorages.acquire_write(buffer_id);
+        *handle = globalHardwareContext.getMainDevice()->resourceManager.createBuffer(bufferSize, elementSize, convertBufferUsage(usage), true, useDedicated);
+
+        if (data != nullptr && handle->bufferAllocInfo.pMappedData != nullptr)
+        {
+            std::memcpy(handle->bufferAllocInfo.pMappedData, data, static_cast<size_t>(dataSize));
+        }
+        else if (data != nullptr && dataSize > 0)
+        {
+            needsStagedUpload = true;
+        }
+    }
+
+    if (needsStagedUpload)
+    {
+        copyFromData(data, dataSize);
     }
 }
 
@@ -97,30 +110,20 @@ HardwareBuffer::HardwareBuffer(const ExternalHandle &memHandle, const uint32_t b
 #endif
 
     const VkBufferUsageFlags vkUsage = convertBufferUsage(usage);
-    auto const buffer_id = globalBufferStorages.allocate();
-    bufferID.store(buffer_id, std::memory_order_release);
+    bufferHandle_ = globalBufferStorages.allocate_handle();
+    auto const buffer_id = getBufferID();
     auto const bufferHandle = globalBufferStorages.acquire_write(buffer_id);
     *bufferHandle = globalHardwareContext.getMainDevice()->resourceManager.importBufferMemory(memory_handle, bufferSize, elementSize, allocSize, vkUsage);
 }
 
 HardwareBuffer::HardwareBuffer(const HardwareBuffer &other)
+    : bufferHandle_(other.bufferHandle_)
 {
-    std::lock_guard<std::mutex> lock(other.bufferMutex);
-    auto const other_buffer_id = other.bufferID.load(std::memory_order_acquire);
-    bufferID.store(other_buffer_id, std::memory_order_release);
-    if (other_buffer_id > 0)
-    {
-        auto const handle = globalBufferStorages.acquire_write(other_buffer_id);
-        incrementBufferRefCount(other_buffer_id, handle);
-    }
 }
 
 HardwareBuffer::HardwareBuffer(HardwareBuffer &&other) noexcept
+    : bufferHandle_(std::move(other.bufferHandle_))
 {
-    std::lock_guard<std::mutex> lock(other.bufferMutex);
-    auto const other_buffer_id = other.bufferID.load(std::memory_order_relaxed);
-    other.bufferID.store(0, std::memory_order_release);
-    bufferID.store(other_buffer_id, std::memory_order_release);
 }
 
 HardwareBuffer &HardwareBuffer::operator=(HardwareBuffer &&other) noexcept
@@ -129,46 +132,11 @@ HardwareBuffer &HardwareBuffer::operator=(HardwareBuffer &&other) noexcept
     {
         return *this;
     }
-    std::scoped_lock lock(bufferMutex, other.bufferMutex);
-    auto const self_id = bufferID.load(std::memory_order_acquire);
-    auto const other_id = other.bufferID.load(std::memory_order_acquire);
-
-    if (self_id > 0)
-    {
-        bool should_destroy_self = false;
-        if (auto const handle = globalBufferStorages.acquire_write(self_id);
-            decrementBufferRefCount(self_id, handle))
-        {
-            should_destroy_self = true;
-        }
-        if (should_destroy_self)
-        {
-            globalBufferStorages.deallocate(self_id);
-        }
-    }
-    bufferID.store(other_id, std::memory_order_release);
-    other.bufferID.store(0, std::memory_order_release);
+    bufferHandle_ = std::move(other.bufferHandle_);
     return *this;
 }
 
-HardwareBuffer::~HardwareBuffer()
-{
-    // NOTE: 不要修改写法，避免死锁
-    auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
-    if (self_buffer_id > 0)
-    {
-        bool destroy = false;
-        if (auto const handle = globalBufferStorages.acquire_write(self_buffer_id);
-            decrementBufferRefCount(self_buffer_id, handle))
-        {
-            destroy = true;
-        }
-        if (destroy)
-        {
-            globalBufferStorages.deallocate(self_buffer_id);
-        }
-    }
-}
+HardwareBuffer::~HardwareBuffer() = default;
 
 HardwareBuffer &HardwareBuffer::operator=(const HardwareBuffer &other)
 {
@@ -176,77 +144,19 @@ HardwareBuffer &HardwareBuffer::operator=(const HardwareBuffer &other)
     {
         return *this;
     }
-    std::scoped_lock lock(bufferMutex, other.bufferMutex);
-    auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
-    auto const other_buffer_id = other.bufferID.load(std::memory_order_acquire);
-
-    if (self_buffer_id == 0 && other_buffer_id == 0)
-    {
-        return *this;
-    }
-
-    if (self_buffer_id == other_buffer_id)
-    {
-        return *this;
-    }
-
-    if (other_buffer_id == 0)
-    {
-        bool should_destroy_self = false;
-        if (auto const self_handle = globalBufferStorages.acquire_write(self_buffer_id);
-            decrementBufferRefCount(self_buffer_id, self_handle))
-        {
-            should_destroy_self = true;
-        }
-        if (should_destroy_self)
-        {
-            globalBufferStorages.deallocate(self_buffer_id);
-        }
-        bufferID.store(0, std::memory_order_release);
-        return *this;
-    }
-
-    if (self_buffer_id == 0)
-    {
-        bufferID.store(other_buffer_id, std::memory_order_release);
-        auto const other_handle = globalBufferStorages.acquire_write(other_buffer_id);
-        incrementBufferRefCount(other_buffer_id, other_handle);
-        return *this;
-    }
-
-    bool should_destroy_self = false;
-    if (self_buffer_id < other_buffer_id)
-    {
-        auto const self_handle = globalBufferStorages.acquire_write(self_buffer_id);
-        auto const other_handle = globalBufferStorages.acquire_write(other_buffer_id);
-        incrementBufferRefCount(other_buffer_id, other_handle);
-        if (decrementBufferRefCount(self_buffer_id, self_handle))
-        {
-            should_destroy_self = true;
-        }
-    }
-    else
-    {
-        auto const other_handle = globalBufferStorages.acquire_write(other_buffer_id);
-        auto const self_handle = globalBufferStorages.acquire_write(self_buffer_id);
-        incrementBufferRefCount(other_buffer_id, other_handle);
-        if (decrementBufferRefCount(self_buffer_id, self_handle))
-        {
-            should_destroy_self = true;
-        }
-    }
-    if (should_destroy_self)
-    {
-        globalBufferStorages.deallocate(self_buffer_id);
-    }
-    bufferID.store(other_buffer_id, std::memory_order_release);
+    bufferHandle_ = other.bufferHandle_;
     return *this;
 }
 
 HardwareBuffer::operator bool() const
 {
-    auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
-    return self_buffer_id > 0 && globalBufferStorages.acquire_read(self_buffer_id)->bufferHandle != VK_NULL_HANDLE;
+    auto const self_buffer_id = getBufferID();
+    if (self_buffer_id == 0 || !bufferHandle_)
+    {
+        return false;
+    }
+    auto handle = globalBufferStorages.try_acquire_read(self_buffer_id);
+    return handle && handle->bufferHandle != VK_NULL_HANDLE;
 }
 
 BufferCopyCommand HardwareBuffer::copyTo(const HardwareBuffer &dst,
@@ -267,7 +177,7 @@ BufferToImageCommand HardwareBuffer::copyTo(const HardwareImage &dst,
 
 uint32_t HardwareBuffer::storeDescriptor() const
 {
-    auto bufferHandle = globalBufferStorages.acquire_write(bufferID);
+    auto bufferHandle = globalBufferStorages.acquire_write(getBufferID());
     return globalHardwareContext.getMainDevice()->resourceManager.storeDescriptor(bufferHandle);
 }
 
@@ -277,19 +187,40 @@ bool HardwareBuffer::copyFromData(const void *inputData, const uint64_t size) co
     {
         return false;
     }
-    auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
+    auto const self_buffer_id = getBufferID();
     if (self_buffer_id == 0)
     {
         CFW_LOG_WARNING("Cannot copy data to an uninitialized HardwareBuffer.");
         return false;
     }
-    if (const auto handle = globalBufferStorages.acquire_write(self_buffer_id);
-        handle->bufferAllocInfo.pMappedData != nullptr)
     {
-        std::memcpy(handle->bufferAllocInfo.pMappedData, inputData, size);
-        return true;
+        const auto handle = globalBufferStorages.acquire_write(self_buffer_id);
+        if (handle->bufferAllocInfo.pMappedData != nullptr)
+        {
+            std::memcpy(handle->bufferAllocInfo.pMappedData, inputData, static_cast<size_t>(size));
+            return true;
+        }
     }
-    return false;
+
+    if (size > std::numeric_limits<uint32_t>::max())
+    {
+        CFW_LOG_WARNING("Cannot stage upload larger than 4 GiB with the current HardwareBuffer API.");
+        return false;
+    }
+
+    HardwareBuffer stagingBuffer(static_cast<uint32_t>(size), 1, BufferUsage::StorageBuffer, nullptr, false);
+    void *mappedData = stagingBuffer.getMappedData();
+    if (mappedData == nullptr)
+    {
+        CFW_LOG_WARNING("Cannot stage upload because the staging buffer is not host-visible.");
+        return false;
+    }
+    std::memcpy(mappedData, inputData, static_cast<size_t>(size));
+
+    HardwareExecutor executor;
+    executor << stagingBuffer.copyTo(*this, 0, 0, size) << executor.commit();
+    executor.waitForDeferredResources();
+    return true;
 }
 
 bool HardwareBuffer::copyToData(void *outputData, const uint64_t size) const
@@ -298,7 +229,7 @@ bool HardwareBuffer::copyToData(void *outputData, const uint64_t size) const
     {
         return false;
     }
-    auto const self_buffer_id = bufferID.load(std::memory_order_acquire);
+    auto const self_buffer_id = getBufferID();
     if (self_buffer_id == 0)
     {
         CFW_LOG_WARNING("Cannot copy uninitialized HardwareBuffer to out data.");
@@ -315,28 +246,48 @@ bool HardwareBuffer::copyToData(void *outputData, const uint64_t size) const
 
 bool HardwareBuffer::readback(void *outputData, const uint64_t size) const
 {
-    return copyToData(outputData, size);
+    if (copyToData(outputData, size))
+    {
+        return true;
+    }
+
+    if (outputData == nullptr || size == 0)
+    {
+        return false;
+    }
+
+    if (size > std::numeric_limits<uint32_t>::max())
+    {
+        CFW_LOG_WARNING("Cannot stage readback larger than 4 GiB with the current HardwareBuffer API.");
+        return false;
+    }
+
+    HardwareBuffer stagingBuffer(static_cast<uint32_t>(size), 1, BufferUsage::StorageBuffer, nullptr, false);
+    HardwareExecutor executor;
+    executor << copyTo(stagingBuffer, 0, 0, size) << executor.commit();
+    executor.waitForDeferredResources();
+    return stagingBuffer.copyToData(outputData, size);
 }
 
 void *HardwareBuffer::getMappedData() const
 {
-    return globalBufferStorages.acquire_read(bufferID.load(std::memory_order_acquire))->bufferAllocInfo.pMappedData;
+    return globalBufferStorages.acquire_read(getBufferID())->bufferAllocInfo.pMappedData;
 }
 
 uint64_t HardwareBuffer::getElementCount() const
 {
-    return globalBufferStorages.acquire_read(bufferID.load(std::memory_order_acquire))->elementCount;
+    return globalBufferStorages.acquire_read(getBufferID())->elementCount;
 }
 
 uint64_t HardwareBuffer::getElementSize() const
 {
-    return globalBufferStorages.acquire_read(bufferID.load(std::memory_order_acquire))->elementSize;
+    return globalBufferStorages.acquire_read(getBufferID())->elementSize;
 }
 
 ExternalHandle HardwareBuffer::exportBufferMemory()
 {
     ExternalHandle winHandle{};
-    const auto bufferHandle = globalBufferStorages.acquire_write(bufferID.load(std::memory_order_acquire));
+    const auto bufferHandle = globalBufferStorages.acquire_write(getBufferID());
 
     ResourceManager::ExternalMemoryHandle memory_handle = globalHardwareContext.getMainDevice()->resourceManager.exportBufferMemory(*bufferHandle);
 #if _WIN32 || _WIN64

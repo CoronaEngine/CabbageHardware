@@ -1,6 +1,7 @@
 ﻿#include "CabbageHardware.h"
 #include "HardwareCommands.h"
 #include "HardwareWrapperVulkan/HardwareVulkan/HardwareExecutorVulkan.h"
+#include "HardwareWrapperVulkan/HardwareVulkan/ResourceCommand.h"
 #include "HardwareWrapperVulkan/PipelineVulkan/ComputePipeline.h"
 #include "HardwareWrapperVulkan/PipelineVulkan/RasterizerPipeline.h"
 #include "HardwareWrapperVulkan/ResourcePool.h"

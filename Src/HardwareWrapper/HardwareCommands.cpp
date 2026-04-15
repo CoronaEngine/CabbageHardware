@@ -43,13 +43,13 @@ struct BufferCopyCommandImpl : CopyCommandImpl
         {
             auto srcHandle = globalBufferStorages.acquire_write(srcBufferID);
             auto dstHandle = globalBufferStorages.acquire_write(dstBufferID);
-            command = std::make_unique<CopyBufferCommand>(*srcHandle, *dstHandle);
+            command = std::make_unique<CopyBufferCommand>(*srcHandle, *dstHandle, srcOffset, dstOffset, size);
         }
         else
         {
             auto dstHandle = globalBufferStorages.acquire_write(dstBufferID);
             auto srcHandle = globalBufferStorages.acquire_write(srcBufferID);
-            command = std::make_unique<CopyBufferCommand>(*srcHandle, *dstHandle);
+            command = std::make_unique<CopyBufferCommand>(*srcHandle, *dstHandle, srcOffset, dstOffset, size);
         }
 
         return command.get();
@@ -81,7 +81,7 @@ struct BufferToImageCommandImpl : CopyCommandImpl
 
         auto srcHandle = globalBufferStorages.acquire_write(srcBuffer.getBufferID());
         auto dstHandle = globalImageStorages.acquire_write(dstImage.getImageID());
-        command = std::make_unique<CopyBufferToImageCommand>(*srcHandle, *dstHandle, imageMip);
+        command = std::make_unique<CopyBufferToImageCommand>(*srcHandle, *dstHandle, bufferOffset, imageLayer, imageMip);
 
         return command.get();
     }
@@ -192,7 +192,7 @@ struct ImageToBufferCommandImpl : CopyCommandImpl
 
         auto srcHandle = globalImageStorages.acquire_write(srcImage.getImageID());
         auto dstHandle = globalBufferStorages.acquire_write(dstBuffer.getBufferID());
-        command = std::make_unique<CopyImageToBufferCommand>(*srcHandle, *dstHandle);
+        command = std::make_unique<CopyImageToBufferCommand>(*srcHandle, *dstHandle, imageLayer, imageMip, bufferOffset);
 
         return command.get();
     }

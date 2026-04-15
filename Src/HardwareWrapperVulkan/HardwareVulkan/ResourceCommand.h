@@ -6,8 +6,15 @@ struct CopyBufferCommand : public CommandRecordVulkan
 {
     ResourceManager::BufferHardwareWrap &srcBuffer;
     ResourceManager::BufferHardwareWrap &dstBuffer;
+    uint64_t srcOffset{0};
+    uint64_t dstOffset{0};
+    uint64_t size{0};
 
-    CopyBufferCommand(ResourceManager::BufferHardwareWrap &src, ResourceManager::BufferHardwareWrap &dst);
+    CopyBufferCommand(ResourceManager::BufferHardwareWrap &src,
+                      ResourceManager::BufferHardwareWrap &dst,
+                      uint64_t srcOffset = 0,
+                      uint64_t dstOffset = 0,
+                      uint64_t size = 0);
 
     ExecutorType getExecutorType() override;
     void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override;
@@ -112,10 +119,14 @@ struct CopyBufferToImageCommand : public CommandRecordVulkan
 {
     ResourceManager::BufferHardwareWrap &srcBuffer;
     ResourceManager::ImageHardwareWrap &dstImage;
+    uint64_t bufferOffset{0};
+    uint32_t imageLayer{0};
     uint32_t mipLevel;
 
     CopyBufferToImageCommand(ResourceManager::BufferHardwareWrap &srcBuf,
                              ResourceManager::ImageHardwareWrap &dstImg,
+                             uint64_t bufferOffset = 0,
+                             uint32_t imageLayer = 0,
                              uint32_t mip = 0);
 
     ExecutorType getExecutorType() override;
@@ -128,8 +139,15 @@ struct CopyImageToBufferCommand : public CommandRecordVulkan
 {
     ResourceManager::ImageHardwareWrap &srcImage;
     ResourceManager::BufferHardwareWrap &dstBuffer;
+    uint32_t imageLayer{0};
+    uint32_t imageMip{0};
+    uint64_t bufferOffset{0};
 
-    CopyImageToBufferCommand(ResourceManager::ImageHardwareWrap &srcImg, ResourceManager::BufferHardwareWrap &dstBuf);
+    CopyImageToBufferCommand(ResourceManager::ImageHardwareWrap &srcImg,
+                             ResourceManager::BufferHardwareWrap &dstBuf,
+                             uint32_t imageLayer = 0,
+                             uint32_t imageMip = 0,
+                             uint64_t bufferOffset = 0);
 
     ExecutorType getExecutorType() override;
     void commitCommand(HardwareExecutorVulkan &hardwareExecutor) override;

@@ -14,6 +14,144 @@
 #include "Codegen/VariateProxy.h"
 #include "HardwareCommands.h"
 
+namespace CabbageHardwareInternal
+{
+struct BufferTag;
+struct ImageTag;
+struct SamplerTag;
+struct PushConstantTag;
+struct DisplayerTag;
+struct ComputePipelineTag;
+struct RasterizerPipelineTag;
+struct ExecutorTag;
+
+struct ResourceRegistryBase
+{
+    virtual ~ResourceRegistryBase() = default;
+    virtual void retain(std::uintptr_t id, std::uint64_t generation) noexcept = 0;
+    virtual void release(std::uintptr_t id, std::uint64_t generation) noexcept = 0;
+    virtual bool alive(std::uintptr_t id, std::uint64_t generation) const noexcept = 0;
+    virtual const char *name() const noexcept = 0;
+};
+
+template <typename Tag>
+class ResourceHandle
+{
+  public:
+    ResourceHandle() = default;
+
+    ResourceHandle(const ResourceHandle &other)
+        : registry_(other.registry_), id_(other.id_), generation_(other.generation_)
+    {
+        retain();
+    }
+
+    ResourceHandle(ResourceHandle &&other) noexcept
+        : registry_(other.registry_), id_(other.id_), generation_(other.generation_)
+    {
+        other.registry_ = nullptr;
+        other.id_ = 0;
+        other.generation_ = 0;
+    }
+
+    ~ResourceHandle()
+    {
+        reset();
+    }
+
+    ResourceHandle &operator=(const ResourceHandle &other)
+    {
+        if (this == &other)
+        {
+            return *this;
+        }
+
+        ResourceHandle tmp(other);
+        swap(tmp);
+        return *this;
+    }
+
+    ResourceHandle &operator=(ResourceHandle &&other) noexcept
+    {
+        if (this == &other)
+        {
+            return *this;
+        }
+
+        reset();
+        registry_ = other.registry_;
+        id_ = other.id_;
+        generation_ = other.generation_;
+        other.registry_ = nullptr;
+        other.id_ = 0;
+        other.generation_ = 0;
+        return *this;
+    }
+
+    [[nodiscard]] static ResourceHandle adopt(ResourceRegistryBase *registry,
+                                              std::uintptr_t id,
+                                              std::uint64_t generation) noexcept
+    {
+        ResourceHandle handle;
+        handle.registry_ = registry;
+        handle.id_ = id;
+        handle.generation_ = generation;
+        return handle;
+    }
+
+    void reset() noexcept
+    {
+        if (registry_ != nullptr && id_ != 0)
+        {
+            registry_->release(id_, generation_);
+        }
+        registry_ = nullptr;
+        id_ = 0;
+        generation_ = 0;
+    }
+
+    [[nodiscard]] std::uintptr_t id() const noexcept
+    {
+        return id_;
+    }
+
+    [[nodiscard]] std::uint64_t generation() const noexcept
+    {
+        return generation_;
+    }
+
+    [[nodiscard]] bool valid() const noexcept
+    {
+        return registry_ != nullptr && id_ != 0 && registry_->alive(id_, generation_);
+    }
+
+    explicit operator bool() const noexcept
+    {
+        return valid();
+    }
+
+    void swap(ResourceHandle &other) noexcept
+    {
+        std::swap(registry_, other.registry_);
+        std::swap(id_, other.id_);
+        std::swap(generation_, other.generation_);
+    }
+
+  private:
+    void retain() noexcept
+    {
+        if (registry_ != nullptr && id_ != 0)
+        {
+            registry_->retain(id_, generation_);
+        }
+    }
+
+    ResourceRegistryBase *registry_{nullptr};
+    std::uintptr_t id_{0};
+    std::uint64_t generation_{0};
+};
+} // namespace CabbageHardwareInternal
+
 // Forward declare platform-specific types instead of including platform headers
 #if defined(_WIN32)
 // Forward declare HANDLE without including Windows.h
@@ -213,12 +351,11 @@ struct HardwareBuffer
 
     [[nodiscard]] uintptr_t getBufferID() const
     {
-        return bufferID.load(std::memory_order_acquire);
+        return bufferHandle_.id();
     }
 
   private:
-    std::atomic<std::uintptr_t> bufferID;
-    mutable std::mutex bufferMutex;
+    CabbageHardwareInternal::ResourceHandle<CabbageHardwareInternal::BufferTag> bufferHandle_;
 
     friend class HardwareImage;
 };
@@ -235,7 +372,7 @@ struct HardwareImageCreateInfo
     ResourceState initialState = ResourceState::Unknown;
     bool keepInitialState{false};
     std::string debugName{};
-    // void *initialData{nullptr};
+    const void *initialData{nullptr};
 
     HardwareImageCreateInfo() = default;
     HardwareImageCreateInfo(uint32_t w, uint32_t h, ImageFormat fmt = ImageFormat::RGBA8_SRGB)
@@ -287,12 +424,11 @@ struct HardwareSampler
 
     [[nodiscard]] uintptr_t getSamplerID() const
     {
-        return samplerID.load(std::memory_order_acquire);
+        return samplerHandle_.id();
     }
 
   private:
-    std::atomic<std::uintptr_t> samplerID;
-    mutable std::mutex samplerMutex;
+    CabbageHardwareInternal::ResourceHandle<CabbageHardwareInternal::SamplerTag> samplerHandle_;
 };
 
 // ================= 对外封装：HardwareImage =================
@@ -316,12 +452,13 @@ struct HardwareImage
     [[nodiscard]] uint32_t storeDescriptor();
     [[nodiscard]] uintptr_t getImageID() const
     {
-        return imageID.load(std::memory_order_acquire);
+        return imageHandle_.id();
     }
 
     /// Set the clear color used by the RasterizerPipeline render pass (LOAD_OP_CLEAR).
     /// Default is (0, 0, 0, 1).  For transparent render targets, use (0, 0, 0, 0).
     void setClearColor(float r, float g, float b, float a);
+    void setSampler(const HardwareSampler &sampler);
 
     // 流式拷贝命令（用于 HardwareExecutor << ）
     [[nodiscard]] ImageCopyCommand copyTo(const HardwareImage &dst,
@@ -343,8 +480,7 @@ struct HardwareImage
     //[[nodiscard]] uint32_t getArrayLayers() const;
 
   private:
-    std::atomic<std::uintptr_t> imageID;
-    mutable std::mutex imageMutex;
+    CabbageHardwareInternal::ResourceHandle<CabbageHardwareInternal::ImageTag> imageHandle_;
 
     friend class HardwareDisplayer;
 };
@@ -393,14 +529,13 @@ struct HardwarePushConstant
     [[nodiscard]] uint64_t getSize() const;
     [[nodiscard]] uintptr_t getPushConstantID() const
     {
-        return pushConstantID.load(std::memory_order_acquire);
+        return pushConstantHandle_.id();
     }
 
   private:
     void copyFromRaw(const void *src, uint64_t size);
 
-    std::atomic<std::uintptr_t> pushConstantID;
-    mutable std::mutex pushConstantMutex;
+    CabbageHardwareInternal::ResourceHandle<CabbageHardwareInternal::PushConstantTag> pushConstantHandle_;
 };
 
 // Forward declarations
@@ -480,12 +615,11 @@ struct HardwareDisplayer
 
     [[nodiscard]] uintptr_t getDisplayerID() const
     {
-        return displaySurfaceID.load(std::memory_order_acquire);
+        return displayHandle_.id();
     }
 
   private:
-    std::atomic<std::uintptr_t> displaySurfaceID;
-    mutable std::mutex displayerMutex;
+    CabbageHardwareInternal::ResourceHandle<CabbageHardwareInternal::DisplayerTag> displayHandle_;
 };
 
 // ================= 对外封装：ComputePipelineBase =================
@@ -520,7 +654,7 @@ struct ComputePipelineBase
 
     [[nodiscard]] uintptr_t getComputePipelineID() const
     {
-        return computePipelineID.load(std::memory_order_acquire);
+        return computePipelineHandle_.id();
     }
 
     template<typename ProxyType>
@@ -539,8 +673,12 @@ struct ComputePipelineBase
     void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType);
 
     mutable std::mutex computePipelineMutex;
-    std::atomic<std::uintptr_t> computePipelineID;
+    CabbageHardwareInternal::ResourceHandle<CabbageHardwareInternal::ComputePipelineTag> computePipelineHandle_;
     std::vector<EmbeddedShader::AutoBindEntry> autoBindEntries_;
+
+    friend void computePipelineInitFromCompiler(ComputePipelineBase &pipeline,
+                                                const EmbeddedShader::ShaderCodeCompiler &compiler,
+                                                const std::source_location &src);
 };
 
 // ================= 对外封装：RasterizerPipelineBase =================
@@ -620,7 +758,7 @@ struct RasterizerPipelineBase
 
     [[nodiscard]] uintptr_t getRasterizerPipelineID() const
     {
-        return rasterizerPipelineID.load(std::memory_order_acquire);
+        return rasterizerPipelineHandle_.id();
     }
 
   private:
@@ -631,8 +769,14 @@ struct RasterizerPipelineBase
     void setResourceDirect(uint64_t byteOffset, uint32_t typeSize, const HardwareImage &image, int32_t bindType, uint32_t location = 0);
 
     mutable std::mutex rasterizerPipelineMutex;
-    std::atomic<std::uintptr_t> rasterizerPipelineID;
+    CabbageHardwareInternal::ResourceHandle<CabbageHardwareInternal::RasterizerPipelineTag> rasterizerPipelineHandle_;
     std::vector<EmbeddedShader::AutoBindEntry> autoBindEntries_;
+
+    friend void rasterizerPipelineInitFromCompiler(RasterizerPipelineBase &pipeline,
+                                                   const EmbeddedShader::ShaderCodeCompiler &vertexCompiler,
+                                                   const EmbeddedShader::ShaderCodeCompiler &fragmentCompiler,
+                                                   uint32_t multiviewCount,
+                                                   const std::source_location &src);
 };
 
 // ================= 对外封装：HardwareExecutor =================
@@ -669,12 +813,11 @@ struct HardwareExecutor
 
     [[nodiscard]] uintptr_t getExecutorID() const
     {
-        return executorID.load(std::memory_order_acquire);
+        return executorHandle_.id();
     }
 
   private:
-    mutable std::mutex executorMutex;
-    std::atomic<std::uintptr_t> executorID;
+    CabbageHardwareInternal::ResourceHandle<CabbageHardwareInternal::ExecutorTag> executorHandle_;
 };
 
 // ================= ResourceProxy Implementation =================
@@ -721,7 +864,7 @@ BoundField<PipelineType>& BoundField<PipelineType>::operator=(const T& value)
 
 // ================= ComputePipeline 模板构造函数实现 =================
 // 需要访问 Storage 和 ComputePipelineVulkan，通过辅助函数实现
-void computePipelineInitFromCompiler(std::atomic<std::uintptr_t> &pipelineID, 
+void computePipelineInitFromCompiler(ComputePipelineBase &pipeline,
                                       const EmbeddedShader::ShaderCodeCompiler &compiler,
                                       const std::source_location &src);
 
@@ -744,11 +887,11 @@ ComputePipelineBase::ComputePipelineBase(F &&computeShaderCode,
     autoBindEntries_ = std::move(pipelineObj.autoBindEntries);
 
     // 调用辅助函数完成 Vulkan 管线创建
-    computePipelineInitFromCompiler(computePipelineID, *pipelineObj.compute, sourceLocation);
+    computePipelineInitFromCompiler(*this, *pipelineObj.compute, sourceLocation);
 }
 
 // ================= RasterizerPipeline 模板构造函数实现 =================
-void rasterizerPipelineInitFromCompiler(std::atomic<std::uintptr_t> &pipelineID,
+void rasterizerPipelineInitFromCompiler(RasterizerPipelineBase &pipeline,
                                          const EmbeddedShader::ShaderCodeCompiler &vertexCompiler,
                                          const EmbeddedShader::ShaderCodeCompiler &fragmentCompiler,
                                          uint32_t multiviewCount,
@@ -776,7 +919,7 @@ RasterizerPipelineBase::RasterizerPipelineBase(VF &&vertexShaderCode,
     autoBindEntries_ = std::move(pipelineObj.autoBindEntries);
 
     // 调用辅助函数完成 Vulkan 管线创建
-    rasterizerPipelineInitFromCompiler(rasterizerPipelineID, 
+    rasterizerPipelineInitFromCompiler(*this,
                                         *pipelineObj.vertex, 
                                         *pipelineObj.fragment, 
                                         multiviewCount,
