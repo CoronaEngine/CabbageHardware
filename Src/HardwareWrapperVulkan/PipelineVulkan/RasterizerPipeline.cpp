@@ -338,8 +338,6 @@ RasterizerPipelineVulkan::~RasterizerPipelineVulkan()
 
     if (device != VK_NULL_HANDLE)
     {
-        vkDeviceWaitIdle(device);
-
         if (frameBuffers != VK_NULL_HANDLE)
         {
             vkDestroyFramebuffer(device, frameBuffers, nullptr);

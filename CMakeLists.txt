@@ -9,6 +9,7 @@ project(
 
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 option(CABBAGE_HARDWARE_BUILD_EXAMPLES "Build CabbageHardware examples" ${PROJECT_IS_TOP_LEVEL})
+option(CABBAGE_HARDWARE_BUILD_TESTS "Build CabbageHardware tests" ${PROJECT_IS_TOP_LEVEL})
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -96,6 +97,7 @@ FetchContent_Declare(
     GIT_TAG vulkan-sdk-1.4.341
     EXCLUDE_FROM_ALL
 )
+set(SPIRV_SKIP_TESTS ON CACHE BOOL "Skip SPIRV-Tools tests in the parent project" FORCE)
 FetchContent_MakeAvailable(SPIRV-Tools)
 
 # 修复 SPIRV-Tools 在 C++20 下的运算符重写警告 (C5232)
@@ -166,6 +168,11 @@ FetchContent_MakeAvailable(VulkanMemoryAllocator)
 
 add_subdirectory(Src)
 add_subdirectory(Scripts)
+
+if(CABBAGE_HARDWARE_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
 if(CABBAGE_HARDWARE_BUILD_EXAMPLES)
     FetchContent_Declare(

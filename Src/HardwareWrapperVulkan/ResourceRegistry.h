@@ -43,15 +43,9 @@ class ResourceRegistry final : public ResourceRegistryBase
         return Handle::adopt(this, id, generation);
     }
 
-    [[nodiscard]] ObjectId allocate()
-    {
-        return allocate_handle().id();
-    }
+    [[nodiscard]] ObjectId allocate() = delete;
 
-    void deallocate(ObjectId id)
-    {
-        release(id, generation_of(id));
-    }
+    void deallocate(ObjectId id) = delete;
 
     [[nodiscard]] ReadHandle acquire_read(ObjectId id)
     {

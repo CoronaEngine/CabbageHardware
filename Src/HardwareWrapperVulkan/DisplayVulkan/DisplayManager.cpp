@@ -18,11 +18,26 @@ DisplayManager::~DisplayManager()
 
 void DisplayManager::cleanUpDisplayManager()
 {
-    VkDevice device = (displayDevice ? displayDevice->deviceManager.getLogicalDevice() : VK_NULL_HANDLE);
+    auto drainExecutor = [](const std::shared_ptr<HardwareExecutorVulkan> &executor) {
+        if (executor)
+        {
+            executor->waitForAllDeferredResources();
+        }
+    };
+    drainExecutor(waitedExecutor);
+    drainExecutor(mainDeviceExecutor);
+    drainExecutor(displayDeviceExecutor);
 
+    VkDevice device = (displayDevice ? displayDevice->deviceManager.getLogicalDevice() : VK_NULL_HANDLE);
     if (device != VK_NULL_HANDLE)
     {
-        vkDeviceWaitIdle(device);
+        for (auto &fence : acquireFences)
+        {
+            if (fence != VK_NULL_HANDLE)
+            {
+                (void)vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
+            }
+        }
     }
 
     // 按照正确的顺序清理资源
@@ -455,7 +470,13 @@ void DisplayManager::createSwapChain()
 void DisplayManager::recreateSwapChain()
 {
     VkDevice device = displayDevice->deviceManager.getLogicalDevice();
-    vkDeviceWaitIdle(device);
+    for (auto &fence : acquireFences)
+    {
+        if (fence != VK_NULL_HANDLE)
+        {
+            (void)vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
+        }
+    }
 
     cleanupSyncObjects();
     //displayDeviceExecutors.clear();

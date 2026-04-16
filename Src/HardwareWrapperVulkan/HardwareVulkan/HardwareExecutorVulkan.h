@@ -25,7 +25,9 @@ struct ResourceHolderCommand : public CopyCommandImpl
 {
     std::vector<HardwareBuffer> buffers;
     std::vector<HardwareImage> images;
-    // Add other resources if needed (e.g., PushConstants)
+    std::vector<HardwarePushConstant> pushConstants;
+    std::vector<ComputePipelineBase> computePipelines;
+    std::vector<RasterizerPipelineBase> rasterizerPipelines;
 
     CommandRecordVulkan* getCommandRecord() override { return nullptr; }
 };

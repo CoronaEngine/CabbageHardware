@@ -1,10 +1,12 @@
 ﻿#pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include <ktm/ktm.h>

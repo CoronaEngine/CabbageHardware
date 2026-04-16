@@ -162,8 +162,6 @@ ComputePipelineVulkan::~ComputePipelineVulkan()
 
     if (device != VK_NULL_HANDLE)
     {
-        vkDeviceWaitIdle(device);
-
         if (pipeline != VK_NULL_HANDLE)
         {
             vkDestroyPipeline(device, pipeline, nullptr);
