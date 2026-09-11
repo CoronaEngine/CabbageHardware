@@ -1,7 +1,7 @@
 #include "execution_profile.h"
 
 #include "horizon.h"
-#include "corona/kernel/core/i_logger.h"
+#include "horizon/core/logging.h"
 
 #include <algorithm>
 #include <array>

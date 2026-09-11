@@ -1,81 +1,101 @@
 #pragma once
-#include "quill/Logger.h"
+#include "core/util/logging.h"
+#include "core/util/logging_quill.h"
 
-namespace Corona::Kernel {
+namespace Corona::Kernel
+{
 
-/**
- * @brief 日志级别枚举
- */
-enum class LogLevel {
-    trace,    ///< 跟踪级别，最详细的调试信息
-    debug,    ///< 调试级别，用于开发调试
-    info,     ///< 信息级别，常规运行信息
-    warning,  ///< 警告级别，潜在问题
-    error,    ///< 错误级别，错误但不致命
-    fatal     ///< 致命级别，严重错误导致程序无法继续
-};
-
-/**
- * @brief Corona 日志系统 - Quill 的轻量封装
- *
- * CoronaLogger 直接使用 Quill 日志库，提供零开销的日志记录。
- *
- * 特性：
- * - 完全异步，无锁设计
- * - 自动捕获源代码位置信息（编译期宏展开）
- * - 线程安全的日志输出
- * - 极低延迟（~10-15ns）
- * - 支持格式化字符串（libfmt 语法）
- *
- * 使用示例：
- * @code
- * #include "corona/kernel/core/i_logger.h"
- *
- * CFW_LOG_INFO("程序启动");
- * CFW_LOG_WARNING("配置文件未找到，使用默认值: {}", default_value);
- * CFW_LOG_ERROR("网络连接失败，错误码: {}", error_code);
- * @endcode
- */
-class CoronaLogger {
-   public:
     /**
-     * @brief 初始化日志系统
+     * @brief 日志级别枚举
+     */
+    enum class LogLevel
+    {
+        trace,   ///< 跟踪级别，最详细的调试信息
+        debug,   ///< 调试级别，用于开发调试
+        info,    ///< 信息级别，常规运行信息
+        warning, ///< 警告级别，潜在问题
+        error,   ///< 错误级别，错误但不致命
+        fatal    ///< 致命级别，严重错误导致程序无法继续
+    };
+
+    /**
+     * @brief 旧 Corona 日志接口的兼容层，转发至 horizon::core 的统一日志实例。
      *
-     * 通常由 KernelContext 自动调用，也可手动调用确保初始化
-     * 多次调用是安全的（使用 std::call_once）
+     * 文件输出和信号处理由应用在首次记录日志前通过
+     * horizon::core::initialize_logging 配置；默认只输出到控制台。
+     * 旧宏仍保留格式化、调用位置及 Python/Vue 前缀。
      *
-     * 自动创建：
-     * - 控制台 Sink（输出到 stdout）
-     * - 文件 Sink（格式: YYYY-MM-DD_HH-MM-SS_corona.log）
-     */
-    static void initialize();
-
-    /**
-     * @brief 设置日志级别
-     * @param level 最低日志级别
-     */
-    static void set_log_level(LogLevel level);
-
-    /**
-     * @brief 刷新所有待处理的日志
+     * 使用示例：
+     * @code
+     * #include "horizon/core/logging.h"
      *
-     * 强制将缓冲区的日志立即写入（通常用于程序退出前）
+     * CFW_LOG_INFO("程序启动");
+     * CFW_LOG_WARNING("配置文件未找到，使用默认值: {}", default_value);
+     * CFW_LOG_ERROR("网络连接失败，错误码: {}", error_code);
+     * @endcode
      */
-    static void flush();
+    class CoronaLogger
+    {
+    public:
+        /**
+         * @brief 初始化日志系统
+         *
+         * 复用 Core 已有配置；未初始化时使用 Core 默认配置。
+         * 多次调用不会重置日志级别或输出配置。
+         */
+        static void initialize() { horizon::core::initialize_logging(); }
 
-    /**
-     * @brief 获取底层 Quill Logger（高级用户）
-     * @return Quill logger 指针，用于直接调用 Quill API
-     */
-    static quill::Logger* get_logger();
+        /**
+         * @brief 设置日志级别
+         * @param level 最低日志级别
+         */
+        static void set_log_level(LogLevel level)
+        {
+            using CoreLevel = horizon::core::LogLevel;
+            switch (level)
+            {
+            case LogLevel::trace:
+                horizon::core::set_log_level(CoreLevel::Trace);
+                break;
+            case LogLevel::debug:
+                horizon::core::set_log_level(CoreLevel::Debug);
+                break;
+            case LogLevel::info:
+                horizon::core::set_log_level(CoreLevel::Info);
+                break;
+            case LogLevel::warning:
+                horizon::core::set_log_level(CoreLevel::Warning);
+                break;
+            case LogLevel::error:
+                horizon::core::set_log_level(CoreLevel::Error);
+                break;
+            case LogLevel::fatal:
+                horizon::core::set_log_level(CoreLevel::Critical);
+                break;
+            default:
+                horizon::core::set_log_level(CoreLevel::Info);
+                break;
+            }
+        }
 
-    // ========== 回调 Sink 管理 ==========
+        /**
+         * @brief 刷新所有待处理的日志
+         *
+         * 强制将缓冲区的日志立即写入（通常用于程序退出前）
+         */
+        static void flush() { horizon::core::log_flush(); }
 
-   private:
-    CoronaLogger() = delete;
-};
+        /**
+         * @brief 获取底层 Quill Logger（高级用户）
+         * @return Quill logger 指针，用于直接调用 Quill API
+         */
+        static quill::Logger* get_logger() { return horizon::core::get_quill_logger(); }
 
-}  // namespace Corona::Kernel
+    private:
+        CoronaLogger() = delete;
+    };
+
+} // namespace Corona::Kernel
 
 // ========================================
 // 日志宏 - 推荐使用方式

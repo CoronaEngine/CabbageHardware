@@ -8,7 +8,7 @@
 #define VK_NO_PROTOTYPES
 #endif
 
-#include "corona/kernel/utils/storage.h"
+#include "horizon/core/storage.h"
 #include "horizon.h"
 
 #include <vk_mem_alloc.h>
@@ -45,7 +45,7 @@ namespace Corona::Horizon
         public:
             Read() = default;
 
-            Read(typename Corona::Kernel::Utils::Storage<Slot>::ReadHandle handle, std::uint64_t generation)
+            Read(typename horizon::core::Storage<Slot>::ReadHandle handle, std::uint64_t generation)
                 : handle_(std::move(handle)), generation_(generation)
             {
             }
@@ -62,7 +62,7 @@ namespace Corona::Horizon
             [[nodiscard]] const Resource& operator*() const noexcept { return *get(); }
 
         private:
-            typename Corona::Kernel::Utils::Storage<Slot>::ReadHandle handle_ {};
+            typename horizon::core::Storage<Slot>::ReadHandle handle_ {};
             std::uint64_t generation_ { 0 };
         };
 
@@ -71,7 +71,7 @@ namespace Corona::Horizon
         public:
             Write() = default;
 
-            Write(typename Corona::Kernel::Utils::Storage<Slot>::WriteHandle handle, std::uint64_t generation)
+            Write(typename horizon::core::Storage<Slot>::WriteHandle handle, std::uint64_t generation)
                 : handle_(std::move(handle)), generation_(generation)
             {
             }
@@ -88,7 +88,7 @@ namespace Corona::Horizon
             [[nodiscard]] Resource& operator*() const noexcept { return *get(); }
 
         private:
-            typename Corona::Kernel::Utils::Storage<Slot>::WriteHandle handle_ {};
+            typename horizon::core::Storage<Slot>::WriteHandle handle_ {};
             std::uint64_t generation_ { 0 };
         };
 
@@ -317,7 +317,7 @@ namespace Corona::Horizon
             live_lock_.clear(std::memory_order_release);
         }
 
-        mutable Corona::Kernel::Utils::Storage<Slot> storage_ {};
+        mutable horizon::core::Storage<Slot> storage_ {};
         std::atomic<std::uint64_t> next_generation_ { 1 };
         mutable std::atomic_flag live_lock_ = ATOMIC_FLAG_INIT;
         std::vector<std::pair<std::uintptr_t, std::uint64_t>> live_handles_;

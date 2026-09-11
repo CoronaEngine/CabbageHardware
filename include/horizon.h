@@ -1154,7 +1154,11 @@ namespace Corona::Horizon
 }
 
 #ifndef HORIZON_NO_SHORT_NAMESPACE
-namespace horizon = Corona::Horizon;
+// Keep the legacy short names compatible with the real horizon::core namespace.
+namespace horizon
+{
+    using namespace Corona::Horizon;
+}
 #endif
 
 template <typename PipelineType>

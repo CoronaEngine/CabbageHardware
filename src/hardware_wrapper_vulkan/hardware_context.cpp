@@ -27,7 +27,7 @@
 #include <windows.h>
 #endif
 
-#include "corona/kernel/core/i_logger.h"
+#include "horizon/core/logging.h"
 #include "hardware_wrapper/diagnostics.h"
 #include "resource_pool.h"
 

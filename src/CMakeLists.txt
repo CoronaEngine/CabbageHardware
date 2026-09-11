@@ -15,18 +15,10 @@ if(HORIZON_BUILD_ENGINE)
         "${CMAKE_CURRENT_SOURCE_DIR}/hardware_wrapper_vulkan/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/hardware_wrapper_vulkan/*.c"
         "${CMAKE_CURRENT_SOURCE_DIR}/hardware_wrapper_vulkan/*.h"
-
-        "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.c"
-        "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.h"
     )
 
     set(PUBLIC_HEADERS
         "${PROJECT_SOURCE_DIR}/include/horizon.h"
-        "${PROJECT_SOURCE_DIR}/include/corona/kernel/core/i_logger.h"
-        "${PROJECT_SOURCE_DIR}/include/corona/kernel/utils/stack_trace.h"
-        "${PROJECT_SOURCE_DIR}/include/corona/kernel/utils/storage.h"
         "${PROJECT_SOURCE_DIR}/include/corona/pal/cfw_platform.h"
     )
 
@@ -41,6 +33,7 @@ if(HORIZON_BUILD_ENGINE)
     )
 
     target_link_libraries(Horizon PUBLIC
+        horizon-core
         Helicon
         quill::quill
         horizon::volk

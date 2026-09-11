@@ -1,4 +1,11 @@
+#ifdef HORIZON_TEST_ENGINE_LOGGING
+#include "horizon.h"
+#endif
 #include "core/util/logging.h"
+
+#ifdef HORIZON_TEST_LEGACY_LOGGING
+#include "horizon/core/logging.h"
+#endif
 
 #include <cstdio>
 #include <filesystem>
@@ -47,9 +54,14 @@ bool restore_stdout(int descriptor) {
 
 }// namespace
 
-int main() {
+int main(int argc, char**)
+{
     const std::filesystem::path output_path =
+#ifdef HORIZON_TEST_LEGACY_LOGGING
+        std::filesystem::current_path() / (argc > 1 ? "horizon-test-logging-legacy-first.log" : "horizon-test-logging-core-first.log");
+#else
         std::filesystem::current_path() / "horizon-test-core-logging.log";
+#endif
     std::filesystem::remove(output_path);
 
     const int original_stdout = duplicate_stdout();
@@ -65,6 +77,12 @@ int main() {
         return 1;
     }
 
+#ifdef HORIZON_TEST_LEGACY_LOGGING
+    if (argc > 1)
+    {
+        Corona::Kernel::CoronaLogger::initialize();
+    }
+#endif
     horizon::core::log_level_debug();
     horizon::core::debug("debug value ", 1);
     horizon::core::log_level_info();
@@ -74,6 +92,16 @@ int main() {
     horizon::core::info("suppressed info");
     horizon::core::log_level_error();
     horizon::core::warning("suppressed warning");
+#ifdef HORIZON_TEST_LEGACY_LOGGING
+    horizon::core::log_level_debug();
+    Corona::Kernel::CoronaLogger::set_log_level(Corona::Kernel::LogLevel::warning);
+    horizon::core::info("suppressed by legacy level");
+    horizon::core::log_level_error();
+    CFW_LOG_WARNING("suppressed by core level");
+    horizon::core::log_level_debug();
+    CFW_LOG_DEBUG("legacy formatted value {}", 42);
+    CFW_LOG_FLUSH();
+#endif
     horizon::core::log_level_debug();
     horizon::core::log_flush();
     std::fflush(stdout);
@@ -93,6 +121,16 @@ int main() {
            "Info messages are filtered at Warning level");
     expect(output.find("suppressed warning") == std::string::npos,
            "Warning messages are filtered at Error level");
+#ifdef HORIZON_TEST_LEGACY_LOGGING
+    expect(output.find("suppressed by legacy level") == std::string::npos,
+           "Legacy level changes also filter Core messages");
+    expect(output.find("suppressed by core level") == std::string::npos,
+           "Core level changes also filter legacy messages");
+    expect(output.find("legacy formatted value 42") != std::string::npos,
+           "Legacy macros share Core's level and preserve formatting");
+    expect(output.find("test_logging.cpp") != std::string::npos,
+           "Legacy macros preserve the caller's source location");
+#endif
     output_stream.close();
     std::filesystem::remove(output_path);
 

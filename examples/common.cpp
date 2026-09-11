@@ -12,7 +12,7 @@
 #include <exception>
 #include <span>
 
-#include "corona/kernel/core/i_logger.h"
+#include "horizon/core/logging.h"
 #include "hardware_wrapper_vulkan/hardware/execution.h"
 
 using namespace Corona::Horizon;

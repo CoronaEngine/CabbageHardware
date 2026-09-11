@@ -10,7 +10,7 @@
 #include <string_view>
 #include <variant>
 
-#include "corona/kernel/core/i_logger.h"
+#include "horizon/core/logging.h"
 
 #ifndef HORIZON_ENABLE_HARDWARE_VALIDATION
 #if defined(NDEBUG)

@@ -11,16 +11,22 @@ else()
 endif()
 
 add_library(horizon-core STATIC ${HEADER_FILES} ${SOURCE_FILES})
+target_sources(horizon-core PRIVATE
+    "${PROJECT_SOURCE_DIR}/include/horizon/core/logging.h"
+    "${PROJECT_SOURCE_DIR}/include/horizon/core/storage.h"
+    "${PROJECT_SOURCE_DIR}/include/horizon/core/stack_trace.h"
+)
 target_include_directories(horizon-core
     PUBLIC
     "${PROJECT_SOURCE_DIR}/src"
+    "${PROJECT_SOURCE_DIR}/include"
 )
 target_link_libraries(horizon-core PUBLIC
+    quill::quill
     $<$<TARGET_EXISTS:horizon::fmt>:horizon::fmt>
     $<$<TARGET_EXISTS:horizon::xxhash>:horizon::xxhash>
 )
 target_link_libraries(horizon-core PRIVATE
-    quill::quill
     ${CMAKE_DL_LIBS}
     $<$<PLATFORM_ID:Windows>:dbghelp>
 )

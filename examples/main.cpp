@@ -24,11 +24,35 @@
 #include "example_edsl_rsm/example_edsl_rsm.h"
 #include "example_edsl_sponza/example_edsl_sponza.h"
 
+#include "core/util/logging.h"
+
+#include <ctime>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <string_view>
 
 int main(int argc, char **argv)
 {
+    // Application policy: keep the timestamped file and crash flushing enabled.
+    const auto now = std::time(nullptr);
+    std::tm local_time {};
+#ifdef _WIN32
+    localtime_s(&local_time, &now);
+#else
+    localtime_r(&now, &local_time);
+#endif
+    std::ostringstream log_filename;
+    log_filename << std::put_time(&local_time, "%Y-%m-%d_%H-%M-%S") << "_corona.log";
+    horizon::core::LoggingOptions logging;
+    logging.file_path = std::filesystem::path { "logs" } / log_filename.str();
+    logging.install_signal_handlers = true;
+    logging.configure_utf8_console = true;
+#ifdef CORONA_LOG_LEVEL
+    logging.level = static_cast<horizon::core::LogLevel>(CORONA_LOG_LEVEL);
+#endif
+    horizon::core::initialize_logging(logging);
+
     const std::string_view mode = argc > 1 ? std::string_view(argv[1]) : std::string_view("sponza");
 
     if (mode == "baseline")

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+#include <cstdlib>
 #include <sstream>
 #include <string>
 
@@ -14,7 +16,7 @@
 #endif
 // clang-format on
 
-namespace Corona::Kernel::Utils {
+namespace horizon::core {
 
 /**
  * @brief 捕获当前线程的调用堆栈
@@ -144,4 +146,10 @@ inline std::string capture_stack_trace_light(int skip_frames = 1, int max_frames
 #endif
 }
 
+}  // namespace horizon::core
+
+// Source compatibility for callers still using the former function names.
+namespace Corona::Kernel::Utils {
+using horizon::core::capture_stack_trace;
+using horizon::core::capture_stack_trace_light;
 }  // namespace Corona::Kernel::Utils

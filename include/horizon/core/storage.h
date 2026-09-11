@@ -12,7 +12,7 @@
 #include <utility>
 #include <vector>
 
-#include "corona/kernel/core/i_logger.h"
+#include "horizon/core/logging.h"
 #include "corona/pal/cfw_platform.h"
 
 // 超时锁配置（用于死锁检测）
@@ -41,7 +41,7 @@
 #define CFW_ENABLE_LOCK_LOGGING 0  // 默认关闭，设为 1 则启用锁日志记录
 #endif
 
-namespace Corona::Kernel::Utils {
+namespace horizon::core {
 
 /**
  * @brief 线程安全的固定容量静态缓冲区
@@ -1044,4 +1044,10 @@ class Storage {
     std::atomic<std::size_t> buffer_count_{InitialBuffers};  ///< 当前 buffer 数量
 };
 
+}  // namespace horizon::core
+
+// Source compatibility for callers still using the former type names.
+namespace Corona::Kernel::Utils {
+using horizon::core::StaticBuffer;
+using horizon::core::Storage;
 }  // namespace Corona::Kernel::Utils
